@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions
+    url: https://github.com/stacktape/docstube/discussions
+    about: Questions, ideas, and general feedback
+  - name: Website & waitlist
+    url: https://docstube.dev
+    about: Follow progress and request early access
