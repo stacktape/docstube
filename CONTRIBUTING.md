@@ -10,7 +10,7 @@ There's no code to run yet. The most valuable contributions today are:
 
 ## Once the code lands
 
-A full development guide will live here. For context, docstube is a TypeScript project (Node), structured as a monorepo, using Vitest for tests and Oxlint/Oxfmt for lint + format. **CI does not call real AI agents** - tests run against recorded fixtures.
+A full development guide will live here. For context, docstube is a TypeScript project (Node), structured as a pnpm-workspaces monorepo, using Vitest for tests and Oxlint/Oxfmt for lint + format. **CI does not call real AI agents** - tests run against recorded fixtures.
 
 ## Pull requests
 

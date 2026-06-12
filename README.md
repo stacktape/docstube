@@ -47,7 +47,7 @@ docstube is being built in the open. Watch the repo and follow [Discussions](../
 - [ ] Local web UI (setup + review)
 - [ ] Incremental updates + GitHub Action
 - [ ] Docs site renderer (Astro)
-- [ ] First public preview
+- [ ] First public release
 
 ## Contributing
 

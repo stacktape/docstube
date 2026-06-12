@@ -25,6 +25,9 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
-# docstube local state (uncomment when code lands - never commit secrets or the local DB)
-# .docstube/cache/
-# .docstube/*.db
+# docstube local state (machine-only; manifest/criteria/instructions ARE committed)
+.docstube/db.sqlite*
+.docstube/cache/
+.docstube/runs/
+
+BUSINESS.md
