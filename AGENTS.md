@@ -34,6 +34,8 @@ Useful commands:
 ```bash
 pnpm install
 pnpm run validate
+pnpm run overnight:dry
+pnpm run overnight
 pnpm run typecheck
 pnpm run lint
 pnpm run test
@@ -43,6 +45,8 @@ pnpm run upg
 ```
 
 `validate` is the normal handoff command. Keep caches under `node_modules/.cache` when adding tools.
+`overnight` runs the ordered implementation queue from `tasks.md`; use `overnight:dry` to check
+the runner without calling agents or committing.
 
 Node-run TypeScript should use Node's built-in type stripping: run `node path/to/script.ts`
 directly, keep syntax erasable, use extensionful relative imports, and do not add `tsx`,
@@ -51,13 +55,27 @@ documented reason.
 
 ## Build order
 
-Implement sequentially per `PLAN.md` §21: S0 contracts first, then S1 through S9. Do not skip ahead
-into UI, adapters, or theme polish before S0 contracts are frozen and tested.
+Implement sequentially per `tasks.md`, which is derived from `PLAN.md`: S0 contracts first, then
+S1 through S9. Do not skip ahead into UI, adapters, or theme polish before S0 contracts and the
+walking skeleton are frozen and tested.
+
+The project infrastructure is already in place: workspace layout, tooling, CI, deployment,
+release workflow, npm publishing, standalone binaries, Stacktape-hosted install scripts, and
+installer telemetry. Product implementation agents should not rework that infrastructure unless a
+task explicitly requires a narrow fix.
 
 TBD boundaries are hard boundaries. Do not implement or improvise screenshot capture,
 migration-import, hosted-backend internals, or additional agent adapters beyond the built-in four.
 Marketing-web implementation lives in `apps/web` and is handled by another agent/workstream; leave
 only infrastructure placeholders unless explicitly assigned that work.
+
+When running the overnight queue:
+
+- `tasks.md` is the ordered task list.
+- `.docstube-build/` contains runner logs and resume state and is intentionally ignored.
+- Each task should produce a focused commit.
+- If a task fails review repeatedly, inspect `.docstube-build/logs/`, fix manually or adjust the
+  task, then rerun; the runner resumes at the failed task.
 
 ## Package layout
 

@@ -18,6 +18,14 @@
       "@docstube/web-ui": ["./apps/local-ui/src/main.tsx"]
     }
   },
-  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx", "*.config.ts", "stacktape.ts"],
-  "exclude": ["node_modules", "dist", "build", "coverage", ".docstube"]
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "*.config.ts",
+    "stacktape.ts",
+    "run-overnight.ts"
+  ],
+  "exclude": ["node_modules", "dist", "build", "coverage", ".docstube", ".docstube-build"]
 }

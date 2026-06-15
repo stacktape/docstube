@@ -32,5 +32,6 @@ Thumbs.db
 .docstube/db.sqlite*
 .docstube/cache/
 .docstube/runs/
+.docstube-build/
 
 BUSINESS.md

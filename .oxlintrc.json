@@ -9,7 +9,15 @@
     "browser": true,
     "node": true
   },
-  "ignorePatterns": ["node_modules/**", "dist/**", "build/**", "coverage/**", ".docstube/**", "packages/*/dist/**"],
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    "coverage/**",
+    ".docstube/**",
+    ".docstube-build/**",
+    "packages/*/dist/**"
+  ],
   "options": {
     "maxWarnings": 0
   },

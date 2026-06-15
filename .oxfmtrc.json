@@ -8,6 +8,7 @@
     "build/**",
     "coverage/**",
     ".docstube/**",
+    ".docstube-build/**",
     "pnpm-lock.yaml",
     "PLAN.md",
     "BUSINESS.md"
