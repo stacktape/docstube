@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
@@ -53,11 +53,105 @@ const createTarGz = async ({ archivePath, cwd }: { archivePath: string; cwd: str
   await tar.c({ cwd, file: archivePath, gzip: true, portable: true }, ['.']);
 };
 
+const crcTable = Array.from({ length: 256 }, (_, index) => {
+  let crc = index;
+  for (let bit = 0; bit < 8; bit += 1) {
+    crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+  }
+  return crc >>> 0;
+});
+
+const crc32 = (buffer: Buffer) => {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+};
+
+const uint16 = (value: number) => {
+  const buffer = Buffer.allocUnsafe(2);
+  buffer.writeUInt16LE(value, 0);
+  return buffer;
+};
+
+const uint32 = (value: number) => {
+  const buffer = Buffer.allocUnsafe(4);
+  buffer.writeUInt32LE(value, 0);
+  return buffer;
+};
+
 const createZip = async ({ archivePath, cwd }: { archivePath: string; cwd: string }) => {
-  const powershellCommand = `Compress-Archive -Path ${JSON.stringify(join(cwd, '*'))} -DestinationPath ${JSON.stringify(
-    archivePath
-  )} -Force`;
-  await run('powershell', ['-NoProfile', '-Command', powershellCommand]);
+  const fileNames = (await readdir(cwd, { withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .toSorted();
+  const files = await Promise.all(
+    fileNames.map(async (fileName) => ({
+      content: await readFile(join(cwd, fileName)),
+      fileName
+    }))
+  );
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let offset = 0;
+
+  for (const { content, fileName } of files) {
+    const nameBuffer = Buffer.from(fileName);
+    const checksum = crc32(content);
+    const localHeader = Buffer.concat([
+      uint32(0x04034b50),
+      uint16(20),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(checksum),
+      uint32(content.length),
+      uint32(content.length),
+      uint16(nameBuffer.length),
+      uint16(0),
+      nameBuffer
+    ]);
+    const centralHeader = Buffer.concat([
+      uint32(0x02014b50),
+      uint16(20),
+      uint16(20),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(checksum),
+      uint32(content.length),
+      uint32(content.length),
+      uint16(nameBuffer.length),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint16(0),
+      uint32(0),
+      uint32(offset),
+      nameBuffer
+    ]);
+
+    localParts.push(localHeader, content);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + content.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const endOfCentralDirectory = Buffer.concat([
+    uint32(0x06054b50),
+    uint16(0),
+    uint16(0),
+    uint16(fileNames.length),
+    uint16(fileNames.length),
+    uint32(centralDirectory.length),
+    uint32(offset),
+    uint16(0)
+  ]);
+
+  await writeFile(archivePath, Buffer.concat([...localParts, centralDirectory, endOfCentralDirectory]));
 };
 
 const writeSha256 = async (filePath: string) => {
@@ -90,7 +184,6 @@ const main = async () => {
     executablePath,
     '--compress',
     'Brotli',
-    '--no-bytecode',
     '--fallback-to-source'
   ]);
 
