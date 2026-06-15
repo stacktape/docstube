@@ -1,0 +1,33 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error",
+    "perf": "warn",
+    "suspicious": "warn"
+  },
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "ignorePatterns": ["node_modules/**", "dist/**", "build/**", "coverage/**", ".docstube/**", "packages/*/dist/**"],
+  "options": {
+    "maxWarnings": 0
+  },
+  "overrides": [
+    {
+      "files": ["packages/web-ui/**/*.tsx"],
+      "plugins": ["react", "jsx-a11y", "typescript"],
+      "rules": {
+        "react-in-jsx-scope": "off"
+      }
+    },
+    {
+      "files": ["**/*.spec.ts", "**/*.spec.tsx"],
+      "plugins": ["vitest", "typescript"]
+    }
+  ],
+  "plugins": ["import", "typescript", "unicorn"],
+  "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error", "info", "time", "clear"] }]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@docstube/verifiers",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/verifiers.mjs",
+      "types": "./dist/verifiers.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/verifiers.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@mdx-js/mdx": "^3.1.1",
+    "@terrastruct/d2": "^0.1.33",
+    "zod": "^4.4.3"
+  }
+}

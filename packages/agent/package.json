@@ -1,0 +1,24 @@
+{
+  "name": "@docstube/agent",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/agent.mjs",
+      "types": "./dist/agent.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/agent.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "execa": "^9.6.1",
+    "zod": "^4.4.3"
+  }
+}

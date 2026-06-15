@@ -1,0 +1,21 @@
+{
+  "name": "@docstube/skills",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src/**/*.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/skills.mjs",
+      "types": "./dist/skills.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/skills.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  }
+}

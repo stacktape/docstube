@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@docstube/action": ["./apps/github-action/src/github-action.ts"],
+      "@docstube/agent": ["./packages/agent/src/agent.ts"],
+      "@docstube/cli": ["./apps/cli/src/cli.ts"],
+      "@docstube/codemap": ["./packages/codemap/src/codemap.ts"],
+      "@docstube/contracts": ["./packages/contracts/src/contracts.ts"],
+      "@docstube/core": ["./packages/core/src/core.ts"],
+      "@docstube/extractors": ["./packages/extractors/src/extractors.ts"],
+      "@docstube/install-events": ["./apps/install-events/src/install-events.ts"],
+      "@docstube/skills": ["./packages/skills/src/skills.ts"],
+      "@docstube/theme": ["./packages/theme/src/theme.ts"],
+      "@docstube/verifiers": ["./packages/verifiers/src/verifiers.ts"],
+      "@docstube/web": ["./apps/web/src/web.ts"],
+      "@docstube/web-ui": ["./apps/local-ui/src/main.tsx"]
+    }
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "packages/**/*.tsx", "*.config.ts", "stacktape.ts"],
+  "exclude": ["node_modules", "dist", "build", "coverage", ".docstube"]
+}

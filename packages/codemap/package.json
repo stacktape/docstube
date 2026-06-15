@@ -1,0 +1,24 @@
+{
+  "name": "@docstube/codemap",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/codemap.mjs",
+      "types": "./dist/codemap.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/codemap.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.26.9",
+    "zod": "^4.4.3"
+  }
+}

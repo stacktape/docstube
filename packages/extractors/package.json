@@ -1,0 +1,24 @@
+{
+  "name": "@docstube/extractors",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/extractors.mjs",
+      "types": "./dist/extractors.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/extractors.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "typedoc": "^0.28.19",
+    "zod": "^4.4.3"
+  }
+}

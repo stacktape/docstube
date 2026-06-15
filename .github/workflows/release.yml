@@ -1,0 +1,161 @@
+name: Release
+run-name: Release ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version, for example 1.2.3 or 1.2.3-beta.1
+        required: true
+        type: string
+      prerelease:
+        description: Mark the GitHub release and npm publish as prerelease
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run validate
+
+  build-binaries:
+    name: Build ${{ matrix.platform }} binary
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            os: ubuntu-latest
+          - platform: linux-arm64
+            os: ubuntu-latest
+          - platform: macos-x64
+            os: macos-13
+          - platform: macos-arm64
+            os: macos-latest
+          - platform: windows-x64
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run release:set-version -- --version ${{ inputs.version }}
+      - run: pnpm run release:binary -- --version ${{ inputs.version }} --platform ${{ matrix.platform }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.platform }}
+          path: |
+            dist-release/*.tar.gz
+            dist-release/*.zip
+            dist-release/*.sha256
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run release:set-version -- --version ${{ inputs.version }}
+      - run: pnpm run build:cli
+      - run: pnpm run release:install-scripts -- --version ${{ inputs.version }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binary-*
+          path: dist-release/artifacts
+          merge-multiple: true
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          mkdir -p dist-release/upload
+          find dist-release/artifacts -maxdepth 1 -type f -exec cp {} dist-release/upload/ \;
+          cp dist-release/install-scripts/* dist-release/upload/
+          cd dist-release/upload
+          : > SHA256SUMS
+          for asset in docstube-v*.tar.gz docstube-v*.zip *.sh *.ps1; do
+            if [ -f "$asset" ]; then
+              sha256sum "$asset" >> SHA256SUMS
+            fi
+          done
+      - name: Commit version bump
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json apps/*/package.json packages/*/package.json packages/core/src/core.ts
+          git commit -m "release: v${{ inputs.version }}"
+          git push
+      - name: Publish npm package
+        shell: bash
+        run: |
+          TAG_ARG=""
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            TAG_ARG="--tag $(echo "${{ inputs.version }}" | sed -E 's/^[0-9]+\.[0-9]+\.[0-9]+-([a-z]+)\.[0-9]+$/\1/')"
+          fi
+          pnpm publish apps/cli --provenance --access public --no-git-checks $TAG_ARG
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_sha="$(git rev-parse HEAD)"
+          prerelease_arg=""
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            prerelease_arg="--prerelease"
+          fi
+          gh release create "v${{ inputs.version }}" dist-release/upload/* \
+            --target "$release_sha" \
+            --title "v${{ inputs.version }}" \
+            --notes "Version ${{ inputs.version }}" \
+            $prerelease_arg
+      - name: Install Stacktape CLI
+        if: ${{ vars.DOCSTUBE_PUBLISH_INSTALL_SCRIPTS == 'true' }}
+        shell: bash
+        run: |
+          curl -L https://installs.stacktape.com/linux.sh | sh
+          echo "$HOME/.stacktape/bin" >> "$GITHUB_PATH"
+      - name: Publish Stacktape-hosted install scripts
+        if: ${{ vars.DOCSTUBE_PUBLISH_INSTALL_SCRIPTS == 'true' }}
+        env:
+          DOCSTUBE_INSTALL_SCRIPTS_RESOURCE: installScripts
+          DOCSTUBE_STACKTAPE_REGION: ${{ vars.DOCSTUBE_STACKTAPE_REGION }}
+          STACKTAPE_API_KEY: ${{ secrets.STACKTAPE_API_KEY }}
+        shell: bash
+        run: |
+          BUCKET_TYPE="production"
+          if [ "${{ inputs.prerelease }}" = "true" ]; then
+            BUCKET_TYPE="preview"
+          fi
+          pnpm run release:install-scripts:publish -- --version ${{ inputs.version }} --bucket-type "$BUCKET_TYPE"

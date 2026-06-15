@@ -62,8 +62,9 @@ Four layers:
    State & provenance (SQLite + `.docstube/`) → Deterministic verifier registry → Incremental
    engine (StateBackend seam).
 2. **Local control plane**: Hono server + Vite/React SPA (setup wizard + review UI), tRPC + WS.
-3. **Output artifact**: user-owned Astro docs site; theme + component registry delivered as a
-   versioned npm dependency (`@docstube/theme`) with per-component eject.
+3. **Output artifact**: user-owned Astro docs site; theme + component registry source is
+   generated into the user's repo so the docs site is self-contained and deployable to any static
+   host. docstube can later update that generated theme code without regenerating content.
 4. **GitHub Action**: wraps `docstube update`; opens PRs with only the affected pages.
 
 ## 4. Monorepo & stack
@@ -72,7 +73,7 @@ Four layers:
 |---|---|---|
 | Language / runtime | TypeScript on Node (current LTS) | |
 | Package manager | pnpm workspaces **⚑ default** | + Changesets for versioning/release |
-| CLI binary | `@yao-pkg/pkg` with `--sea` | handles native addons (better-sqlite3); cross-compiles |
+| CLI binary | `@yao-pkg/pkg` | GitHub/install-script distribution is standalone and does not require user Node |
 | CLI startup | lazy-load command modules (dynamic `import()`); heavy deps never on hot path; `NODE_COMPILE_CACHE`; bundle with tsdown/Rolldown | "snappy CLI" requirement |
 | DB | better-sqlite3 + Drizzle | revisit `node:sqlite` when stable |
 | Schemas/contracts | Zod everywhere | config, agent I/O, registry props, tRPC |
@@ -87,13 +88,27 @@ Four layers:
 | Lint/format | Oxlint + Oxfmt | fall back to Prettier/Biome without ceremony if Oxfmt (alpha) bites |
 | Telemetry | PostHog, opt-out, anonymous | §18 |
 
-**Packages** (`packages/`): `cli`, `core` (orchestrator, pipeline, config, state),
-`agent` (**published standalone as `@docstube/agent`** — the adapter abstraction is a deliberate
-ecosystem play), `verifiers`, `codemap` (tree-sitter structural map + language plugins),
-`extractors` (API-reference extractors), `theme` (`@docstube/theme`), `web-ui`, `action`,
-`skills` (shipped SKILL.md sources), and `website` (the public marketing site — Astro +
-Tailwind, lives in the same monorepo, deployed via Stacktape). **⚑ default** layout;
-merge/split pragmatically.
+**Workspace layout.** Reusable/published units live in `packages/`; runnable surfaces live in
+`apps/`.
+
+**Packages** (`packages/`): `contracts` (S0 Zod schemas, shared types, IDs, result taxonomies,
+and public contract snapshots), `core` (orchestrator, pipeline, config loading, state, local
+server wiring), `agent` (intended future standalone package once the adapter contract is stable),
+`verifiers`, `codemap` (tree-sitter structural map + language plugins), `extractors`
+(API-reference extractors), `theme` (internal source for generated/ejected theme code), `skills`
+(shipped SKILL.md sources).
+
+**Apps** (`apps/`): `cli` (the published `docstube` npm package and binary entry source),
+`local-ui` (Vite/React localhost control plane), `github-action`, and `web` (public marketing website). The `web` app is kept in
+the workspace so shared tooling and dependency policy apply, but its implementation is handled
+by another agent/workstream; product implementation agents should not spend project-build time
+on marketing-web features unless explicitly assigned.
+
+**Publishing policy.** Initial public npm publishing is intentionally narrow: publish `docstube`
+only. Internal workspace packages stay private until a concrete external contract exists.
+`@docstube/agent` is the likely next public package, but not before S0/S3 adapter contracts have
+stabilized. The generated docs theme is vendored/ejected into user repos, so `@docstube/theme`
+is not required as a public runtime dependency in v1.
 
 ## 5. Config: the `docstube.yml` family
 
@@ -120,10 +135,15 @@ site:
   description: One-line tagline        # + logo, favicon, og-image, base URL (SEO/meta)
 context: |
   Short free-text project context.
-sources:                               # existing docs as context — code stays ground truth (§9.1)
-  - { type: files, path: ./old-docs/ }
-  - { type: url,   url: https://old-docs.example.com }
-  - { type: mcp,   server: confluence } # user's own MCP server, enabled via the agent CLI
+sources:                               # import / starting context — code stays ground truth (§9.1)
+  reference:                           # → feeds docs writer + IA
+    - { type: files, path: ./old-docs/ }
+    - { type: files, path: ./openapi.yaml }
+    - { type: git,   repo: git@github.com:acme/docs.git }   # Mode 2: private clone (token from env)
+    - { type: mcp,   server: confluence }                   # Mode 1: user's own connector
+  intent:                              # → feeds changelog "why" (offered, not forced)
+    - { type: mcp,   server: jira }
+    - { type: files, path: ./docs/adr/ }
 personas:
   - id: junior-dev
     description: Mid-level dev, no AWS experience
@@ -142,6 +162,11 @@ components:
 structure: ./docs/ia.yml               # references, not inlined
 glossary: ./docs/glossary.yaml
 output: ./docs-site                    # scaffolded Astro site dir
+seo:
+  siteUrl: https://docs.example.com    # enables canonical URLs + sitemap; meta/OG/FAQ on by default
+changelog:
+  range: tags                          # how to pick the version range
+  sources: [{ type: mcp, server: jira }]   # optional "why" context (user's own MCP server)
 # screenshots: {}                      # RESERVED — TBD capability, schema accepts object, unused
 ```
 
@@ -254,6 +279,15 @@ guarantees are made today so adding them later is additive, never breaking:
    is designed so new adapters (including, later, third-party adapter packages) register without
    touching core.
 
+**Permissions & sandboxing (first-class adapter contract):** every invocation declares
+**writable roots** (the docs output dir + `.docstube/` scratch only) and read-only source;
+non-interactive/auto-approve flags are mandatory (a hung permission prompt is a bug);
+per-adapter mapping to vendor permission/sandbox flags. Enforcement depth varies by vendor, so
+docstube adds its own **post-run guard**: after every agent step, a `git status` check verifies
+no source file outside the writable roots was mutated — a dirty tree outside allowed paths
+fails the step. **Before S3 begins, re-verify all vendor CLI facts (flags, JSON modes, MCP
+support, subscription terms) from primary sources** — they are perishable.
+
 Cross-cutting requirements: parse only structured JSON/JSONL output (never scrape human text);
 pin + detect CLI versions at runtime; per-vendor rate-limit handling; robust timeouts with child
 process kill; **content-addressed caching of every agent step** keyed by
@@ -292,7 +326,10 @@ Principles (all implemented, all measured):
    components skill is **generated per project** from registry metadata × the `enabled` list.
 5. **Adapters own delivery policy; evals own truth.** Skill paths differ per agent
    (`.claude/skills/`, `.agents/skills/`, Gemini's dir) — materialized at run start, gitignored,
-   cleaned up. If an agent's skill activation proves unreliable, its adapter inlines bodies
+   cleaned up. **Materialization is
+   non-destructive**: docstube writes only into a namespaced subfolder (`docstube-*`) with an
+   ownership marker file, never overwrites or deletes files it doesn't own, and cleanup
+   removes only marker-owned entries. If an agent's skill activation proves unreliable, its adapter inlines bodies
    instead. Eval suite runs context ablations (skill-on/off, index-vs-inline); **retry rate is
    the health metric** that promotes/demotes content between tiers.
 
@@ -302,24 +339,67 @@ Shipped skills: `d2-diagrams` (guide + few-shot + validation script), `docstube-
 (generated), `docstube-writing`. The `d2-diagrams` skill is **also published standalone** to
 skills directories/marketplaces with docstube attribution (top-of-funnel).
 
-### 9.1 External sources (existing docs, Confluence, internal wikis, MCP)
+### 9.1 Import / starting context (existing docs + intent sources)
 
-A typed `sources:` list in config: `files` (local paths), `url`, and `mcp` (a named MCP server).
-Delivery follows the BYO philosophy — **docstube implements no MCP client**: all three
-vendor CLIs support MCP natively, so the adapters simply enable the **user's own configured MCP
-servers** for writer/IA-proposer runs, and prompts instruct when to consult them (Confluence,
-internal wikis, ticket systems — whatever the user already has wired up). MCP/URL reads are
-observed through the same tool-event stream as file reads and recorded in provenance as
-**external dependencies**; since external content can't be hash-diffed like code, pages
-depending on it are swept by the periodic re-verification pass (§13.3).
+**Purpose.** "Import" pulls in existing material as *starting context* — it helps the writer
+make better decisions and seeds the initial navigation, but it never bypasses verification. It
+is **scaffolding, not foundation**: most valuable on first generation (shaping the IA and first
+drafts) and intentionally **decaying** in relevance as docstube's own verified docs surpass the
+old ones.
 
-**Conflict rule: code is ground truth.** Existing docs inform structure, terminology, and intent
-— they are *claims to verify*, never authority. When an existing doc contradicts the code, the
-code wins and the discrepancy is recorded as a finding. These discrepancies surface as a
-**"drift report"** — "your existing docs disagree with your code in N places" — a near-free
-byproduct of verification and a strong demo/launch artifact. Full migration-import (content
-reuse, URL/redirect preservation, platform importers) remains **TBD**; the sources framework is
-context-only.
+**Two kinds of context (same loaders, different consumers):**
+- **Reference context** (what the docs should *say*): existing docs, READMEs/Markdown, internal
+  wikis, and **OpenAPI/Swagger specs** (gold-standard structured input for API docs). → feeds
+  the **docs** writer + IA proposer.
+- **Intent / "why" context** (why things shipped): **Jira, Linear, GitHub Issues, PR
+  descriptions, ADRs**. → feeds the **changelog** pipeline (§15.5). Poor for the docs body, ideal
+  for explaining a release.
+Both are **offered to the agent, never forced** — consistent with §9 (knowledge is made
+available; the agent pulls what it needs).
+
+**Three delivery modes, organized by who handles credentials** (a typed `sources:` list in
+config):
+
+| Mode | Where the data is | Credentials | docstube's job |
+|---|---|---|---|
+| **1. User's MCP** | behind a connector the user already runs (Confluence, Jira, Linear…) | the user's MCP server owns auth — **not docstube's concern** | enable it on the run; prompt the agent that it may consult it |
+| **2. docstube fetches** | a private remote (private git repo, authenticated export) | **request a token / SSO from the user** | fetch/clone with provided creds, then digest |
+| **3. Already on disk** | the repo being documented, or another local repo | none | read files (a glob) |
+
+Notes: **Mode 1** needs no integration code — all three vendor CLIs speak MCP, so docstube
+implements **no MCP client**; it just enables the user's own servers (this is the right path for
+anything behind serious enterprise auth). **Mode 3** is the common case (most "docs" are a README
+plus a few `.md` files). **Mode 2** is, for v1, **authenticated git/URL fetch (private repo
+clone with a token)** — the realistic 90%; deep SSO flows to arbitrary platforms are "later, only
+if asked," since such systems are better reached via Mode 1. **Website/HTML scraping is
+explicitly out of scope** — docs are generated *from* a source (Markdown/MDX/OpenAPI) the user
+can point at directly, so recovering HTML is solving a non-problem.
+
+**Lifecycle — digest, not copy, not RAG.** On import, raw content is fetched into a temp
+location for that run and **discarded after**; an agent distills each source into a **structured
+digest** — key facts, terminology/glossary candidates, the old navigation structure, and notable
+claims, each with provenance — and *that* persists in `.docstube/` (small, re-feedable on later
+runs, explicitly labeled "what the old source said at import time," so it decays gracefully).
+**No permanent verbatim copy** (it goes stale and competes with the real docs for "truth") and
+**no vector/RAG index** — a bounded, front-loaded body of text doesn't justify that machinery,
+and this matches the agentic-over-RAG decision in §12 (heavy semantic retrieval stays a
+hosted-tier concern, out of the free core).
+
+**Credential rule (Mode 2).** Any token or login is used only for the fetch and lives in
+env/keychain — never in config, the digest, state, transcripts, telemetry, or generated output
+(same iron rule as screenshot creds, §19).
+
+**Provenance & freshness.** MCP/remote reads are observed through the same tool-event stream as
+file reads and recorded as **external dependencies**; since external content can't be hash-diffed
+like code, pages depending on it are swept by the periodic re-verification pass (§13.3).
+
+**Conflict rule: code is ground truth.** Imported material is *untrusted, possibly-stale input*
+— it informs structure, terminology, and intent but is never authority. When it contradicts the
+code, the code wins and the discrepancy surfaces in the **drift report** ("your existing docs
+disagree with your code in N places") — a near-free byproduct of verification and a strong
+launch artifact. Importing therefore *improves on* the old docs by catching their errors rather
+than laundering them forward. Full migration-import (content reuse, URL/redirect preservation,
+platform importers) remains **TBD**; this framework is **context-only**.
 
 ## 10. Pipeline
 
@@ -382,6 +462,23 @@ Review-UI feedback → categorizer agent → routed to exactly one home: a crite
 glossary entry, or a config change. All versioned; all applied next run. This is the only
 mechanism for persistent feedback — no ever-growing prompt blob.
 
+### 10.7 Stable identifiers (S0 contract)
+- **Page IDs**: every IA node carries an immutable `id` (in `ia.yml`), independent of
+  title/slug. Jobs, provenance, findings, feedback, and cross-references key off it; slugs are
+  derived and renameable (with redirects) without breaking identity.
+- **Section IDs**: generated pages carry stable per-section IDs via a defined MDX marker
+  convention + page frontmatter schema (both S0 contracts). On regeneration, the writer
+  receives the previous page and **must preserve existing section IDs** for surviving
+  sections; new sections get new IDs. A deterministic check enforces presence + uniqueness.
+  Section IDs anchor per-section provenance citations, per-section feedback, and future
+  surgical regeneration.
+- **Element-level identity is deliberately NOT durable.** Arbitrary elements can't keep
+  identity across LLM regeneration without absurdly constraining the writer. Element feedback
+  is captured as *section ID + ephemeral descriptor* (component type/index + text snippet at
+  capture time) — durable only as context inside the routed feedback record. This is
+  sufficient because feedback's durable form is the routed artifact (criteria/instruction/
+  glossary/config), not an annotation pinned to an element.
+
 ## 11. Deterministic verifiers
 
 Pluggable registry (`@docstube/verifiers`), run after each page generation, **before** any LLM
@@ -396,6 +493,15 @@ judge spends a token; their failures are hard gates and drive the escalating-ret
 - D2 compilation (via `@terrastruct/d2`).
 - Vale prose linting **⚑ default** (style/terminology), config shipped with the theme.
 - Glossary integrity: referenced terms exist; duplicate/orphan detection.
+
+**Execution model & failure taxonomy (S0 contract).** v1 verifiers are **static-only** — code
+samples are type-checked and import-resolved (tsc, pyright), never *executed*; doctest-style
+execution is a future capability. This keeps the sandbox burden low; remaining hygiene:
+per-check timeouts, temp-dir isolation, no network during checks. Every check returns a
+structured result from a fixed taxonomy: `pass` / `fail` (gates, with finding) / `warn`
+(non-gating) / `skipped` (unsupported language/feature — never a failure) / `error` (the
+verifier itself crashed — logged + telemetry, retried once, never counted as a page failure).
+Each verifier ships with fixture repos exercising all five outcomes.
 
 ## 12. Code understanding (`@docstube/codemap`)
 
@@ -438,12 +544,17 @@ regenerate or flag — never silently leave a page stale.**
 ### 13.4 The StateBackend seam
 ```ts
 interface StateBackend {
-  resolveDirty(manifest, changedSymbols): { dirtyPages, reasons }
-  pushState(runId, state): void
-  pullState(runId): state
-  recordOutcome(event): void   // fire-and-forget
+  // Async from S0 (the remote implementation crosses the network); versioned via a
+  // capabilities handshake so old clients and new backends negotiate cleanly.
+  capabilities(): Promise<{ version: string; features: string[] }>
+  resolveDirty(manifest, changedSymbols): Promise<{ dirtyPages, reasons }>
+  pushState(runId, state): Promise<void>
+  pullState(runId): Promise<state>
+  recordOutcome(event): Promise<void>   // fire-and-forget semantics, still awaitable
 }
 ```
+`LocalBackend` may be synchronous internally (better-sqlite3) but conforms to the async
+contract. A single contract test suite runs against every implementation.
 `LocalBackend` (default, fully functional, this plan). `RemoteBackend` (hosted tier, later):
 same interface over the tRPC `v1` frozen contract; auth via API token; version header;
 **graceful fallback to LocalBackend when unreachable**. Section-level semantic regeneration and
@@ -452,15 +563,18 @@ learned relevance gating are hosted-tier concerns — out of scope here.
 ## 14. Output artifact
 
 ### 14.1 Site & theme delivery
-`docstube generate` scaffolds a thin Astro site into `output:` containing only content + config
-+ token overrides; the theme and registry come from **`@docstube/theme`** (dependency-style,
-Starlight-like) so fixes/components flow via npm and the generator always knows the component
-set of a given version. **Per-component eject** (shadcn-style) is the escape hatch for deep
-customization. Pagefind search at build. Static output; user-owned deploy to any static host
-— the wizard and docs ship **first-class deploy recipes**, including Stacktape
-(`hostingContentType: 'astro-static-website'`), optionally scaffolding a ready `stacktape.yml`
-for the docs site. The theme renders a small **"Generated by docstube" footer credit** —
-default on, disableable via `theme.attribution: false` — the standard OSS virality channel.
+`docstube generate` scaffolds a self-contained Astro site into `output:` containing content,
+config, token overrides, and the generated theme/component source needed to build the site. The
+theme package in this monorepo is an internal source/template for that generated code, not a
+required public dependency of the user's docs site. Theme updates happen when the user installs
+a newer docstube and runs a dedicated theme/update command, or when the GitHub Action runs a
+newer docstube version (for example `latest`) with automatic theme updates enabled. Updates must
+avoid regenerating documentation content unless explicitly requested. Static output; user-owned
+deploy to any static host — the wizard and docs ship **first-class deploy recipes**, including
+Stacktape (`hostingContentType: 'astro-static-website'`), optionally scaffolding a ready
+`stacktape.yml` for the docs site. The theme renders a small **"Generated by docstube" footer
+credit** — default on, disableable via `theme.attribution: false` — the standard OSS virality
+channel.
 
 ### 14.2 Layout archetypes
 Invariant: left nav + right in-page TOC. Two archetypes, chosen by the IA step, declared in
@@ -496,7 +610,20 @@ upgrades every page with zero regeneration. Renders via `Term` (dotted underline
 keyboard-accessible); auto-generated Glossary page; feeds llms.txt.
 
 ### 14.6 LLM-ready output
-`llms.txt` + `llms-full.txt` are generated at site build; an MCP server serving the docs is part of the same output surface.
+`llms.txt` + `llms-full.txt` are generated at site build; an MCP server serving the docs is
+part of the same output surface.
+
+### 14.7 SEO & AEO
+Two layers, both in scope. **Technical (automatic, in the theme/build):** per-page meta tags,
+`sitemap.xml`, canonical URLs, Open Graph / social-card images, and structured data — ordinary
+SEO hygiene, cheap because Astro static output is already fast and crawlable. **Content
+(the writer agent produces it):** AI assistants disproportionately quote question-and-answer
+shaped content, so the writer is guided to use **question-style headings** ("How do I…",
+"Why does…") with a one-sentence answer directly under each before the details, and to add a
+short **FAQ section** (real developer questions, phrased as the persona would ask them) where
+appropriate. FAQ answers are claims like any other prose — fact-checked by the verifiers, so the
+AEO content carries no trust compromise. (`llms.txt` above is the machine-readable half of AEO;
+this is the human-readable half.)
 
 ## 15. GitHub Action
 
@@ -506,6 +633,51 @@ re-runs converge. Agent credentials/API keys come from runner secrets. Concurren
 worktrees / atomic job claims — parallel runs must not corrupt shared state. The **portable
 manifest** (committed) is the state shared between local runs and CI; the SQLite binary is not
 committed.
+
+## 15.1 Release distribution
+
+Two install paths are supported:
+
+1. **npm:** the `docstube` package is published as a Node-based CLI for users who already use
+   Node/npm/pnpm. It requires the declared Node LTS baseline and runs the compiled JS CLI
+   directly. It does **not** download or wrap the standalone binary.
+2. **Standalone binary:** GitHub Releases contain `@yao-pkg/pkg`-built binaries for Linux x64,
+   Linux arm64, macOS x64, macOS arm64, and Windows x64, plus checksums and install scripts.
+   This is the canonical path for non-JS/TS projects and does not require Node on the user's
+   machine.
+
+Stacktape-hosted install scripts are the canonical public URLs, e.g.
+`https://installs.docstube.dev/linux.sh` and `https://installs.docstube.dev/windows.ps1`. Those
+small scripts download binaries from GitHub Releases. The same scripts are uploaded to each
+GitHub Release for transparency and reproducibility. Binaries stay hosted on GitHub Releases
+unless bandwidth/control becomes a reason to move them.
+
+Deployment infrastructure lives in root `stacktape.ts`: a static hosting bucket for
+`installs.docstube.dev`, a static hosting bucket for the public `docstube.dev` website, and a
+small public install-events Lambda behind `events.docstube.dev`. The install-events backend is
+open-source for transparency, but PostHog credentials are injected through Stacktape secrets and
+never committed.
+
+Release workflow: one validation job runs before release artifact creation; platform binary
+jobs depend on it and do not repeat full validation; the release job sets versions, publishes
+the `docstube` npm package with provenance, creates the GitHub Release, uploads binaries,
+checksums, and install scripts, and prepares/publishes the Stacktape-hosted scripts once that
+hosting bucket is configured. The release workflow is allowed to rerun validation even if `main`
+is already green because it creates privileged, immutable artifacts.
+
+## 15.5 Changelog generation
+
+A second use of the existing pipeline, pointed at history instead of a code snapshot. Given a
+range (two refs/tags), a writer agent reads the **git history**, groups changes, and writes a
+human-readable changelog; verifiers fact-check each entry **against the actual diffs** (same
+trust mechanism as docs). The **"why" context** arrives through the MCP pass-through (§9.1) —
+the user's own Jira/Linear/issue-tracker MCP server, enabled on the agent run, no new
+integration code from docstube. Two output flavors fall out naturally: a standard release
+changelog, and a **"what changed in your docs"** summary that ties a release back to the pages
+docstube regenerated. Output is MDX in the docs site (and feeds `llms.txt`). Config: a
+`changelog:` block (range strategy, grouping, optional MCP sources); runnable on demand and from
+the GitHub Action. Code remains ground truth — the diff wins over any tracker note that
+contradicts it.
 
 ## 16. `.docstube/` layout **⚑ default**
 
@@ -541,6 +713,13 @@ PostHog; **opt-out**; disclosed meaningfully on first run; documented exactly; r
 error types, durations, adapter/model choice, retry rates. **Never:** code, repo contents,
 prompts, paths, project names, generated content.
 
+Installer telemetry is narrower than runtime CLI telemetry. Install scripts may report
+started/succeeded/failed, version, platform, installer name, source, duration, and a coarse
+error kind to `events.docstube.dev`; they must not send paths, usernames, hostnames, shell
+arguments, repository data, or source content. Events are forwarded server-side to PostHog as
+anonymous events without person profiles and with GeoIP disabled where supported. Installer
+telemetry is best-effort and must never fail installation.
+
 ## 19. Security & privacy
 
 - Secrets (agent API keys; later screenshot creds) live in env / OS keychain — never in config,
@@ -550,6 +729,10 @@ prompts, paths, project names, generated content.
   machines or other local users.
 - The Action consumes secrets only from the runner's secret store.
 - The hosted seam transmits hashes/manifests, not source (when it exists).
+- **Privacy wording rule (docs, README, marketing):** docstube never sends source to docstube
+  servers — but source context *is* sent to the user's **chosen AI provider** via their own
+  agents/API keys, exactly as in their normal agent usage. Never claim "your code is sent
+  nowhere"; claim "never to us; only to the provider you already use, on your own credentials."
 - `SECURITY.md` + GitHub private advisories (already in the repo bootstrap).
 
 ## 20. OSS project management
@@ -557,11 +740,14 @@ prompts, paths, project names, generated content.
 Already bootstrapped (README, LICENSE MIT, CONTRIBUTING, CoC, SECURITY, issue/PR templates).
 Additionally:
 - `AGENTS.md` canonical, `CLAUDE.md` symlinked; keep in sync with this plan's locked decisions.
-- Conventional Commits + Changesets; release workflow publishes packages + binaries.
+- Conventional Commits + Changesets; release workflow publishes the `docstube` npm package,
+  standalone binaries, checksums, and install scripts. Other workspace packages stay private
+  until deliberately promoted.
 - CI as in §17; plus schema-snapshot diff job for the hosted tRPC contract (§4).
 - Contributor surfaces by design: language plugins (§12), verifier plugins (§11), registry
   components (§14.3), adapters (§8). Label and document these as the on-ramps.
-- Standalone published packages as distribution: `@docstube/agent`, the `d2-diagrams` skill.
+- Standalone published packages later, once stable: likely `@docstube/agent` and the
+  `d2-diagrams` skill.
 
 ## 21. Build approach: full scope, one agent, sequential
 
@@ -573,27 +759,57 @@ docstube-operated free-hosting offer for OSS projects — parked for future desi
 together with premium pricing). TBD items stay out not for sequencing reasons but because they are undesigned:
 do not improvise them.
 
+**No phased releases ≠ no internal gates.** Each step S0–S9 has internal acceptance criteria
+and must close with fixture/demo proof before the next begins. Gates are engineering
+checkpoints, not public launches.
+
 **Step 0 — freeze the contracts.** Contracts-first remains the highest-value ordering rule even
-for one agent: define the shared contracts before any feature work — the Zod config-family
-schemas (`docstube.yml`, `ia.yml`, `glossary.yaml`), the findings schema, the `AgentAdapter`
-interface, the `StateBackend` interface, the registry component-metadata schema, the tRPC
-routers, and the `.docstube/` Drizzle schema. Every later step then codes against stable
-interfaces and is testable with mocks/fixtures before its dependencies exist.
+for one agent. The S0 contract set: the Zod config-family schemas (`docstube.yml`, `ia.yml`,
+`glossary.yaml`), the **findings** schema, the **criteria-checklist** schema, the **feedback
+record** schema, the **provenance manifest** schema (`manifest.yml` — it crosses the local/CI
+boundary), the **normalized adapter event** schema (tool-use + cost events across vendors), the
+**cache-key derivation spec**, the **deterministic-check result taxonomy** (§11), the
+**generated-page frontmatter + section-ID marker convention** and **page/section ID rules**
+(§10.7), the async versioned `StateBackend` (§13.4), the `AgentAdapter` interface (incl.
+permissions contract, §8), the registry component-metadata schema, the tRPC routers, and the
+`.docstube/` Drizzle schema. Every later step then codes against stable interfaces and is
+testable with mocks/fixtures before its dependencies exist.
+
+**S0 acceptance criteria (the first gate):**
+1. Every S0 schema implemented in Zod with exported types + valid/invalid fixture tests.
+2. JSON Schema generated for the config family, snapshot-tested; the reference `docstube.yml`
+   in §5 validates against it.
+3. YAML round-trip test: programmatic edit of a commented `docstube.yml` preserves comments
+   and formatting.
+4. tRPC routers typecheck; the `AppRouter` `.d.ts` snapshot + CI diff job exist.
+5. Drizzle migrations create a fresh DB; migration test passes.
+6. Async `StateBackend` contract test suite passes against a `LocalBackend` stub (the same
+   suite the future `RemoteBackend` must pass).
+7. `AgentAdapter` contract test passes against the mock/record-replay adapter; one recorded
+   fixture round-trips through it.
+8. Page/section ID validators exist; uniqueness/presence checks run.
+9. **Packaging smoke job** (runs in CI from S0 onward): @yao-pkg/pkg builds a minimal CLI with
+   better-sqlite3 + one lazy dynamic import for Linux/macOS/Windows — packaging risk is proven
+   early, not discovered at S8.
+10. **Walking skeleton (S0 exit demo):** fixture repo → replay adapter emits canned writer
+    output → one deterministic check → state lands in SQLite → page renders to HTML via a
+    minimal MDX compile (full theme comes in S4). The spine works end-to-end with zero real
+    agents.
 
 **Build order** (a topological order through the real dependencies; each step is finishable and
 testable in isolation):
 
 | Step | Contents | Why here |
 |---|---|---|
-| S0 | contracts & schemas (above) | everything depends on them |
+| S0 | contracts & schemas in `packages/contracts` (above) | everything depends on them |
 | S1 | codemap (tree-sitter, normalized hashes) + extractors (TypeDoc, griffe) | pure and deterministic; fixture-testable; feeds pipeline + incremental engine |
 | S2 | deterministic verifiers (MDX, props, tsc, pyright, imports, links, D2, Vale, glossary) | standalone; must exist before the pipeline can gate |
 | S3 | `@docstube/agent` adapters (Codex, Claude, Gemini, direct API) + usage caps + record/replay harness | unlocks all later pipeline work via replay fixtures |
-| S4 | theme + registry + glossary remark plugin + D2 build + llms.txt + docs-serving MCP server | independent of the pipeline; gives writer output a real render target |
-| S5 | orchestrator + pipeline (findings/gate/retry/refinement) + skills materialization & content + sources/MCP pass-through + drift report | integrates S1–S4 |
+| S4 | theme + registry + glossary remark plugin + D2 build + llms.txt + SEO/AEO (meta, sitemap, OG, structured data) + docs-serving MCP server | independent of the pipeline; gives writer output a real render target |
+| S5 | orchestrator + pipeline (findings/gate/retry/refinement) + skills materialization & content + import loaders (files/git/MCP) & digest + drift report + changelog generation + FAQ/AEO writer guidance | integrates S1–S4 |
 | S6 | incremental engine (provenance, normalized-hash detection, topology pass) + `LocalBackend` | builds on S1 + S5 state |
-| S7 | web UI: NavTree, wizard (incl. theming modes), generation dashboard, review UI + feedback subsystem | consumes the now-real tRPC surface |
-| S8 | CLI polish + binary packaging + telemetry; GitHub Action | thin shells over the core |
+| S7 | local UI (`apps/local-ui`): NavTree, wizard (incl. theming modes), generation dashboard, review UI + feedback subsystem | consumes the now-real tRPC surface |
+| S8 | CLI polish + binary packaging (`apps/cli`) + telemetry; GitHub Action (`apps/github-action`) | thin shells over the core |
 | S9 | eval suite + gold-set calibration + dogfood workflow (docstube's docs via docstube) | needs the integrated whole |
 
 **Definition of done (the north star):** a stranger runs `npx docstube generate` on their TS or
@@ -615,9 +831,9 @@ Python repo and gets a verified, beautiful docs site — and `docstube update` k
 ## 23. Decision log (one-liners)
 
 Name docstube / docstube.dev · MIT, BYO-compute, hosted tier later · Node LTS (not Bun) ·
-better-sqlite3+Drizzle · yao-pkg binary · pnpm+Changesets ⚑ · Hono · tRPC both seams (frozen v1 +
+better-sqlite3+Drizzle · yao-pkg binary for no-Node installs · pnpm+Changesets ⚑ · Hono · tRPC both seams (frozen v1 +
 .d.ts diff on hosted seam; oRPC fallback) · Vite/React/Tailwind UI · custom Astro theme,
-dependency-style + per-component eject · Pagefind ⚑ · `docstube.yml` YAML config + JSON Schema
+generated into user repos as self-contained source + updateable by docstube command/Action · Pagefind ⚑ · `docstube.yml` YAML config + JSON Schema
 (supersedes TS config) · comment-preserving YAML edits · Zod everywhere · Oxlint+Oxfmt ·
 Vitest + record/replay; live evals gated; dogfood · telemetry opt-out (PostHog) · findings model
 (criteria + blocker/major/minor; no raw scores; derived score ranks only) · deterministic
@@ -627,7 +843,7 @@ regen; topology pass · tier-1 TS/JS + Python; tiered elsewhere · API refs extr
 LLM-written · D2 only (WASM, sketch), text sources only · component registry as contract;
 consolidated initial set · glossary build-time auto-linking · layouts: single-tree | sectioned only ·
 skills: index-in-prompt/body-on-demand, role-scoped, executables-over-prose, adapter-owned
-delivery, eval-ablated · `@docstube/agent` + `d2-diagrams` skill published standalone ·
+delivery, eval-ablated · `@docstube/agent` + `d2-diagrams` skill are future standalone publishing surfaces after contracts stabilize ·
 NavTree reused 3 ways (IA edit / progress / review), in-flow not canvas · no node-graph canvas
 (CI-style step timelines; React Flow reserved for a future provenance explorer) ·
 generation dashboard streams finished pages for review; depth-first scheduling;
@@ -638,7 +854,13 @@ screenshots TBD (reserved keys only) · hosted internals out of scope · no mile
 scope built sequentially by one coding agent against frozen contracts (S0); released all at
 once · parked for future design: screenshots, migration-import, hosted backend, premium pricing,
 additional agent adapters (open-weight models; open agent-id + registry keep it additive),
-docstube-operated free hosting for OSS (badge-funded) · marketing website lives in the monorepo
-(`website`, Astro+Tailwind, deployed via Stacktape) · deploy recipes incl. Stacktape scaffold ·
+docstube-operated free hosting for OSS (badge-funded) · marketing website lives in `apps/web`
+and is handled by another agent/workstream, outside the product-build scope · deploy recipes incl. Stacktape scaffold ·
 "Generated by docstube" footer credit, default on, disableable · business context deliberately
-excluded from this public document (lives in gitignored BUSINESS.md).
+excluded from this public document (lives in gitignored BUSINESS.md) · changelog generation from git history (pipeline pointed at diffs; "why" via Jira/Linear MCP pass-through; diff is ground truth) · SEO/AEO: technical (meta/sitemap/OG/structured-data, automatic) + content (question-headings + FAQ sections, writer-produced, verified) · cross-repo search/impact analysis dropped from scope for now · import = starting context (reference→docs, intent→changelog; offered not forced); three modes by credential owner (user-MCP / docstube-fetch-private-git / on-disk); digest-not-copy-not-RAG; website scraping cut; migration-import still TBD · license stays MIT (idea-copying is defended by speed/community/brand/data-flywheel, not license terms) · review-driven (June
+2026): StateBackend async + versioned from S0 · page/section IDs are S0 contracts, element
+identity deliberately ephemeral · adapter permissions/sandboxing first-class + post-run
+git-status guard · verifiers static-only in v1 with a fixed result taxonomy · skills
+materialization non-destructive (namespaced + ownership markers) · internal acceptance gates
+per step (no *public* phases) · packaging smoke + walking skeleton from S0 · privacy wording
+rule ("never to us; only to your chosen provider") · marketing claims must map to mechanics.

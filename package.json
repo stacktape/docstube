@@ -1,0 +1,48 @@
+{
+  "name": "docstube-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=1 build",
+    "build:cli": "tsdown apps/cli/src/cli.ts --format esm --dts --clean --target node24 --workspace . --out-dir apps/cli/dist",
+    "changeset": "changeset",
+    "format": "oxfmt --write package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .oxlintrc.json .oxfmtrc.json stacktape.ts apps packages scripts .github/workflows",
+    "format:check": "oxfmt --check package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .oxlintrc.json .oxfmtrc.json stacktape.ts apps packages scripts .github/workflows",
+    "lint": "oxlint apps packages scripts stacktape.ts *.config.ts --no-error-on-unmatched-pattern",
+    "release": "changeset publish",
+    "release:binary": "node scripts/release/build-binary.ts",
+    "release:install-scripts": "node scripts/release/prepare-install-scripts.ts",
+    "release:install-scripts:publish": "node scripts/release/publish-install-scripts.ts",
+    "release:set-version": "node scripts/release/set-version.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "stacktape:deploy": "stacktape deploy --projectName docstube-web --stage production --region eu-west-1",
+    "stacktape:deploy:preview": "stacktape deploy --projectName docstube-web --stage preview --region eu-west-1",
+    "stacktape:compile": "stacktape compile-template --projectName docstube-web --stage production --region eu-west-1",
+    "upg": "taze",
+    "validate": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "validate:fix": "oxlint apps packages scripts stacktape.ts *.config.ts --fix --no-error-on-unmatched-pattern && pnpm run format && pnpm run validate",
+    "version-packages": "changeset version",
+    "deploy:prod": "stacktape deploy --projectName docstube --stage production --region eu-west-1"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@types/node": "^24.12.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "oxfmt": "^0.54.0",
+    "oxlint": "^1.69.0",
+    "stacktape": "^3.7.0",
+    "tar": "^7.5.2",
+    "taze": "^19.14.1",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=24.12.0",
+    "pnpm": ">=11.0.0"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

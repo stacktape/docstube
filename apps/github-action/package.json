@@ -1,0 +1,20 @@
+{
+  "name": "@docstube/action",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/github-action.mjs",
+      "types": "./dist/github-action.d.mts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/github-action.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  }
+}
