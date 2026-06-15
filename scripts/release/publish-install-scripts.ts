@@ -12,7 +12,7 @@ const parseArgs = () => {
   };
   return {
     bucketType: (getValue('bucket-type') || 'production') as BucketType,
-    projectName: getValue('project-name') || process.env.DOCSTUBE_STACKTAPE_PROJECT || 'docstube-web',
+    projectName: getValue('project-name') || process.env.DOCSTUBE_STACKTAPE_PROJECT || 'docstube',
     region: getValue('region') || process.env.DOCSTUBE_STACKTAPE_REGION || 'eu-west-1',
     resourceName: getValue('resource-name') || process.env.DOCSTUBE_INSTALL_SCRIPTS_RESOURCE || 'installScripts',
     sourceDir: getValue('source-dir') || 'dist-release/install-scripts',
