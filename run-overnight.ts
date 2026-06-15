@@ -56,10 +56,29 @@ const writeLog = (name: string, content: string) => {
   }
 };
 
-const run = (cmd: string, args: string[], input?: string) => {
+const tail = (text: string, maxChars = 12000) => {
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  return `[output truncated to last ${maxChars} characters]\n${text.slice(-maxChars)}`;
+};
+
+const commandFailureMessage = (cmd: string, args: string[], status: number | null, signal: string | null) => {
+  const signalText = signal ? `, signal ${signal}` : '';
+  return `${cmd} ${args.join(' ')} failed with exit code ${status}${signalText}.`;
+};
+
+const runResult = (cmd: string, args: string[], input?: string) => {
   if (DRY) {
     say(`  [dry-run] would run: ${cmd} ${args.join(' ')}`);
-    return cmd === 'codex' ? 'VERDICT: PASS' : '(dry-run output)';
+    return {
+      error: undefined,
+      ok: true,
+      output: cmd === 'codex' ? 'VERDICT: PASS' : '(dry-run output)',
+      signal: null,
+      status: 0
+    };
   }
 
   const result = spawnSync(cmd, args, {
@@ -72,18 +91,29 @@ const run = (cmd: string, args: string[], input?: string) => {
 
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
 
+  return {
+    error: result.error,
+    ok: !result.error && result.status === 0,
+    output,
+    signal: result.signal,
+    status: result.status
+  };
+};
+
+const run = (cmd: string, args: string[], input?: string) => {
+  const result = runResult(cmd, args, input);
+
   if (result.error) {
-    writeLog(`failed-${Date.now()}-${cmd}.log`, output || String(result.error));
+    writeLog(`failed-${Date.now()}-${cmd}.log`, result.output || String(result.error));
     throw result.error;
   }
 
-  if (result.status !== 0) {
-    writeLog(`failed-${Date.now()}-${cmd}.log`, output);
-    const signal = result.signal ? `, signal ${result.signal}` : '';
-    throw new Error(`${cmd} ${args.join(' ')} failed with exit code ${result.status}${signal}.`);
+  if (!result.ok) {
+    writeLog(`failed-${Date.now()}-${cmd}.log`, result.output);
+    throw new Error(commandFailureMessage(cmd, args, result.status, result.signal));
   }
 
-  return output;
+  return result.output;
 };
 
 const parseTasks = () => {
@@ -213,7 +243,7 @@ Rules:
 
 const claudeFix = (task: Task, review: string, tag: string, round: number) => {
   say(`  -> Claude fixing round ${round}`);
-  const prompt = `Codex reviewed your work on task "${task.title}" and found issues.
+  const prompt = `Codex review or validation found issues in your work on task "${task.title}".
 
 Fix every [BLOCKER] and [MAJOR]. Address [MINOR] if cheap. Change nothing unrelated.
 Do not edit AGENTS.md, PLAN.md, tasks.md, release workflows, deployment files, or package infrastructure unless the task explicitly requires it.
@@ -267,12 +297,28 @@ const validate = (tag: string) => {
       throw new Error('DOCSTUBE_SKIP_VALIDATE is not allowed for real overnight runs.');
     }
     say('  -> Skipping validation because DOCSTUBE_SKIP_VALIDATE=1');
-    return;
+    return { ok: true, review: '' };
   }
 
   say('  -> Running pnpm run validate');
-  const output = run('pnpm', ['run', 'validate']);
-  writeLog(`${tag}.validate.log`, output);
+  const result = runResult('pnpm', ['run', 'validate']);
+  writeLog(`${tag}.validate.log`, result.output);
+
+  if (result.error) {
+    return {
+      ok: false,
+      review: `[BLOCKER] Validation command failed before completing.\n\n${String(result.error)}\n\n${tail(result.output)}`
+    };
+  }
+
+  if (!result.ok) {
+    return {
+      ok: false,
+      review: `[BLOCKER] pnpm run validate failed.\n\n${commandFailureMessage('pnpm', ['run', 'validate'], result.status, result.signal)}\n\n${tail(result.output)}`
+    };
+  }
+
+  return { ok: true, review: '' };
 };
 
 const commitTask = (task: Task, index: number) => {
@@ -320,12 +366,22 @@ const main = () => {
     for (let round = 1; round <= MAX_REVIEW_ROUNDS; round += 1) {
       assertHeadUnchanged(taskHead, `task ${index} review round ${round}`);
       if (codexReview(task, tag, round)) {
-        passed = true;
-        break;
+        const validation = validate(tag);
+        assertHeadUnchanged(taskHead, `task ${index} validation round ${round}`);
+
+        if (validation.ok) {
+          passed = true;
+          break;
+        }
+
+        say(`    Validation: FAIL round ${round}`);
+        lastReview = validation.review;
       }
+
       if (round === MAX_REVIEW_ROUNDS) {
         break;
       }
+
       claudeFix(task, lastReview, tag, round);
       assertHeadUnchanged(taskHead, `task ${index} fix round ${round}`);
     }
@@ -336,8 +392,6 @@ const main = () => {
       process.exit(2);
     }
 
-    validate(tag);
-    assertHeadUnchanged(taskHead, `task ${index} validation`);
     commitTask(task, index);
     say(`Task ${index} done.`);
   }

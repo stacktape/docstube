@@ -156,7 +156,8 @@ Scope:
 - Normalized hashes for TS/JS and Python fixture files.
 - Language plugin seam.
 - TypeDoc extraction for TS/JS fixtures.
-- griffe extraction for Python fixtures.
+- griffe extraction for Python fixtures, with structured skip or mock fixture output if Python or
+  griffe is unavailable in the local/CI environment.
 - Stable serialized source-map output consumed by later pipeline work.
 
 Acceptance:
