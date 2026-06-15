@@ -16,7 +16,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 
 const TASKS_FILE = 'tasks.md';
 const MAX_REVIEW_ROUNDS = 4;
@@ -69,6 +69,48 @@ const commandFailureMessage = (cmd: string, args: string[], status: number | nul
   return `${cmd} ${args.join(' ')} failed with exit code ${status}${signalText}.`;
 };
 
+type ReviewVerdict = 'PASS' | 'FAIL';
+
+const parseReviewVerdict = (review: string): ReviewVerdict | undefined => {
+  const transcriptStart = review.search(/\r?\nOpenAI Codex v\d/i);
+  const answer = transcriptStart === -1 ? review : review.slice(0, transcriptStart);
+  const matches = [...answer.matchAll(/^\s*(?:\*\*)?VERDICT:\s*(PASS|FAIL)\b(?:\*\*)?\s*$/gim)];
+  const finalMatch = matches.at(-1);
+  const verdict = finalMatch?.[1]?.toUpperCase();
+
+  return verdict === 'PASS' || verdict === 'FAIL' ? verdict : undefined;
+};
+
+// Node's spawn does not apply Windows PATHEXT resolution, so a bare command such as
+// `pnpm` fails with ENOENT even when `pnpm.exe`/`pnpm.cmd` is on PATH. Resolve the real
+// executable ourselves and keep shell:false so prompt and commit-message args are never
+// re-parsed by a shell. Returns the original command on non-Windows or when unresolved.
+const resolveExecutable = (cmd: string) => {
+  if (process.platform !== 'win32' || cmd.includes('/') || cmd.includes('\\')) {
+    return cmd;
+  }
+
+  const extensions = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD')
+    .split(';')
+    .map((ext) => ext.trim())
+    .filter(Boolean);
+  const searchDirs = (process.env.PATH || '').split(delimiter).filter(Boolean);
+
+  // Try PATHEXT extensions before the bare name: package managers like pnpm ship both an
+  // extensionless Unix shim and a `.CMD` shim in the same directory, and Windows can only
+  // execute the `.CMD`. Matching the bare name first would pick the unrunnable Unix shim.
+  for (const dir of searchDirs) {
+    for (const ext of [...extensions, '']) {
+      const candidate = join(dir, `${cmd}${ext}`);
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return cmd;
+};
+
 const runResult = (cmd: string, args: string[], input?: string) => {
   if (DRY) {
     say(`  [dry-run] would run: ${cmd} ${args.join(' ')}`);
@@ -81,7 +123,14 @@ const runResult = (cmd: string, args: string[], input?: string) => {
     };
   }
 
-  const result = spawnSync(cmd, args, {
+  // `.cmd`/`.bat` shims cannot be executed directly with shell:false on modern Node, so
+  // route those through the command processor while leaving native executables untouched.
+  const resolved = resolveExecutable(cmd);
+  const isShim = /\.(?:cmd|bat)$/i.test(resolved);
+  const spawnCmd = isShim ? process.env.ComSpec || 'cmd.exe' : resolved;
+  const spawnArgs = isShim ? ['/d', '/s', '/c', resolved, ...args] : args;
+
+  const result = spawnSync(spawnCmd, spawnArgs, {
     input,
     encoding: 'utf8',
     maxBuffer: 128 * 1024 * 1024,
@@ -281,11 +330,12 @@ ${diff}`;
   const review = run('codex', ['exec', '--sandbox', 'read-only', '--color', 'never', '-C', '.', '-'], prompt);
   writeLog(`${tag}.review-${round}.log`, review);
 
-  const pass = /^\s*(?:\*\*)?VERDICT:\s*PASS\b/im.test(review);
+  const verdict = parseReviewVerdict(review);
+  const pass = verdict === 'PASS';
   say(`    Codex: ${pass ? 'PASS' : 'FAIL'} round ${round}`);
 
   if (!pass) {
-    lastReview = review;
+    lastReview = verdict ? review : `[BLOCKER] Codex review did not include a parseable final verdict.\n\n${review}`;
   }
 
   return pass;
