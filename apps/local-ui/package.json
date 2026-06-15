@@ -9,6 +9,8 @@
     "typecheck": "tsc -p ../../tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@docstube/contracts": "workspace:*",
+    "@docstube/core": "workspace:*",
     "@tailwindcss/vite": "^4.3.1",
     "@trpc/client": "^11.17.0",
     "@trpc/react-query": "^11.17.0",

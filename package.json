@@ -17,7 +17,7 @@
     "release:install-scripts": "node scripts/release/prepare-install-scripts.ts",
     "release:install-scripts:publish": "node scripts/release/publish-install-scripts.ts",
     "release:set-version": "node scripts/release/set-version.ts",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "stacktape:deploy": "stacktape deploy --projectName docstube --stage production --region eu-west-1",

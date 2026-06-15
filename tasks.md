@@ -12,6 +12,13 @@ Rules for every task:
 - Do not implement anything under the hard TBD boundaries.
 - Keep packages private unless the task explicitly says otherwise.
 - Prefer tests and fixtures close to the code being implemented.
+- A task that touches a package or app is not done if Vitest collects zero tests for that touched
+  package or app. Add at least one focused test file under that workspace before claiming the task.
+- Workspace package dependencies for the planned `@docstube/*` imports are pre-wired. If a task
+  adds a new concrete cross-package import that is not already declared, it may add the matching
+  `workspace:*` dependency to the consumer package. Exception: `apps/cli` is the public
+  `docstube` package and must not publish private `@docstube/*` runtime dependencies; bundle
+  internal CLI imports instead.
 - Run `pnpm run validate` before marking the task done unless a narrower check is explicitly
   justified in the task output.
 
@@ -31,7 +38,8 @@ Scope:
 Acceptance:
 
 - Contract primitives have focused tests.
-- Invalid fixtures produce useful Zod errors.
+- Invalid fixtures produce useful Zod errors with non-empty `error.issues` and expected `path`
+  values.
 - `pnpm run validate` passes.
 
 ## Task 01 - Config family schemas and YAML round trip
@@ -91,14 +99,21 @@ Scope:
 
 - Drizzle schema for local `.docstube/db.sqlite`.
 - Migration creation and fresh DB test.
+- `.docstube/` scaffold helper that creates committed-friendly `manifest.yml`, `criteria/`, and
+  `instructions/` while keeping DB/cache/run files machine-local.
 - Async versioned `StateBackend` interface.
 - `LocalBackend` stub implementing the contract with deterministic in-memory or SQLite behavior.
 - Contract test suite reusable by future backends.
 - tRPC router skeleton and AppRouter type snapshot.
+- Minimum AppRouter procedures for later UI work: config read, config write, IA proposal list,
+  theme-token read/write, run status, page status list, page detail, feedback submit, approve
+  page, regenerate page.
 
 Acceptance:
 
 - Fresh DB migration test passes.
+- Scaffold fixture creates the expected committed files/directories without creating secrets,
+  transcripts, cache files, or SQLite files in committed state.
 - `StateBackend` contract test passes against `LocalBackend`.
 - tRPC types compile and have a snapshot/diff test.
 - `pnpm run validate` passes.
@@ -113,7 +128,7 @@ Scope:
 - Normalized adapter event schema.
 - Permissions/sandbox declaration types.
 - Mock adapter.
-- Record/replay fixture format.
+- Versioned record/replay fixture format with a schema.
 - Minimal walking skeleton: fixture repo -> replay writer output -> deterministic check -> state
   persisted -> one page rendered to HTML by minimal MDX compile.
 
@@ -127,6 +142,8 @@ Acceptance:
 - No live AI calls.
 - Walking skeleton fixture passes end to end.
 - The skeleton uses the S0 contracts from `@docstube/contracts`; it does not invent local shapes.
+- The fixture asserts concrete artifacts: compiled HTML contains a known token, persisted state
+  has the expected `passed` row, and the deterministic check returns the expected result.
 - `pnpm run validate` passes.
 
 ## Task 05 - Codemap and API extractors
@@ -167,6 +184,7 @@ Scope:
 Acceptance:
 
 - Each verifier has focused fixtures.
+- Each verifier has at least one passing fixture and one finding-producing failing fixture.
 - Verifier failures produce structured findings.
 - Verifiers reuse S0 contracts instead of local result shapes.
 - `pnpm run validate` passes.
@@ -188,7 +206,8 @@ Scope:
 Acceptance:
 
 - Each verifier has focused fixtures.
-- Optional tools skip explicitly, not silently.
+- Each verifier has at least one passing fixture and one finding-producing failing fixture.
+- Optional tools skip explicitly as structured `status: "skipped"` results, not silently.
 - API reference consistency failures become structured findings.
 - `pnpm run validate` passes.
 
@@ -211,7 +230,10 @@ Scope:
 
 Acceptance:
 
-- Re-check installed CLI help or primary vendor docs before relying on flags.
+- A simulated adapter that writes outside writable roots is rejected by the post-run guard.
+- A hung child process is killed and surfaced as a timeout error.
+- JSONL/JSON recorded fixtures parse into the expected normalized adapter event sequence.
+- Version detection is tested against recorded command output fixtures.
 - Unit tests use mocks and record/replay fixtures only.
 - No CI path calls real agents.
 - `pnpm run validate` passes.
@@ -288,13 +310,15 @@ Scope:
 - Source loaders for files/directories and private git refs.
 - MCP source pass-through using the user's agent configuration.
 - Source digest format.
-- Drift report skeleton.
+- Drift report skeleton: structured findings for reference docs that disagree with code-grounded
+  facts, without treating reference docs as truth.
 
 Acceptance:
 
 - Materialization preserves user-edited files where promised.
 - Source loaders never store secrets.
 - Conflict handling documents that code wins.
+- Drift report fixtures include one reference-doc disagreement finding.
 - `pnpm run validate` passes.
 
 ## Task 13 - Pipeline run initialization and scheduling
@@ -364,19 +388,45 @@ Scope:
 - Provenance capture: seed context, observed reads, citations.
 - Normalized-hash dirty detection.
 - Symbol-to-page mapping.
-- Conservative uncertainty behavior.
-- Topology consistency pass.
+- Conservative uncertainty behavior: if a page has no recorded citation/read for a changed symbol
+  but its seed context hash changed, or if provenance is missing/corrupt for a page that might
+  cover the changed area, the page is regenerated or flagged rather than skipped.
+- Topology consistency pass: nav-tree references resolve, page slugs remain unique, cross-page
+  links to regenerated symbols are revisited, and glossary terms used by changed pages are still
+  defined.
 - `.docstube/manifest.yml` update.
 - Durable `LocalBackend` implementation over SQLite.
 
 Acceptance:
 
-- Fixture repo changes dirty the expected pages.
+- Fixture repo changes dirty a named expected page set, and the test asserts the exact set.
 - Uncertain provenance regenerates or flags rather than skipping.
+- Topology-pass fixtures cover a broken nav reference, stale cross-page link, and missing glossary
+  term.
 - Manifest is portable and committed-friendly.
 - `pnpm run validate` passes.
 
-## Task 17 - Local UI setup wizard and config editing
+## Task 17 - Local server and browser startup
+
+Goal: serve the real local control plane surface before UI screens depend on it.
+
+Scope:
+
+- Hono server wiring in `packages/core`.
+- tRPC mount for the AppRouter procedures defined in Task 03.
+- Static serving for the built local UI.
+- Ephemeral session token on localhost URLs.
+- `generate` startup helper that starts the server and opens the wizard URL.
+
+Acceptance:
+
+- Server tests cover tRPC calls, static UI serving, localhost binding, and invalid session token
+  rejection.
+- Browser-open behavior is tested through a mock opener.
+- No marketing website or deployment infrastructure is changed.
+- `pnpm run validate` passes.
+
+## Task 18 - Local UI setup wizard and config editing
 
 Goal: implement the setup path over the real config and tRPC surfaces.
 
@@ -390,12 +440,14 @@ Scope:
 
 Acceptance:
 
-- Desktop and mobile screenshots are nonblank and non-overlapping.
+- Component tests render the wizard at 375px and 1280px widths, assert named `data-testid`
+  anchors are present/non-empty, and include a layout guard such as `scrollWidth <= clientWidth`
+  for the primary shell.
 - Wizard writes config-family files that validate.
 - No screenshot-capture product feature is implemented.
 - `pnpm run validate` passes.
 
-## Task 18 - Local UI dashboard and live preview
+## Task 19 - Local UI dashboard and live preview
 
 Goal: make long generation runs observable while pages finish.
 
@@ -412,10 +464,12 @@ Acceptance:
 
 - Dashboard fixtures cover queued/running/retrying/passed/flagged states.
 - No node-graph pipeline canvas.
-- Desktop and mobile screenshots are nonblank and non-overlapping.
+- Component tests render the dashboard at 375px and 1280px widths, assert named `data-testid`
+  anchors are present/non-empty, and include a layout guard such as `scrollWidth <= clientWidth`
+  for the primary shell.
 - `pnpm run validate` passes.
 
-## Task 19 - Local UI review and feedback flows
+## Task 20 - Local UI review and feedback flows
 
 Goal: implement the review room after generated pages exist.
 
@@ -432,10 +486,12 @@ Acceptance:
 - Review fixtures cover findings, approvals, and regeneration requests.
 - Feedback writes to the correct criteria/instructions/glossary/config target through tested
   mocks.
-- Desktop and mobile screenshots are nonblank and non-overlapping.
+- Component tests render review at 375px and 1280px widths, assert named `data-testid` anchors
+  are present/non-empty, and include a layout guard such as `scrollWidth <= clientWidth` for the
+  primary shell.
 - `pnpm run validate` passes.
 
-## Task 20 - CLI commands and runtime telemetry
+## Task 21 - CLI commands and runtime telemetry
 
 Goal: make the user-facing CLI drive the implemented core.
 
@@ -452,6 +508,11 @@ Scope:
 - `NODE_COMPILE_CACHE` where appropriate.
 - Runtime telemetry opt-out and disclosure.
 
+Out of scope:
+
+- Installer telemetry, `apps/install-events`, Stacktape secret wiring, release workflows, and
+  deployment infrastructure.
+
 Acceptance:
 
 - CLI startup stays light.
@@ -460,7 +521,7 @@ Acceptance:
 - Add a Changeset for user-facing CLI behavior if release notes would matter.
 - `pnpm run validate` passes.
 
-## Task 21 - GitHub Action
+## Task 22 - GitHub Action
 
 Goal: make the Action wrap `docstube update` and open PRs.
 
@@ -473,6 +534,10 @@ Scope:
 - Idempotent reruns.
 - Concurrency protection.
 
+Out of scope:
+
+- Release workflows, npm publishing, Stacktape deployment, and install-script publishing.
+
 Acceptance:
 
 - Action fixture or local action test uses mocks/replay.
@@ -482,7 +547,7 @@ Acceptance:
 - No live AI calls in CI.
 - `pnpm run validate` passes.
 
-## Task 22 - Deterministic product smoke
+## Task 23 - Deterministic product smoke
 
 Goal: prove the integrated product works before adding eval complexity.
 
@@ -501,7 +566,7 @@ Acceptance:
 - Update regenerates or flags the expected pages.
 - `pnpm run validate` passes.
 
-## Task 23 - Evals, live gated workflow, and dogfood
+## Task 24 - Evals, live gated workflow, and dogfood
 
 Goal: add quality proof after the integrated product works.
 
@@ -514,6 +579,11 @@ Scope:
 - Skill-on/off comparisons.
 - Secrets-gated live workflow.
 - Dogfood workflow that generates docstube's own docs and deploys the result.
+
+Out of scope:
+
+- Production Stacktape app infrastructure and release distribution workflows unless a human
+  explicitly asks for deployment changes.
 
 Acceptance:
 

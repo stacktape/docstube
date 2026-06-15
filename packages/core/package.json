@@ -18,6 +18,12 @@
     "typecheck": "tsc -p ../../tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@docstube/agent": "workspace:*",
+    "@docstube/codemap": "workspace:*",
+    "@docstube/contracts": "workspace:*",
+    "@docstube/extractors": "workspace:*",
+    "@docstube/skills": "workspace:*",
+    "@docstube/verifiers": "workspace:*",
     "@trpc/server": "^11.17.0",
     "better-sqlite3": "^12.10.1",
     "drizzle-orm": "^0.45.2",

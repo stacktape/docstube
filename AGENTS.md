@@ -189,6 +189,8 @@ export * from './config-schema';
 
 - Every package must compile.
 - Keep tests close to the contracts they prove.
+- If you touch a package or app, add or update at least one focused Vitest test collected from
+  that workspace; a touched workspace with zero collected tests is not done.
 - CI and normal tests use mocks or record/replay fixtures only. Live AI runs belong in a separate
   secrets-gated workflow.
 - For user-facing changes, add a Changeset.

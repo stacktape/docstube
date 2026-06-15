@@ -25,6 +25,10 @@ const STATE_FILE = '.docstube-build/state';
 const START_SHA_FILE = '.docstube-build/start-sha';
 const DRY = process.argv.includes('--dry-run');
 const SKIP_VALIDATE = process.env.DOCSTUBE_SKIP_VALIDATE === '1';
+const DEFAULT_COMMAND_TIMEOUT_MS = Number.parseInt(
+  process.env.DOCSTUBE_OVERNIGHT_COMMAND_TIMEOUT_MS || String(2 * 60 * 60 * 1000),
+  10
+);
 
 if (!DRY) {
   mkdirSync(LOG_DIR, { recursive: true });
@@ -62,18 +66,21 @@ const run = (cmd: string, args: string[], input?: string) => {
     input,
     encoding: 'utf8',
     maxBuffer: 128 * 1024 * 1024,
-    shell: false
+    shell: false,
+    timeout: DEFAULT_COMMAND_TIMEOUT_MS
   });
 
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
 
   if (result.error) {
+    writeLog(`failed-${Date.now()}-${cmd}.log`, output || String(result.error));
     throw result.error;
   }
 
   if (result.status !== 0) {
     writeLog(`failed-${Date.now()}-${cmd}.log`, output);
-    throw new Error(`${cmd} ${args.join(' ')} failed with exit code ${result.status}.`);
+    const signal = result.signal ? `, signal ${result.signal}` : '';
+    throw new Error(`${cmd} ${args.join(' ')} failed with exit code ${result.status}${signal}.`);
   }
 
   return output;
@@ -244,7 +251,7 @@ ${diff}`;
   const review = run('codex', ['exec', '--sandbox', 'read-only', '--color', 'never', '-C', '.', '-'], prompt);
   writeLog(`${tag}.review-${round}.log`, review);
 
-  const pass = /^VERDICT:\s*PASS\s*$/m.test(review);
+  const pass = /^\s*(?:\*\*)?VERDICT:\s*PASS\b/im.test(review);
   say(`    Codex: ${pass ? 'PASS' : 'FAIL'} round ${round}`);
 
   if (!pass) {
@@ -256,6 +263,9 @@ ${diff}`;
 
 const validate = (tag: string) => {
   if (SKIP_VALIDATE) {
+    if (!DRY) {
+      throw new Error('DOCSTUBE_SKIP_VALIDATE is not allowed for real overnight runs.');
+    }
     say('  -> Skipping validation because DOCSTUBE_SKIP_VALIDATE=1');
     return;
   }

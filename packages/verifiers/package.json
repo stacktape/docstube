@@ -18,6 +18,8 @@
     "typecheck": "tsc -p ../../tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@docstube/contracts": "workspace:*",
+    "@docstube/extractors": "workspace:*",
     "@mdx-js/mdx": "^3.1.1",
     "@terrastruct/d2": "^0.1.33",
     "zod": "^4.4.3"
