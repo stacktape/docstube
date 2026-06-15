@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $DefaultVersion = "<<DEFAULT_VERSION>>"
 $Platform = "windows-x64"
-$Repo = "docstube/docstube"
+$Repo = "stacktape/docstube"
 $InstallDir = if ($env:DOCSTUBE_INSTALL_DIR) { $env:DOCSTUBE_INSTALL_DIR } else { Join-Path $HOME ".docstube\bin" }
 $Version = if ($env:DOCSTUBE_VERSION) { $env:DOCSTUBE_VERSION } else { $DefaultVersion }
 $EventsUrl = if ($env:DOCSTUBE_INSTALL_EVENTS_URL) { $env:DOCSTUBE_INSTALL_EVENTS_URL } else { "https://events.docstube.dev/v1/install" }

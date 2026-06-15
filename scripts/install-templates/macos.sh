@@ -3,7 +3,7 @@ set -eu
 
 DEFAULT_VERSION="<<DEFAULT_VERSION>>"
 PLATFORM="macos-x64"
-REPO="docstube/docstube"
+REPO="stacktape/docstube"
 INSTALL_DIR="${DOCSTUBE_INSTALL_DIR:-$HOME/.docstube/bin}"
 VERSION="${DOCSTUBE_VERSION:-$DEFAULT_VERSION}"
 EVENTS_URL="${DOCSTUBE_INSTALL_EVENTS_URL:-https://events.docstube.dev/v1/install}"
