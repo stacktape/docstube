@@ -26,3 +26,28 @@ export const s0ContractAreas = [
   'registry-component',
   'trpc-router'
 ] as const satisfies readonly S0ContractArea[];
+
+export {
+  identifierSchema,
+  jsonValueSchema,
+  packageNameSchema,
+  packageVersionSchema,
+  relativePathSchema,
+  semverSchema,
+  severities,
+  severitySchema,
+  timestampSchema
+} from './primitives';
+export type {
+  Identifier,
+  JsonValue,
+  PackageName,
+  PackageVersion,
+  RelativePath,
+  Semver,
+  Severity,
+  Timestamp
+} from './primitives';
+
+export { contractFixtures, errorCoversPaths, issuePaths } from './fixtures';
+export type { ContractFixtureName, ContractFixtures, InvalidCase, IssuePath, ValidCase } from './fixtures';
