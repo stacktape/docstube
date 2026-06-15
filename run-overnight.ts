@@ -22,6 +22,7 @@ const TASKS_FILE = 'tasks.md';
 const MAX_REVIEW_ROUNDS = 4;
 const LOG_DIR = '.docstube-build/logs';
 const STATE_FILE = '.docstube-build/state';
+const START_SHA_FILE = '.docstube-build/start-sha';
 const DRY = process.argv.includes('--dry-run');
 const SKIP_VALIDATE = process.env.DOCSTUBE_SKIP_VALIDATE === '1';
 
@@ -128,6 +129,44 @@ const readState = () => {
   return Number.isFinite(state) ? state : 0;
 };
 
+const gitOutput = (args: string[]) => run('git', args).trim();
+
+const currentHead = () => gitOutput(['rev-parse', 'HEAD']);
+
+const statusLines = () =>
+  gitOutput(['status', '--short'])
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean);
+
+const assertCleanWorkingTree = (context: string) => {
+  if (DRY) {
+    return;
+  }
+
+  const dirty = statusLines();
+  if (dirty.length > 0) {
+    throw new Error(
+      `Refusing to ${context} with a dirty working tree.\n` +
+        `Commit, stash, or remove these changes first:\n${dirty.join('\n')}`
+    );
+  }
+};
+
+const assertHeadUnchanged = (expectedHead: string, context: string) => {
+  if (DRY) {
+    return;
+  }
+
+  const actualHead = currentHead();
+  if (actualHead !== expectedHead) {
+    throw new Error(
+      `Refusing to continue: HEAD changed during ${context}.\n` +
+        `Expected ${expectedHead}, got ${actualHead}. Agents must not commit or rewrite history.`
+    );
+  }
+};
+
 const prepareReviewDiff = () => {
   run('git', ['add', '-N', '.']);
   const status = run('git', ['status', '--short']);
@@ -153,10 +192,11 @@ ${task.body}
 Rules:
 - Implement ONLY this task. Do not start later tasks.
 - Do not rebuild release, deploy, CI, or package infrastructure unless this task explicitly requires it.
+- Do not edit AGENTS.md, PLAN.md, or tasks.md unless this task explicitly requires it.
 - Test-first where practical.
 - Make this task's acceptance checks pass.
 - Never implement anything PLAN.md marks as a hard TBD boundary.
-- If a design change is truly required, edit PLAN.md in the same change and explain why.
+- If a design change seems required, stop and explain it instead of changing the plan.
 - Ensure the project builds and this task's tests pass.
 - Do not commit; the runner commits after review.`;
 
@@ -169,6 +209,7 @@ const claudeFix = (task: Task, review: string, tag: string, round: number) => {
   const prompt = `Codex reviewed your work on task "${task.title}" and found issues.
 
 Fix every [BLOCKER] and [MAJOR]. Address [MINOR] if cheap. Change nothing unrelated.
+Do not edit AGENTS.md, PLAN.md, tasks.md, release workflows, deployment files, or package infrastructure unless the task explicitly requires it.
 
 REVIEW FINDINGS:
 ${review}
@@ -186,7 +227,10 @@ const codexReview = (task: Task, tag: string, round: number) => {
   const diff = DRY ? '(dry-run)' : prepareReviewDiff();
   const prompt = `Review this docstube change for the task: "${task.title}".
 
-Judge ONLY against the task's stated scope and acceptance criteria, AGENTS.md, and relevant PLAN.md sections.
+TASK BODY:
+${task.body}
+
+Judge ONLY against this exact task scope and acceptance criteria, AGENTS.md, and relevant PLAN.md sections.
 Report findings as a list, each tagged [BLOCKER], [MAJOR], or [MINOR], with file:line when possible.
 Do not suggest new scope or redesigns. Be concise.
 
@@ -239,9 +283,14 @@ const commitTask = (task: Task, index: number) => {
 };
 
 const main = () => {
+  assertCleanWorkingTree('start the overnight runner');
   const tasks = parseTasks();
   const start = readState();
   say(`Starting overnight build${DRY ? ' (dry run)' : ''}. ${tasks.length} tasks; resuming at index ${start}.`);
+
+  if (!DRY && start === 0) {
+    writeFileSync(START_SHA_FILE, `${currentHead()}\n`);
+  }
 
   for (let index = start; index < tasks.length; index += 1) {
     const task = tasks[index];
@@ -251,16 +300,24 @@ const main = () => {
 
     const tag = `task-${String(index).padStart(2, '0')}`;
     say(`===== TASK ${index}/${tasks.length - 1}: ${task.title} =====`);
+    assertCleanWorkingTree(`start task ${index}`);
+    const taskHead = currentHead();
 
     claudeImplement(task, tag);
+    assertHeadUnchanged(taskHead, `task ${index} implementation`);
 
     let passed = false;
     for (let round = 1; round <= MAX_REVIEW_ROUNDS; round += 1) {
+      assertHeadUnchanged(taskHead, `task ${index} review round ${round}`);
       if (codexReview(task, tag, round)) {
         passed = true;
         break;
       }
+      if (round === MAX_REVIEW_ROUNDS) {
+        break;
+      }
       claudeFix(task, lastReview, tag, round);
+      assertHeadUnchanged(taskHead, `task ${index} fix round ${round}`);
     }
 
     if (!passed) {
@@ -270,6 +327,7 @@ const main = () => {
     }
 
     validate(tag);
+    assertHeadUnchanged(taskHead, `task ${index} validation`);
     commitTask(task, index);
     say(`Task ${index} done.`);
   }

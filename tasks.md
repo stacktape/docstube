@@ -7,6 +7,8 @@ Rules for every task:
 - Read `AGENTS.md` and `PLAN.md` first.
 - Implement only the current task.
 - Do not rebuild or redesign project infrastructure that `PLAN.md` marks as already done.
+- Do not edit `PLAN.md`, `AGENTS.md`, `tasks.md`, release workflows, deployment files, or package
+  infrastructure unless the task explicitly says to.
 - Do not implement anything under the hard TBD boundaries.
 - Keep packages private unless the task explicitly says otherwise.
 - Prefer tests and fixtures close to the code being implemented.
@@ -41,6 +43,7 @@ Scope:
 - `docstube.yml` schema.
 - `ia.yml` schema.
 - `glossary.yaml` schema.
+- Reserved `screenshots:` config object that accepts an object and is not used elsewhere.
 - JSON Schema generation for the config family.
 - Runtime validation helpers.
 - YAML Document API edit helper that preserves comments and formatting.
@@ -50,12 +53,13 @@ Acceptance:
 
 - Valid and invalid config fixtures are tested.
 - JSON Schema output is snapshot-tested.
+- The reserved `screenshots:` object validates without triggering any screenshot implementation.
 - A commented YAML fixture is edited and retains comments/formatting.
 - `pnpm run validate` passes.
 
-## Task 02 - Findings, criteria, feedback, manifest, and page IDs
+## Task 02 - S0 content, page, verifier, and registry contracts
 
-Goal: freeze the rest of S0 content/state contracts.
+Goal: freeze the non-database S0 contracts that downstream packages must reuse.
 
 Scope:
 
@@ -67,11 +71,15 @@ Scope:
 - Page ID and section ID validators.
 - Section marker convention helpers.
 - Cache-key derivation spec and tests.
+- Deterministic-check result taxonomy.
+- Registry component metadata schema, including prop-schema references and component names.
 
 Acceptance:
 
 - Every schema has valid/invalid fixtures.
 - Page/section uniqueness and presence checks are tested.
+- Deterministic-check results and registry component metadata are snapshot-tested.
+- Downstream packages can import these contracts from `@docstube/contracts`.
 - No numeric quality score is introduced.
 - `pnpm run validate` passes.
 
@@ -95,9 +103,9 @@ Acceptance:
 - tRPC types compile and have a snapshot/diff test.
 - `pnpm run validate` passes.
 
-## Task 04 - Agent contract, mock adapter, walking skeleton, and packaging smoke
+## Task 04 - Agent contract, mock adapter, and walking skeleton
 
-Goal: finish the S0 exit demo without real agents.
+Goal: finish the S0 exit demo without real agents or infrastructure churn.
 
 Scope:
 
@@ -108,14 +116,17 @@ Scope:
 - Record/replay fixture format.
 - Minimal walking skeleton: fixture repo -> replay writer output -> deterministic check -> state
   persisted -> one page rendered to HTML by minimal MDX compile.
-- Packaging smoke job or test for `@yao-pkg/pkg` with a minimal CLI, `better-sqlite3`, and one
-  lazy dynamic import.
+
+Out of scope:
+
+- Release, deploy, CI, and packaging workflow edits.
+- New binary packaging infrastructure. It already works.
 
 Acceptance:
 
 - No live AI calls.
 - Walking skeleton fixture passes end to end.
-- Packaging smoke runs in CI or is wired so CI will run it.
+- The skeleton uses the S0 contracts from `@docstube/contracts`; it does not invent local shapes.
 - `pnpm run validate` passes.
 
 ## Task 05 - Codemap and API extractors
@@ -138,32 +149,50 @@ Acceptance:
 - Unsupported languages degrade to file-level tracking.
 - `pnpm run validate` passes.
 
-## Task 06 - Deterministic verifier registry and core checks
+## Task 06 - Verifier registry and foundational checks
 
-Goal: implement the verifier framework and core checks before agent generation expands.
+Goal: implement the verifier framework and the checks needed by the walking skeleton and config
+flow.
 
 Scope:
 
 - Verifier registry in `packages/verifiers`.
-- Shared deterministic-check result taxonomy.
+- Shared use of the deterministic-check result taxonomy from `@docstube/contracts`.
 - Config-family check.
+- Generated-page frontmatter check.
+- Page and section ID check.
 - MDX compile check.
-- Component prop validation hook.
-- TypeScript snippet check.
-- Python snippet check where `pyright` is available, with graceful skip otherwise.
-- Import/path check.
-- Link check.
-- D2 check.
-- Glossary rules check.
+- Component prop validation hook using registry component metadata.
 
 Acceptance:
 
 - Each verifier has focused fixtures.
 - Verifier failures produce structured findings.
-- Optional tools skip explicitly, not silently.
+- Verifiers reuse S0 contracts instead of local result shapes.
 - `pnpm run validate` passes.
 
-## Task 07 - Built-in agent adapters and usage caps
+## Task 07 - Verifier content, code, link, D2, glossary, and API checks
+
+Goal: complete deterministic verifier coverage before real generation expands.
+
+Scope:
+
+- TypeScript snippet check.
+- Python snippet check where `pyright` is available, with graceful skip otherwise.
+- Import/path check.
+- Internal and external link check.
+- D2 check.
+- Glossary rules check.
+- API reference consistency check against extractor output.
+
+Acceptance:
+
+- Each verifier has focused fixtures.
+- Optional tools skip explicitly, not silently.
+- API reference consistency failures become structured findings.
+- `pnpm run validate` passes.
+
+## Task 08 - Built-in agent adapters and usage caps
 
 Goal: implement real adapter surfaces behind the frozen contract.
 
@@ -187,32 +216,65 @@ Acceptance:
 - No CI path calls real agents.
 - `pnpm run validate` passes.
 
-## Task 08 - Theme, registry, glossary, D2, llms, and SEO
+## Task 09 - Theme registry, layouts, and core components
 
-Goal: make generated writer output render as a real static docs site.
+Goal: make writer output target a concrete component and layout contract.
 
 Scope:
 
 - Astro + React generated theme source in `packages/theme`.
-- Registry component metadata schema usage.
+- Registry component metadata usage from `@docstube/contracts`.
 - Initial component set needed by the writer.
 - Layouts: `single-tree` and `sectioned`.
+- Fixture docs site with representative MDX pages.
+
+Acceptance:
+
+- Fixture docs site builds.
+- Component prop validation uses the shared registry metadata.
+- No generated docs site depends on public `@docstube/theme`.
+- `pnpm run validate` passes.
+
+## Task 10 - Theme build integrations: search, D2, glossary, and llms
+
+Goal: add the build-time integrations that make generated docs useful and verifiable.
+
+Scope:
+
 - Pagefind search integration.
 - D2 build support with sketch mode default.
 - Glossary remark plugin.
 - `llms.txt` and `llms-full.txt`.
 - Docs-serving MCP server.
-- Sitemap, canonical URLs, metadata, Open Graph, structured data.
+
+Acceptance:
+
+- Fixture docs site builds with search artifacts.
+- Glossary and D2 fixtures render.
+- `llms.txt` and `llms-full.txt` are generated deterministically.
+- `pnpm run validate` passes.
+
+## Task 11 - Theme SEO, AEO, and footer output
+
+Goal: complete the static site output quality layer.
+
+Scope:
+
+- Sitemap.
+- Canonical URLs.
+- Metadata.
+- Open Graph.
+- Structured data.
+- FAQ/AEO output hooks expected by writer output.
 - "Generated by docstube" footer credit, default on and disableable.
 
 Acceptance:
 
-- Fixture docs site builds.
-- Glossary and D2 fixtures render.
-- No generated docs site depends on public `@docstube/theme`.
+- Fixture docs site snapshots include expected SEO/AEO artifacts.
+- Footer credit can be disabled through config/theme options.
 - `pnpm run validate` passes.
 
-## Task 09 - Skills and source loaders
+## Task 12 - Skills and source loaders
 
 Goal: materialize reusable agent guidance and source context safely.
 
@@ -235,30 +297,65 @@ Acceptance:
 - Conflict handling documents that code wins.
 - `pnpm run validate` passes.
 
-## Task 10 - Orchestrator, gate, retry, and changelog pipeline
+## Task 13 - Pipeline run initialization and scheduling
 
-Goal: build the main generation loop over mocks/replay first, then adapters.
+Goal: create the main generation run structure without broad orchestration all at once.
 
 Scope:
 
 - Config loading and run initialization.
+- Durable run records.
 - Page scheduler with depth-first time-to-first-page behavior.
-- Writer, reviewer, verifier orchestration.
+- Terminal progress state model.
+- Cap-freeze state transitions, without UI polish.
+
+Acceptance:
+
+- Fixture run initializes from config-family files.
+- Scheduler order is deterministic and tested.
+- Runs are resumable from persisted state.
+- `pnpm run validate` passes.
+
+## Task 14 - Replay-based writer, reviewer, verifier orchestration
+
+Goal: wire the core generation loop over mocks/replay before relying on live adapters.
+
+Scope:
+
+- Writer step.
+- Persona reviewer steps.
+- Deterministic verifier steps.
 - Findings merge logic.
-- Retry/refinement loop.
 - Passed/flagged page states.
-- Persisted transcripts and cache keys.
+- Integration fixture with replay adapters and deterministic verifiers.
+
+Acceptance:
+
+- No live AI calls in CI.
+- Failed gates are reproducible from persisted state.
+- The pipeline uses shared findings and verifier result contracts.
+- `pnpm run validate` passes.
+
+## Task 15 - Retry, cache, transcripts, and changelog pipeline
+
+Goal: complete the non-UI pipeline behaviors after the basic gate works.
+
+Scope:
+
+- Retry/refinement loop.
+- Persisted transcripts.
+- Content-addressed agent cache keys.
 - Changelog generation over git diffs.
 - FAQ/AEO writer guidance.
 
 Acceptance:
 
-- Integration fixture uses replay adapters and deterministic verifiers.
-- No live AI calls in CI.
-- Failed gates are reproducible from persisted state.
+- Retry limits and cache hits are tested.
+- Transcripts do not store secrets.
+- Changelog entries are fact-checked against diffs in fixtures.
 - `pnpm run validate` passes.
 
-## Task 11 - Incremental engine and LocalBackend
+## Task 16 - Incremental engine and LocalBackend
 
 Goal: make `docstube update` regenerate only affected pages.
 
@@ -279,31 +376,66 @@ Acceptance:
 - Manifest is portable and committed-friendly.
 - `pnpm run validate` passes.
 
-## Task 12 - Local UI wizard, dashboard, and review
+## Task 17 - Local UI setup wizard and config editing
 
-Goal: implement the localhost control plane over the real tRPC surface.
+Goal: implement the setup path over the real config and tRPC surfaces.
 
 Scope:
 
-- Shared in-flow `NavTree`.
+- Shared in-flow `NavTree` foundation.
 - Setup wizard.
 - IA proposal editing.
 - Theme token editor with preview.
-- Generation dashboard with page statuses and timelines.
-- Live preview pane.
-- Cap-freeze banner.
-- Review UI with feedback scopes and approve/regenerate actions.
-- Feedback categorizer integration through mocks/replay.
+- Comment-preserving writes to `docstube.yml` and `ia.yml`.
 
 Acceptance:
 
-- UI is usable at desktop and mobile sizes.
-- No node-graph pipeline canvas.
-- Playwright or equivalent local screenshots verify the main screens are nonblank and not
-  overlapping.
+- Desktop and mobile screenshots are nonblank and non-overlapping.
+- Wizard writes config-family files that validate.
+- No screenshot-capture product feature is implemented.
 - `pnpm run validate` passes.
 
-## Task 13 - CLI commands and runtime telemetry
+## Task 18 - Local UI dashboard and live preview
+
+Goal: make long generation runs observable while pages finish.
+
+Scope:
+
+- NavTree progress statuses.
+- Generation dashboard.
+- Page status timelines.
+- Live preview pane.
+- Cap-freeze banner.
+- Terminal progress mirror integration where needed.
+
+Acceptance:
+
+- Dashboard fixtures cover queued/running/retrying/passed/flagged states.
+- No node-graph pipeline canvas.
+- Desktop and mobile screenshots are nonblank and non-overlapping.
+- `pnpm run validate` passes.
+
+## Task 19 - Local UI review and feedback flows
+
+Goal: implement the review room after generated pages exist.
+
+Scope:
+
+- Production-rendered page preview.
+- Element, section, page, and docs feedback scopes.
+- Feedback categorizer integration through mocks/replay.
+- Approve and regenerate actions.
+- Findings badges in review navigation.
+
+Acceptance:
+
+- Review fixtures cover findings, approvals, and regeneration requests.
+- Feedback writes to the correct criteria/instructions/glossary/config target through tested
+  mocks.
+- Desktop and mobile screenshots are nonblank and non-overlapping.
+- `pnpm run validate` passes.
+
+## Task 20 - CLI commands and runtime telemetry
 
 Goal: make the user-facing CLI drive the implemented core.
 
@@ -311,6 +443,7 @@ Scope:
 
 - `generate`.
 - `generate --yes`.
+- `generate --fresh`.
 - `update`.
 - `validate`.
 - `check <d2|mdx|snippet|config> <file>`.
@@ -322,11 +455,12 @@ Scope:
 Acceptance:
 
 - CLI startup stays light.
-- Command tests cover success and failure paths.
+- Command tests cover success, failure, `--fresh`, resumability, and progress output.
 - Telemetry tests prove forbidden data is not sent.
+- Add a Changeset for user-facing CLI behavior if release notes would matter.
 - `pnpm run validate` passes.
 
-## Task 14 - GitHub Action
+## Task 21 - GitHub Action
 
 Goal: make the Action wrap `docstube update` and open PRs.
 
@@ -343,10 +477,31 @@ Acceptance:
 
 - Action fixture or local action test uses mocks/replay.
 - Action never pushes generated docs silently.
+- Action tests cover resumability and progress summary output.
+- Add a Changeset for user-facing Action behavior if release notes would matter.
 - No live AI calls in CI.
 - `pnpm run validate` passes.
 
-## Task 15 - Evals, live gated workflow, and dogfood
+## Task 22 - Deterministic product smoke
+
+Goal: prove the integrated product works before adding eval complexity.
+
+Scope:
+
+- TS fixture repo through CLI `generate --yes`.
+- Python fixture repo through CLI `generate --yes`.
+- Rendered site build for both fixtures.
+- `docstube update` after a small source change in both fixtures.
+- Assertions for generated docs, manifest updates, and verifier findings.
+
+Acceptance:
+
+- Smoke tests use mocks/replay, not live AI.
+- Both fixture sites build.
+- Update regenerates or flags the expected pages.
+- `pnpm run validate` passes.
+
+## Task 23 - Evals, live gated workflow, and dogfood
 
 Goal: add quality proof after the integrated product works.
 
