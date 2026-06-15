@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`registry component metadata > snapshots a representative registry 1`] = `
+{
+  "components": [
+    {
+      "category": "content",
+      "description": "Highlighted aside for notes and warnings",
+      "name": "Callout",
+      "props": {
+        "ref": "callout-props",
+      },
+      "status": "stable",
+    },
+    {
+      "category": "code",
+      "description": "Tabbed group of code blocks",
+      "name": "CodeGroup",
+      "props": {
+        "ref": "code-group-props",
+      },
+      "status": "experimental",
+    },
+    {
+      "description": "Reserved screenshot component (capture not implemented)",
+      "name": "Screenshot",
+      "props": {
+        "ref": "screenshot-props",
+      },
+      "status": "reserved",
+    },
+  ],
+  "version": 1,
+}
+`;

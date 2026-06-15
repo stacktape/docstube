@@ -117,3 +117,71 @@ export type { JsonSchema } from './config-json-schema';
 
 export { configFamilyFixtures, docstubeConfigFixtures, glossaryFixtures, iaFixtures } from './config-fixtures';
 export type { ConfigFamilyFixtureName, ConfigFamilyFixtures } from './config-fixtures';
+
+export {
+  buildSectionMarker,
+  extractSectionMarkers,
+  parseSectionMarker,
+  sectionMarkerKinds,
+  sectionMarkerNamespace
+} from './section-markers';
+export type { SectionMarker, SectionMarkerKind } from './section-markers';
+
+export {
+  checkSectionPresence,
+  duplicatePageIds,
+  duplicateSectionIds,
+  generatedPageFrontmatterSchema,
+  generatedStampSchema,
+  pageIdSchema,
+  pageStatuses,
+  pageStatusSchema,
+  sectionIdSchema
+} from './page-schema';
+export type {
+  GeneratedPageFrontmatter,
+  GeneratedStamp,
+  PageId,
+  PageStatus,
+  SectionId,
+  SectionPresenceResult
+} from './page-schema';
+
+export { cacheKeyFields, cacheKeyInputSchema, deriveCacheKey, sha256Schema } from './cache-key';
+export type { CacheKeyInput, Sha256 } from './cache-key';
+
+export { findingLocationSchema, findingOrigins, findingOriginSchema, findingSchema } from './findings-schema';
+export type { Finding, FindingLocation, FindingOrigin } from './findings-schema';
+
+export { criteriaChecklistSchema, criteriaItemSchema, criteriaScopes, criteriaScopeSchema } from './criteria-schema';
+export type { CriteriaChecklist, CriteriaItem, CriteriaScope } from './criteria-schema';
+
+export {
+  feedbackCategories,
+  feedbackCategorySchema,
+  feedbackRecordSchema,
+  feedbackScopes,
+  feedbackScopeSchema,
+  feedbackStatuses,
+  feedbackStatusSchema
+} from './feedback-schema';
+export type { FeedbackCategory, FeedbackRecord, FeedbackScope, FeedbackStatus } from './feedback-schema';
+
+export { manifestPageSchema, manifestSchema, pageProvenanceSchema, provenanceCitationSchema } from './manifest-schema';
+export type { Manifest, ManifestPage, PageProvenance, ProvenanceCitation } from './manifest-schema';
+
+export { checkResultSchema, checkStatuses, checkStatusSchema } from './check-result-schema';
+export type { CheckResult, CheckStatus } from './check-result-schema';
+
+export {
+  componentStatuses,
+  componentStatusSchema,
+  propSchemaRefSchema,
+  registryComponentSchema,
+  registrySchema,
+  reservedComponentNames
+} from './registry-schema';
+export type { ComponentRegistry, ComponentStatus, PropSchemaRef, RegistryComponent } from './registry-schema';
+
+export { s0Fixtures } from './s0-fixtures';
+export type { S0FixtureName, S0Fixtures } from './s0-fixtures';

@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`deterministic-check result taxonomy > snapshots one result of each status 1`] = `
+[
+  {
+    "checkId": "mdx-compile",
+    "status": "passed",
+  },
+  {
+    "checkId": "link-check",
+    "findings": [
+      {
+        "code": "broken-internal-link",
+        "location": {
+          "line": 8,
+          "path": "docs/guides/install.mdx",
+        },
+        "message": "Link target /missing does not exist",
+        "origin": "verifier",
+        "pageId": "guides/install",
+        "severity": "major",
+      },
+    ],
+    "status": "failed",
+  },
+  {
+    "checkId": "python-snippet",
+    "reason": "pyright not installed",
+    "status": "skipped",
+  },
+  {
+    "checkId": "d2-render",
+    "error": "d2 binary not found",
+    "status": "errored",
+  },
+]
+`;
