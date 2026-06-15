@@ -23,7 +23,17 @@ const MAX_REVIEW_ROUNDS = 4;
 const LOG_DIR = '.docstube-build/logs';
 const STATE_FILE = '.docstube-build/state';
 const START_SHA_FILE = '.docstube-build/start-sha';
-const CLAUDE_ARGS = ['-p', '--permission-mode', 'acceptEdits', '--disallowedTools', 'Bash', '--output-format', 'text'];
+const CLAUDE_ARGS = [
+  '-p',
+  '--input-format',
+  'text',
+  '--permission-mode',
+  'acceptEdits',
+  '--disallowedTools',
+  'Bash',
+  '--output-format',
+  'text'
+];
 const DRY = process.argv.includes('--dry-run');
 const SKIP_VALIDATE = process.env.DOCSTUBE_SKIP_VALIDATE === '1';
 const DEFAULT_COMMAND_TIMEOUT_MS = Number.parseInt(
@@ -288,7 +298,7 @@ Rules:
 - Keep the project buildable and this task's tests passing.
 - Do not commit; the runner commits after review.`;
 
-  const output = run('claude', [...CLAUDE_ARGS, prompt]);
+  const output = run('claude', CLAUDE_ARGS, prompt);
   writeLog(`${tag}.implement.log`, output);
 };
 
@@ -304,7 +314,7 @@ ${review}
 
 After fixing, keep the build and this task's tests passing. Do not run shell commands. Do not commit.`;
 
-  const output = run('claude', [...CLAUDE_ARGS, prompt]);
+  const output = run('claude', CLAUDE_ARGS, prompt);
   writeLog(`${tag}.fix-${round}.log`, output);
 };
 
