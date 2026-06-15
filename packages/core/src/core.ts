@@ -28,7 +28,7 @@ export const docstubeWorkspaceApps: DocstubeWorkspaceApp[] = [
   '@docstube/web'
 ];
 
-export const docstubeVersion = '0.0.1';
+export const docstubeVersion = '0.0.2';
 
 export const getDocstubePackageInfo = () => {
   return {
