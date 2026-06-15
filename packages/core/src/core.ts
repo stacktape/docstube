@@ -1,3 +1,6 @@
+export { editYamlDocument, loadDocstubeConfig, loadGlossary, loadIa, parseYaml, setYamlIn } from './config-yaml';
+export type { YamlPath } from './config-yaml';
+
 export type DocstubeWorkspacePackage =
   | '@docstube/agent'
   | '@docstube/codemap'

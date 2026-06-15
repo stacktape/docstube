@@ -1,0 +1,36 @@
+# docstube configuration. Edited by the setup wizard with comments preserved.
+version: 1
+
+site:
+  name: Acme Toolkit # shown in the site header
+  description: Documentation for the Acme toolkit
+  url: https://docs.acme.dev
+
+docsType: library # library | application | api | cli | service
+
+output:
+  dir: docs
+  layout: single-tree # single-tree | sectioned
+
+# Audiences docstube writes and reviews for.
+personas:
+  - id: developer
+    title: Application developer
+    goals:
+      - integrate quickly
+  - id: maintainer
+    title: Library maintainer
+
+agents:
+  writer:
+    adapter: codex # codex | claude | gemini | api
+  reviewer:
+    adapter: claude
+
+# Approximate usage caps. docstube freezes with margin near these.
+caps:
+  maxUsd: 5
+
+# Reserved for a future screenshots capability. Not used yet.
+screenshots:
+  enabled: false

@@ -1,0 +1,12 @@
+# Information architecture. Editable as a NavTree in the setup wizard.
+version: 1
+nav:
+  - id: overview
+    title: Overview
+    brief: What the Acme toolkit is and when to use it
+  - id: guides
+    title: Guides
+    children:
+      - id: install
+        title: Install
+        path: guides/install.mdx

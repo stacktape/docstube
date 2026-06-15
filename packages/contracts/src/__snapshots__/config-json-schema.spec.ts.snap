@@ -1,0 +1,475 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`config family JSON Schema > snapshots the full config family schema set 1`] = `
+{
+  "docstube.yml": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "agents": {
+        "additionalProperties": false,
+        "properties": {
+          "reviewer": {
+            "additionalProperties": false,
+            "properties": {
+              "adapter": {
+                "enum": [
+                  "codex",
+                  "claude",
+                  "gemini",
+                  "api",
+                ],
+                "type": "string",
+              },
+              "baseUrl": {
+                "format": "uri",
+                "type": "string",
+              },
+              "model": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "provider": {
+                "enum": [
+                  "openai",
+                  "anthropic",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "adapter",
+            ],
+            "type": "object",
+          },
+          "verifier": {
+            "additionalProperties": false,
+            "properties": {
+              "adapter": {
+                "enum": [
+                  "codex",
+                  "claude",
+                  "gemini",
+                  "api",
+                ],
+                "type": "string",
+              },
+              "baseUrl": {
+                "format": "uri",
+                "type": "string",
+              },
+              "model": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "provider": {
+                "enum": [
+                  "openai",
+                  "anthropic",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "adapter",
+            ],
+            "type": "object",
+          },
+          "writer": {
+            "additionalProperties": false,
+            "properties": {
+              "adapter": {
+                "enum": [
+                  "codex",
+                  "claude",
+                  "gemini",
+                  "api",
+                ],
+                "type": "string",
+              },
+              "baseUrl": {
+                "format": "uri",
+                "type": "string",
+              },
+              "model": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "provider": {
+                "enum": [
+                  "openai",
+                  "anthropic",
+                ],
+                "type": "string",
+              },
+            },
+            "required": [
+              "adapter",
+            ],
+            "type": "object",
+          },
+        },
+        "required": [
+          "writer",
+        ],
+        "type": "object",
+      },
+      "caps": {
+        "additionalProperties": false,
+        "properties": {
+          "maxPages": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          "maxTokens": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
+          "maxUsd": {
+            "exclusiveMinimum": 0,
+            "type": "number",
+          },
+        },
+        "type": "object",
+      },
+      "docsType": {
+        "enum": [
+          "library",
+          "application",
+          "api",
+          "cli",
+          "service",
+        ],
+        "type": "string",
+      },
+      "glossary": {
+        "default": "glossary.yaml",
+        "minLength": 1,
+        "type": "string",
+      },
+      "ia": {
+        "default": "ia.yml",
+        "minLength": 1,
+        "type": "string",
+      },
+      "output": {
+        "additionalProperties": false,
+        "default": {
+          "dir": "docs",
+          "layout": "single-tree",
+        },
+        "properties": {
+          "dir": {
+            "default": "docs",
+            "minLength": 1,
+            "type": "string",
+          },
+          "layout": {
+            "default": "single-tree",
+            "enum": [
+              "single-tree",
+              "sectioned",
+            ],
+            "type": "string",
+          },
+        },
+        "type": "object",
+      },
+      "personas": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "description": {
+              "type": "string",
+            },
+            "goals": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string",
+            },
+            "title": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "title",
+          ],
+          "type": "object",
+        },
+        "minItems": 1,
+        "type": "array",
+      },
+      "screenshots": {
+        "additionalProperties": {},
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
+      "site": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+          },
+          "locale": {
+            "default": "en",
+            "minLength": 2,
+            "type": "string",
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "url": {
+            "format": "uri",
+            "type": "string",
+          },
+        },
+        "required": [
+          "name",
+        ],
+        "type": "object",
+      },
+      "sources": {
+        "items": {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "path",
+                  "type": "string",
+                },
+                "path": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "path",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "git",
+                  "type": "string",
+                },
+                "ref": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+                "url": {
+                  "format": "uri",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "url",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "const": "mcp",
+                  "type": "string",
+                },
+                "server": {
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "kind",
+                "server",
+              ],
+              "type": "object",
+            },
+          ],
+        },
+        "type": "array",
+      },
+      "theme": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "items": {
+              "pattern": "^[A-Z][A-Za-z0-9]*$",
+              "type": "string",
+            },
+            "type": "array",
+          },
+          "credit": {
+            "default": true,
+            "type": "boolean",
+          },
+          "tokens": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                },
+                {
+                  "type": "number",
+                },
+              ],
+            },
+            "propertyNames": {
+              "type": "string",
+            },
+            "type": "object",
+          },
+        },
+        "type": "object",
+      },
+      "version": {
+        "const": 1,
+        "default": 1,
+        "type": "number",
+      },
+    },
+    "required": [
+      "site",
+      "docsType",
+      "personas",
+      "agents",
+    ],
+    "type": "object",
+  },
+  "glossary.yaml": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "terms": {
+        "items": {
+          "additionalProperties": false,
+          "properties": {
+            "aliases": {
+              "items": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "type": "array",
+            },
+            "definition": {
+              "minLength": 1,
+              "type": "string",
+            },
+            "id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string",
+            },
+            "term": {
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "term",
+            "definition",
+          ],
+          "type": "object",
+        },
+        "type": "array",
+      },
+      "version": {
+        "const": 1,
+        "default": 1,
+        "type": "number",
+      },
+    },
+    "required": [
+      "terms",
+    ],
+    "type": "object",
+  },
+  "ia.yml": {
+    "$defs": {
+      "__schema0": {
+        "additionalProperties": false,
+        "properties": {
+          "brief": {
+            "type": "string",
+          },
+          "children": {
+            "items": {
+              "$ref": "#/$defs/__schema0",
+            },
+            "type": "array",
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string",
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string",
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string",
+          },
+        },
+        "required": [
+          "id",
+          "title",
+        ],
+        "type": "object",
+      },
+    },
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "layout": {
+        "enum": [
+          "single-tree",
+          "sectioned",
+        ],
+        "type": "string",
+      },
+      "nav": {
+        "items": {
+          "$ref": "#/$defs/__schema0",
+        },
+        "minItems": 1,
+        "type": "array",
+      },
+      "version": {
+        "const": 1,
+        "default": 1,
+        "type": "number",
+      },
+    },
+    "required": [
+      "nav",
+    ],
+    "type": "object",
+  },
+}
+`;

@@ -1,0 +1,11 @@
+# Glossary terms used for build-time autolinking.
+version: 1
+terms:
+  - id: codemap
+    term: Codemap
+    definition: A structural map of the source repo.
+    aliases:
+      - structural map
+  - id: persona
+    term: Persona
+    definition: A documentation audience target.
