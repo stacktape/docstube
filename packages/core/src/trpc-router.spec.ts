@@ -13,6 +13,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { openDocstubeDatabase } from './db-migrations.ts';
+import { feedbackApplicationInputSchema } from './feedback-application.ts';
 import { createLocalBackend } from './local-backend.ts';
 import type { StateBackend } from './state-backend.ts';
 import {
@@ -41,6 +42,7 @@ describe('AppRouter contract', () => {
       { path: 'dashboard.read', type: 'query' },
       { path: 'feedback.list', type: 'query' },
       { path: 'feedback.submit', type: 'mutation' },
+      { path: 'feedback.write', type: 'mutation' },
       { path: 'ia.proposals', type: 'query' },
       { path: 'pages.approve', type: 'mutation' },
       { path: 'pages.detail', type: 'query' },
@@ -77,6 +79,7 @@ describe('AppRouter contract', () => {
     // Config and feedback inputs reuse the frozen contract schemas verbatim.
     expect(byPath['config.write']?.input).toEqual(toInputJsonSchema(docstubeConfigSchema));
     expect(byPath['feedback.submit']?.input).toEqual(toInputJsonSchema(feedbackRecordSchema));
+    expect(byPath['feedback.write']?.input).toEqual(toInputJsonSchema(feedbackApplicationInputSchema));
     expect(byPath['setup.save']?.input).toEqual(
       toInputJsonSchema(
         z.strictObject({
@@ -192,6 +195,31 @@ describe('AppRouter contract', () => {
       expect(loaded.themeTokens).toEqual({ accent: '#2563eb' });
       await expect(readFile(join(workspaceDir, 'docstube.yml'), 'utf8')).resolves.toContain('Acme Toolkit');
       await expect(readFile(join(workspaceDir, 'ia.yml'), 'utf8')).resolves.toContain('Explain Acme.');
+      await expect(readFile(join(workspaceDir, 'glossary.yaml'), 'utf8')).resolves.toContain('terms: []');
+    } finally {
+      await backend.close();
+      await rm(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns a scaffoldable setup draft when no config-family files exist', async () => {
+    const workspaceDir = await mkdtemp(join(tmpdir(), 'docstube-trpc-empty-setup-'));
+    const { caller, backend } = makeCaller({ workspaceDir });
+    try {
+      const draft = await caller.setup.read();
+      expect(draft.config?.site.name).toBe(workspaceDir.split(/[\\/]/u).at(-1));
+      expect(draft.ia?.nav[0]?.id).toBe('overview');
+
+      await caller.setup.save({
+        config: draft.config!,
+        ia: draft.ia!,
+        themeTokens: draft.themeTokens
+      });
+
+      await expect(readFile(join(workspaceDir, 'docstube.yml'), 'utf8')).resolves.toContain(
+        'docstube-trpc-empty-setup'
+      );
+      await expect(readFile(join(workspaceDir, 'ia.yml'), 'utf8')).resolves.toContain('Project overview.');
       await expect(readFile(join(workspaceDir, 'glossary.yaml'), 'utf8')).resolves.toContain('terms: []');
     } finally {
       await backend.close();

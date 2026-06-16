@@ -102,7 +102,12 @@ const createClient = (overrides: ClientOverrides = {}): LocalUiClient => ({
   },
   feedback: {
     list: vi.fn<LocalUiClient['feedback']['list']>(async () => feedback),
-    submit: vi.fn<LocalUiClient['feedback']['submit']>(async (record) => record)
+    submit: vi.fn<LocalUiClient['feedback']['submit']>(async (record) => record),
+    write: vi.fn<LocalUiClient['feedback']['write']>(async (target, record) => ({
+      feedback: record,
+      target,
+      written: []
+    }))
   },
   pages: {
     approve: vi.fn<LocalUiClient['pages']['approve']>(async (pageId) => ({
@@ -254,8 +259,9 @@ describe('ProductApp', () => {
     fireEvent.change(screen.getByTestId('feedback-message'), { target: { value: 'Keep this writing instruction.' } });
     fireEvent.click(screen.getByTestId('feedback-submit'));
 
-    await waitFor(() => expect(client.feedback.submit).toHaveBeenCalledTimes(1));
-    expect(client.feedback.submit).toHaveBeenCalledWith(
+    await waitFor(() => expect(client.feedback.write).toHaveBeenCalledTimes(1));
+    expect(client.feedback.write).toHaveBeenCalledWith(
+      'instructions',
       expect.objectContaining({
         category: 'instruction',
         message: 'Keep this writing instruction.',

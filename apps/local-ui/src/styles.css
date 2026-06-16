@@ -107,6 +107,24 @@ button {
   width: 100%;
 }
 
+.stack-list {
+  display: grid;
+  gap: 12px;
+}
+
+.nested-panel {
+  background: #f8fafc;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.source-row {
+  display: grid;
+  gap: 10px;
+}
+
 .primary-button,
 .icon-button {
   align-items: center;
@@ -123,6 +141,17 @@ button {
   color: #ffffff;
   min-height: 38px;
   padding: 8px 14px;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.full-width-button {
+  margin-top: 12px;
+  width: 100%;
 }
 
 .icon-button {
@@ -171,6 +200,29 @@ button {
 .token-grid {
   display: grid;
   gap: 10px;
+}
+
+.component-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.component-option {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #d7deea;
+  border-radius: 6px;
+  color: #34425e;
+  display: flex;
+  gap: 8px;
+  min-height: 36px;
+  min-width: 0;
+  padding: 7px 9px;
+}
+
+.component-option span {
+  overflow-wrap: anywhere;
 }
 
 .color-control {

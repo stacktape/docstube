@@ -160,7 +160,7 @@ function ReviewView(props: { client: LocalUiClient; data: ReviewData; refresh: (
     await props.refresh();
   };
   const writeFeedback = async (_target: FeedbackWriteTarget, record: FeedbackRecord) => {
-    await props.client.feedback.submit(record);
+    await props.client.feedback.write(_target, record);
     await props.refresh();
   };
 

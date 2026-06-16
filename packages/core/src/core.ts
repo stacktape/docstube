@@ -165,6 +165,19 @@ export { writeSetupWizardFiles } from './setup-files.ts';
 export type { SetupWizardFileWriteInput, SetupWizardFileWriteResult } from './setup-files.ts';
 
 export {
+  applyFeedbackToProjectFiles,
+  feedbackApplicationInputSchema,
+  feedbackApplicationTargetSchema,
+  feedbackApplicationTargets
+} from './feedback-application.ts';
+export type {
+  ApplyFeedbackToProjectFilesInput,
+  FeedbackApplicationInput,
+  FeedbackApplicationResult,
+  FeedbackApplicationTarget
+} from './feedback-application.ts';
+
+export {
   createS0WalkingSkeletonReplayFixture,
   runS0WalkingSkeleton,
   walkingSkeletonHtmlToken,

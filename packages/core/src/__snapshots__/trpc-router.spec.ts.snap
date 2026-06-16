@@ -23,6 +23,10 @@ exports[`AppRouter contract > snapshots the AppRouter procedure surface 1`] = `
     "type": "mutation",
   },
   {
+    "path": "feedback.write",
+    "type": "mutation",
+  },
+  {
     "path": "ia.proposals",
     "type": "query",
   },

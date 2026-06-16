@@ -1,15 +1,19 @@
 import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 import {
   docstubeConfigSchema,
   feedbackRecordSchema,
   iaSchema,
   pageIdSchema,
+  parseDocstubeConfig,
   relativePathSchema
 } from '@docstube/contracts';
+import type { Ia } from '@docstube/contracts';
 import { compileMdxBodyToHtml } from '@docstube/verifiers';
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
 import { extractSectionMarkers } from '@docstube/contracts';
+import { applyFeedbackToProjectFiles, feedbackApplicationInputSchema } from './feedback-application.ts';
 import { createTerminalProgressState } from './pipeline-run.ts';
 import {
   loadProjectConfigFamily,
@@ -80,6 +84,32 @@ const readGeneratedPageContent = async (input: { ctx: TrpcContext; slug?: string
   }
 };
 
+const draftSetupState = (ctx: TrpcContext, configPath: string) => {
+  const siteName = ctx.workspaceDir ? basename(ctx.workspaceDir) : 'docstube';
+  const config = parseDocstubeConfig({
+    site: { name: siteName || 'docstube', locale: 'en' },
+    docsType: 'library',
+    output: { dir: 'docs', layout: 'single-tree' },
+    personas: [{ id: 'developer', title: 'Developer', goals: ['integrate quickly'] }],
+    agents: { writer: { adapter: 'codex' } },
+    sources: [{ kind: 'path', path: 'src' }],
+    ia: 'ia.yml',
+    glossary: 'glossary.yaml',
+    theme: { credit: true, tokens: { accent: '#2563eb', surface: '#f8fafc', radius: 8 } }
+  });
+  const ia = {
+    version: 1,
+    layout: 'single-tree',
+    nav: [{ id: 'overview', title: 'Overview', path: 'overview.mdx', brief: 'Project overview.' }]
+  } satisfies Ia;
+  return {
+    config,
+    configPath,
+    ia,
+    themeTokens: config.theme?.tokens ?? {}
+  };
+};
+
 const setupState = async (ctx: TrpcContext, configPath?: string) => {
   const effectiveConfigPath = configPath ?? ctx.configPath ?? 'docstube.yml';
   const themeTokens = await ctx.backend.getThemeTokens();
@@ -101,10 +131,14 @@ const setupState = async (ctx: TrpcContext, configPath?: string) => {
   }
 
   const [config, proposals] = await Promise.all([ctx.backend.getConfig(), ctx.backend.listIaProposals()]);
+  const ia = proposals.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0]?.ia ?? null;
+  if (!config && !ia) {
+    return draftSetupState(ctx, effectiveConfigPath);
+  }
   return {
     config,
     configPath: effectiveConfigPath,
-    ia: proposals.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0]?.ia ?? null,
+    ia,
     themeTokens
   };
 };
@@ -220,6 +254,14 @@ export const appRouter = t.router({
     regenerate: t.procedure.input(pageRefInput).mutation(({ ctx, input }) => ctx.backend.regeneratePage(input.pageId))
   }),
   feedback: t.router({
+    write: t.procedure.input(feedbackApplicationInputSchema).mutation(({ ctx, input }) =>
+      applyFeedbackToProjectFiles({
+        ...input,
+        backend: ctx.backend,
+        configPath: ctx.configPath,
+        workspaceDir: ctx.workspaceDir
+      })
+    ),
     list: t.procedure.input(feedbackListInput).query(({ ctx, input }) => ctx.backend.listFeedback(input?.pageId)),
     submit: t.procedure.input(feedbackRecordSchema).mutation(({ ctx, input }) => ctx.backend.submitFeedback(input))
   })

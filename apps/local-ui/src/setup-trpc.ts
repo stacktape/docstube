@@ -1,7 +1,14 @@
 import type { AppRouter } from '@docstube/core';
 import type { DocstubeConfig, FeedbackRecord, Ia } from '@docstube/contracts';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import type { PageDetail, RunRecord, TerminalProgressState, ThemeTokens } from '@docstube/core';
+import type {
+  FeedbackApplicationResult,
+  FeedbackApplicationTarget,
+  PageDetail,
+  RunRecord,
+  TerminalProgressState,
+  ThemeTokens
+} from '@docstube/core';
 import type { DashboardPage } from './generation-dashboard.tsx';
 import type { ReviewPage } from './review-room.tsx';
 import type { SetupWizardSaveInput } from './setup-wizard.tsx';
@@ -27,6 +34,7 @@ export type LocalUiClient = {
   feedback: {
     list: (pageId?: string) => Promise<FeedbackRecord[]>;
     submit: (record: FeedbackRecord) => Promise<FeedbackRecord>;
+    write: (target: FeedbackApplicationTarget, record: FeedbackRecord) => Promise<FeedbackApplicationResult>;
   };
   pages: {
     approve: (pageId: string) => Promise<PageDetail>;
@@ -63,7 +71,8 @@ export const createLocalUiClient = (sessionToken: string): LocalUiClient => {
     },
     feedback: {
       list: (pageId) => client.feedback.list.query(pageId ? { pageId } : undefined),
-      submit: (record) => client.feedback.submit.mutate(record)
+      submit: (record) => client.feedback.submit.mutate(record),
+      write: (target, record) => client.feedback.write.mutate({ target, record })
     },
     pages: {
       approve: (pageId) => client.pages.approve.mutate({ pageId }),
