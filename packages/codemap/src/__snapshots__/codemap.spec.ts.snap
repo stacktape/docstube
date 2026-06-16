@@ -1,0 +1,78 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`codemap source maps > serializes stable source-map artifacts 1`] = `
+"{
+  "version": 1,
+  "files": [
+    {
+      "path": "src/a.ts",
+      "language": "typescript",
+      "normalizedHash": "997c37bd0c60dfa955c1b4dee28d4fb15323576eb89e9caab1aad55c4f0f74f0",
+      "symbols": [
+        {
+          "id": "typescript:src/a.ts:alpha",
+          "name": "alpha",
+          "kind": "const",
+          "language": "typescript",
+          "filePath": "src/a.ts",
+          "range": {
+            "startLine": 1,
+            "endLine": 1
+          },
+          "normalizedHash": "997c37bd0c60dfa955c1b4dee28d4fb15323576eb89e9caab1aad55c4f0f74f0",
+          "signature": "export const alpha = 1;"
+        }
+      ]
+    },
+    {
+      "path": "src/b.py",
+      "language": "python",
+      "normalizedHash": "60c976424f8b70b6f7d66427728df309d0804942da7c51f9bb4a56561eb7d961",
+      "symbols": [
+        {
+          "id": "python:src/b.py:beta",
+          "name": "beta",
+          "kind": "function",
+          "language": "python",
+          "filePath": "src/b.py",
+          "range": {
+            "startLine": 1,
+            "endLine": 2
+          },
+          "normalizedHash": "60c976424f8b70b6f7d66427728df309d0804942da7c51f9bb4a56561eb7d961",
+          "signature": "def beta():"
+        }
+      ]
+    }
+  ],
+  "symbols": [
+    {
+      "id": "python:src/b.py:beta",
+      "name": "beta",
+      "kind": "function",
+      "language": "python",
+      "filePath": "src/b.py",
+      "range": {
+        "startLine": 1,
+        "endLine": 2
+      },
+      "normalizedHash": "60c976424f8b70b6f7d66427728df309d0804942da7c51f9bb4a56561eb7d961",
+      "signature": "def beta():"
+    },
+    {
+      "id": "typescript:src/a.ts:alpha",
+      "name": "alpha",
+      "kind": "const",
+      "language": "typescript",
+      "filePath": "src/a.ts",
+      "range": {
+        "startLine": 1,
+        "endLine": 1
+      },
+      "normalizedHash": "997c37bd0c60dfa955c1b4dee28d4fb15323576eb89e9caab1aad55c4f0f74f0",
+      "signature": "export const alpha = 1;"
+    }
+  ]
+}
+"
+`;
