@@ -104,6 +104,16 @@ export type {
   UpdateManifestInput
 } from './incremental-engine';
 
+export { createLocalControlPlaneApp, startGenerateSession, startLocalControlPlane } from './local-server';
+export type {
+  GenerateStartupOptions,
+  LocalControlPlaneApp,
+  LocalControlPlaneAppOptions,
+  OpenBrowser,
+  StartedLocalControlPlane,
+  StartLocalControlPlaneOptions
+} from './local-server';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
