@@ -32,6 +32,12 @@ export type WalkingSkeletonResult = {
   artifactPath: RelativePath;
 };
 
+export type WalkingSkeletonReplayFixtureOptions = {
+  outputPath?: RelativePath;
+  sourcePath?: RelativePath;
+  token?: string;
+};
+
 export class WalkingSkeletonError extends Error {
   constructor(message: string) {
     super(message);
@@ -179,8 +185,14 @@ export const runS0WalkingSkeleton = async (options: WalkingSkeletonOptions): Pro
   };
 };
 
-export const createS0WalkingSkeletonReplayFixture = async (repoRoot: string): Promise<AgentReplayFixture> => {
-  const input = await createWalkingSkeletonInput(repoRoot);
+export const createS0WalkingSkeletonReplayFixture = async (
+  repoRoot: string,
+  options: WalkingSkeletonReplayFixtureOptions = {}
+): Promise<AgentReplayFixture> => {
+  const sourcePath = relativePathSchema.parse(options.sourcePath ?? walkingSkeletonSourcePath);
+  const outputPath = relativePathSchema.parse(options.outputPath ?? walkingSkeletonOutputPath);
+  const token = options.token ?? walkingSkeletonHtmlToken;
+  const input = await createWalkingSkeletonInput(repoRoot, sourcePath, outputPath);
   const content = [
     '---',
     'id: overview',
@@ -196,7 +208,7 @@ export const createS0WalkingSkeletonReplayFixture = async (repoRoot: string): Pr
     '',
     '## Overview',
     '',
-    `The fixture toolkit renders ${walkingSkeletonHtmlToken}.`,
+    `The fixture toolkit renders ${token}.`,
     '',
     buildSectionMarker('end', 'intro')
   ].join('\n');
@@ -226,7 +238,7 @@ export const createS0WalkingSkeletonReplayFixture = async (repoRoot: string): Pr
           type: 'artifact-written',
           sequence: 1,
           timestamp: defaultTimestamp,
-          path: walkingSkeletonOutputPath,
+          path: outputPath,
           bytes: content.length
         },
         {
@@ -236,7 +248,7 @@ export const createS0WalkingSkeletonReplayFixture = async (repoRoot: string): Pr
           exitCode: 0
         }
       ],
-      artifacts: [{ path: walkingSkeletonOutputPath, content, encoding: 'utf8' }]
+      artifacts: [{ path: outputPath, content, encoding: 'utf8' }]
     }
   };
 };

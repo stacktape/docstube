@@ -15,6 +15,7 @@ export type CliCommandResult = {
 
 export type GenerateCommandOptions = {
   fresh?: boolean;
+  initialize?: (input: { workspaceDir: string }) => Promise<CliCommandResult>;
   openBrowser?: OpenBrowser;
   start?: (options: { openBrowser?: OpenBrowser; workspaceDir?: string }) => Promise<StartedLocalControlPlane>;
   workspaceDir?: string;
@@ -156,6 +157,11 @@ export const runGenerateCommand = async (
 
   if (options.yes) {
     output.info('Zero-question mode enabled.');
+    const initialize = options.initialize ?? ((input) => runGenerateYesInitialization(input, output));
+    const initialized = await initialize({ workspaceDir });
+    if (initialized.exitCode !== 0) {
+      return initialized;
+    }
   }
 
   const start = options.start ?? (await import('@docstube/core')).startGenerateSession;
@@ -248,17 +254,20 @@ export const runTelemetryCommand = async (
   return { exitCode: 0 };
 };
 
-export const runGenerateYesInitialization = async (input: {
-  workspaceDir: string;
-  dbPath?: string;
-}): Promise<CliCommandResult> => {
+export const runGenerateYesInitialization = async (
+  input: {
+    workspaceDir: string;
+    dbPath?: string;
+  },
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
   const dbPath = input.dbPath ?? join(input.workspaceDir, '.docstube', 'db.sqlite');
   await mkdir(join(input.workspaceDir, '.docstube'), { recursive: true });
   const { createLocalBackend, initializeRunFromConfigFamily, openDocstubeDatabase } = await import('@docstube/core');
   const backend = createLocalBackend(openDocstubeDatabase(dbPath));
   try {
     const result = await initializeRunFromConfigFamily({ backend, workspaceDir: input.workspaceDir });
-    defaultOutput.info(`Initialized ${result.pages.length} pages for ${result.run.id}.`);
+    output.info(`Initialized ${result.pages.length} pages for ${result.run.id}.`);
     return { exitCode: 0 };
   } finally {
     await backend.close();

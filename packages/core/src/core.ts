@@ -117,6 +117,21 @@ export type {
 export { writeSetupWizardFiles } from './setup-files';
 export type { SetupWizardFileWriteInput, SetupWizardFileWriteResult } from './setup-files';
 
+export {
+  createS0WalkingSkeletonReplayFixture,
+  runS0WalkingSkeleton,
+  walkingSkeletonHtmlToken,
+  walkingSkeletonOutputPath,
+  walkingSkeletonRunId,
+  walkingSkeletonSourcePath,
+  walkingSkeletonTaskId
+} from './walking-skeleton';
+export type {
+  WalkingSkeletonOptions,
+  WalkingSkeletonReplayFixtureOptions,
+  WalkingSkeletonResult
+} from './walking-skeleton';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
