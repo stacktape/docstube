@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,7 +74,10 @@ describe('initializeProjectGeneration', () => {
         'layout: "../layouts/DocLayout.astro"'
       );
       await expect(readFile(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain(
-        'Source context:'
+        'Source facts:'
+      );
+      await expect(readFile(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain(
+        'toolkit (const'
       );
       await expect(
         readFile(join(workspaceDir, 'docs', 'src', 'pages', 'guides', 'install.mdx'), 'utf8')
@@ -88,6 +91,16 @@ describe('initializeProjectGeneration', () => {
       ]);
       expect(manifest.pages.find((page) => page.id === 'guides/install')?.provenance.reads).toEqual([]);
       expect(manifest.pages.find((page) => page.id === 'overview')?.provenance.reads).toEqual(['src/toolkit.ts']);
+      expect(manifest.pages.find((page) => page.id === 'overview')?.provenance.citations).toEqual([
+        { path: 'src/toolkit.ts', symbol: 'toolkit' }
+      ]);
+      await expect(readdir(join(workspaceDir, '.docstube', 'cache', 'agents'))).resolves.not.toHaveLength(0);
+      await expect(
+        readFile(
+          join(workspaceDir, '.docstube', 'runs', first.runId, 'transcripts', 'writer-overview-attempt-0.json'),
+          'utf8'
+        )
+      ).resolves.toContain('"taskId": "writer-overview"');
     });
   });
 

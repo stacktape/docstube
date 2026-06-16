@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { dirname as posixDirname, join as posixJoin, relative as posixRelative } from 'node:path/posix';
 import {
   createClaudeAdapter,
@@ -9,17 +9,12 @@ import {
   createMockAgentAdapter
 } from '@docstube/agent';
 import { buildSectionMarker } from '@docstube/contracts';
-import {
-  checkGeneratedPageSections,
-  checkMdxCompiles,
-  generatedPageSectionCheckId,
-  mdxCompileCheckId
-} from '@docstube/verifiers';
 import type { AgentAdapter, AgentTextArtifact } from '@docstube/agent';
 import type {
   AgentChoice,
   DocstubeConfig,
   Finding,
+  Glossary,
   Manifest,
   ManifestPage,
   PageId,
@@ -31,17 +26,20 @@ import { openDocstubeDatabase } from './db-migrations.ts';
 import { createPageProvenance, updateManifest, writeManifestFile } from './incremental-engine.ts';
 import type { ManifestPageUpdate } from './incremental-engine.ts';
 import { createLocalBackend } from './local-backend.ts';
+import { createPageGenerationContext, createSourceGroundingContext } from './page-generation-context.ts';
+import type { PageGenerationContext } from './page-generation-context.ts';
 import { runReplayPageGeneration } from './page-orchestrator.ts';
-import type { PageDeterministicVerifier } from './page-orchestrator.ts';
 import type { PersonaReviewer } from './page-orchestrator.ts';
-import { initializeRunFromConfigFamily, transitionRunStatus } from './pipeline-run.ts';
+import { freezeRunForCaps, initializeRunFromConfigFamily, transitionRunStatus } from './pipeline-run.ts';
 import type { ScheduledPage } from './pipeline-run.ts';
+import { createProjectPageVerifiers } from './page-verifier-gate.ts';
 import { refreshGeneratedSiteAssets } from './project-assets.ts';
 import type { ProjectAssetRefreshResult } from './project-assets.ts';
 import {
   collectProjectSourceFiles,
   createPageSeedContext,
   defaultConfigPath,
+  docstubeDirPath,
   ensureDocstubeDir,
   projectDbPath,
   projectManifestPath,
@@ -80,6 +78,7 @@ export type ProjectGenerationOptions = ProjectGenerationInitializationOptions & 
 
 export type ProjectGenerationResult = ProjectGenerationInitializationResult & {
   assetRefresh: ProjectAssetRefreshResult;
+  capFrozen: boolean;
   generatedPages: GeneratedProjectPage[];
   manifest: Manifest;
   manifestPath: string;
@@ -122,15 +121,29 @@ const astroLayoutPathForPage = (pagePath: RelativePath): string => {
 };
 
 const artifactContentForPage = (input: {
+  context?: Pick<PageGenerationContext, 'apiSymbols' | 'sourceFacts'>;
   generatedAt: Timestamp;
   page: ScheduledPage;
   seedContext: PageSeedContext;
   sourceFiles: readonly ProjectSourceFile[];
 }): string => {
+  const sourceFacts = input.context?.sourceFacts ?? [];
   const sourceLines =
-    input.sourceFiles.length > 0
-      ? input.sourceFiles.slice(0, 12).map((source) => `- \`${escapeCodeText(source.path)}\``)
-      : ['- No configured source files were discovered for this deterministic run.'];
+    sourceFacts.length > 0
+      ? sourceFacts.slice(0, 12).map((fact) => `- ${escapeMarkdownText(fact)}`)
+      : input.sourceFiles.length > 0
+        ? input.sourceFiles.slice(0, 12).map((source) => `- \`${escapeCodeText(source.path)}\``)
+        : ['- No configured source files were discovered for this deterministic run.'];
+  const apiSymbols = input.context?.apiSymbols ?? [];
+  const apiLines =
+    apiSymbols.length > 0
+      ? apiSymbols
+          .slice(0, 12)
+          .map(
+            (symbol) =>
+              `- ${escapeMarkdownText(symbol.name)} (${symbol.kind}) from \`${escapeCodeText(symbol.sourcePath)}\``
+          )
+      : ['- No API symbols were extracted for this deterministic run.'];
   const personaLines = input.seedContext.personas.map((persona) => `  - ${persona}`);
 
   return [
@@ -156,8 +169,11 @@ const artifactContentForPage = (input: {
     `${escapeMarkdownText(input.seedContext.site.name)} documentation page generated from the configured IA.`,
     input.page.brief ? `Brief: ${escapeMarkdownText(input.page.brief)}` : undefined,
     '',
-    'Source context:',
+    'Source facts:',
     ...sourceLines,
+    '',
+    'API symbols:',
+    ...apiLines,
     '',
     buildSectionMarker('end', 'intro')
   ]
@@ -172,10 +188,10 @@ const writeArtifact = async (workspaceDir: string, artifact: AgentTextArtifact):
 };
 
 const pageManifestUpdate = (input: {
+  context: PageGenerationContext;
   page: ScheduledPage;
   result: Awaited<ReturnType<typeof runReplayPageGeneration>>;
   seedContext: PageSeedContext;
-  sourceFiles: readonly ProjectSourceFile[];
 }): ManifestPageUpdate => ({
   id: input.result.generatedPage.frontmatter.id,
   path: input.result.artifact.path,
@@ -184,8 +200,8 @@ const pageManifestUpdate = (input: {
   sections: input.result.generatedPage.frontmatter.sections ?? [],
   provenance: createPageProvenance({
     seedContext: input.seedContext,
-    reads: input.sourceFiles.map((source) => source.path),
-    citations: input.sourceFiles.map((source) => ({ path: source.path }))
+    reads: input.context.provenance.reads,
+    citations: input.context.provenance.citations
   })
 });
 
@@ -235,9 +251,11 @@ export const createDeterministicProjectGenerationAdapters: ProjectGenerationAdap
   const artifacts = input.pages.map((page): AgentTextArtifact => {
     const pageSources = sourceFilesForPage(page, input.sourceFiles);
     const seedContext = createPageSeedContext({ config: input.config, page, sources: pageSources });
+    const sourceGrounding = createSourceGroundingContext(pageSources);
     return {
       path: page.slug,
       content: artifactContentForPage({
+        context: sourceGrounding,
         generatedAt: input.generatedAt,
         page,
         seedContext,
@@ -259,6 +277,7 @@ export const createDeterministicProjectGenerationAdapters: ProjectGenerationAdap
 };
 
 export type GenerateConfiguredProjectPagesResult = {
+  capFrozen: boolean;
   generatedPages: GeneratedProjectPage[];
   manifestPages: ManifestPageUpdate[];
 };
@@ -268,6 +287,8 @@ export const generateConfiguredProjectPages = async (input: {
   backend: StateBackend;
   config: DocstubeConfig;
   generatedAt: Timestamp;
+  glossary: Glossary;
+  maxRetries?: number;
   pages: readonly ScheduledPage[];
   runId: string;
   sourceFiles: readonly ProjectSourceFile[];
@@ -280,44 +301,73 @@ export const generateConfiguredProjectPages = async (input: {
     sourceFiles: input.sourceFiles,
     workspaceDir: input.workspaceDir
   });
-  const verifiers = [
-    { id: generatedPageSectionCheckId, run: checkGeneratedPageSections },
-    {
-      id: mdxCompileCheckId,
-      run: (page) => checkMdxCompiles({ path: page.path, body: page.body })
-    }
-  ] satisfies readonly PageDeterministicVerifier[];
   const generatedPages: GeneratedProjectPage[] = [];
   const manifestPages: ManifestPageUpdate[] = [];
+  const knownFiles = [
+    ...new Set([...input.sourceFiles.map((source) => source.path), ...input.pages.map((page) => page.slug)])
+  ];
+  const cacheDir = join(docstubeDirPath(input.workspaceDir), 'cache', 'agents');
+  const transcriptRunDir = join(docstubeDirPath(input.workspaceDir), 'runs', input.runId);
 
-  await input.pages.reduce(async (previous, page) => {
-    await previous;
-    const pageSources = sourceFilesForPage(page, input.sourceFiles);
-    const seedContext = createPageSeedContext({ config: input.config, page, sources: pageSources });
-    const result = await runReplayPageGeneration({
-      backend: input.backend,
-      runId: input.runId,
-      repoRoot: input.workspaceDir,
-      page,
-      writer: adapters.writer,
-      reviewers: adapters.reviewers,
-      verifiers,
-      model: adapters.model,
-      now: () => input.generatedAt
-    });
-    await writeArtifact(input.workspaceDir, result.artifact);
-    manifestPages.push(pageManifestUpdate({ page, result, seedContext, sourceFiles: pageSources }));
-    generatedPages.push({
-      id: result.generatedPage.frontmatter.id,
-      path: result.artifact.path,
-      title: result.generatedPage.frontmatter.title,
-      status: result.page.status === 'flagged' ? 'flagged' : 'passed',
-      sections: result.generatedPage.frontmatter.sections ?? [],
-      findings: result.page.findings
-    });
-  }, Promise.resolve());
+  const state = await input.pages.reduce<Promise<{ capFrozen: boolean }>>(
+    async (previous, page) => {
+      const previousState = await previous;
+      if (previousState.capFrozen) {
+        return previousState;
+      }
 
-  return { generatedPages, manifestPages };
+      const maxPages = input.config.caps?.maxPages;
+      if (maxPages !== undefined && generatedPages.length >= maxPages) {
+        await freezeRunForCaps({
+          backend: input.backend,
+          runId: input.runId,
+          note: `Stopped after ${generatedPages.length} generated pages because caps.maxPages=${maxPages}.`,
+          now: () => input.generatedAt
+        });
+        return { capFrozen: true };
+      }
+
+      const pageSources = sourceFilesForPage(page, input.sourceFiles);
+      const seedContext = createPageSeedContext({ config: input.config, page, sources: pageSources });
+      const context = await createPageGenerationContext({
+        config: input.config,
+        glossary: input.glossary,
+        page,
+        sources: pageSources,
+        workspaceDir: input.workspaceDir
+      });
+      const verifiers = createProjectPageVerifiers({ context, knownFiles });
+      const result = await runReplayPageGeneration({
+        backend: input.backend,
+        runId: input.runId,
+        repoRoot: input.workspaceDir,
+        page,
+        writer: adapters.writer,
+        reviewers: adapters.reviewers,
+        verifiers,
+        cacheDir,
+        context,
+        maxRetries: input.maxRetries ?? 1,
+        model: adapters.model,
+        now: () => input.generatedAt,
+        transcriptRunDir
+      });
+      await writeArtifact(input.workspaceDir, result.artifact);
+      manifestPages.push(pageManifestUpdate({ context, page, result, seedContext }));
+      generatedPages.push({
+        id: result.generatedPage.frontmatter.id,
+        path: result.artifact.path,
+        title: result.generatedPage.frontmatter.title,
+        status: result.page.status === 'flagged' ? 'flagged' : 'passed',
+        sections: result.generatedPage.frontmatter.sections ?? [],
+        findings: result.page.findings
+      });
+      return { capFrozen: false };
+    },
+    Promise.resolve({ capFrozen: false })
+  );
+
+  return { capFrozen: state.capFrozen, generatedPages, manifestPages };
 };
 
 export const initializeProjectGeneration = async (
@@ -371,6 +421,7 @@ export const generateProjectDocumentation = async (
       backend,
       config: initialized.config,
       generatedAt,
+      glossary: initialized.glossary,
       pages,
       runId: initialized.run.id,
       sourceFiles,
@@ -388,10 +439,13 @@ export const generateProjectDocumentation = async (
       ia: initialized.ia,
       workspaceDir: input.workspaceDir
     });
-    await transitionRunStatus({ backend, runId: initialized.run.id, status: 'completed', now });
+    if (!generation.capFrozen) {
+      await transitionRunStatus({ backend, runId: initialized.run.id, status: 'completed', now });
+    }
 
     return {
       assetRefresh,
+      capFrozen: generation.capFrozen,
       generatedPages: generation.generatedPages,
       manifest,
       manifestPath,

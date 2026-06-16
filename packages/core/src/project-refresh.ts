@@ -180,12 +180,13 @@ export const refreshProjectDocumentation = async (input: ProjectRefreshOptions):
             backend,
             config: initialized.config,
             generatedAt: timestamp,
+            glossary: initialized.glossary,
             pages: uniquePagesToGenerate,
             runId: initialized.run.id,
             sourceFiles,
             workspaceDir: input.workspaceDir
           })
-        : { generatedPages: [], manifestPages: [] };
+        : { capFrozen: false, generatedPages: [], manifestPages: [] };
     const flagUpdates: ManifestPageUpdate[] = [];
     const changedPages = new Map<string, ProjectRefreshPageChange>();
     const flagTasks: Promise<void>[] = [];

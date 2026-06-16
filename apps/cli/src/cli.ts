@@ -26,6 +26,19 @@ const printHelp = (command?: string): void => {
   output.info(getCommandHelp(command));
 };
 
+const runCliCommand = async (
+  command: string,
+  run: () => Promise<{ exitCode: number }> | { exitCode: number }
+): Promise<void> => {
+  const { runCliCommandWithTelemetry } = await import('./runtime-telemetry.ts');
+  const result = await runCliCommandWithTelemetry({
+    command,
+    run,
+    workspaceDir: process.cwd()
+  });
+  process.exitCode = result.exitCode;
+};
+
 const wizard = defineCommand({
   meta: {
     description: 'Start the local setup wizard and generation control plane.',
@@ -35,16 +48,17 @@ const wizard = defineCommand({
     fresh: { type: 'boolean', description: 'Discard local wizard state before starting.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runWizardCommand } = await import('./commands/wizard-command.ts');
-    const result = await runWizardCommand(
-      {
-        fresh: args.fresh === true,
-        uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('wizard', async () => {
+      enableNodeCompileCache();
+      const { runWizardCommand } = await import('./commands/wizard-command.ts');
+      return runWizardCommand(
+        {
+          fresh: args.fresh === true,
+          uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL
+        },
+        output
+      );
+    });
   }
 });
 
@@ -58,16 +72,17 @@ const generate = defineCommand({
     config: { type: 'string', description: 'Path to docstube.yml.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runGenerateCommand } = await import('./commands/generate-command.ts');
-    const result = await runGenerateCommand(
-      {
-        configPath: typeof args.config === 'string' ? args.config : undefined,
-        fresh: args.fresh === true
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('generate', async () => {
+      enableNodeCompileCache();
+      const { runGenerateCommand } = await import('./commands/generate-command.ts');
+      return runGenerateCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined,
+          fresh: args.fresh === true
+        },
+        output
+      );
+    });
   }
 });
 
@@ -80,15 +95,16 @@ const refresh = defineCommand({
     config: { type: 'string', description: 'Path to docstube.yml.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runRefreshCommand } = await import('./commands/refresh-command.ts');
-    const result = await runRefreshCommand(
-      {
-        configPath: typeof args.config === 'string' ? args.config : undefined
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('refresh', async () => {
+      enableNodeCompileCache();
+      const { runRefreshCommand } = await import('./commands/refresh-command.ts');
+      return runRefreshCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined
+        },
+        output
+      );
+    });
   }
 });
 
@@ -104,25 +120,25 @@ const refine = defineCommand({
     'max-rounds': { type: 'string', description: 'Maximum refinement rounds.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const maxRounds = typeof args['max-rounds'] === 'string' ? Number(args['max-rounds']) : undefined;
-    if (maxRounds !== undefined && (!Number.isInteger(maxRounds) || maxRounds < 1)) {
-      output.error(`Invalid --max-rounds value: ${args['max-rounds']}`);
-      process.exitCode = 1;
-      return;
-    }
+    await runCliCommand('refine', async () => {
+      enableNodeCompileCache();
+      const maxRounds = typeof args['max-rounds'] === 'string' ? Number(args['max-rounds']) : undefined;
+      if (maxRounds !== undefined && (!Number.isInteger(maxRounds) || maxRounds < 1)) {
+        output.error(`Invalid --max-rounds value: ${args['max-rounds']}`);
+        return { exitCode: 1 };
+      }
 
-    const { runRefineCommand } = await import('./commands/refine-command.ts');
-    const result = await runRefineCommand(
-      {
-        configPath: typeof args.config === 'string' ? args.config : undefined,
-        failed: args.failed === true,
-        maxRounds,
-        target: typeof args.target === 'string' ? args.target : undefined
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+      const { runRefineCommand } = await import('./commands/refine-command.ts');
+      return runRefineCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined,
+          failed: args.failed === true,
+          maxRounds,
+          target: typeof args.target === 'string' ? args.target : undefined
+        },
+        output
+      );
+    });
   }
 });
 
@@ -135,15 +151,16 @@ const validate = defineCommand({
     config: { type: 'string', description: 'Path to docstube.yml.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runValidateCommand } = await import('./commands/validate-command.ts');
-    const result = await runValidateCommand(
-      {
-        configPath: typeof args.config === 'string' ? args.config : undefined
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('validate', async () => {
+      enableNodeCompileCache();
+      const { runValidateCommand } = await import('./commands/validate-command.ts');
+      return runValidateCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined
+        },
+        output
+      );
+    });
   }
 });
 
@@ -159,35 +176,32 @@ const check = defineCommand({
     config: { type: 'string', description: 'Path to docstube.yml for --all.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    if (args.all === true) {
-      const { runCheckAllCommand } = await import('./commands/check-command.ts');
-      const result = await runCheckAllCommand(
-        {
-          configPath: typeof args.config === 'string' ? args.config : undefined
-        },
-        output
-      );
-      process.exitCode = result.exitCode;
-      return;
-    }
+    await runCliCommand('check', async () => {
+      enableNodeCompileCache();
+      if (args.all === true) {
+        const { runCheckAllCommand } = await import('./commands/check-command.ts');
+        return runCheckAllCommand(
+          {
+            configPath: typeof args.config === 'string' ? args.config : undefined
+          },
+          output
+        );
+      }
 
-    const kind = args.kind;
-    if (kind !== 'd2' && kind !== 'mdx' && kind !== 'snippet' && kind !== 'config') {
-      output.error('Expected `docstube check --all` or `docstube check <d2|mdx|snippet|config> <file>`.');
-      process.exitCode = 1;
-      return;
-    }
+      const kind = args.kind;
+      if (kind !== 'd2' && kind !== 'mdx' && kind !== 'snippet' && kind !== 'config') {
+        output.error('Expected `docstube check --all` or `docstube check <d2|mdx|snippet|config> <file>`.');
+        return { exitCode: 1 };
+      }
 
-    if (typeof args.file !== 'string') {
-      output.error(`Missing file for check kind: ${kind}`);
-      process.exitCode = 1;
-      return;
-    }
+      if (typeof args.file !== 'string') {
+        output.error(`Missing file for check kind: ${kind}`);
+        return { exitCode: 1 };
+      }
 
-    const { runCheckCommand } = await import('./commands/check-command.ts');
-    const result = await runCheckCommand({ kind, file: args.file }, output);
-    process.exitCode = result.exitCode;
+      const { runCheckCommand } = await import('./commands/check-command.ts');
+      return runCheckCommand({ kind, file: args.file }, output);
+    });
   }
 });
 
@@ -200,15 +214,16 @@ const status = defineCommand({
     config: { type: 'string', description: 'Path to docstube.yml.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runStatusCommand } = await import('./commands/status-command.ts');
-    const result = await runStatusCommand(
-      {
-        configPath: typeof args.config === 'string' ? args.config : undefined
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('status', async () => {
+      enableNodeCompileCache();
+      const { runStatusCommand } = await import('./commands/status-command.ts');
+      return runStatusCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined
+        },
+        output
+      );
+    });
   }
 });
 
@@ -221,15 +236,16 @@ const doctor = defineCommand({
     config: { type: 'string', description: 'Path to docstube.yml.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runDoctorCommand } = await import('./commands/doctor-command.ts');
-    const result = await runDoctorCommand(
-      {
-        configPath: typeof args.config === 'string' ? args.config : undefined
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('doctor', async () => {
+      enableNodeCompileCache();
+      const { runDoctorCommand } = await import('./commands/doctor-command.ts');
+      return runDoctorCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined
+        },
+        output
+      );
+    });
   }
 });
 
@@ -243,16 +259,17 @@ const upgrade = defineCommand({
     to: { type: 'string', description: 'Target version. Defaults to latest.' }
   },
   async run({ args }) {
-    enableNodeCompileCache();
-    const { runUpgradeCommand } = await import('./commands/upgrade-command.ts');
-    const result = await runUpgradeCommand(
-      {
-        check: args.check === true,
-        targetVersion: typeof args.to === 'string' ? args.to : undefined
-      },
-      output
-    );
-    process.exitCode = result.exitCode;
+    await runCliCommand('upgrade', async () => {
+      enableNodeCompileCache();
+      const { runUpgradeCommand } = await import('./commands/upgrade-command.ts');
+      return runUpgradeCommand(
+        {
+          check: args.check === true,
+          targetVersion: typeof args.to === 'string' ? args.to : undefined
+        },
+        output
+      );
+    });
   }
 });
 
@@ -261,8 +278,11 @@ const version = defineCommand({
     description: 'Print the docstube version.',
     name: 'version'
   },
-  run: () => {
-    output.info(docstubeVersion);
+  async run() {
+    await runCliCommand('version', () => {
+      output.info(docstubeVersion);
+      return { exitCode: 0 };
+    });
   }
 });
 
@@ -274,8 +294,11 @@ const help = defineCommand({
   args: {
     command: { type: 'positional', required: false, description: 'Command to describe.' }
   },
-  run({ args }) {
-    printHelp(typeof args.command === 'string' ? args.command : undefined);
+  async run({ args }) {
+    await runCliCommand('help', () => {
+      printHelp(typeof args.command === 'string' ? args.command : undefined);
+      return { exitCode: 0 };
+    });
   }
 });
 

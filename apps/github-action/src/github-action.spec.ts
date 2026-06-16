@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createDocstubeCommandRunner,
   createDocstubeActionBranchName,
   createDocstubeActionConcurrencyGroup,
   readGitHubActionInputsFromEnv,
@@ -235,6 +236,28 @@ describe('GitHub Action wrapper', () => {
     expect(result.changed).toBe(false);
     expect(harness.operations).toEqual(['info:Starting docstube validate.', 'validate:/repo']);
     expect(harness.outputs.changed).toBe('false');
+  });
+
+  it('passes config-path through the default npx command runner', async () => {
+    const calls: { args: readonly string[]; command: string; cwd: string }[] = [];
+    const runner = createDocstubeCommandRunner('refresh', 'docstube@latest', async (command, args, options) => {
+      calls.push({ command, args, cwd: options.cwd });
+      return { exitCode: 0, stdout: 'ok', stderr: '' };
+    });
+
+    await expect(
+      runner({
+        configPath: 'config/docstube.yml',
+        workspaceDir: '/repo'
+      })
+    ).resolves.toEqual({ exitCode: 0, output: 'ok' });
+    expect(calls).toEqual([
+      {
+        command: 'npx',
+        args: ['--yes', 'docstube@latest', 'refresh', '--config', 'config/docstube.yml'],
+        cwd: '/repo'
+      }
+    ]);
   });
 
   it('creates deterministic branch names and concurrency groups', () => {

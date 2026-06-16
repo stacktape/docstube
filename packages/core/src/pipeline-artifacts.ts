@@ -49,7 +49,8 @@ export const runRetryLoop = async <T>(input: {
         status: 'failed',
         attempts: input.maxRetries + 1,
         exhausted: true,
-        findings: result.findings
+        findings: result.findings,
+        ...(result.value === undefined ? {} : { value: result.value })
       };
     }
 

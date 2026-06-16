@@ -20,6 +20,8 @@ import { runWizardCommand } from './commands/wizard-command.ts';
 import type { CliOutput } from './cli-output.ts';
 import {
   createRuntimeTelemetryEvent,
+  readRuntimeTelemetryEnabled,
+  runCliCommandWithTelemetry,
   sendRuntimeTelemetry,
   writeRuntimeTelemetryEnabled
 } from './runtime-telemetry.ts';
@@ -183,13 +185,56 @@ describe('CLI commands', () => {
 
   it('runs all available deterministic checks over the project', async () => {
     await withWorkspace(async (dir) => {
-      await mkdir(join(dir, 'docs'), { recursive: true });
-      await writeFile(join(dir, 'docs', 'page.mdx'), '# Hello\n\nWorld\n', 'utf8');
+      const configPath = join(dir, 'docstube.yml');
+      const config = await readFile(configPath, 'utf8');
+      await writeFile(configPath, config.replace('dir: docs', 'dir: site-docs'), 'utf8');
+      await mkdir(join(dir, 'site-docs'), { recursive: true });
+      await writeFile(join(dir, 'site-docs', 'page.mdx'), '# Hello\n\nWorld\n', 'utf8');
+      const output = captureOutput();
+      const doctorInputs: unknown[] = [];
+
+      await expect(
+        runCheckAllCommand(
+          {
+            workspaceDir: dir,
+            runProjectDoctor: async (input) => {
+              doctorInputs.push(input);
+              return {
+                ok: true,
+                checks: [{ id: 'config', status: 'passed', message: 'docstube.yml trust gate passed' }]
+              };
+            }
+          },
+          output.output
+        )
+      ).resolves.toEqual({ exitCode: 0 });
+      expect(output.lines).toContain('info:config-family: passed');
+      expect(output.lines).toContain('info:config: passed - docstube.yml trust gate passed');
+      expect(output.lines).toContain('info:mdx-compile: passed');
+      expect(doctorInputs).toEqual([{ configPath: 'docstube.yml', workspaceDir: dir }]);
+      expect(output.lines.some((line) => line.includes('No docs/*.mdx'))).toBe(false);
+    });
+  });
+
+  it('fails check --all when project validation cannot trust the config family', async () => {
+    await withWorkspace(async (dir) => {
+      await rm(join(dir, 'docstube.yml'));
       const output = captureOutput();
 
-      await expect(runCheckAllCommand({ workspaceDir: dir }, output.output)).resolves.toEqual({ exitCode: 0 });
-      expect(output.lines).toContain('info:config-family: passed');
-      expect(output.lines).toContain('info:mdx-compile: passed');
+      await expect(
+        runCheckAllCommand(
+          {
+            workspaceDir: dir,
+            runProjectDoctor: async () => ({
+              ok: false,
+              checks: [{ id: 'config', status: 'failed', message: 'missing docstube.yml' }]
+            })
+          },
+          output.output
+        )
+      ).resolves.toEqual({ exitCode: 1 });
+      expect(output.lines).toContain('error:No docstube.yml found. Run docstube wizard first.');
+      expect(output.lines).toContain('error:config: failed - missing docstube.yml');
     });
   });
 
@@ -367,8 +412,9 @@ describe('CLI commands', () => {
     });
   });
 
-  it('keeps runtime telemetry opt-in and never sends forbidden runtime data', async () => {
+  it('keeps runtime telemetry opt-out and never sends forbidden runtime data', async () => {
     await withWorkspace(async (dir) => {
+      await expect(readRuntimeTelemetryEnabled(dir)).resolves.toBe(true);
       await writeRuntimeTelemetryEnabled(dir, true);
 
       const sent: RuntimeTelemetryEvent[] = [];
@@ -397,6 +443,49 @@ describe('CLI commands', () => {
         }
       });
       expect(disabled.sent).toBe(false);
+    });
+  });
+
+  it('records CLI command execution telemetry without paths, prompts, source, or secrets', async () => {
+    await withWorkspace(async (dir) => {
+      const sent: RuntimeTelemetryEvent[] = [];
+      let time = 0;
+
+      await expect(
+        runCliCommandWithTelemetry({
+          command: 'generate',
+          workspaceDir: dir,
+          now: () => {
+            time += 15;
+            return time;
+          },
+          run: () => ({ exitCode: 0 }),
+          transport: (payload) => {
+            sent.push(payload);
+          }
+        })
+      ).resolves.toEqual({ exitCode: 0 });
+
+      expect(sent.map((event) => event.status)).toEqual(['started', 'succeeded']);
+      expect(sent[1]).toMatchObject({ command: 'generate', durationMs: 15, status: 'succeeded' });
+      const serialized = JSON.stringify(sent);
+      for (const forbidden of [dir, 'docstube.yml', 'sk-', 'prompt', 'path', 'source', 'transcript', 'secret']) {
+        expect(serialized).not.toContain(forbidden);
+      }
+
+      sent.length = 0;
+      await expect(
+        runCliCommandWithTelemetry({
+          command: 'generate',
+          env: { DOCSTUBE_TELEMETRY: 'false' },
+          workspaceDir: dir,
+          run: () => ({ exitCode: 0 }),
+          transport: (payload) => {
+            sent.push(payload);
+          }
+        })
+      ).resolves.toEqual({ exitCode: 0 });
+      expect(sent).toEqual([]);
     });
   });
 });

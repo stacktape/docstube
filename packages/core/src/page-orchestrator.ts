@@ -7,6 +7,9 @@ import { findingSchema, generatedPageFrontmatterSchema } from '@docstube/contrac
 import type { CheckResult, Finding, GeneratedPageFrontmatter, Timestamp } from '@docstube/contracts';
 import type { AgentAdapter, AgentRunInput, AgentTextArtifact } from '@docstube/agent';
 import type { GeneratedMdxPage } from '@docstube/verifiers';
+import { runCachedAgentStep, runRetryLoop, writeAgentTranscript } from './pipeline-artifacts.ts';
+import type { AgentCacheKeyInput } from './pipeline-artifacts.ts';
+import type { PageGenerationContext } from './page-generation-context.ts';
 import type { ScheduledPage } from './pipeline-run.ts';
 import type { PageDetail, StateBackend } from './state-backend.ts';
 
@@ -22,12 +25,16 @@ export type PageDeterministicVerifier = {
 
 export type PageGenerationOptions = {
   backend: StateBackend;
+  cacheDir?: string;
+  context?: PageGenerationContext;
+  maxRetries?: number;
   model?: string;
   now?: () => Timestamp;
   page: ScheduledPage;
   repoRoot: string;
   reviewers: readonly PersonaReviewer[];
   runId: string;
+  transcriptRunDir?: string;
   verifiers: readonly PageDeterministicVerifier[];
   writer: AgentAdapter;
 };
@@ -54,9 +61,64 @@ const safeTaskId = (prefix: string, pageId: string): string => `${prefix}-${page
 
 const writableRootForPage = (repoRoot: string, page: ScheduledPage): string => resolve(repoRoot, dirname(page.slug));
 
+const promptList = (title: string, values: readonly string[], empty: string): string[] => [
+  title,
+  ...(values.length > 0 ? values.map((value) => `- ${value}`) : [`- ${empty}`])
+];
+
+const sourceContextPrompt = (context: PageGenerationContext | undefined): string[] => {
+  if (!context) {
+    return ['Grounding context: none supplied.'];
+  }
+
+  return [
+    ...promptList(
+      'Source-grounded facts:',
+      context.sourceFacts.slice(0, 24),
+      'No configured source files matched this page.'
+    ),
+    ...promptList(
+      'Allowed theme components:',
+      context.componentNames.map((name) => `\`${name}\``),
+      'No theme components configured.'
+    ),
+    ...promptList(
+      'Available API symbols:',
+      context.apiSymbols.slice(0, 24).map((symbol) => `${symbol.name} (${symbol.kind}) from ${symbol.sourcePath}`),
+      'No API symbols extracted for this page.'
+    ),
+    ...promptList(
+      'Glossary terms:',
+      context.glossaryTerms
+        .slice(0, 24)
+        .map((term) => `${term.id}: ${term.term}${term.aliases.length > 0 ? ` (${term.aliases.join(', ')})` : ''}`),
+      'No glossary terms configured.'
+    ),
+    ...promptList('Committed writing instructions:', context.instructions.slice(0, 8), 'No extra instructions.'),
+    ...promptList('Committed review criteria:', context.criteria.slice(0, 8), 'No extra criteria.')
+  ];
+};
+
+const findingsPrompt = (findings: readonly Finding[]): string[] =>
+  findings.length === 0
+    ? []
+    : [
+        'Previous findings to fix before returning the page:',
+        ...findings.slice(0, 12).map((finding) => `- ${finding.severity} ${finding.code}: ${finding.message}`)
+      ];
+
+const sourceDigestMetadata = (context: PageGenerationContext | undefined) =>
+  context?.sourceDigests.map((digest) => ({
+    algorithm: digest.algorithm,
+    path: digest.path,
+    value: digest.value
+  })) ?? [];
+
 export const createWriterRunInput = (input: {
+  context?: PageGenerationContext;
   model?: string;
   page: ScheduledPage;
+  previousFindings?: readonly Finding[];
   repoRoot: string;
   runId: string;
 }): AgentRunInput => ({
@@ -68,6 +130,10 @@ export const createWriterRunInput = (input: {
     `Title: ${input.page.title}`,
     input.page.brief ? `Brief: ${input.page.brief}` : 'Brief: none',
     'The file must contain one docstube-generated MDX page with valid frontmatter and section markers.',
+    'Use code and committed project context as the source of truth. Do not invent facts that are not grounded below.',
+    'When referencing APIs or project behavior, cite the relevant source path or symbol in prose.',
+    ...sourceContextPrompt(input.context),
+    ...findingsPrompt(input.previousFindings ?? []),
     'If your adapter supports artifacts, also return that MDX artifact.'
   ].join('\n'),
   sandbox: {
@@ -75,11 +141,20 @@ export const createWriterRunInput = (input: {
     writableRoots: [writableRootForPage(input.repoRoot, input.page)],
     allowNetwork: false,
     shell: 'none'
+  },
+  metadata: {
+    runId: input.runId,
+    pageId: input.page.id,
+    pagePath: input.page.slug,
+    sourceDigests: sourceDigestMetadata(input.context),
+    componentNames: [...(input.context?.componentNames ?? [])],
+    apiSymbols: input.context?.apiSymbols.map((symbol) => symbol.name) ?? []
   }
 });
 
 export const createReviewerRunInput = (input: {
   artifactContent: string;
+  context?: PageGenerationContext;
   model?: string;
   page: ScheduledPage;
   personaId: string;
@@ -92,6 +167,8 @@ export const createReviewerRunInput = (input: {
     `Run: ${input.runId}`,
     `Review page ${input.page.id} for persona ${input.personaId}.`,
     'Return JSON findings only.',
+    'Check the page against source facts, committed criteria, glossary, and the persona audience.',
+    ...sourceContextPrompt(input.context),
     '',
     input.artifactContent
   ].join('\n'),
@@ -100,6 +177,12 @@ export const createReviewerRunInput = (input: {
     writableRoots: [],
     allowNetwork: false,
     shell: 'none'
+  },
+  metadata: {
+    runId: input.runId,
+    pageId: input.page.id,
+    personaId: input.personaId,
+    sourceDigests: sourceDigestMetadata(input.context)
   }
 });
 
@@ -192,6 +275,138 @@ export const mergeFindings = (...groups: readonly Finding[][]): Finding[] => {
   return [...merged.values()];
 };
 
+type PageGenerationAttempt = {
+  artifact: AgentTextArtifact;
+  checkResults: CheckResult[];
+  findings: Finding[];
+  generatedPage: GeneratedMdxPage;
+  reviewerFindings: Finding[];
+  verifierFindings: Finding[];
+};
+
+const cacheKeyInput = (input: {
+  adapter: AgentAdapter;
+  context?: PageGenerationContext;
+  model: string;
+  prompt: string;
+}): AgentCacheKeyInput => ({
+  adapterId: input.adapter.id,
+  adapterVersion: input.adapter.version,
+  model: input.model,
+  prompt: input.prompt,
+  inputDigests: input.context?.sourceDigests ?? []
+});
+
+const runAgentStep = async (input: {
+  adapter: AgentAdapter;
+  cacheDir?: string;
+  context?: PageGenerationContext;
+  run: () => Promise<Awaited<ReturnType<AgentAdapter['run']>>>;
+  runInput: AgentRunInput;
+  stepId: string;
+  transcriptRunDir?: string;
+}) => {
+  const result = input.cacheDir
+    ? (
+        await runCachedAgentStep({
+          cacheDir: input.cacheDir,
+          cacheKeyInput: cacheKeyInput({
+            adapter: input.adapter,
+            context: input.context,
+            model: input.runInput.model,
+            prompt: input.runInput.prompt
+          }),
+          run: input.run
+        })
+      ).result
+    : await input.run();
+
+  if (input.transcriptRunDir) {
+    await writeAgentTranscript({
+      runDir: input.transcriptRunDir,
+      stepId: input.stepId,
+      input: input.runInput,
+      result
+    });
+  }
+
+  return result;
+};
+
+const runPageGenerationAttempt = async (input: {
+  attempt: number;
+  context?: PageGenerationContext;
+  model: string;
+  options: PageGenerationOptions;
+  previousFindings: readonly Finding[];
+}): Promise<PageGenerationAttempt> => {
+  const writerInput = createWriterRunInput({
+    runId: input.options.runId,
+    page: input.options.page,
+    repoRoot: input.options.repoRoot,
+    model: input.model,
+    context: input.context,
+    previousFindings: input.previousFindings
+  });
+  const writerResult = await runAgentStep({
+    adapter: input.options.writer,
+    cacheDir: input.options.cacheDir,
+    context: input.context,
+    runInput: writerInput,
+    stepId: `${writerInput.taskId}-attempt-${input.attempt}`,
+    transcriptRunDir: input.options.transcriptRunDir,
+    run: () => input.options.writer.run(writerInput)
+  });
+  if (writerResult.status === 'failed') {
+    throw new PageGenerationError(writerResult.error);
+  }
+
+  const artifact =
+    writerResult.artifacts.find((candidate) => candidate.path === input.options.page.slug) ??
+    (await readGeneratedArtifactFromWorkspace({ repoRoot: input.options.repoRoot, page: input.options.page }));
+  if (!artifact) {
+    throw new PageGenerationError(`writer did not produce expected artifact: ${input.options.page.slug}`);
+  }
+
+  const generatedPage = splitGeneratedPageArtifact(artifact);
+  const reviewerResults = await Promise.all(
+    input.options.reviewers.map(async (reviewer) => {
+      const reviewerInput = createReviewerRunInput({
+        runId: input.options.runId,
+        page: input.options.page,
+        repoRoot: input.options.repoRoot,
+        personaId: reviewer.personaId,
+        artifactContent: artifact.content,
+        model: input.model,
+        context: input.context
+      });
+      const result = await runAgentStep({
+        adapter: reviewer.adapter,
+        cacheDir: input.options.cacheDir,
+        context: input.context,
+        runInput: reviewerInput,
+        stepId: `${reviewerInput.taskId}-attempt-${input.attempt}`,
+        transcriptRunDir: input.options.transcriptRunDir,
+        run: () => reviewer.adapter.run(reviewerInput)
+      });
+      return result.status === 'completed' ? reviewerFindingsFromOutput(result.output) : [];
+    })
+  );
+  const checkResults = await Promise.all(input.options.verifiers.map((verifier) => verifier.run(generatedPage)));
+  const reviewerFindings = mergeFindings(...reviewerResults);
+  const verifierFindings = mergeFindings(checkResults.flatMap(checkResultFindings));
+  const findings = mergeFindings(reviewerFindings, verifierFindings);
+
+  return {
+    artifact,
+    generatedPage,
+    checkResults,
+    reviewerFindings,
+    verifierFindings,
+    findings
+  };
+};
+
 export const runReplayPageGeneration = async (options: PageGenerationOptions): Promise<PageGenerationResult> => {
   const now = options.now ?? (() => defaultTimestamp);
   const model = options.model ?? 'replay-fixture';
@@ -207,40 +422,40 @@ export const runReplayPageGeneration = async (options: PageGenerationOptions): P
     updatedAt: now()
   });
 
-  const writerResult = await options.writer.run(
-    createWriterRunInput({ runId: options.runId, page: options.page, repoRoot: options.repoRoot, model })
-  );
-  if (writerResult.status === 'failed') {
-    throw new PageGenerationError(writerResult.error);
-  }
-
-  const artifact =
-    writerResult.artifacts.find((candidate) => candidate.path === options.page.slug) ??
-    (await readGeneratedArtifactFromWorkspace({ repoRoot: options.repoRoot, page: options.page }));
-  if (!artifact) {
-    throw new PageGenerationError(`writer did not produce expected artifact: ${options.page.slug}`);
-  }
-
-  const generatedPage = splitGeneratedPageArtifact(artifact);
-  const reviewerResults = await Promise.all(
-    options.reviewers.map(async (reviewer) => {
-      const result = await reviewer.adapter.run(
-        createReviewerRunInput({
+  const retryResult = await runRetryLoop({
+    maxRetries: options.maxRetries ?? 0,
+    runAttempt: async (attempt, previousFindings) => {
+      if (attempt > 0) {
+        await options.backend.upsertPage({
+          id: options.page.id,
           runId: options.runId,
-          page: options.page,
-          repoRoot: options.repoRoot,
-          personaId: reviewer.personaId,
-          artifactContent: artifact.content,
-          model
-        })
-      );
-      return result.status === 'completed' ? reviewerFindingsFromOutput(result.output) : [];
-    })
-  );
-  const checkResults = await Promise.all(options.verifiers.map((verifier) => verifier.run(generatedPage)));
-  const reviewerFindings = mergeFindings(...reviewerResults);
-  const verifierFindings = mergeFindings(checkResults.flatMap(checkResultFindings));
-  const findings = mergeFindings(reviewerFindings, verifierFindings);
+          title: options.page.title,
+          slug: options.page.slug,
+          status: 'retrying',
+          approved: false,
+          findings: [...previousFindings],
+          updatedAt: now()
+        });
+      }
+
+      const attemptResult = await runPageGenerationAttempt({
+        attempt,
+        context: options.context,
+        model,
+        options,
+        previousFindings
+      });
+
+      return attemptResult.findings.length === 0
+        ? { status: 'passed', value: attemptResult }
+        : { status: 'retry', findings: attemptResult.findings, value: attemptResult };
+    }
+  });
+  if (!retryResult.value) {
+    throw new PageGenerationError(`page generation failed without an artifact: ${options.page.slug}`);
+  }
+
+  const { artifact, generatedPage, checkResults, reviewerFindings, verifierFindings, findings } = retryResult.value;
 
   const page = await options.backend.upsertPage({
     id: generatedPage.frontmatter.id,

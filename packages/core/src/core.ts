@@ -58,6 +58,17 @@ export type {
   ProjectGenerationResult
 } from './project-generation.ts';
 
+export { createPageGenerationContext, createSourceGroundingContext } from './page-generation-context.ts';
+export type {
+  PageGenerationContext,
+  PageGenerationGlossaryTerm,
+  PageGenerationSource,
+  PageGenerationSourceSymbol,
+  SourceGroundingContext
+} from './page-generation-context.ts';
+
+export { createProjectPageVerifiers, extractMdxComponentUsages } from './page-verifier-gate.ts';
+
 export { refreshProjectDocumentation } from './project-refresh.ts';
 export type { ProjectAssetRefreshResult } from './project-assets.ts';
 export type { ProjectRefreshOptions, ProjectRefreshPageChange, ProjectRefreshResult } from './project-refresh.ts';

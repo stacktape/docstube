@@ -237,12 +237,13 @@ export const refineProjectDocumentation = async (input: ProjectRefinementOptions
             backend,
             config: initialized.config,
             generatedAt: now(),
+            glossary: initialized.glossary,
             pages: scheduled.pages,
             runId: initialized.run.id,
             sourceFiles,
             workspaceDir: input.workspaceDir
           })
-        : { generatedPages: [], manifestPages: [] };
+        : { capFrozen: false, generatedPages: [], manifestPages: [] };
 
     if (scheduled.missing.length > 0) {
       await Promise.all(

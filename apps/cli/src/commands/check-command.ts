@@ -15,6 +15,10 @@ export type CheckCommandOptions = {
 
 export type CheckAllCommandOptions = {
   configPath?: string;
+  runProjectDoctor?: (input: { configPath?: string; workspaceDir: string }) => Promise<{
+    checks: readonly { id: string; message: string; status: string }[];
+    ok: boolean;
+  }>;
   workspaceDir?: string;
 };
 
@@ -49,20 +53,38 @@ export const runCheckAllCommand = async (
   const workspaceDir = options.workspaceDir ?? process.cwd();
   const configPath = options.configPath ?? 'docstube.yml';
   let failedCount = 0;
+  const configExists = await pathExists(join(workspaceDir, configPath));
 
-  if (await pathExists(join(workspaceDir, configPath))) {
+  if (configExists) {
     const validate = await runValidateCommand({ configPath, workspaceDir }, output);
     if (validate.exitCode !== 0) {
       failedCount += 1;
     }
   } else {
-    output.info(`No ${configPath} found; skipping config-family.`);
+    output.error(`No ${configPath} found. Run docstube wizard first.`);
+    failedCount += 1;
   }
 
-  const docsRoot = join(workspaceDir, 'docs');
+  const runProjectDoctor = options.runProjectDoctor ?? (await import('@docstube/core')).doctorProject;
+  const doctor = await runProjectDoctor({ configPath, workspaceDir });
+  for (const check of doctor.checks) {
+    const line = `${check.id}: ${check.status} - ${check.message}`;
+    if (check.status === 'failed') {
+      output.error(line);
+    } else {
+      output.info(line);
+    }
+  }
+  if (!doctor.ok) {
+    failedCount += 1;
+  }
+
+  const docsRoot = join(workspaceDir, configExists ? await readConfiguredDocsRoot(workspaceDir, configPath) : 'docs');
   const files = await listFilesRecursive(docsRoot, ['.d2', '.mdx']);
   if (files.length === 0) {
-    output.info('No docs/*.mdx or docs/*.d2 files found.');
+    output.info(
+      `No ${toRelativePath(workspaceDir, docsRoot)}/*.mdx or ${toRelativePath(workspaceDir, docsRoot)}/*.d2 files found.`
+    );
   }
 
   const fileResults = await Promise.all(
@@ -74,4 +96,28 @@ export const runCheckAllCommand = async (
   failedCount += fileResults.filter((result) => result.exitCode !== 0).length;
 
   return { exitCode: failedCount > 0 ? 1 : 0 };
+};
+
+const readConfiguredDocsRoot = async (workspaceDir: string, configPath: string): Promise<string> => {
+  try {
+    const config = parse(await readFile(join(workspaceDir, configPath), 'utf8')) as {
+      output?: { dir?: unknown };
+    };
+    if (typeof config.output?.dir !== 'string') {
+      return 'docs';
+    }
+
+    const outputDir = config.output.dir.replaceAll('\\', '/');
+    if (
+      outputDir === '..' ||
+      outputDir.startsWith('../') ||
+      outputDir.startsWith('/') ||
+      /^[A-Za-z]:/u.test(outputDir)
+    ) {
+      return 'docs';
+    }
+    return config.output.dir;
+  } catch {
+    return 'docs';
+  }
 };

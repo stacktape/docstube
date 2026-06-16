@@ -116,6 +116,12 @@ type ProcessRunResult = {
   stdout: string;
 };
 
+type GitHubActionProcessRunner = (
+  command: string,
+  args: readonly string[],
+  options: { cwd: string; env?: Record<string, string | undefined> }
+) => Promise<ProcessRunResult>;
+
 export const actionPackageName = '@docstube/action';
 
 const execFileAsync = promisify(execFile);
@@ -590,11 +596,22 @@ const createPullRequestClient = (token?: string): GitHubActionPullRequestClient 
   };
 };
 
-const createDocstubeCommandRunner =
-  (mode: GitHubActionMode, docstubePackage: string) =>
+export const createDocstubeCommandArgs = (input: {
+  configPath?: string;
+  docstubePackage: string;
+  mode: GitHubActionMode;
+}): string[] => [
+  '--yes',
+  input.docstubePackage,
+  input.mode,
+  ...(input.configPath ? ['--config', input.configPath] : [])
+];
+
+export const createDocstubeCommandRunner =
+  (mode: GitHubActionMode, docstubePackage: string, processRunner: GitHubActionProcessRunner = runProcess) =>
   async (input: DocstubeActionCommandInput): Promise<DocstubeActionCommandResult> => {
-    const args = ['--yes', docstubePackage, mode];
-    const result = await runProcess('npx', args, { cwd: input.workspaceDir });
+    const args = createDocstubeCommandArgs({ configPath: input.configPath, docstubePackage, mode });
+    const result = await processRunner('npx', args, { cwd: input.workspaceDir });
     return {
       exitCode: result.exitCode,
       output: [result.stdout, result.stderr].filter(Boolean).join('\n')
