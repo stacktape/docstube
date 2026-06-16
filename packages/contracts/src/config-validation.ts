@@ -1,7 +1,7 @@
 import type { ZodError } from 'zod';
-import { type DocstubeConfig, docstubeConfigSchema } from './config-schema';
-import { type Glossary, glossarySchema } from './glossary-schema';
-import { type Ia, iaSchema } from './ia-schema';
+import { type DocstubeConfig, docstubeConfigSchema } from './config-schema.ts';
+import { type Glossary, glossarySchema } from './glossary-schema.ts';
+import { type Ia, iaSchema } from './ia-schema.ts';
 
 // Runtime validation helpers for the config family. These operate on already-parsed JS values
 // (e.g. from a YAML load). YAML text handling and comment-preserving edits live in the core

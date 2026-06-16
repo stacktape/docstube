@@ -23,6 +23,7 @@
     "apps/**/*.tsx",
     "packages/**/*.ts",
     "packages/**/*.tsx",
+    "scripts/**/*.ts",
     "*.config.ts",
     "stacktape.ts",
     "run-overnight.ts"

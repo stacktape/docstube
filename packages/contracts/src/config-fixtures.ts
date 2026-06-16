@@ -1,8 +1,8 @@
 import type { z } from 'zod';
-import { docstubeConfigSchema } from './config-schema';
-import type { InvalidCase } from './fixtures';
-import { glossarySchema } from './glossary-schema';
-import { iaSchema } from './ia-schema';
+import { docstubeConfigSchema } from './config-schema.ts';
+import type { InvalidCase } from './fixtures.ts';
+import { glossarySchema } from './glossary-schema.ts';
+import { iaSchema } from './ia-schema.ts';
 
 // Reusable valid/invalid fixtures for the config family, mirroring the primitive fixtures in
 // `fixtures.ts`. Valid cases are typed by the schema input shape so on-disk files may omit

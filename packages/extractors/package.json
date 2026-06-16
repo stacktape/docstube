@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/extractors.mjs",
-      "types": "./dist/extractors.d.mts"
+      "docstube-source": "./src/extractors.ts",
+      "types": "./dist/extractors.d.mts",
+      "import": "./dist/extractors.mjs"
     }
   },
   "scripts": {

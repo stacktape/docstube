@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { registryComponentSchema, registrySchema, reservedComponentNames } from './registry-schema';
+import { registryComponentSchema, registrySchema, reservedComponentNames } from './registry-schema.ts';
 
 describe('registry component metadata', () => {
   it('reserves the Screenshot component name', () => {

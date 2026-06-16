@@ -33,12 +33,13 @@ const generate = defineCommand({
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runGenerateCommand } = await import('./cli-commands');
+    const { runGenerateCommand } = await import('./cli-commands.ts');
     const result = await runGenerateCommand(
       {
         yes: args.yes === true,
         fresh: args.fresh === true,
-        openBrowser: args['no-open'] === true ? () => {} : undefined
+        openBrowser: args['no-open'] === true ? () => {} : undefined,
+        uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL
       },
       output
     );
@@ -53,7 +54,7 @@ const update = defineCommand({
   },
   async run() {
     enableNodeCompileCache();
-    const { runUpdateCommand } = await import('./cli-commands');
+    const { runUpdateCommand } = await import('./cli-commands.ts');
     const result = await runUpdateCommand({}, output);
     process.exitCode = result.exitCode;
   }
@@ -66,7 +67,7 @@ const validate = defineCommand({
   },
   async run() {
     enableNodeCompileCache();
-    const { runValidateCommand } = await import('./cli-commands');
+    const { runValidateCommand } = await import('./cli-commands.ts');
     const result = await runValidateCommand({}, output);
     process.exitCode = result.exitCode;
   }
@@ -90,7 +91,7 @@ const check = defineCommand({
       return;
     }
 
-    const { runCheckCommand } = await import('./cli-commands');
+    const { runCheckCommand } = await import('./cli-commands.ts');
     const result = await runCheckCommand({ kind, file: args.file }, output);
     process.exitCode = result.exitCode;
   }
@@ -112,7 +113,7 @@ const telemetry = defineCommand({
       return;
     }
 
-    const { runTelemetryCommand } = await import('./cli-commands');
+    const { runTelemetryCommand } = await import('./cli-commands.ts');
     const result = await runTelemetryCommand({ action }, output);
     process.exitCode = result.exitCode;
   }
@@ -131,8 +132,10 @@ const main = defineCommand({
     check,
     telemetry
   },
-  run: () => {
-    console.info('Run `docstube generate` to start the local control plane.');
+  run: ({ rawArgs }) => {
+    if (rawArgs.length === 0) {
+      console.info('Run `docstube generate` to start the local control plane.');
+    }
   }
 });
 

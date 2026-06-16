@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { FeedbackCategory, FeedbackRecord, Finding } from '@docstube/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ReviewRoom, feedbackCategoryToTarget } from './review-room';
-import type { CategorizedFeedback, FeedbackWriteTarget, ReviewPage } from './review-room';
+import { ReviewRoom, feedbackCategoryToTarget } from './review-room.tsx';
+import type { CategorizedFeedback, FeedbackWriteTarget, ReviewPage } from './review-room.tsx';
 
 const timestamp = '2026-06-16T00:00:00.000Z';
 

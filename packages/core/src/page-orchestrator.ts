@@ -5,8 +5,8 @@ import { findingSchema, generatedPageFrontmatterSchema } from '@docstube/contrac
 import type { CheckResult, Finding, GeneratedPageFrontmatter, Timestamp } from '@docstube/contracts';
 import type { AgentAdapter, AgentRunInput, AgentTextArtifact } from '@docstube/agent';
 import type { GeneratedMdxPage } from '@docstube/verifiers';
-import type { ScheduledPage } from './pipeline-run';
-import type { PageDetail, StateBackend } from './state-backend';
+import type { ScheduledPage } from './pipeline-run.ts';
+import type { PageDetail, StateBackend } from './state-backend.ts';
 
 export type PersonaReviewer = {
   adapter: AgentAdapter;

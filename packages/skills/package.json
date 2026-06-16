@@ -10,8 +10,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/skills.mjs",
-      "types": "./dist/skills.d.mts"
+      "docstube-source": "./src/skills.ts",
+      "types": "./dist/skills.d.mts",
+      "import": "./dist/skills.mjs"
     }
   },
   "scripts": {

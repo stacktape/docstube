@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkResultSchema, checkStatuses } from './check-result-schema';
+import { checkResultSchema, checkStatuses } from './check-result-schema.ts';
 
 describe('deterministic-check result taxonomy', () => {
   it('fixes the status taxonomy', () => {

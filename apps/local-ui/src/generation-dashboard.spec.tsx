@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Finding } from '@docstube/contracts';
 import type { PageProgress, RunRecord, TerminalProgressState } from '@docstube/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { GenerationDashboard } from './generation-dashboard';
-import type { DashboardPage } from './generation-dashboard';
+import { GenerationDashboard } from './generation-dashboard.tsx';
+import type { DashboardPage } from './generation-dashboard.tsx';
 
 const timestamp = '2026-06-16T00:00:00.000Z';
 

@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/agent.mjs",
-      "types": "./dist/agent.d.mts"
+      "docstube-source": "./src/agent.ts",
+      "types": "./dist/agent.d.mts",
+      "import": "./dist/agent.mjs"
     }
   },
   "scripts": {

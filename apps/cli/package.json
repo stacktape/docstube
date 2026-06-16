@@ -16,8 +16,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/cli.mjs",
-      "types": "./dist/cli.d.mts"
+      "docstube-source": "./src/cli.ts",
+      "types": "./dist/cli.d.mts",
+      "import": "./dist/cli.mjs"
     }
   },
   "scripts": {

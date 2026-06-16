@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { DocstubeConfig, Ia } from '@docstube/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { SetupWizard } from './setup-wizard';
-import type { SetupWizardSaveInput } from './setup-wizard';
+import { SetupWizard } from './setup-wizard.tsx';
+import type { SetupWizardSaveInput } from './setup-wizard.tsx';
 
 const config: DocstubeConfig = {
   version: 1,

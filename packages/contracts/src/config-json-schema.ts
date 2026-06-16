@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { docstubeConfigSchema } from './config-schema';
-import { glossarySchema } from './glossary-schema';
-import { iaSchema } from './ia-schema';
+import { docstubeConfigSchema } from './config-schema.ts';
+import { glossarySchema } from './glossary-schema.ts';
+import { iaSchema } from './ia-schema.ts';
 
 // JSON Schema generation for the config family. These power editor validation/autocomplete for
 // `docstube.yml`, `ia.yml`, and `glossary.yaml`, and are snapshot-tested so the published

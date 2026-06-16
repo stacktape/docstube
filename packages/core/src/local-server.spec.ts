@@ -1,12 +1,14 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DocstubeConfig } from '@docstube/contracts';
 import { describe, expect, it } from 'vitest';
-import { openDocstubeDatabase } from './db-migrations';
-import { createLocalBackend } from './local-backend';
-import { createLocalControlPlaneApp, startLocalControlPlane } from './local-server';
-import type { StateBackend } from './state-backend';
+import { openDocstubeDatabase } from './db-migrations.ts';
+import { createLocalBackend } from './local-backend.ts';
+import { createLocalControlPlaneApp, startLocalControlPlane } from './local-server.ts';
+import type { StateBackend } from './state-backend.ts';
 
 const config: DocstubeConfig = {
   version: 1,
@@ -38,6 +40,52 @@ const withUiDist = async (run: (uiDistDir: string) => Promise<void>) => {
     await run(dir);
   } finally {
     await rm(dir, { recursive: true, force: true });
+  }
+};
+
+const closeServer = async (server: Server): Promise<void> =>
+  new Promise((resolveClose, reject) => {
+    server.close((error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolveClose();
+    });
+  });
+
+const withUiDevServer = async (run: (uiDevServerUrl: string) => Promise<void>) => {
+  const server = createServer((request, response) => {
+    response.setHeader('cache-control', 'public, max-age=31536000');
+    response.setHeader('x-docstube-dev-path', request.url ?? '/');
+    if (request.url?.startsWith('/assets/')) {
+      response.setHeader('content-type', 'text/javascript; charset=utf-8');
+      response.end('window.__docstubeVite = true;');
+      return;
+    }
+
+    response.setHeader('content-type', 'text/html; charset=utf-8');
+    response.end('<div id="root">docstube vite local ui</div>');
+  });
+
+  await new Promise<void>((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject);
+      resolveListen();
+    });
+  });
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    await closeServer(server);
+    throw new Error('Fixture UI dev server did not bind to a TCP address.');
+  }
+
+  try {
+    await run(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await closeServer(server);
   }
 };
 
@@ -84,6 +132,29 @@ describe('local control plane app', () => {
         expect(asset.status).toBe(200);
         expect(asset.headers.get('content-type')).toContain('text/javascript');
         expect(await asset.text()).toContain('__docstube');
+      });
+    });
+  });
+
+  it('proxies the local UI to a loopback Vite dev server', async () => {
+    await withBackend(async (backend) => {
+      await withUiDevServer(async (uiDevServerUrl) => {
+        const { app } = createLocalControlPlaneApp({
+          backend,
+          uiDevServerUrl,
+          sessionToken: 'test-token'
+        });
+
+        const wizard = await app.request('/wizard?session=test-token');
+        const cookie = wizard.headers.get('set-cookie')?.split(';')[0];
+        const asset = await app.request('/assets/app.js?t=123', { headers: { cookie: cookie ?? '' } });
+
+        expect(wizard.status).toBe(200);
+        expect(await wizard.text()).toContain('docstube vite local ui');
+        expect(wizard.headers.get('cache-control')).toBe('no-store');
+        expect(asset.status).toBe(200);
+        expect(asset.headers.get('x-docstube-dev-path')).toBe('/assets/app.js?t=123');
+        expect(await asset.text()).toContain('__docstubeVite');
       });
     });
   });

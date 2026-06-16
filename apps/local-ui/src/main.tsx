@@ -1,11 +1,11 @@
 import { createRoot } from 'react-dom/client';
 import type { DocstubeConfig, Ia } from '@docstube/contracts';
-import { GenerationDashboard } from './generation-dashboard';
-import type { DashboardPage } from './generation-dashboard';
-import { ReviewRoom } from './review-room';
-import type { ReviewPage } from './review-room';
-import { createSetupWizardSaver } from './setup-trpc';
-import { SetupWizard } from './setup-wizard';
+import { GenerationDashboard } from './generation-dashboard.tsx';
+import type { DashboardPage } from './generation-dashboard.tsx';
+import { ReviewRoom } from './review-room.tsx';
+import type { ReviewPage } from './review-room.tsx';
+import { createSetupWizardSaver } from './setup-trpc.ts';
+import { SetupWizard } from './setup-wizard.tsx';
 // oxlint-disable-next-line import/no-unassigned-import -- Vite loads app-level CSS from the entry module.
 import './styles.css';
 

@@ -5,7 +5,7 @@ import {
   diffSourceMaps,
   normalizeSourceForHash,
   serializeSourceMap
-} from './codemap';
+} from './codemap.ts';
 
 const tsFixture = [
   'export function keep(value: string) {',

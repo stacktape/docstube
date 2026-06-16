@@ -12,7 +12,7 @@ import {
   materializeBuiltInSkills,
   skillOwnershipMarker,
   skillUserEditedMarker
-} from './skills';
+} from './skills.ts';
 
 const withTempDir = async (run: (dir: string) => Promise<void>) => {
   const dir = await mkdtemp(join(tmpdir(), 'docstube-skills-'));

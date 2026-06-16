@@ -19,8 +19,8 @@ import {
   updateManifest,
   writeManifestFile
 } from '@docstube/core';
-import { runGenerateCommand, runUpdateCommand } from './cli-commands';
-import type { CliOutput } from './cli-commands';
+import { runGenerateCommand, runUpdateCommand } from './cli-commands.ts';
+import type { CliOutput } from './cli-commands.ts';
 
 type ProductSmokeFixture = {
   changedSource: string;

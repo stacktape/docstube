@@ -1,7 +1,7 @@
 import type { ZodError, ZodType } from 'zod';
 import { describe, expect, it } from 'vitest';
-import { errorCoversPaths } from './fixtures';
-import { s0Fixtures } from './s0-fixtures';
+import { errorCoversPaths } from './fixtures.ts';
+import { s0Fixtures } from './s0-fixtures.ts';
 
 const invalidError = (schema: ZodType, value: unknown): ZodError => {
   const result = schema.safeParse(value);

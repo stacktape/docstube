@@ -25,8 +25,8 @@ import {
   themeLayouts,
   writeLlmsFiles,
   writeSeoFiles
-} from './theme';
-import type { LlmsInput, MarkdownAstNode, SeoInput } from './theme';
+} from './theme.ts';
+import type { LlmsInput, MarkdownAstNode, SeoInput } from './theme.ts';
 
 const execFileAsync = promisify(execFile);
 

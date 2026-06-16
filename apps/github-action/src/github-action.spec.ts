@@ -4,7 +4,7 @@ import {
   createDocstubeActionConcurrencyGroup,
   readGitHubActionInputsFromEnv,
   runGitHubAction
-} from './github-action';
+} from './github-action.ts';
 import type {
   DocstubeActionCommandInput,
   DocstubeActionCommandResult,
@@ -13,7 +13,7 @@ import type {
   GitHubActionGitClient,
   GitHubActionPullRequestClient,
   GitHubPullRequest
-} from './github-action';
+} from './github-action.ts';
 
 type HarnessOptions = {
   changedFiles?: readonly string[];

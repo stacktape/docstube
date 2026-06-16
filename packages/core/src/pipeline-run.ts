@@ -3,9 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { glossarySchema, iaSchema, pageIdSchema } from '@docstube/contracts';
 import type { DocstubeConfig, Glossary, Ia, IaNode, PageId } from '@docstube/contracts';
-import { loadDocstubeConfig, loadGlossary, loadIa } from './config-yaml';
-import { StateBackendError, pageProgressStatuses } from './state-backend';
-import type { PageDetail, PageProgress, RunRecord, RunStatus, StateBackend } from './state-backend';
+import { loadDocstubeConfig, loadGlossary, loadIa } from './config-yaml.ts';
+import { StateBackendError, pageProgressStatuses } from './state-backend.ts';
+import type { PageDetail, PageProgress, RunRecord, RunStatus, StateBackend } from './state-backend.ts';
 
 export type ScheduledPage = {
   brief?: string;

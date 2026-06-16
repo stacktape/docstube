@@ -1,10 +1,10 @@
 import { docstubeConfigSchema, feedbackRecordSchema, pageIdSchema, parseDocstubeConfig } from '@docstube/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { openDocstubeDatabase } from './db-migrations';
-import { createLocalBackend } from './local-backend';
-import type { StateBackend } from './state-backend';
-import { appRouter, appRouterContract, appRouterProcedures, type AppRouterProcedureContract } from './trpc-router';
+import { openDocstubeDatabase } from './db-migrations.ts';
+import { createLocalBackend } from './local-backend.ts';
+import type { StateBackend } from './state-backend.ts';
+import { appRouter, appRouterContract, appRouterProcedures, type AppRouterProcedureContract } from './trpc-router.ts';
 
 const toInputJsonSchema = (schema: z.ZodType): Record<string, unknown> =>
   z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as unknown as Record<string, unknown>;

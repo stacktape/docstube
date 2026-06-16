@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/core.mjs",
-      "types": "./dist/core.d.mts"
+      "docstube-source": "./src/core.ts",
+      "types": "./dist/core.d.mts",
+      "import": "./dist/core.mjs"
     }
   },
   "scripts": {

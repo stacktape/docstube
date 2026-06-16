@@ -2,8 +2,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { feedbackRecordSchema } from '@docstube/contracts';
 import type { FeedbackRecord } from '@docstube/contracts';
-import { appConfig, feedback, iaProposals, pages, runs, themeTokens } from './db-schema';
-import type { SqliteDatabase } from './db-migrations';
+import { appConfig, feedback, iaProposals, pages, runs, themeTokens } from './db-schema.ts';
+import type { SqliteDatabase } from './db-migrations.ts';
 import {
   STATE_BACKEND_VERSION,
   StateBackendError,
@@ -13,7 +13,7 @@ import {
   type RunRecord,
   type StateBackend,
   type ThemeTokens
-} from './state-backend';
+} from './state-backend.ts';
 
 // Local SQLite implementation of the `StateBackend` contract.
 //

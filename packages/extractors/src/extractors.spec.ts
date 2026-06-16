@@ -6,7 +6,7 @@ import {
   extractPythonApiReferencesWithGriffe,
   extractTypeScriptApiReferences,
   type ApiReferenceSymbol
-} from './extractors';
+} from './extractors.ts';
 
 const makeTempProject = async (): Promise<{ root: string; entry: string }> => {
   const root = await mkdtemp(join(tmpdir(), 'docstube-extractors-'));

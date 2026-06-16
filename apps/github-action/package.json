@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/github-action.mjs",
-      "types": "./dist/github-action.d.mts"
+      "docstube-source": "./src/github-action.ts",
+      "types": "./dist/github-action.d.mts",
+      "import": "./dist/github-action.mjs"
     }
   },
   "scripts": {

@@ -6,8 +6,8 @@ import {
   generatedPageFrontmatterSchema,
   pageIdSchema,
   sectionIdSchema
-} from './page-schema';
-import { buildSectionMarker, extractSectionMarkers, parseSectionMarker } from './section-markers';
+} from './page-schema.ts';
+import { buildSectionMarker, extractSectionMarkers, parseSectionMarker } from './section-markers.ts';
 
 describe('pageIdSchema', () => {
   it('accepts single and nested kebab segments', () => {

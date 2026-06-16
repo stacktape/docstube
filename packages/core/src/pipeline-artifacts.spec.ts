@@ -11,7 +11,7 @@ import {
   runCachedAgentStep,
   runRetryLoop,
   writeAgentTranscript
-} from './pipeline-artifacts';
+} from './pipeline-artifacts.ts';
 
 const timestamp = '2026-06-16T00:00:00.000Z';
 

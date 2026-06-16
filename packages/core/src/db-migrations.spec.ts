@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { migrate, migrations, openDocstubeDatabase } from './db-migrations';
+import { migrate, migrations, openDocstubeDatabase } from './db-migrations.ts';
 
 const expectedTables = ['app_config', 'runs', 'pages', 'feedback', 'ia_proposals', 'theme_tokens'];
 

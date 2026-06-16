@@ -31,8 +31,8 @@ import {
   pageSectionIdCheckId,
   pythonSnippetCheckId,
   typescriptSnippetCheckId
-} from './verifiers';
-import type { GeneratedMdxPage } from './verifiers';
+} from './verifiers.ts';
+import type { GeneratedMdxPage } from './verifiers.ts';
 
 const page: GeneratedMdxPage = {
   path: 'docs/overview.mdx',

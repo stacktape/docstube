@@ -14,7 +14,7 @@ import {
   runTopologyConsistencyPass,
   updateManifest,
   writeManifestFile
-} from './incremental-engine';
+} from './incremental-engine.ts';
 
 const generatedWith: PackageVersion = { name: 'docstube', version: '0.0.0' };
 

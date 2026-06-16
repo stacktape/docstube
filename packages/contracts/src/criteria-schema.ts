@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { identifierSchema, severitySchema } from './primitives';
+import { identifierSchema, severitySchema } from './primitives.ts';
 
 // Criteria checklist schema for `.docstube/criteria/`.
 //

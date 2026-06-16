@@ -7,15 +7,15 @@ import { checkGeneratedPageSections } from '@docstube/verifiers';
 import { describe, expect, it } from 'vitest';
 import type { AgentReplayFixture, AgentRunInput, AgentTextArtifact } from '@docstube/agent';
 import type { Finding, JsonValue, Timestamp } from '@docstube/contracts';
-import { openDocstubeDatabase } from './db-migrations';
-import { createLocalBackend } from './local-backend';
-import type { ScheduledPage } from './pipeline-run';
+import { openDocstubeDatabase } from './db-migrations.ts';
+import { createLocalBackend } from './local-backend.ts';
+import type { ScheduledPage } from './pipeline-run.ts';
 import {
   createReviewerRunInput,
   createWriterRunInput,
   mergeFindings,
   runReplayPageGeneration
-} from './page-orchestrator';
+} from './page-orchestrator.ts';
 
 const timestamp: Timestamp = '2026-06-16T00:00:00.000Z';
 

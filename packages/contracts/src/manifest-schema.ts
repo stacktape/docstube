@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { sha256Schema } from './cache-key';
-import { pageIdSchema, pageStatusSchema, sectionIdSchema } from './page-schema';
-import { packageVersionSchema, relativePathSchema } from './primitives';
+import { sha256Schema } from './cache-key.ts';
+import { pageIdSchema, pageStatusSchema, sectionIdSchema } from './page-schema.ts';
+import { packageVersionSchema, relativePathSchema } from './primitives.ts';
 
 // `.docstube/manifest.yml` schema.
 //

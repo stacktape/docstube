@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseGoldEvalSet, runDeterministicEvals, runEvalFile, scoreCandidate } from './run-evals';
+import { parseGoldEvalSet, runDeterministicEvals, runEvalFile, scoreCandidate } from './run-evals.ts';
 
 const goldSetPath = fileURLToPath(new URL('../../evals/gold-set.json', import.meta.url));
 

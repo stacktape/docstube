@@ -7,7 +7,7 @@ import {
   type PageDetail,
   type RunRecord,
   type StateBackend
-} from './state-backend';
+} from './state-backend.ts';
 
 // Reusable `StateBackend` contract test suite.
 //

@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { DocstubeConfig, Ia } from '@docstube/contracts';
 import type { Document } from 'yaml';
-import { editYamlDocument, loadDocstubeConfig, loadIa } from './config-yaml';
+import { editYamlDocument, loadDocstubeConfig, loadIa } from './config-yaml.ts';
 
 export type SetupWizardFileWriteInput = {
   config: DocstubeConfig;

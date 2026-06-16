@@ -21,8 +21,8 @@ import {
   parseCliVersionOutput,
   runAdapterProcess,
   usageExceedsCaps
-} from './agent';
-import type { AdapterProcessRunner, AgentReplayFixture, AgentRunInput } from './agent';
+} from './agent.ts';
+import type { AdapterProcessRunner, AgentReplayFixture, AgentRunInput } from './agent.ts';
 
 const input: AgentRunInput = agentRunInputSchema.parse({
   taskId: 'walking-skeleton',

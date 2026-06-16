@@ -28,7 +28,7 @@ import type {
   Sha256
 } from '@docstube/contracts';
 import { parse, stringify } from 'yaml';
-import { schedulePagesFromIa } from './pipeline-run';
+import { schedulePagesFromIa } from './pipeline-run.ts';
 
 export type SourceSnapshotInput = {
   content: string;

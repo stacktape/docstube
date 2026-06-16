@@ -37,7 +37,7 @@ export {
   severities,
   severitySchema,
   timestampSchema
-} from './primitives';
+} from './primitives.ts';
 export type {
   Identifier,
   JsonValue,
@@ -47,10 +47,10 @@ export type {
   Semver,
   Severity,
   Timestamp
-} from './primitives';
+} from './primitives.ts';
 
-export { contractFixtures, errorCoversPaths, issuePaths } from './fixtures';
-export type { ContractFixtureName, ContractFixtures, InvalidCase, IssuePath, ValidCase } from './fixtures';
+export { contractFixtures, errorCoversPaths, issuePaths } from './fixtures.ts';
+export type { ContractFixtureName, ContractFixtures, InvalidCase, IssuePath, ValidCase } from './fixtures.ts';
 
 export {
   agentAdapters,
@@ -72,7 +72,7 @@ export {
   sourceReferenceSchema,
   themeSchema,
   usageCapsSchema
-} from './config-schema';
+} from './config-schema.ts';
 export type {
   AgentAdapterKind,
   AgentChoice,
@@ -88,13 +88,13 @@ export type {
   SourceReference,
   ThemeConfig,
   UsageCaps
-} from './config-schema';
+} from './config-schema.ts';
 
-export { iaNodeSchema, iaSchema } from './ia-schema';
-export type { Ia, IaNode } from './ia-schema';
+export { iaNodeSchema, iaSchema } from './ia-schema.ts';
+export type { Ia, IaNode } from './ia-schema.ts';
 
-export { glossarySchema, glossaryTermSchema } from './glossary-schema';
-export type { Glossary, GlossaryTerm } from './glossary-schema';
+export { glossarySchema, glossaryTermSchema } from './glossary-schema.ts';
+export type { Glossary, GlossaryTerm } from './glossary-schema.ts';
 
 export {
   ConfigValidationError,
@@ -104,19 +104,19 @@ export {
   safeParseDocstubeConfig,
   safeParseGlossary,
   safeParseIa
-} from './config-validation';
-export type { ConfigFamilyFile, ConfigParseResult } from './config-validation';
+} from './config-validation.ts';
+export type { ConfigFamilyFile, ConfigParseResult } from './config-validation.ts';
 
 export {
   configFamilyJsonSchemas,
   docstubeConfigJsonSchema,
   glossaryJsonSchema,
   iaJsonSchema
-} from './config-json-schema';
-export type { JsonSchema } from './config-json-schema';
+} from './config-json-schema.ts';
+export type { JsonSchema } from './config-json-schema.ts';
 
-export { configFamilyFixtures, docstubeConfigFixtures, glossaryFixtures, iaFixtures } from './config-fixtures';
-export type { ConfigFamilyFixtureName, ConfigFamilyFixtures } from './config-fixtures';
+export { configFamilyFixtures, docstubeConfigFixtures, glossaryFixtures, iaFixtures } from './config-fixtures.ts';
+export type { ConfigFamilyFixtureName, ConfigFamilyFixtures } from './config-fixtures.ts';
 
 export {
   buildSectionMarker,
@@ -124,8 +124,8 @@ export {
   parseSectionMarker,
   sectionMarkerKinds,
   sectionMarkerNamespace
-} from './section-markers';
-export type { SectionMarker, SectionMarkerKind } from './section-markers';
+} from './section-markers.ts';
+export type { SectionMarker, SectionMarkerKind } from './section-markers.ts';
 
 export {
   checkSectionPresence,
@@ -137,7 +137,7 @@ export {
   pageStatuses,
   pageStatusSchema,
   sectionIdSchema
-} from './page-schema';
+} from './page-schema.ts';
 export type {
   GeneratedPageFrontmatter,
   GeneratedStamp,
@@ -145,16 +145,16 @@ export type {
   PageStatus,
   SectionId,
   SectionPresenceResult
-} from './page-schema';
+} from './page-schema.ts';
 
-export { cacheKeyFields, cacheKeyInputSchema, deriveCacheKey, sha256Schema } from './cache-key';
-export type { CacheKeyInput, Sha256 } from './cache-key';
+export { cacheKeyFields, cacheKeyInputSchema, deriveCacheKey, sha256Schema } from './cache-key.ts';
+export type { CacheKeyInput, Sha256 } from './cache-key.ts';
 
-export { findingLocationSchema, findingOrigins, findingOriginSchema, findingSchema } from './findings-schema';
-export type { Finding, FindingLocation, FindingOrigin } from './findings-schema';
+export { findingLocationSchema, findingOrigins, findingOriginSchema, findingSchema } from './findings-schema.ts';
+export type { Finding, FindingLocation, FindingOrigin } from './findings-schema.ts';
 
-export { criteriaChecklistSchema, criteriaItemSchema, criteriaScopes, criteriaScopeSchema } from './criteria-schema';
-export type { CriteriaChecklist, CriteriaItem, CriteriaScope } from './criteria-schema';
+export { criteriaChecklistSchema, criteriaItemSchema, criteriaScopes, criteriaScopeSchema } from './criteria-schema.ts';
+export type { CriteriaChecklist, CriteriaItem, CriteriaScope } from './criteria-schema.ts';
 
 export {
   feedbackCategories,
@@ -164,14 +164,19 @@ export {
   feedbackScopeSchema,
   feedbackStatuses,
   feedbackStatusSchema
-} from './feedback-schema';
-export type { FeedbackCategory, FeedbackRecord, FeedbackScope, FeedbackStatus } from './feedback-schema';
+} from './feedback-schema.ts';
+export type { FeedbackCategory, FeedbackRecord, FeedbackScope, FeedbackStatus } from './feedback-schema.ts';
 
-export { manifestPageSchema, manifestSchema, pageProvenanceSchema, provenanceCitationSchema } from './manifest-schema';
-export type { Manifest, ManifestPage, PageProvenance, ProvenanceCitation } from './manifest-schema';
+export {
+  manifestPageSchema,
+  manifestSchema,
+  pageProvenanceSchema,
+  provenanceCitationSchema
+} from './manifest-schema.ts';
+export type { Manifest, ManifestPage, PageProvenance, ProvenanceCitation } from './manifest-schema.ts';
 
-export { checkResultSchema, checkStatuses, checkStatusSchema } from './check-result-schema';
-export type { CheckResult, CheckStatus } from './check-result-schema';
+export { checkResultSchema, checkStatuses, checkStatusSchema } from './check-result-schema.ts';
+export type { CheckResult, CheckStatus } from './check-result-schema.ts';
 
 export {
   componentStatuses,
@@ -180,8 +185,8 @@ export {
   registryComponentSchema,
   registrySchema,
   reservedComponentNames
-} from './registry-schema';
-export type { ComponentRegistry, ComponentStatus, PropSchemaRef, RegistryComponent } from './registry-schema';
+} from './registry-schema.ts';
+export type { ComponentRegistry, ComponentStatus, PropSchemaRef, RegistryComponent } from './registry-schema.ts';
 
-export { s0Fixtures } from './s0-fixtures';
-export type { S0FixtureName, S0Fixtures } from './s0-fixtures';
+export { s0Fixtures } from './s0-fixtures.ts';
+export type { S0FixtureName, S0Fixtures } from './s0-fixtures.ts';

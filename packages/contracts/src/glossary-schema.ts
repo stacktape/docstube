@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { identifierSchema } from './primitives';
+import { identifierSchema } from './primitives.ts';
 
 // Config family schema for `glossary.yaml`: committed glossary terms and aliases.
 //

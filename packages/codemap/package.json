@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/codemap.mjs",
-      "types": "./dist/codemap.d.mts"
+      "docstube-source": "./src/codemap.ts",
+      "types": "./dist/codemap.d.mts",
+      "import": "./dist/codemap.mjs"
     }
   },
   "scripts": {

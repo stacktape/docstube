@@ -2,7 +2,7 @@ import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { manifestSchema } from '@docstube/contracts';
-import { docstubeVersion } from './core';
+import { docstubeVersion } from './core.ts';
 
 // `.docstube/` scaffold helper.
 //

@@ -1,7 +1,7 @@
 import type { ZodError, ZodType } from 'zod';
 import { describe, expect, it } from 'vitest';
-import { docstubeConfigSchema } from './config-schema';
-import { configFamilyFixtures, docstubeConfigFixtures } from './config-fixtures';
+import { docstubeConfigSchema } from './config-schema.ts';
+import { configFamilyFixtures, docstubeConfigFixtures } from './config-fixtures.ts';
 import {
   ConfigValidationError,
   type ConfigParseResult,
@@ -9,8 +9,8 @@ import {
   safeParseDocstubeConfig,
   safeParseGlossary,
   safeParseIa
-} from './config-validation';
-import { errorCoversPaths } from './fixtures';
+} from './config-validation.ts';
+import { errorCoversPaths } from './fixtures.ts';
 
 const invalidError = (schema: ZodType, value: unknown): ZodError => {
   const result = schema.safeParse(value);

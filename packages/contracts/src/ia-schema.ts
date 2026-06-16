@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { identifierSchema, relativePathSchema } from './primitives';
+import { identifierSchema, relativePathSchema } from './primitives.ts';
 
 // Config family schema for `ia.yml`: the committed information architecture.
 //

@@ -11,8 +11,8 @@ import {
   runUpdateCommand,
   runValidateCommand,
   sendRuntimeTelemetry
-} from './cli-commands';
-import type { CliOutput, RuntimeTelemetryEvent } from './cli-commands';
+} from './cli-commands.ts';
+import type { CliOutput, RuntimeTelemetryEvent } from './cli-commands.ts';
 
 const fixturePath = (name: string): string =>
   fileURLToPath(new URL(`../../../packages/core/src/fixtures/${name}`, import.meta.url));
@@ -57,17 +57,22 @@ describe('CLI commands', () => {
       await mkdir(join(dir, '.docstube'), { recursive: true });
       await writeFile(join(dir, '.docstube', 'db.sqlite'), '', 'utf8');
       const { lines, output } = captureOutput();
+      const startOptions: unknown[] = [];
       const result = await runGenerateCommand(
         {
           workspaceDir: dir,
           yes: true,
-          start: async () => ({
-            host: '127.0.0.1',
-            port: 1234,
-            sessionToken: 'token',
-            url: 'http://127.0.0.1:1234/wizard?session=token',
-            close: async () => {}
-          })
+          uiDevServerUrl: 'http://127.0.0.1:5173',
+          start: async (input) => {
+            startOptions.push(input);
+            return {
+              host: '127.0.0.1',
+              port: 1234,
+              sessionToken: 'token',
+              url: 'http://127.0.0.1:1234/wizard?session=token',
+              close: async () => {}
+            };
+          }
         },
         output
       );
@@ -76,6 +81,13 @@ describe('CLI commands', () => {
       expect(lines).toContain('info:Resuming existing local generation state.');
       expect(lines).toContain('info:Zero-question mode enabled.');
       expect(lines).toContain('info:Started local control plane: http://127.0.0.1:1234/wizard?session=token');
+      expect(startOptions).toEqual([
+        {
+          openBrowser: undefined,
+          uiDevServerUrl: 'http://127.0.0.1:5173',
+          workspaceDir: dir
+        }
+      ]);
     });
   });
 

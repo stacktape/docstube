@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cacheKeyFields, type CacheKeyInput, deriveCacheKey, sha256Schema } from './cache-key';
+import { cacheKeyFields, type CacheKeyInput, deriveCacheKey, sha256Schema } from './cache-key.ts';
 
 const hash = (char: string): string => char.repeat(64);
 

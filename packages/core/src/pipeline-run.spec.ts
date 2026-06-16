@@ -4,8 +4,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { Ia } from '@docstube/contracts';
-import { openDocstubeDatabase } from './db-migrations';
-import { createLocalBackend } from './local-backend';
+import { openDocstubeDatabase } from './db-migrations.ts';
+import { createLocalBackend } from './local-backend.ts';
 import {
   createTerminalProgressState,
   freezeRunForCaps,
@@ -13,7 +13,7 @@ import {
   resumeRunAfterCapIncrease,
   schedulePagesFromIa,
   transitionRunStatus
-} from './pipeline-run';
+} from './pipeline-run.ts';
 
 const fixturesDir = fileURLToPath(new URL('./fixtures/', import.meta.url));
 const timestamp = '2026-06-16T00:00:00.000Z';

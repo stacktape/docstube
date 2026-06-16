@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { componentNameSchema } from './config-schema';
-import { identifierSchema } from './primitives';
+import { componentNameSchema } from './config-schema.ts';
+import { identifierSchema } from './primitives.ts';
 
 // Registry component metadata schema.
 //

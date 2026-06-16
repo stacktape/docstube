@@ -1,14 +1,14 @@
-export { editYamlDocument, loadDocstubeConfig, loadGlossary, loadIa, parseYaml, setYamlIn } from './config-yaml';
-export type { YamlPath } from './config-yaml';
+export { editYamlDocument, loadDocstubeConfig, loadGlossary, loadIa, parseYaml, setYamlIn } from './config-yaml.ts';
+export type { YamlPath } from './config-yaml.ts';
 
-export { appConfig, feedback, iaProposals, pages, runs, themeTokens } from './db-schema';
-export { migrate, migrations, openDocstubeDatabase } from './db-migrations';
-export type { Migration, MigrateResult, OpenDatabaseOptions, SqliteDatabase } from './db-migrations';
+export { appConfig, feedback, iaProposals, pages, runs, themeTokens } from './db-schema.ts';
+export { migrate, migrations, openDocstubeDatabase } from './db-migrations.ts';
+export type { Migration, MigrateResult, OpenDatabaseOptions, SqliteDatabase } from './db-migrations.ts';
 
-export { scaffoldDocstubeDir } from './scaffold';
-export type { ScaffoldOptions, ScaffoldResult } from './scaffold';
+export { scaffoldDocstubeDir } from './scaffold.ts';
+export type { ScaffoldOptions, ScaffoldResult } from './scaffold.ts';
 
-export { pageProgressStatuses, runStatuses, STATE_BACKEND_VERSION, StateBackendError } from './state-backend';
+export { pageProgressStatuses, runStatuses, STATE_BACKEND_VERSION, StateBackendError } from './state-backend.ts';
 export type {
   IaProposal,
   PageDetail,
@@ -19,10 +19,10 @@ export type {
   StateBackend,
   StateBackendErrorCode,
   ThemeTokens
-} from './state-backend';
+} from './state-backend.ts';
 
-export { createLocalBackend } from './local-backend';
-export type { LocalBackendOptions } from './local-backend';
+export { createLocalBackend } from './local-backend.ts';
+export type { LocalBackendOptions } from './local-backend.ts';
 
 export {
   createTerminalProgressState,
@@ -32,26 +32,26 @@ export {
   resumeRunAfterCapIncrease,
   schedulePagesFromIa,
   transitionRunStatus
-} from './pipeline-run';
+} from './pipeline-run.ts';
 export type {
   RunInitializationOptions,
   RunInitializationResult,
   ScheduledPage,
   TerminalProgressState
-} from './pipeline-run';
+} from './pipeline-run.ts';
 
 export {
   createReviewerRunInput,
   createWriterRunInput,
   mergeFindings,
   runReplayPageGeneration
-} from './page-orchestrator';
+} from './page-orchestrator.ts';
 export type {
   PageDeterministicVerifier,
   PageGenerationOptions,
   PageGenerationResult,
   PersonaReviewer
-} from './page-orchestrator';
+} from './page-orchestrator.ts';
 
 export {
   createFaqAeoWriterGuidance,
@@ -63,14 +63,14 @@ export {
   runRetryLoop,
   writeAgentTranscript,
   writeCachedAgentRun
-} from './pipeline-artifacts';
+} from './pipeline-artifacts.ts';
 export type {
   AgentCacheKeyInput,
   CachedAgentRun,
   DiffChangelogEntry,
   RetryAttemptResult,
   RetryLoopResult
-} from './pipeline-artifacts';
+} from './pipeline-artifacts.ts';
 
 export {
   createPageProvenance,
@@ -87,7 +87,7 @@ export {
   runTopologyConsistencyPass,
   updateManifest,
   writeManifestFile
-} from './incremental-engine';
+} from './incremental-engine.ts';
 export type {
   ChangedSource,
   ChangedSymbolRef,
@@ -102,9 +102,9 @@ export type {
   TopologyConsistencyInput,
   TopologyPage,
   UpdateManifestInput
-} from './incremental-engine';
+} from './incremental-engine.ts';
 
-export { createLocalControlPlaneApp, startGenerateSession, startLocalControlPlane } from './local-server';
+export { createLocalControlPlaneApp, startGenerateSession, startLocalControlPlane } from './local-server.ts';
 export type {
   GenerateStartupOptions,
   LocalControlPlaneApp,
@@ -112,10 +112,10 @@ export type {
   OpenBrowser,
   StartedLocalControlPlane,
   StartLocalControlPlaneOptions
-} from './local-server';
+} from './local-server.ts';
 
-export { writeSetupWizardFiles } from './setup-files';
-export type { SetupWizardFileWriteInput, SetupWizardFileWriteResult } from './setup-files';
+export { writeSetupWizardFiles } from './setup-files.ts';
+export type { SetupWizardFileWriteInput, SetupWizardFileWriteResult } from './setup-files.ts';
 
 export {
   createS0WalkingSkeletonReplayFixture,
@@ -125,15 +125,21 @@ export {
   walkingSkeletonRunId,
   walkingSkeletonSourcePath,
   walkingSkeletonTaskId
-} from './walking-skeleton';
+} from './walking-skeleton.ts';
 export type {
   WalkingSkeletonOptions,
   WalkingSkeletonReplayFixtureOptions,
   WalkingSkeletonResult
-} from './walking-skeleton';
+} from './walking-skeleton.ts';
 
-export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
-export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
+export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router.ts';
+export type {
+  AppRouter,
+  AppRouterProcedure,
+  AppRouterProcedureContract,
+  JsonSchema,
+  TrpcContext
+} from './trpc-router.ts';
 
 export type DocstubeWorkspacePackage =
   | '@docstube/agent'

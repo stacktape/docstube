@@ -1,13 +1,13 @@
 import type { z } from 'zod';
-import { cacheKeyInputSchema } from './cache-key';
-import { checkResultSchema } from './check-result-schema';
-import { criteriaChecklistSchema } from './criteria-schema';
-import { feedbackRecordSchema } from './feedback-schema';
-import { findingSchema } from './findings-schema';
-import type { InvalidCase, IssuePath } from './fixtures';
-import { manifestSchema } from './manifest-schema';
-import { generatedPageFrontmatterSchema, pageIdSchema, sectionIdSchema } from './page-schema';
-import { registrySchema } from './registry-schema';
+import { cacheKeyInputSchema } from './cache-key.ts';
+import { checkResultSchema } from './check-result-schema.ts';
+import { criteriaChecklistSchema } from './criteria-schema.ts';
+import { feedbackRecordSchema } from './feedback-schema.ts';
+import { findingSchema } from './findings-schema.ts';
+import type { InvalidCase, IssuePath } from './fixtures.ts';
+import { manifestSchema } from './manifest-schema.ts';
+import { generatedPageFrontmatterSchema, pageIdSchema, sectionIdSchema } from './page-schema.ts';
+import { registrySchema } from './registry-schema.ts';
 
 // Reusable valid/invalid fixtures for the non-config S0 contracts, mirroring `config-fixtures.ts`.
 // Valid cases are typed by each schema's input shape so fixtures may omit default-bearing fields.

@@ -7,7 +7,7 @@ import {
   semverSchema,
   severitySchema,
   timestampSchema
-} from './primitives';
+} from './primitives.ts';
 
 // A path into a value, matching the shape of `ZodIssue['path']`.
 export type IssuePath = ReadonlyArray<PropertyKey>;

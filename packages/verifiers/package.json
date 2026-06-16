@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/verifiers.mjs",
-      "types": "./dist/verifiers.d.mts"
+      "docstube-source": "./src/verifiers.ts",
+      "types": "./dist/verifiers.d.mts",
+      "import": "./dist/verifiers.mjs"
     }
   },
   "scripts": {

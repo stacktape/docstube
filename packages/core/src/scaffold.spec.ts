@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { manifestSchema } from '@docstube/contracts';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { scaffoldDocstubeDir } from './scaffold';
+import { scaffoldDocstubeDir } from './scaffold.ts';
 
 const pathExists = async (path: string): Promise<boolean> => {
   try {

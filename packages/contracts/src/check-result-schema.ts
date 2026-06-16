@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { findingSchema } from './findings-schema';
-import { identifierSchema } from './primitives';
+import { findingSchema } from './findings-schema.ts';
+import { identifierSchema } from './primitives.ts';
 
 // Deterministic-check result taxonomy.
 //

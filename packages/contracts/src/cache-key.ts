@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { semverSchema } from './primitives';
+import { semverSchema } from './primitives.ts';
 
 // Cache-key derivation for agent steps.
 //

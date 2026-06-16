@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ConfigValidationError } from '@docstube/contracts';
 import { describe, expect, it } from 'vitest';
-import { editYamlDocument, loadDocstubeConfig, loadGlossary, loadIa, setYamlIn } from './config-yaml';
+import { editYamlDocument, loadDocstubeConfig, loadGlossary, loadIa, setYamlIn } from './config-yaml.ts';
 
 const fixture = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8');

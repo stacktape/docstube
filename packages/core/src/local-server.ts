@@ -1,23 +1,24 @@
 import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { platform } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
-import { spawn } from 'node:child_process';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { Hono } from 'hono';
-import { appRouter } from './trpc-router';
-import { createLocalBackend } from './local-backend';
-import { openDocstubeDatabase } from './db-migrations';
-import type { StateBackend } from './state-backend';
+import { appRouter } from './trpc-router.ts';
+import { createLocalBackend } from './local-backend.ts';
+import { openDocstubeDatabase } from './db-migrations.ts';
+import type { StateBackend } from './state-backend.ts';
 
 export type OpenBrowser = (url: string) => Promise<void> | void;
 
 export type LocalControlPlaneAppOptions = {
   backend: StateBackend;
   sessionToken?: string;
-  uiDistDir: string;
+  uiDevServerUrl?: string;
+  uiDistDir?: string;
 };
 
 export type LocalControlPlaneApp = {
@@ -125,8 +126,35 @@ const staticResponse = async (uiDistDir: string, requestPath: string): Promise<R
   }
 };
 
+const normalizeUiDevServerUrl = (url: string): string => {
+  const parsed = new URL(url);
+  if (!loopbackHosts.has(parsed.hostname)) {
+    throw new Error(`Local UI dev server must run on localhost, received ${parsed.hostname}.`);
+  }
+
+  return parsed.href.endsWith('/') ? parsed.href : `${parsed.href}/`;
+};
+
+const uiDevServerResponse = async (uiDevServerUrl: string, requestUrl: string): Promise<Response> => {
+  const request = new URL(requestUrl);
+  const target = new URL(`${request.pathname}${request.search}`, uiDevServerUrl);
+  const response = await fetch(target);
+  const headers = new Headers(response.headers);
+  headers.set('cache-control', 'no-store');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+};
+
 export const createLocalControlPlaneApp = (options: LocalControlPlaneAppOptions): LocalControlPlaneApp => {
   const sessionToken = options.sessionToken ?? createSessionToken();
+  const uiDevServerUrl = options.uiDevServerUrl ? normalizeUiDevServerUrl(options.uiDevServerUrl) : undefined;
+  if (!uiDevServerUrl && !options.uiDistDir) {
+    throw new Error('Local control plane requires uiDistDir or uiDevServerUrl.');
+  }
+
   const app = new Hono();
 
   app.use('*', async (context, next) => {
@@ -162,7 +190,11 @@ export const createLocalControlPlaneApp = (options: LocalControlPlaneAppOptions)
 
   app.get('*', (context) => {
     const requestPath = new URL(context.req.url).pathname;
-    return staticResponse(options.uiDistDir, requestPath);
+    if (uiDevServerUrl) {
+      return uiDevServerResponse(uiDevServerUrl, context.req.url);
+    }
+
+    return staticResponse(options.uiDistDir!, requestPath);
   });
 
   return { app, sessionToken };
@@ -306,15 +338,19 @@ export const startGenerateSession = async (options: GenerateStartupOptions = {})
   const backend = options.backend ?? createLocalBackend(openDocstubeDatabase(dbPath));
   const ownsBackend = options.backend === undefined;
   const uiDistDir = options.uiDistDir ?? join(workspaceDir, 'apps', 'local-ui', 'dist');
+  const uiDevServerUrl = options.uiDevServerUrl ?? process.env.DOCSTUBE_UI_DEV_SERVER_URL;
 
-  try {
-    await stat(uiDistDir);
-  } catch {
-    throw new Error(`Local UI build not found at ${uiDistDir}. Run pnpm --filter @docstube/web-ui build first.`);
+  if (!uiDevServerUrl) {
+    try {
+      await stat(uiDistDir);
+    } catch {
+      throw new Error(`Local UI build not found at ${uiDistDir}. Run pnpm --filter @docstube/web-ui build first.`);
+    }
   }
 
   const started = await startLocalControlPlane({
     backend,
+    uiDevServerUrl,
     uiDistDir,
     host: options.host,
     port: options.port,

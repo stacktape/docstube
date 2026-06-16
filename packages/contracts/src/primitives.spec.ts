@@ -9,7 +9,7 @@ import {
   severities,
   severitySchema,
   timestampSchema
-} from './primitives';
+} from './primitives.ts';
 
 const invalidError = (schema: ZodType, value: unknown): ZodError => {
   const result = schema.safeParse(value);

@@ -3,15 +3,15 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createReplayAgentAdapter } from '@docstube/agent';
 import { describe, expect, it } from 'vitest';
-import { openDocstubeDatabase } from './db-migrations';
-import { createLocalBackend } from './local-backend';
+import { openDocstubeDatabase } from './db-migrations.ts';
+import { createLocalBackend } from './local-backend.ts';
 import {
   createS0WalkingSkeletonReplayFixture,
   runS0WalkingSkeleton,
   walkingSkeletonHtmlToken,
   walkingSkeletonOutputPath,
   walkingSkeletonRunId
-} from './walking-skeleton';
+} from './walking-skeleton.ts';
 
 const makeFixtureRepo = async (): Promise<string> => {
   const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-s0-'));

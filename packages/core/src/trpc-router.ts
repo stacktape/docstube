@@ -1,7 +1,7 @@
 import { docstubeConfigSchema, feedbackRecordSchema, pageIdSchema } from '@docstube/contracts';
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
-import type { StateBackend } from './state-backend';
+import type { StateBackend } from './state-backend.ts';
 
 // tRPC router skeleton mounted by the local server (Task 17). It exposes the minimum procedures the
 // setup wizard, generation dashboard, and review UI need, each delegating to the `StateBackend`.

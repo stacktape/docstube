@@ -4,7 +4,7 @@ import {
   docstubeConfigJsonSchema,
   glossaryJsonSchema,
   iaJsonSchema
-} from './config-json-schema';
+} from './config-json-schema.ts';
 
 describe('config family JSON Schema', () => {
   it('targets draft 2020-12', () => {

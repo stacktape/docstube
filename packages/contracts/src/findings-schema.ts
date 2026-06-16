@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { pageIdSchema, sectionIdSchema } from './page-schema';
-import { identifierSchema, jsonValueSchema, relativePathSchema, severitySchema } from './primitives';
+import { pageIdSchema, sectionIdSchema } from './page-schema.ts';
+import { identifierSchema, jsonValueSchema, relativePathSchema, severitySchema } from './primitives.ts';
 
 // Findings schema.
 //

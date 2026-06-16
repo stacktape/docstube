@@ -1,6 +1,6 @@
 import type { AppRouter } from '@docstube/core';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import type { SetupWizardSaveInput } from './setup-wizard';
+import type { SetupWizardSaveInput } from './setup-wizard.tsx';
 
 export const createSetupWizardSaver = (sessionToken: string) => {
   const client = createTRPCClient<AppRouter>({

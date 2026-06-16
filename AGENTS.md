@@ -34,6 +34,8 @@ Useful commands:
 ```bash
 pnpm install
 pnpm run validate
+pnpm run dev
+pnpm run dev:cli -- telemetry status
 pnpm run overnight:dry
 pnpm run overnight
 pnpm run typecheck
@@ -47,6 +49,12 @@ pnpm run upg
 `validate` is the normal handoff command. Keep caches under `node_modules/.cache` when adding tools.
 `overnight` runs the ordered implementation queue from `tasks.md`; use `overnight:dry` to check
 the runner without calling agents or committing.
+
+`dev:cli` runs the CLI from TypeScript source with Node's native type stripping and the
+`docstube-source` package-export condition. `dev` is the local product dev mode: it starts the
+Vite local UI, runs the source CLI, and proxies the UI through the session-guarded local control
+plane. Running `pnpm run dev` with no extra args defaults to `docstube generate`; pass CLI args
+after `--`, for example `pnpm run dev -- validate`.
 
 Node-run TypeScript should use Node's built-in type stripping: run `node path/to/script.ts`
 directly, keep syntax erasable, use extensionful relative imports, and do not add `tsx`,

@@ -39,11 +39,13 @@ const planSummary = (plan: string): string => {
 };
 
 const packageRows = (packageJson: PackageJson): string =>
-  [
-    ['version', packageJson.version ?? 'unknown'],
-    ['package manager', packageJson.packageManager ?? 'unknown'],
-    ['workspace style', 'apps/* and packages/*']
-  ]
+  (
+    [
+      ['version', packageJson.version ?? 'unknown'],
+      ['package manager', packageJson.packageManager ?? 'unknown'],
+      ['workspace style', 'apps/* and packages/*']
+    ] satisfies Array<readonly [string, string]>
+  )
     .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
     .join('\n');
 

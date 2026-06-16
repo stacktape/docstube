@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { layoutSchema } from './config-schema';
-import { identifierSchema, semverSchema, timestampSchema } from './primitives';
-import { extractSectionMarkers } from './section-markers';
+import { layoutSchema } from './config-schema.ts';
+import { identifierSchema, semverSchema, timestampSchema } from './primitives.ts';
+import { extractSectionMarkers } from './section-markers.ts';
 
 // Page and section ID rules, the generated-page frontmatter schema, and the uniqueness/presence
 // checks downstream packages reuse. A page ID is one or more lowercase kebab-case segments joined

@@ -9,8 +9,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "import": "./dist/contracts.mjs",
-      "types": "./dist/contracts.d.mts"
+      "docstube-source": "./src/contracts.ts",
+      "types": "./dist/contracts.d.mts",
+      "import": "./dist/contracts.mjs"
     }
   },
   "scripts": {

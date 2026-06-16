@@ -7,7 +7,7 @@ import type { AgentAdapter, AgentReplayFixture, AgentRunInput, AgentTextArtifact
 import { agentTextArtifactSchema } from '@docstube/agent';
 import { checkGeneratedPageSections, compileGeneratedMdxPageToHtml } from '@docstube/verifiers';
 import type { GeneratedMdxPage } from '@docstube/verifiers';
-import type { PageDetail, RunRecord, StateBackend } from './state-backend';
+import type { PageDetail, RunRecord, StateBackend } from './state-backend.ts';
 
 export const walkingSkeletonTaskId = 's0-walking-skeleton';
 export const walkingSkeletonRunId = 'run-s0-walking-skeleton';

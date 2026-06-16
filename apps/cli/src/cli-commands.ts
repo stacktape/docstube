@@ -17,7 +17,12 @@ export type GenerateCommandOptions = {
   fresh?: boolean;
   initialize?: (input: { workspaceDir: string }) => Promise<CliCommandResult>;
   openBrowser?: OpenBrowser;
-  start?: (options: { openBrowser?: OpenBrowser; workspaceDir?: string }) => Promise<StartedLocalControlPlane>;
+  start?: (options: {
+    openBrowser?: OpenBrowser;
+    uiDevServerUrl?: string;
+    workspaceDir?: string;
+  }) => Promise<StartedLocalControlPlane>;
+  uiDevServerUrl?: string;
   workspaceDir?: string;
   yes?: boolean;
 };
@@ -165,7 +170,11 @@ export const runGenerateCommand = async (
   }
 
   const start = options.start ?? (await import('@docstube/core')).startGenerateSession;
-  const started = await start({ workspaceDir, openBrowser: options.openBrowser });
+  const started = await start({
+    workspaceDir,
+    openBrowser: options.openBrowser,
+    uiDevServerUrl: options.uiDevServerUrl
+  });
   output.info(`Started local control plane: ${started.url}`);
   return { exitCode: 0 };
 };

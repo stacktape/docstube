@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildDogfoodDocs } from './build-dogfood';
+import { buildDogfoodDocs } from './build-dogfood.ts';
 
 const repoFile = (name: string): string => fileURLToPath(new URL(`../../${name}`, import.meta.url));
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { pageIdSchema, sectionIdSchema } from './page-schema';
-import { identifierSchema, timestampSchema } from './primitives';
+import { pageIdSchema, sectionIdSchema } from './page-schema.ts';
+import { identifierSchema, timestampSchema } from './primitives.ts';
 
 // Feedback record schema.
 //
