@@ -145,9 +145,9 @@ Commands:
   candidates.
 - `docstube doctor`: check the local runtime, optional tools, agent CLI availability, and project
   setup without leaking secrets.
-- `docstube upgrade`: update docstube itself for standalone installs and guide npm users to the
-  right package-manager command. `docstube upgrade --project` updates vendored generated-site
-  assets/config migrations without regenerating documentation content unless required.
+- `docstube upgrade`: update the docstube tool itself. Standalone installs self-update from
+  GitHub Releases; package-manager installs use the detected package manager when safe or print
+  the exact command when the current invocation is ephemeral.
 - `docstube help [command]` and `docstube version`.
 
 Long runs are resumable. Re-running continues from durable state; `--fresh` discards state.

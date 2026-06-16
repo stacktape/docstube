@@ -1,4 +1,5 @@
-import { copyFile, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,7 @@ import {
   runCheckCommand,
   runGenerateCommand,
   runRefreshCommand,
+  runUpgradeCommand,
   runValidateCommand,
   runWizardCommand,
   sendRuntimeTelemetry,
@@ -52,6 +54,9 @@ const captureOutput = (): { lines: string[]; output: CliOutput } => {
     }
   };
 };
+
+const sha256FileText = (content: Buffer, fileName: string): Buffer =>
+  Buffer.from(`${createHash('sha256').update(content).digest('hex')}  ${fileName}\n`);
 
 describe('CLI commands', () => {
   it('opens the wizard control plane and resumes existing local state', async () => {
@@ -189,6 +194,141 @@ describe('CLI commands', () => {
         'info:Refresh checks all pages by default, regenerates stale pages, and updates vendored theme assets.'
       );
       expect(lines).toContain('info:Refresh engine is ready to resolve stale pages.');
+    });
+  });
+
+  it('checks available tool upgrades without mutating installs', async () => {
+    await withWorkspace(async (dir) => {
+      const { lines, output } = captureOutput();
+      await expect(
+        runUpgradeCommand(
+          {
+            check: true,
+            currentVersion: '0.0.2',
+            detection: { executablePath: 'docstube', source: 'source-checkout' },
+            targetVersion: '0.0.3',
+            workspaceDir: dir
+          },
+          output
+        )
+      ).resolves.toEqual({ exitCode: 0 });
+
+      expect(lines).toEqual([
+        'info:Current docstube version: 0.0.2',
+        'info:Latest docstube version: 0.0.3',
+        'info:An upgrade is available.'
+      ]);
+    });
+  });
+
+  it('does not hit the registry when a source checkout explains its upgrade path', async () => {
+    await withWorkspace(async (dir) => {
+      const { lines, output } = captureOutput();
+      await expect(
+        runUpgradeCommand(
+          {
+            detection: { executablePath: 'apps/cli/src/cli.ts', source: 'source-checkout' },
+            fetchLatestVersion: async () => {
+              throw new Error('registry should not be queried');
+            },
+            workspaceDir: dir
+          },
+          output
+        )
+      ).resolves.toEqual({ exitCode: 0 });
+
+      expect(lines).toContain('info:This docstube is running from a source checkout.');
+      expect(lines).toContain('info:Upgrade with: git pull && pnpm install');
+    });
+  });
+
+  it('runs the detected local package-manager upgrade command', async () => {
+    await withWorkspace(async (dir) => {
+      const commands: string[] = [];
+      const { lines, output } = captureOutput();
+      await expect(
+        runUpgradeCommand(
+          {
+            currentVersion: '0.0.2',
+            detection: {
+              executablePath: join(dir, 'node_modules', '.bin', 'docstube'),
+              packageInstallScope: 'local',
+              packageManager: 'pnpm',
+              packageRoot: join(dir, 'node_modules', 'docstube'),
+              source: 'node-package'
+            },
+            runProcess: async (command, args, options) => {
+              commands.push(`${command} ${args.join(' ')} ${options?.cwd ?? ''}`.trim());
+              return { exitCode: 0, stdout: '', stderr: '' };
+            },
+            targetVersion: '0.0.3',
+            workspaceDir: dir
+          },
+          output
+        )
+      ).resolves.toEqual({ exitCode: 0 });
+
+      expect(commands).toEqual([`pnpm add -D docstube@0.0.3 ${dir}`]);
+      expect(lines).toContain('info:Running pnpm add -D docstube@0.0.3.');
+      expect(lines).toContain('info:Upgraded docstube to 0.0.3.');
+    });
+  });
+
+  it('prints an ephemeral package-manager upgrade hint instead of mutating cache', async () => {
+    await withWorkspace(async (dir) => {
+      const { lines, output } = captureOutput();
+      await expect(
+        runUpgradeCommand(
+          {
+            detection: {
+              executablePath: join(dir, '_npx', 'docstube'),
+              packageManager: 'npm',
+              source: 'ephemeral'
+            },
+            fetchLatestVersion: async () => {
+              throw new Error('registry should not be queried');
+            },
+            workspaceDir: dir
+          },
+          output
+        )
+      ).resolves.toEqual({ exitCode: 0 });
+
+      expect(lines).toContain('info:This docstube is running from an ephemeral package-manager cache.');
+      expect(lines).toContain('info:Use npx docstube@latest for the latest ephemeral run.');
+    });
+  });
+
+  it('replaces a standalone executable from a verified release asset', async () => {
+    await withWorkspace(async (dir) => {
+      const executablePath = join(dir, 'docstube');
+      await writeFile(executablePath, 'old', 'utf8');
+      const archive = Buffer.from('fake archive');
+      const { lines, output } = captureOutput();
+
+      await expect(
+        runUpgradeCommand(
+          {
+            arch: 'x64',
+            currentVersion: '0.0.2',
+            detection: { executablePath, source: 'standalone-binary' },
+            download: async (url) =>
+              url.endsWith('.sha256') ? sha256FileText(archive, 'docstube-v0.0.3-linux-x64.tar.gz') : archive,
+            platform: 'linux',
+            runProcess: async (_command, args) => {
+              const outDir = String(args.at(-1));
+              await writeFile(join(outDir, 'docstube'), 'new', 'utf8');
+              return { exitCode: 0, stdout: '', stderr: '' };
+            },
+            targetVersion: '0.0.3',
+            workspaceDir: dir
+          },
+          output
+        )
+      ).resolves.toEqual({ exitCode: 0 });
+
+      await expect(readFile(executablePath, 'utf8')).resolves.toBe('new');
+      expect(lines).toContain('info:Upgraded standalone docstube to 0.0.3.');
     });
   });
 

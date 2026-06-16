@@ -41,7 +41,7 @@ Supervisor runbook for a full implementation pass:
 - Inspect `.docstube-build/logs/` whenever a task fails review or validation.
 - Do not accept fixture-only behavior where `PLAN.md` calls for product behavior. Fixtures prove
   the behavior; they are not the behavior.
-- For UI tasks, smoke through the real local server with `pnpm dev wizard --no-open` or a
+- For UI tasks, smoke through the real local server with `pnpm dev wizard` or a
   focused automated browser/component test.
 - The final handoff must include `pnpm run validate`, the deterministic product smoke, and a
   local UI smoke proving the wizard, dashboard, and review flows are reachable.
@@ -583,8 +583,8 @@ Hard behavior placeholders to replace:
 - `refresh` must resolve stale pages, run the topology pass, regenerate dirty pages, refresh
   vendored theme/project assets, and update the manifest.
 - `refine` must use persisted quality scores to work on the worst pages first.
-- `upgrade` must self-update standalone installs and guide npm installs; `upgrade --project` must
-  apply compatible project/theme migrations.
+- `upgrade` must self-update standalone installs, update detected package-manager installs when
+  safe, and print exact commands for ephemeral or ambiguous installs.
 - `doctor` must check optional tools and configured agent CLI availability.
 
 Out of scope:
@@ -601,7 +601,7 @@ Acceptance:
 - `refresh` and `refine` drive real maintenance/refinement pipelines rather than placeholder
   readiness messages.
 - Runtime telemetry tests prove forbidden data is not sent, without adding a telemetry command.
-- Source-dev smoke covers `pnpm dev wizard --no-open`.
+- Source-dev smoke covers `pnpm dev wizard`.
 - Add a Changeset for user-facing CLI behavior if release notes would matter.
 - `pnpm run validate` passes.
 

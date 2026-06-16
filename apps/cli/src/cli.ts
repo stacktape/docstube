@@ -33,7 +33,7 @@ const commandHelp = [
   '  check                  Run deterministic checks.',
   '  status                 Show config, manifest, and page status.',
   '  doctor                 Check local runtime and project setup.',
-  '  upgrade                Upgrade docstube or generated project assets.',
+  '  upgrade                Upgrade the docstube tool itself.',
   '  version                Print the docstube version.',
   '  help [command]         Print command help.'
 ].join('\n');
@@ -45,17 +45,17 @@ const printHelp = (command?: string): void => {
   }
 
   const helpByCommand: Record<string, string> = {
-    wizard: 'Usage: docstube wizard [--fresh] [--no-open]\n\nOpen the local setup wizard and control plane.',
+    wizard: 'Usage: docstube wizard [--fresh]\n\nOpen the local setup wizard and control plane.',
     generate: 'Usage: docstube generate [--fresh] [--config <path>]\n\nGenerate docs from existing config.',
     refresh: 'Usage: docstube refresh [--config <path>]\n\nRefresh all stale pages and vendored theme assets.',
     refine:
-      'Usage: docstube refine [page] [--all] [--failed] [--max-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
+      'Usage: docstube refine [page] [--failed] [--max-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
     validate: 'Usage: docstube validate [--config <path>]\n\nValidate the docstube config family.',
     check:
       'Usage: docstube check --all\n       docstube check <d2|mdx|snippet|config> <file>\n\nRun deterministic checks.',
     status: 'Usage: docstube status\n\nShow config, manifest, and page status.',
     doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
-    upgrade: 'Usage: docstube upgrade [--check] [--project]\n\nUpgrade docstube or generated project assets.',
+    upgrade: 'Usage: docstube upgrade [--check] [--to <version>]\n\nUpgrade the docstube tool itself.',
     version: 'Usage: docstube version\n\nPrint the docstube version.'
   };
 
@@ -68,8 +68,7 @@ const wizard = defineCommand({
     name: 'wizard'
   },
   args: {
-    fresh: { type: 'boolean', description: 'Discard local wizard state before starting.' },
-    'no-open': { type: 'boolean', description: 'Print the local URL without opening a browser.' }
+    fresh: { type: 'boolean', description: 'Discard local wizard state before starting.' }
   },
   async run({ args }) {
     enableNodeCompileCache();
@@ -77,7 +76,6 @@ const wizard = defineCommand({
     const result = await runWizardCommand(
       {
         fresh: args.fresh === true,
-        openBrowser: args['no-open'] === true ? () => {} : undefined,
         uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL
       },
       output
@@ -137,7 +135,6 @@ const refine = defineCommand({
   },
   args: {
     target: { type: 'positional', required: false, description: 'Optional page path or page id to refine.' },
-    all: { type: 'boolean', description: 'Consider all generated pages.' },
     failed: { type: 'boolean', description: 'Consider only pages with failing checks.' },
     'max-rounds': { type: 'string', description: 'Maximum refinement rounds.' }
   },
@@ -153,7 +150,6 @@ const refine = defineCommand({
     const { runRefineCommand } = await import('./cli-commands.ts');
     const result = await runRefineCommand(
       {
-        all: args.all === true,
         failed: args.failed === true,
         maxRounds,
         target: typeof args.target === 'string' ? args.target : undefined
@@ -251,12 +247,12 @@ const doctor = defineCommand({
 
 const upgrade = defineCommand({
   meta: {
-    description: 'Upgrade docstube or generated project assets.',
+    description: 'Upgrade the docstube tool itself.',
     name: 'upgrade'
   },
   args: {
     check: { type: 'boolean', description: 'Only check the current version.' },
-    project: { type: 'boolean', description: 'Upgrade generated project assets instead of docstube itself.' }
+    to: { type: 'string', description: 'Target version. Defaults to latest.' }
   },
   async run({ args }) {
     enableNodeCompileCache();
@@ -264,7 +260,7 @@ const upgrade = defineCommand({
     const result = await runUpgradeCommand(
       {
         check: args.check === true,
-        project: args.project === true
+        targetVersion: typeof args.to === 'string' ? args.to : undefined
       },
       output
     );

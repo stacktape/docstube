@@ -34,7 +34,7 @@ Useful commands:
 ```bash
 pnpm install
 pnpm run validate
-pnpm dev wizard --no-open
+pnpm dev wizard
 pnpm run overnight:dry
 pnpm run overnight
 pnpm run typecheck
