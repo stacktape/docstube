@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   createRuntimeTelemetryEvent,
+  runCheckAllCommand,
   runCheckCommand,
   runGenerateCommand,
-  runUpdateCommand,
+  runRefreshCommand,
   runValidateCommand,
+  runWizardCommand,
   sendRuntimeTelemetry,
   writeRuntimeTelemetryEnabled
 } from './cli-commands.ts';
@@ -52,16 +54,15 @@ const captureOutput = (): { lines: string[]; output: CliOutput } => {
 };
 
 describe('CLI commands', () => {
-  it('starts generate, reports progress, and resumes existing local state', async () => {
+  it('opens the wizard control plane and resumes existing local state', async () => {
     await withWorkspace(async (dir) => {
       await mkdir(join(dir, '.docstube'), { recursive: true });
       await writeFile(join(dir, '.docstube', 'db.sqlite'), '', 'utf8');
       const { lines, output } = captureOutput();
       const startOptions: unknown[] = [];
-      const result = await runGenerateCommand(
+      const result = await runWizardCommand(
         {
           workspaceDir: dir,
-          yes: true,
           uiDevServerUrl: 'http://127.0.0.1:5173',
           start: async (input) => {
             startOptions.push(input);
@@ -78,8 +79,7 @@ describe('CLI commands', () => {
       );
 
       expect(result.exitCode).toBe(0);
-      expect(lines).toContain('info:Resuming existing local generation state.');
-      expect(lines).toContain('info:Zero-question mode enabled.');
+      expect(lines).toContain('info:Resuming existing local wizard state.');
       expect(lines).toContain('info:Started local control plane: http://127.0.0.1:1234/wizard?session=token');
       expect(startOptions).toEqual([
         {
@@ -91,7 +91,7 @@ describe('CLI commands', () => {
     });
   });
 
-  it('supports --fresh by deleting only machine-local SQLite state', async () => {
+  it('supports wizard --fresh by deleting only machine-local SQLite state', async () => {
     await withWorkspace(async (dir) => {
       await mkdir(join(dir, '.docstube'), { recursive: true });
       await Promise.all([
@@ -100,7 +100,7 @@ describe('CLI commands', () => {
         writeFile(join(dir, '.docstube', 'db.sqlite-shm'), 'state', 'utf8')
       ]);
       const { lines, output } = captureOutput();
-      const result = await runGenerateCommand(
+      const result = await runWizardCommand(
         {
           workspaceDir: dir,
           fresh: true,
@@ -116,11 +116,22 @@ describe('CLI commands', () => {
       );
 
       expect(result.exitCode).toBe(0);
-      expect(lines).toContain('info:Discarded local generation state.');
+      expect(lines).toContain('info:Discarded local wizard state.');
       expect(await pathExists(join(dir, '.docstube', 'db.sqlite'))).toBe(false);
       expect(await pathExists(join(dir, '.docstube', 'db.sqlite-wal'))).toBe(false);
       expect(await pathExists(join(dir, '.docstube', 'db.sqlite-shm'))).toBe(false);
       expect(await pathExists(join(dir, 'docstube.yml'))).toBe(true);
+    });
+  });
+
+  it('starts generation from existing config without opening the wizard', async () => {
+    await withWorkspace(async (dir) => {
+      const { lines, output } = captureOutput();
+      await expect(runGenerateCommand({ workspaceDir: dir }, output)).resolves.toEqual({ exitCode: 0 });
+      expect(lines.some((line) => line.includes('Initialized 2 pages for run-'))).toBe(true);
+      expect(lines).toContain(
+        'info:Generation pipeline is queued from config; page writing is implemented by the pipeline tasks.'
+      );
     });
   });
 
@@ -150,7 +161,19 @@ describe('CLI commands', () => {
     });
   });
 
-  it('loads a portable manifest for update', async () => {
+  it('runs all available deterministic checks over the project', async () => {
+    await withWorkspace(async (dir) => {
+      await mkdir(join(dir, 'docs'), { recursive: true });
+      await writeFile(join(dir, 'docs', 'page.mdx'), '# Hello\n\nWorld\n', 'utf8');
+      const output = captureOutput();
+
+      await expect(runCheckAllCommand({ workspaceDir: dir }, output.output)).resolves.toEqual({ exitCode: 0 });
+      expect(output.lines).toContain('info:config-family: passed');
+      expect(output.lines).toContain('info:mdx-compile: passed');
+    });
+  });
+
+  it('loads a portable manifest for refresh', async () => {
     await withWorkspace(async (dir) => {
       await mkdir(join(dir, '.docstube'), { recursive: true });
       await writeFile(
@@ -160,9 +183,12 @@ describe('CLI commands', () => {
       );
       const { lines, output } = captureOutput();
 
-      await expect(runUpdateCommand({ workspaceDir: dir }, output)).resolves.toEqual({ exitCode: 0 });
+      await expect(runRefreshCommand({ workspaceDir: dir }, output)).resolves.toEqual({ exitCode: 0 });
       expect(lines).toContain('info:Loaded manifest with 0 pages.');
-      expect(lines).toContain('info:Incremental update is ready to resolve dirty pages.');
+      expect(lines).toContain(
+        'info:Refresh checks all pages by default, regenerates stale pages, and updates vendored theme assets.'
+      );
+      expect(lines).toContain('info:Refresh engine is ready to resolve stale pages.');
     });
   });
 

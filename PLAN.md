@@ -61,7 +61,7 @@ Runnable apps in `apps/`:
 
 - `cli`: published `docstube` npm package and binary entry point. Keep startup lazy and light.
 - `local-ui`: Vite + React localhost setup, progress, and review UI.
-- `github-action`: wrapper around `docstube update` that opens PRs.
+- `github-action`: wrapper around `docstube refresh` that opens PRs.
 - `install-events`: public install telemetry Lambda.
 - `web`: public marketing website, handled by a separate workstream.
 
@@ -127,13 +127,28 @@ S0 must freeze these contracts before product logic expands:
 
 Commands:
 
-- `docstube generate`: starts the local server, opens the wizard, and runs the pipeline.
-- `docstube generate --yes`: zero-question mode. Infer doc type, default persona, IA proposal,
-  and theme. Go straight to generation.
-- `docstube update`: incremental run used locally and by the GitHub Action.
+- `docstube wizard`: starts the localhost web UI. If config is missing, it opens the setup wizard;
+  if config exists, it opens the project dashboard/control plane.
+- `docstube generate`: runs generation from existing config. It fails with a clear instruction to
+  run `docstube wizard` when config is missing.
+- `docstube generate --fresh`: discards machine-local generation state and regenerates from config.
+- `docstube refresh`: default maintenance command used locally and by the GitHub Action. It checks
+  all pages by default, regenerates stale pages, and refreshes vendored theme/project assets when
+  the installed docstube version changes them.
+- `docstube refine`: improves existing generated pages, prioritizing the lowest quality scores and
+  failed deterministic gates first.
 - `docstube validate`: deterministic validation of config-family files.
+- `docstube check --all`: run all deterministic checks over the project.
 - `docstube check <d2|mdx|snippet|config> <file>`: single deterministic check for agents and
   humans.
+- `docstube status`: summarize config, manifest, page status, dirty/stale pages, and refinement
+  candidates.
+- `docstube doctor`: check the local runtime, optional tools, agent CLI availability, and project
+  setup without leaking secrets.
+- `docstube upgrade`: update docstube itself for standalone installs and guide npm users to the
+  right package-manager command. `docstube upgrade --project` updates vendored generated-site
+  assets/config migrations without regenerating documentation content unless required.
+- `docstube help [command]` and `docstube version`.
 
 Long runs are resumable. Re-running continues from durable state; `--fresh` discards state.
 Progress streams to terminal and web UI.
@@ -209,7 +224,10 @@ Required verifier families:
 - generated-page frontmatter and page/section ID checks
 - API reference consistency
 
-Verifier outputs are structured findings. Do not invent raw numeric quality scores.
+Verifier and reviewer outputs are structured findings plus an explainable derived page quality
+score. The score is stored for prioritization, status, and `docstube refine`; it must be derived
+from criteria results, deterministic gates, and finding severity, never from an opaque raw judge
+number.
 
 ## Theme and generated docs site
 
@@ -281,24 +299,34 @@ Pipeline shape:
 6. Run persona reviewers.
 7. Run deterministic verifiers.
 8. Convert every issue into structured findings.
-9. Retry/refine on blockers and majors within configured limits.
-10. Persist state, provenance, transcripts, cache keys, and rendered outputs.
-11. Surface passed/flagged pages to the UI immediately.
+9. Compute explainable page quality scores from findings and criteria.
+10. Retry/refine on blockers and majors within configured limits.
+11. Persist state, provenance, quality scores, transcripts, cache keys, and rendered outputs.
+12. Surface passed/flagged pages to the UI immediately.
 
-Incremental update:
+Refresh:
 
 - detect changed symbols via normalized hashes
 - map symbols to pages using seed context, observed reads, and citations
 - bias toward regenerating or flagging when provenance is uncertain
 - run a topology pass so pages remain internally consistent
+- refresh vendored generated-site theme/project assets when docstube ships compatible updates
 - update `.docstube/manifest.yml`
+
+Refinement:
+
+- rank pages by quality score, blocker/major findings, failed deterministic gates, recency, and
+  whether the page blocks other pages
+- work on the worst pages first within usage caps
+- preserve provenance and user-approved content unless the refinement explicitly targets it
+- stop when pages meet the configured quality threshold or the configured max rounds/caps are hit
 
 Changelog generation uses the same pipeline over git history. Diffs are ground truth. Optional
 "why" context comes through user-owned MCP sources such as Jira or Linear.
 
 ## GitHub Action
 
-The Action wraps `docstube update`:
+The Action wraps `docstube refresh`:
 
 - checkout
 - load portable manifest
@@ -362,7 +390,7 @@ Use [`tasks.md`](tasks.md) for the concrete queue. It preserves this dependency 
 | S3 | agent adapters and usage caps | replayable agent execution |
 | S4 | theme and generated site | real render target |
 | S5 | orchestrator, skills, source loaders, changelog | integrated generation loop |
-| S6 | incremental engine and `LocalBackend` | efficient updates |
+| S6 | refresh engine and `LocalBackend` | efficient updates |
 | S7 | local UI | wizard, progress, review |
 | S8 | CLI polish, GitHub Action, runtime telemetry | user-facing shells |
 | S9 | evals and dogfood | calibrated quality proof |
@@ -371,8 +399,9 @@ Each task must close with focused tests or fixtures plus `pnpm run validate` unl
 states a narrower check. Do not skip ahead to UI, adapters, or theme polish before S0 contracts
 and the walking skeleton pass.
 
-Definition of done: a stranger runs `npx docstube generate` on a TS or Python repo and gets a
-verified, polished docs site, then `docstube update` keeps it current.
+Definition of done: a stranger runs `npx docstube wizard`, accepts generated config, runs
+`npx docstube generate` on a TS or Python repo and gets a verified, polished docs site, then
+`docstube refresh` keeps it current and `docstube refine` improves the worst pages first.
 
 ## Release and deployment reference
 
@@ -392,7 +421,8 @@ requires it.
 ## Risks
 
 - Vendor CLI volatility: keep adapters version-aware, structured, and tested with record/replay.
-- Judge unreliability: use criteria and deterministic gates, not raw scores.
+- Judge unreliability: derive explainable quality scores from criteria, deterministic gates, and
+  structured findings; do not store opaque raw judge scores.
 - Provenance error: capture seed, observed reads, and citations; regenerate under uncertainty.
 - Scope drift: obey hard TBD boundaries and `tasks.md`.
 - Non-determinism: content-addressed cache, structured outputs, replay fixtures, and evals.
@@ -403,7 +433,8 @@ docstube / docstube.dev; MIT; BYO compute; hosted tier later; Node LTS; pnpm; Ty
 Zod; YAML config; comment-preserving YAML edits; Hono; tRPC; Vite/React/Tailwind; Astro/React
 theme generated into user repos; Pagefind; D2 only; better-sqlite3 and Drizzle; tree-sitter;
 TypeDoc and griffe; Oxlint/Oxfmt; Vitest; record/replay agents; PostHog opt-out telemetry;
-Codex reference adapter; direct API fallback; findings with blocker/major/minor; no raw scores;
+Codex reference adapter; direct API fallback; findings with blocker/major/minor; explainable
+quality score derivation;
 layouts limited to `single-tree` and `sectioned`; NavTree reused across wizard/progress/review;
 no node-graph pipeline canvas; Stacktape deployment; GitHub Releases for binaries;
 Stacktape-hosted install scripts; npm publishes only `docstube` for now.

@@ -23,7 +23,7 @@ export const siteMetadataSchema = z.strictObject({
 
 export type SiteMetadata = z.infer<typeof siteMetadataSchema>;
 
-// Doc-type intent. The pipeline can infer one with `generate --yes`.
+// Doc-type intent. The setup wizard can infer one during project initialization.
 export const docsTypes = ['library', 'application', 'api', 'cli', 'service'] as const;
 
 export const docsTypeSchema = z.enum(docsTypes);

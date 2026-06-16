@@ -22,7 +22,7 @@ export const relativePathSchema = z
 
 export type RelativePath = z.infer<typeof relativePathSchema>;
 
-// Finding severity taxonomy. No numeric quality scores by design.
+// Finding severity taxonomy. Derived quality scores live separately from finding severity.
 export const severities = ['blocker', 'major', 'minor'] as const;
 
 export const severitySchema = z.enum(severities);

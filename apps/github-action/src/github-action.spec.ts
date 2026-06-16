@@ -18,7 +18,7 @@ import type {
 type HarnessOptions = {
   changedFiles?: readonly string[];
   existingPullRequest?: GitHubPullRequest;
-  updateResult?: DocstubeActionCommandResult;
+  refreshResult?: DocstubeActionCommandResult;
   validateResult?: DocstubeActionCommandResult;
 };
 
@@ -36,7 +36,7 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
   const outputs: Record<string, string> = {};
   const summaries: string[] = [];
   const changedFiles = options.changedFiles ?? [];
-  const updateResult = options.updateResult ?? {
+  const refreshResult = options.refreshResult ?? {
     changedPages: [changedPage('docs/overview.mdx', ['changed-provenance-input'])],
     exitCode: 0
   };
@@ -76,9 +76,9 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
     }
   };
 
-  const runDocstubeUpdate = async (input: DocstubeActionCommandInput) => {
-    operations.push(`update:${input.workspaceDir}`);
-    return updateResult;
+  const runDocstubeRefresh = async (input: DocstubeActionCommandInput) => {
+    operations.push(`refresh:${input.workspaceDir}`);
+    return refreshResult;
   };
 
   const runDocstubeValidate = async (input: DocstubeActionCommandInput) => {
@@ -110,14 +110,14 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
           operations.push(`warn:${message}`);
         }
       },
-      runDocstubeUpdate,
+      runDocstubeRefresh,
       runDocstubeValidate
     }
   };
 };
 
 describe('GitHub Action wrapper', () => {
-  it('opens a PR for docstube update changes and reports page reasons', async () => {
+  it('opens a PR for docstube refresh changes and reports page reasons', async () => {
     const harness = createHarness({
       changedFiles: ['docs/overview.mdx', '.docstube/manifest.yml']
     });
@@ -134,22 +134,22 @@ describe('GitHub Action wrapper', () => {
     );
 
     expect(result).toMatchObject({
-      branchName: 'docstube/update/main',
+      branchName: 'docstube/refresh/main',
       changed: true,
       concurrencyGroup: 'docstube-Docs-Update-main',
       exitCode: 0,
       pullRequestUrl: 'https://github.com/stacktape/docstube/pull/12'
     });
     expect(harness.operations).toEqual([
-      'info:Starting docstube update.',
+      'info:Starting docstube refresh.',
       'checkout:main',
-      'branch:docstube/update/main',
-      'update:/repo',
+      'branch:docstube/refresh/main',
+      'refresh:/repo',
       'changed-files',
-      'commit:docs: update docstube output',
-      'push:docstube/update/main',
-      'find-pr:docstube/update/main',
-      'create-pr:docstube/update/main'
+      'commit:docs: refresh docstube output',
+      'push:docstube/refresh/main',
+      'find-pr:docstube/refresh/main',
+      'create-pr:docstube/refresh/main'
     ]);
     expect(harness.summaries.join('\n')).toContain('changed-provenance-input');
     expect(harness.summaries.join('\n')).toContain('docs/overview.mdx');
@@ -169,22 +169,22 @@ describe('GitHub Action wrapper', () => {
     const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
 
     expect(result.pullRequestUrl).toBe('https://github.com/stacktape/docstube/pull/7');
-    expect(harness.operations).toContain('find-pr:docstube/update/main');
+    expect(harness.operations).toContain('find-pr:docstube/refresh/main');
     expect(harness.operations).toContain('update-pr:7');
-    expect(harness.operations).not.toContain('create-pr:docstube/update/main');
+    expect(harness.operations).not.toContain('create-pr:docstube/refresh/main');
   });
 
   it('never pushes generated docs silently when there are no changes', async () => {
-    const harness = createHarness({ changedFiles: [], updateResult: { exitCode: 0 } });
+    const harness = createHarness({ changedFiles: [], refreshResult: { exitCode: 0 } });
 
     const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
 
     expect(result.changed).toBe(false);
     expect(harness.operations).toEqual([
-      'info:Starting docstube update.',
+      'info:Starting docstube refresh.',
       'checkout:main',
-      'branch:docstube/update/main',
-      'update:/repo',
+      'branch:docstube/refresh/main',
+      'refresh:/repo',
       'changed-files'
     ]);
     expect(harness.summaries.join('\n')).toContain('did not leave generated documentation changes');
@@ -198,15 +198,15 @@ describe('GitHub Action wrapper', () => {
 
     expect(result.changed).toBe(true);
     expect(result.pullRequestUrl).toBeUndefined();
-    expect(harness.operations).not.toContain('commit:docs: update docstube output');
-    expect(harness.operations).not.toContain('push:docstube/update/main');
-    expect(harness.operations).not.toContain('create-pr:docstube/update/main');
+    expect(harness.operations).not.toContain('commit:docs: refresh docstube output');
+    expect(harness.operations).not.toContain('push:docstube/refresh/main');
+    expect(harness.operations).not.toContain('create-pr:docstube/refresh/main');
     expect(harness.summaries.join('\n')).toContain('dry-run mode');
   });
 
-  it('does not push or open a PR when docstube update fails', async () => {
+  it('does not push or open a PR when docstube refresh fails', async () => {
     const harness = createHarness({
-      updateResult: { exitCode: 1, output: 'failed with token ghs_secret_token_123456' }
+      refreshResult: { exitCode: 1, output: 'failed with token ghs_secret_token_123456' }
     });
 
     const result = await runGitHubAction(
@@ -217,16 +217,16 @@ describe('GitHub Action wrapper', () => {
     expect(result.exitCode).toBe(1);
     expect(result.changed).toBe(false);
     expect(harness.operations).toEqual([
-      'info:Starting docstube update.',
+      'info:Starting docstube refresh.',
       'checkout:main',
-      'branch:docstube/update/main',
-      'update:/repo'
+      'branch:docstube/refresh/main',
+      'refresh:/repo'
     ]);
     expect(harness.summaries.join('\n')).toContain('[redacted]');
     expect(harness.summaries.join('\n')).not.toContain('ghs_secret_token_123456');
   });
 
-  it('runs validate mode without creating an update branch', async () => {
+  it('runs validate mode without creating a refresh branch', async () => {
     const harness = createHarness();
 
     const result = await runGitHubAction({ mode: 'validate', workspaceDir: '/repo' }, harness.deps);
@@ -255,7 +255,7 @@ describe('GitHub Action wrapper', () => {
       'INPUT_BASE-BRANCH': 'release/v1',
       'INPUT_DRY-RUN': 'true',
       'INPUT_GITHUB-TOKEN': 'ghs_secret_token_123456',
-      INPUT_MODE: 'update'
+      INPUT_MODE: 'refresh'
     });
 
     expect(inputs).toMatchObject({

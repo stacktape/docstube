@@ -7,8 +7,8 @@ import { packageVersionSchema, relativePathSchema } from './primitives.ts';
 //
 // The manifest is the committed, portable provenance/state record the incremental engine reads to
 // decide which pages a code change affects. It captures, per page, the seed-context hash, the
-// files the writer observed, and the citations it grounded on. It carries page status but no
-// numeric quality score, no secrets, and no transcripts.
+// files the writer observed, and the citations it grounded on. It carries page status and
+// portable state, but never secrets, transcripts, or opaque raw judge scores.
 
 export const provenanceCitationSchema = z.strictObject({
   path: relativePathSchema,

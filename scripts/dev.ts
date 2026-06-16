@@ -134,14 +134,14 @@ const runSourceCli = async (input: {
 const readRunArgs = (): string[] => {
   const rawArgs = process.argv.slice(2);
   const args = rawArgs[0] === '--' ? rawArgs.slice(1) : rawArgs;
-  return args.length === 0 ? ['generate'] : args;
+  return args.length === 0 ? ['wizard'] : args;
 };
 
 const main = async (): Promise<void> => {
   const args = readRunArgs();
   const command = args[0];
 
-  if (command !== 'generate') {
+  if (command !== 'wizard') {
     const result = await runSourceCli({ args });
     process.exitCode = result.code ?? (result.signal === 'SIGINT' ? 130 : 1);
     return;

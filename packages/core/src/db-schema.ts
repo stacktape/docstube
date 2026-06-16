@@ -5,8 +5,8 @@ import type { DocstubeConfig, Finding, Ia } from '@docstube/contracts';
 //
 // This database holds pipeline state only; it is never committed (the manifest under
 // `.docstube/manifest.yml` is the portable, committed record). It stores no secrets, transcripts,
-// or numeric quality scores. Persisted page outcomes reuse the frozen `passed`/`flagged` contract
-// statuses; the earlier `queued`/`running`/`retrying` states are in-flight progress only.
+// or opaque raw judge scores. Persisted page outcomes reuse the frozen `passed`/`flagged` contract
+// statuses; derived quality scores are added through the quality-score contract/migration task.
 //
 // The hand-authored migrations in `db-migrations.ts` must stay in sync with these table shapes.
 

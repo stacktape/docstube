@@ -21,22 +21,61 @@ const output = {
   error: (message: string) => console.error(message)
 };
 
-const generate = defineCommand({
+const commandHelp = [
+  'Usage: docstube <command> [options]',
+  '',
+  'Commands:',
+  '  wizard                 Open the local setup wizard and control plane.',
+  '  generate               Generate docs from existing config.',
+  '  refresh                Refresh stale pages and vendored theme assets.',
+  '  refine                 Improve the lowest-quality generated pages first.',
+  '  validate               Validate the docstube config family.',
+  '  check                  Run deterministic checks.',
+  '  status                 Show config, manifest, and page status.',
+  '  doctor                 Check local runtime and project setup.',
+  '  upgrade                Upgrade docstube or generated project assets.',
+  '  version                Print the docstube version.',
+  '  help [command]         Print command help.'
+].join('\n');
+
+const printHelp = (command?: string): void => {
+  if (!command) {
+    output.info(commandHelp);
+    return;
+  }
+
+  const helpByCommand: Record<string, string> = {
+    wizard: 'Usage: docstube wizard [--fresh] [--no-open]\n\nOpen the local setup wizard and control plane.',
+    generate: 'Usage: docstube generate [--fresh] [--config <path>]\n\nGenerate docs from existing config.',
+    refresh: 'Usage: docstube refresh [--config <path>]\n\nRefresh all stale pages and vendored theme assets.',
+    refine:
+      'Usage: docstube refine [page] [--all] [--failed] [--max-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
+    validate: 'Usage: docstube validate [--config <path>]\n\nValidate the docstube config family.',
+    check:
+      'Usage: docstube check --all\n       docstube check <d2|mdx|snippet|config> <file>\n\nRun deterministic checks.',
+    status: 'Usage: docstube status\n\nShow config, manifest, and page status.',
+    doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
+    upgrade: 'Usage: docstube upgrade [--check] [--project]\n\nUpgrade docstube or generated project assets.',
+    version: 'Usage: docstube version\n\nPrint the docstube version.'
+  };
+
+  output.info(helpByCommand[command] ?? `Unknown help topic: ${command}`);
+};
+
+const wizard = defineCommand({
   meta: {
     description: 'Start the local setup wizard and generation control plane.',
-    name: 'generate'
+    name: 'wizard'
   },
   args: {
-    yes: { type: 'boolean', description: 'Run without setup questions.' },
-    fresh: { type: 'boolean', description: 'Discard local machine state before starting.' },
+    fresh: { type: 'boolean', description: 'Discard local wizard state before starting.' },
     'no-open': { type: 'boolean', description: 'Print the local URL without opening a browser.' }
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runGenerateCommand } = await import('./cli-commands.ts');
-    const result = await runGenerateCommand(
+    const { runWizardCommand } = await import('./cli-commands.ts');
+    const result = await runWizardCommand(
       {
-        yes: args.yes === true,
         fresh: args.fresh === true,
         openBrowser: args['no-open'] === true ? () => {} : undefined,
         uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL
@@ -47,15 +86,80 @@ const generate = defineCommand({
   }
 });
 
-const update = defineCommand({
+const generate = defineCommand({
   meta: {
-    description: 'Run an incremental documentation update.',
-    name: 'update'
+    description: 'Generate docs from existing config.',
+    name: 'generate'
   },
-  async run() {
+  args: {
+    fresh: { type: 'boolean', description: 'Discard local generation state before starting.' },
+    config: { type: 'string', description: 'Path to docstube.yml.' }
+  },
+  async run({ args }) {
     enableNodeCompileCache();
-    const { runUpdateCommand } = await import('./cli-commands.ts');
-    const result = await runUpdateCommand({}, output);
+    const { runGenerateCommand } = await import('./cli-commands.ts');
+    const result = await runGenerateCommand(
+      {
+        configPath: typeof args.config === 'string' ? args.config : undefined,
+        fresh: args.fresh === true
+      },
+      output
+    );
+    process.exitCode = result.exitCode;
+  }
+});
+
+const refresh = defineCommand({
+  meta: {
+    description: 'Refresh stale pages and vendored theme assets.',
+    name: 'refresh'
+  },
+  args: {
+    config: { type: 'string', description: 'Path to docstube.yml.' }
+  },
+  async run({ args }) {
+    enableNodeCompileCache();
+    const { runRefreshCommand } = await import('./cli-commands.ts');
+    const result = await runRefreshCommand(
+      {
+        configPath: typeof args.config === 'string' ? args.config : undefined
+      },
+      output
+    );
+    process.exitCode = result.exitCode;
+  }
+});
+
+const refine = defineCommand({
+  meta: {
+    description: 'Improve the lowest-quality generated pages first.',
+    name: 'refine'
+  },
+  args: {
+    target: { type: 'positional', required: false, description: 'Optional page path or page id to refine.' },
+    all: { type: 'boolean', description: 'Consider all generated pages.' },
+    failed: { type: 'boolean', description: 'Consider only pages with failing checks.' },
+    'max-rounds': { type: 'string', description: 'Maximum refinement rounds.' }
+  },
+  async run({ args }) {
+    enableNodeCompileCache();
+    const maxRounds = typeof args['max-rounds'] === 'string' ? Number(args['max-rounds']) : undefined;
+    if (maxRounds !== undefined && (!Number.isInteger(maxRounds) || maxRounds < 1)) {
+      output.error(`Invalid --max-rounds value: ${args['max-rounds']}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const { runRefineCommand } = await import('./cli-commands.ts');
+    const result = await runRefineCommand(
+      {
+        all: args.all === true,
+        failed: args.failed === true,
+        maxRounds,
+        target: typeof args.target === 'string' ? args.target : undefined
+      },
+      output
+    );
     process.exitCode = result.exitCode;
   }
 });
@@ -65,10 +169,18 @@ const validate = defineCommand({
     description: 'Validate the docstube config family.',
     name: 'validate'
   },
-  async run() {
+  args: {
+    config: { type: 'string', description: 'Path to docstube.yml.' }
+  },
+  async run({ args }) {
     enableNodeCompileCache();
     const { runValidateCommand } = await import('./cli-commands.ts');
-    const result = await runValidateCommand({}, output);
+    const result = await runValidateCommand(
+      {
+        configPath: typeof args.config === 'string' ? args.config : undefined
+      },
+      output
+    );
     process.exitCode = result.exitCode;
   }
 });
@@ -79,14 +191,28 @@ const check = defineCommand({
     name: 'check'
   },
   args: {
-    kind: { type: 'positional', required: true, description: 'd2, mdx, snippet, or config' },
-    file: { type: 'positional', required: true, description: 'File to check' }
+    kind: { type: 'positional', required: false, description: 'd2, mdx, snippet, or config' },
+    file: { type: 'positional', required: false, description: 'File to check' },
+    all: { type: 'boolean', description: 'Run all deterministic checks for the project.' }
   },
   async run({ args }) {
     enableNodeCompileCache();
+    if (args.all === true) {
+      const { runCheckAllCommand } = await import('./cli-commands.ts');
+      const result = await runCheckAllCommand({}, output);
+      process.exitCode = result.exitCode;
+      return;
+    }
+
     const kind = args.kind;
     if (kind !== 'd2' && kind !== 'mdx' && kind !== 'snippet' && kind !== 'config') {
-      output.error(`Unknown check kind: ${kind}`);
+      output.error('Expected `docstube check --all` or `docstube check <d2|mdx|snippet|config> <file>`.');
+      process.exitCode = 1;
+      return;
+    }
+
+    if (typeof args.file !== 'string') {
+      output.error(`Missing file for check kind: ${kind}`);
       process.exitCode = 1;
       return;
     }
@@ -97,6 +223,78 @@ const check = defineCommand({
   }
 });
 
+const status = defineCommand({
+  meta: {
+    description: 'Show config, manifest, and page status.',
+    name: 'status'
+  },
+  async run() {
+    enableNodeCompileCache();
+    const { runStatusCommand } = await import('./cli-commands.ts');
+    const result = await runStatusCommand({}, output);
+    process.exitCode = result.exitCode;
+  }
+});
+
+const doctor = defineCommand({
+  meta: {
+    description: 'Check local runtime and project setup.',
+    name: 'doctor'
+  },
+  async run() {
+    enableNodeCompileCache();
+    const { runDoctorCommand } = await import('./cli-commands.ts');
+    const result = await runDoctorCommand({}, output);
+    process.exitCode = result.exitCode;
+  }
+});
+
+const upgrade = defineCommand({
+  meta: {
+    description: 'Upgrade docstube or generated project assets.',
+    name: 'upgrade'
+  },
+  args: {
+    check: { type: 'boolean', description: 'Only check the current version.' },
+    project: { type: 'boolean', description: 'Upgrade generated project assets instead of docstube itself.' }
+  },
+  async run({ args }) {
+    enableNodeCompileCache();
+    const { runUpgradeCommand } = await import('./cli-commands.ts');
+    const result = await runUpgradeCommand(
+      {
+        check: args.check === true,
+        project: args.project === true
+      },
+      output
+    );
+    process.exitCode = result.exitCode;
+  }
+});
+
+const version = defineCommand({
+  meta: {
+    description: 'Print the docstube version.',
+    name: 'version'
+  },
+  run: () => {
+    output.info(docstubeVersion);
+  }
+});
+
+const help = defineCommand({
+  meta: {
+    description: 'Print command help.',
+    name: 'help'
+  },
+  args: {
+    command: { type: 'positional', required: false, description: 'Command to describe.' }
+  },
+  run({ args }) {
+    printHelp(typeof args.command === 'string' ? args.command : undefined);
+  }
+});
+
 const main = defineCommand({
   meta: {
     description: 'Generate verified, always-current documentation from source code.',
@@ -104,14 +302,21 @@ const main = defineCommand({
     version: docstubeVersion
   },
   subCommands: {
+    wizard,
     generate,
-    update,
+    refresh,
+    refine,
     validate,
-    check
+    check,
+    status,
+    doctor,
+    upgrade,
+    version,
+    help
   },
   run: ({ rawArgs }) => {
     if (rawArgs.length === 0) {
-      console.info('Run `docstube generate` to start the local control plane.');
+      printHelp();
     }
   }
 });

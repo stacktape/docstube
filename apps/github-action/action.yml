@@ -1,10 +1,10 @@
 name: docstube
-description: Regenerate docstube documentation and open or update a pull request.
+description: Refresh docstube documentation and open or update a pull request.
 inputs:
   mode:
-    description: Run docstube update or validate.
+    description: Run docstube refresh or validate.
     required: false
-    default: update
+    default: refresh
   github-token:
     description: GitHub token used by the gh CLI to open or update the PR.
     required: false
@@ -12,13 +12,13 @@ inputs:
     description: Branch to update from and target with the PR.
     required: false
   branch-prefix:
-    description: Prefix for the generated update branch.
+    description: Prefix for the generated refresh branch.
     required: false
-    default: docstube/update
+    default: docstube/refresh
   commit-message:
     description: Commit message for generated documentation changes.
     required: false
-    default: 'docs: update docstube output'
+    default: 'docs: refresh docstube output'
   config-path:
     description: Optional docstube config path.
     required: false
@@ -30,14 +30,14 @@ inputs:
     description: Checked-out repository path.
     required: false
   dry-run:
-    description: Run update and report the PR body without committing, pushing, or opening a PR.
+    description: Run refresh and report the PR body without committing, pushing, or opening a PR.
     required: false
     default: 'false'
 outputs:
   changed:
     description: Whether docstube left generated documentation changes.
   branch-name:
-    description: Branch name used for docstube update changes.
+    description: Branch name used for docstube refresh changes.
   changed-files:
     description: JSON array of changed files.
   changed-pages:
@@ -45,7 +45,7 @@ outputs:
   pull-request-url:
     description: URL of the opened or updated pull request.
   concurrency-group:
-    description: Suggested workflow concurrency group for this update run.
+    description: Suggested workflow concurrency group for this refresh run.
 runs:
   using: node24
   main: dist/github-action.mjs

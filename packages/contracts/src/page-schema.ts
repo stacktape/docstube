@@ -28,8 +28,8 @@ export const sectionIdSchema = z
 
 export type SectionId = z.infer<typeof sectionIdSchema>;
 
-// Page lifecycle state. There is no numeric quality score by design; a page is `passed` once it
-// clears the gate and `flagged` while findings remain.
+// Page lifecycle state. Quality scoring is derived separately from criteria and findings; status
+// remains the coarse gate outcome.
 export const pageStatuses = ['passed', 'flagged'] as const;
 
 export const pageStatusSchema = z.enum(pageStatuses);

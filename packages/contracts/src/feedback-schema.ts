@@ -6,7 +6,7 @@ import { identifierSchema, timestampSchema } from './primitives.ts';
 //
 // The review UI captures feedback at four scopes: element, section, page, and whole-docs. The
 // categorizer routes a record to a downstream target (criteria, writing instructions, glossary,
-// or config). Records carry no secrets and no numeric scores.
+// or config). Records carry no secrets and no opaque raw judge scores.
 
 export const feedbackScopes = ['element', 'section', 'page', 'docs'] as const;
 

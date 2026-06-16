@@ -34,7 +34,7 @@ Useful commands:
 ```bash
 pnpm install
 pnpm run validate
-pnpm dev generate --no-open
+pnpm dev wizard --no-open
 pnpm run overnight:dry
 pnpm run overnight
 pnpm run typecheck
@@ -50,9 +50,9 @@ pnpm run upg
 the runner without calling agents or committing.
 
 `pnpm dev <docstube-command>` runs the CLI from TypeScript source with Node's native type
-stripping and the `docstube-source` package-export condition. `pnpm dev generate` also starts the
+stripping and the `docstube-source` package-export condition. `pnpm dev wizard` also starts the
 Vite local UI and proxies it through the session-guarded local control plane. Running `pnpm dev`
-with no extra args defaults to `pnpm dev generate`.
+with no extra args defaults to `pnpm dev wizard`.
 
 Node-run TypeScript should use Node's built-in type stripping: run `node path/to/script.ts`
 directly, keep syntax erasable, use extensionful relative imports, and do not add `tsx`,
@@ -120,7 +120,7 @@ Do not add `index.ts` files.
   installer scripts and never include paths, usernames, hostnames, args, prompts, or source code.
 - Generated docs sites vendor the theme/source they need. Do not make user docs sites depend on
   `@docstube/theme` in v1.
-- Theme updates are applied by a docstube update command or the GitHub Action without
+- Theme updates are applied by `docstube refresh` or the GitHub Action without
   regenerating docs content unless explicitly requested.
 
 ## Style rules

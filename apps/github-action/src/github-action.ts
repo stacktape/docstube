@@ -6,10 +6,10 @@ import { promisify } from 'node:util';
 export type GitHubActionCommand = {
   configPath?: string;
   cwd: string;
-  mode: 'generate' | 'update' | 'validate';
+  mode: 'generate' | 'refresh' | 'validate';
 };
 
-export type GitHubActionMode = 'update' | 'validate';
+export type GitHubActionMode = 'refresh' | 'validate';
 
 export type GitHubActionChangedPage = {
   path: string;
@@ -95,7 +95,7 @@ export type GitHubActionDeps = {
   git: GitHubActionGitClient;
   pullRequest: GitHubActionPullRequestClient;
   reporter: GitHubActionReporter;
-  runDocstubeUpdate: (input: DocstubeActionCommandInput) => Promise<DocstubeActionCommandResult>;
+  runDocstubeRefresh: (input: DocstubeActionCommandInput) => Promise<DocstubeActionCommandResult>;
   runDocstubeValidate: (input: DocstubeActionCommandInput) => Promise<DocstubeActionCommandResult>;
 };
 
@@ -119,8 +119,8 @@ type ProcessRunResult = {
 export const actionPackageName = '@docstube/action';
 
 const execFileAsync = promisify(execFile);
-const defaultBranchPrefix = 'docstube/update';
-const defaultCommitMessage = 'docs: update docstube output';
+const defaultBranchPrefix = 'docstube/refresh';
+const defaultCommitMessage = 'docs: refresh docstube output';
 const defaultDocstubePackage = 'docstube@latest';
 
 const compact = (value: string): string => value.trim().replace(/\s+/g, ' ');
@@ -153,7 +153,7 @@ const pageFromChangedFile = (path: string): GitHubActionChangedPage | undefined 
     return undefined;
   }
 
-  return { path, reasons: ['changed by docstube update'] };
+  return { path, reasons: ['changed by docstube refresh'] };
 };
 
 const changedPagesFromFiles = (files: readonly string[]): readonly GitHubActionChangedPage[] =>
@@ -169,7 +169,7 @@ const bulletList = (items: readonly string[]): string =>
   items.length === 0 ? '- None' : items.map((item) => `- ${item}`).join('\n');
 
 const formatChangedPage = (page: GitHubActionChangedPage): string =>
-  `- \`${page.path}\` - ${page.reasons.length > 0 ? page.reasons.join(', ') : 'changed by docstube update'}`;
+  `- \`${page.path}\` - ${page.reasons.length > 0 ? page.reasons.join(', ') : 'changed by docstube refresh'}`;
 
 const formatPullRequestBody = (input: {
   changedFiles: readonly string[];
@@ -177,7 +177,7 @@ const formatPullRequestBody = (input: {
   concurrencyGroup: string;
 }): string =>
   [
-    '## docstube update',
+    '## docstube refresh',
     '',
     'This PR was created by the docstube GitHub Action. It contains generated documentation changes only.',
     '',
@@ -266,7 +266,7 @@ export const runGitHubAction = async (
   inputs: GitHubActionInputs,
   deps: GitHubActionDeps
 ): Promise<GitHubActionResult> => {
-  const mode = inputs.mode ?? 'update';
+  const mode = inputs.mode ?? 'refresh';
   const baseBranch = inputs.baseBranch ?? 'main';
   const branchName = createDocstubeActionBranchName({
     baseBranch,
@@ -309,20 +309,20 @@ export const runGitHubAction = async (
   await deps.git.checkoutBase({ baseBranch, workspaceDir: inputs.workspaceDir });
   await deps.git.createBranch({ branchName, workspaceDir: inputs.workspaceDir });
 
-  const updateResult = await deps.runDocstubeUpdate({
+  const refreshResult = await deps.runDocstubeRefresh({
     configPath: inputs.configPath,
     workspaceDir: inputs.workspaceDir
   });
 
-  if (updateResult.exitCode !== 0) {
-    const output = updateResult.output ? `\n\n${compact(updateResult.output)}` : '';
+  if (refreshResult.exitCode !== 0) {
+    const output = refreshResult.output ? `\n\n${compact(refreshResult.output)}` : '';
     const result: GitHubActionResult = {
       branchName,
       changed: false,
       changedFiles: [],
       changedPages: [],
       concurrencyGroup,
-      exitCode: updateResult.exitCode,
+      exitCode: refreshResult.exitCode,
       summary:
         formatSummary({
           changedFiles: [],
@@ -336,7 +336,7 @@ export const runGitHubAction = async (
   }
 
   const changedFiles = (await deps.git.changedFiles({ workspaceDir: inputs.workspaceDir })).toSorted();
-  const changedPages = normalizeChangedPages(updateResult.changedPages, changedFiles);
+  const changedPages = normalizeChangedPages(refreshResult.changedPages, changedFiles);
 
   if (changedFiles.length === 0) {
     const result: GitHubActionResult = {
@@ -357,7 +357,7 @@ export const runGitHubAction = async (
     return completeAction(result, deps.reporter, secrets);
   }
 
-  const title = 'docs: update docstube output';
+  const title = 'docs: refresh docstube output';
   const body = formatPullRequestBody({ changedFiles, changedPages, concurrencyGroup });
 
   if (dryRun) {
@@ -630,7 +630,7 @@ export const createDefaultGitHubActionDeps = (input: {
     git: createGitClient(),
     pullRequest: createPullRequestClient(input.githubToken),
     reporter: createReporter(),
-    runDocstubeUpdate: createDocstubeCommandRunner('update', docstubePackage),
+    runDocstubeRefresh: createDocstubeCommandRunner('refresh', docstubePackage),
     runDocstubeValidate: createDocstubeCommandRunner('validate', docstubePackage)
   };
 };
@@ -659,8 +659,11 @@ const readBooleanActionInput = (env: NodeJS.ProcessEnv, name: string): boolean |
 };
 
 const readActionMode = (env: NodeJS.ProcessEnv): GitHubActionMode => {
-  const raw = readActionInput(env, 'mode') ?? 'update';
-  if (raw === 'update' || raw === 'validate') {
+  const raw = readActionInput(env, 'mode') ?? 'refresh';
+  if (raw === 'update' || raw === 'refresh') {
+    return 'refresh';
+  }
+  if (raw === 'validate') {
     return raw;
   }
   throw new Error(`Unsupported docstube Action mode: ${raw}.`);

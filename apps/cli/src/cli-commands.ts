@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import { parse } from 'yaml';
 import type { CheckResult } from '@docstube/contracts';
@@ -13,21 +13,36 @@ export type CliCommandResult = {
   exitCode: number;
 };
 
-export type GenerateCommandOptions = {
-  fresh?: boolean;
-  initialize?: (input: { workspaceDir: string }) => Promise<CliCommandResult>;
+export type StartControlPlane = (options: {
   openBrowser?: OpenBrowser;
-  start?: (options: {
-    openBrowser?: OpenBrowser;
-    uiDevServerUrl?: string;
-    workspaceDir?: string;
-  }) => Promise<StartedLocalControlPlane>;
   uiDevServerUrl?: string;
   workspaceDir?: string;
-  yes?: boolean;
+}) => Promise<StartedLocalControlPlane>;
+
+export type WizardCommandOptions = {
+  fresh?: boolean;
+  openBrowser?: OpenBrowser;
+  start?: StartControlPlane;
+  uiDevServerUrl?: string;
+  workspaceDir?: string;
 };
 
-export type UpdateCommandOptions = {
+export type GenerateCommandOptions = {
+  configPath?: string;
+  fresh?: boolean;
+  workspaceDir?: string;
+};
+
+export type RefreshCommandOptions = {
+  configPath?: string;
+  workspaceDir?: string;
+};
+
+export type RefineCommandOptions = {
+  all?: boolean;
+  failed?: boolean;
+  maxRounds?: number;
+  target?: string;
   workspaceDir?: string;
 };
 
@@ -39,6 +54,24 @@ export type ValidateCommandOptions = {
 export type CheckCommandOptions = {
   file: string;
   kind: 'config' | 'd2' | 'mdx' | 'snippet';
+  workspaceDir?: string;
+};
+
+export type CheckAllCommandOptions = {
+  workspaceDir?: string;
+};
+
+export type StatusCommandOptions = {
+  workspaceDir?: string;
+};
+
+export type DoctorCommandOptions = {
+  workspaceDir?: string;
+};
+
+export type UpgradeCommandOptions = {
+  check?: boolean;
+  project?: boolean;
   workspaceDir?: string;
 };
 
@@ -76,6 +109,10 @@ const stateFiles = (workspaceDir: string): string[] => [
   join(workspaceDir, '.docstube', 'db.sqlite-wal')
 ];
 
+const deleteMachineState = async (workspaceDir: string): Promise<void> => {
+  await Promise.all(stateFiles(workspaceDir).map((file) => rm(file, { force: true })));
+};
+
 const toRelativePath = (workspaceDir: string, file: string): string => {
   const candidate = relative(workspaceDir, file).replaceAll('\\', '/');
   return candidate && !candidate.startsWith('..') && !candidate.startsWith('/') ? candidate : basename(file);
@@ -99,6 +136,28 @@ const printCheckResult = (output: CliOutput, result: CheckResult): void => {
 };
 
 const telemetryPath = (workspaceDir: string): string => join(workspaceDir, '.docstube', 'telemetry.json');
+
+const manifestPath = (workspaceDir: string): string => join(workspaceDir, '.docstube', 'manifest.yml');
+
+const listFilesRecursive = async (root: string, extensions: readonly string[]): Promise<string[]> => {
+  if (!(await pathExists(root))) {
+    return [];
+  }
+
+  const entries = await readdir(root, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(root, entry.name);
+      if (entry.isDirectory()) {
+        return listFilesRecursive(path, extensions);
+      }
+
+      return extensions.some((extension) => entry.name.endsWith(extension)) ? [path] : [];
+    })
+  );
+
+  return files.flat().toSorted();
+};
 
 export const createRuntimeTelemetryEvent = (input: {
   command: string;
@@ -139,27 +198,18 @@ export const sendRuntimeTelemetry = async (input: {
   return { sent: true };
 };
 
-export const runGenerateCommand = async (
-  options: GenerateCommandOptions = {},
+export const runWizardCommand = async (
+  options: WizardCommandOptions = {},
   output: CliOutput = defaultOutput
 ): Promise<CliCommandResult> => {
   const workspaceDir = options.workspaceDir ?? process.cwd();
   const existingState = await pathExists(stateFiles(workspaceDir)[0]!);
 
   if (options.fresh) {
-    await Promise.all(stateFiles(workspaceDir).map((file) => rm(file, { force: true })));
-    output.info('Discarded local generation state.');
+    await deleteMachineState(workspaceDir);
+    output.info('Discarded local wizard state.');
   } else if (existingState) {
-    output.info('Resuming existing local generation state.');
-  }
-
-  if (options.yes) {
-    output.info('Zero-question mode enabled.');
-    const initialize = options.initialize ?? ((input) => runGenerateYesInitialization(input, output));
-    const initialized = await initialize({ workspaceDir });
-    if (initialized.exitCode !== 0) {
-      return initialized;
-    }
+    output.info('Resuming existing local wizard state.');
   }
 
   const start = options.start ?? (await import('@docstube/core')).startGenerateSession;
@@ -172,22 +222,66 @@ export const runGenerateCommand = async (
   return { exitCode: 0 };
 };
 
-export const runUpdateCommand = async (
-  options: UpdateCommandOptions = {},
+export const runGenerateCommand = async (
+  options: GenerateCommandOptions = {},
   output: CliOutput = defaultOutput
 ): Promise<CliCommandResult> => {
   const workspaceDir = options.workspaceDir ?? process.cwd();
-  const manifestPath = join(workspaceDir, '.docstube', 'manifest.yml');
-  if (!(await pathExists(manifestPath))) {
+  const configPath = options.configPath ?? 'docstube.yml';
+
+  if (!(await pathExists(join(workspaceDir, configPath)))) {
+    output.error(`No ${configPath} found. Run docstube wizard first.`);
+    return { exitCode: 1 };
+  }
+
+  if (options.fresh) {
+    await deleteMachineState(workspaceDir);
+    output.info('Discarded local generation state.');
+  } else if (await pathExists(stateFiles(workspaceDir)[0]!)) {
+    output.info('Resuming existing local generation state.');
+  }
+
+  return runGenerateInitialization({ configPath, workspaceDir }, output);
+};
+
+export const runRefreshCommand = async (
+  options: RefreshCommandOptions = {},
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
+  const workspaceDir = options.workspaceDir ?? process.cwd();
+  const path = manifestPath(workspaceDir);
+  if (!(await pathExists(path))) {
     output.error('No .docstube/manifest.yml found. Run docstube generate first.');
     return { exitCode: 1 };
   }
 
   const { readManifestFile } = await import('@docstube/core');
-  const manifest = await readManifestFile(manifestPath);
+  const manifest = await readManifestFile(path);
   output.info(`Loaded manifest with ${manifest.pages.length} pages.`);
-  output.info('Incremental update is ready to resolve dirty pages.');
+  output.info('Refresh checks all pages by default, regenerates stale pages, and updates vendored theme assets.');
+  output.info('Refresh engine is ready to resolve stale pages.');
   return { exitCode: 0 };
+};
+
+export const runRefineCommand = async (
+  options: RefineCommandOptions = {},
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
+  const workspaceDir = options.workspaceDir ?? process.cwd();
+  const path = manifestPath(workspaceDir);
+  if (!(await pathExists(path))) {
+    output.error('No .docstube/manifest.yml found. Run docstube generate first.');
+    return { exitCode: 1 };
+  }
+
+  const { readManifestFile } = await import('@docstube/core');
+  const manifest = await readManifestFile(path);
+  const target = options.target ? ` for ${options.target}` : '';
+  const rounds = options.maxRounds ? ` up to ${options.maxRounds} rounds` : '';
+  output.info(`Loaded manifest with ${manifest.pages.length} pages.`);
+  output.info(`Refinement will prioritize the lowest quality scores first${target}${rounds}.`);
+  output.error('The score-driven refinement pipeline is not implemented yet.');
+  return { exitCode: 1 };
 };
 
 export const runValidateCommand = async (
@@ -240,8 +334,107 @@ export const runCheckCommand = async (
   return { exitCode: resultFailed(result) ? 1 : 0 };
 };
 
-export const runGenerateYesInitialization = async (
+export const runCheckAllCommand = async (
+  options: CheckAllCommandOptions = {},
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
+  const workspaceDir = options.workspaceDir ?? process.cwd();
+  let failedCount = 0;
+
+  if (await pathExists(join(workspaceDir, 'docstube.yml'))) {
+    const validate = await runValidateCommand({ workspaceDir }, output);
+    if (validate.exitCode !== 0) {
+      failedCount += 1;
+    }
+  } else {
+    output.info('No docstube.yml found; skipping config-family.');
+  }
+
+  const docsRoot = join(workspaceDir, 'docs');
+  const files = await listFilesRecursive(docsRoot, ['.d2', '.mdx']);
+  if (files.length === 0) {
+    output.info('No docs/*.mdx or docs/*.d2 files found.');
+  }
+
+  const fileResults = await Promise.all(
+    files.map((file) => {
+      const kind = file.endsWith('.d2') ? 'd2' : 'mdx';
+      return runCheckCommand({ file, kind, workspaceDir }, output);
+    })
+  );
+  failedCount += fileResults.filter((result) => result.exitCode !== 0).length;
+
+  return { exitCode: failedCount > 0 ? 1 : 0 };
+};
+
+export const runStatusCommand = async (
+  options: StatusCommandOptions = {},
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
+  const workspaceDir = options.workspaceDir ?? process.cwd();
+  const hasConfig = await pathExists(join(workspaceDir, 'docstube.yml'));
+  const hasManifest = await pathExists(manifestPath(workspaceDir));
+
+  output.info(`Config: ${hasConfig ? 'found' : 'missing'}`);
+  output.info(`Manifest: ${hasManifest ? 'found' : 'missing'}`);
+
+  if (hasManifest) {
+    const { readManifestFile } = await import('@docstube/core');
+    const manifest = await readManifestFile(manifestPath(workspaceDir));
+    const counts = new Map<string, number>();
+    for (const page of manifest.pages) {
+      counts.set(page.status, (counts.get(page.status) ?? 0) + 1);
+    }
+    const summary =
+      counts.size === 0 ? '0 pages' : [...counts.entries()].map(([status, count]) => `${status}:${count}`).join(', ');
+    output.info(`Pages: ${summary}`);
+    output.info(`Generated with: ${manifest.generatedWith.name} ${manifest.generatedWith.version}`);
+  }
+
+  return { exitCode: 0 };
+};
+
+export const runDoctorCommand = async (
+  options: DoctorCommandOptions = {},
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
+  const workspaceDir = options.workspaceDir ?? process.cwd();
+  output.info(`Node: ${process.version}`);
+  output.info(`Platform: ${process.platform}/${process.arch}`);
+
+  if (!(await pathExists(join(workspaceDir, 'docstube.yml')))) {
+    output.error('Config: missing docstube.yml. Run docstube wizard first.');
+    return { exitCode: 1 };
+  }
+
+  const validate = await runValidateCommand({ workspaceDir }, output);
+  return { exitCode: validate.exitCode };
+};
+
+export const runUpgradeCommand = async (
+  options: UpgradeCommandOptions = {},
+  output: CliOutput = defaultOutput
+): Promise<CliCommandResult> => {
+  if (options.check) {
+    output.info(`Current docstube version: ${docstubeVersion}`);
+    output.info('Upgrade availability checks are not implemented yet.');
+    return { exitCode: 0 };
+  }
+
+  if (options.project) {
+    output.error('Project asset/theme upgrades are not implemented yet.');
+    return { exitCode: 1 };
+  }
+
+  output.error('Self-upgrade is not implemented yet.');
+  output.info('For npm installs, use your package manager to install docstube@latest.');
+  output.info('For standalone installs, rerun the docstube install script.');
+  return { exitCode: 1 };
+};
+
+export const runGenerateInitialization = async (
   input: {
+    configPath?: string;
     workspaceDir: string;
     dbPath?: string;
   },
@@ -252,8 +445,13 @@ export const runGenerateYesInitialization = async (
   const { createLocalBackend, initializeRunFromConfigFamily, openDocstubeDatabase } = await import('@docstube/core');
   const backend = createLocalBackend(openDocstubeDatabase(dbPath));
   try {
-    const result = await initializeRunFromConfigFamily({ backend, workspaceDir: input.workspaceDir });
-    output.info(`Initialized ${result.pages.length} pages for ${result.run.id}.`);
+    const result = await initializeRunFromConfigFamily({
+      backend,
+      configPath: input.configPath,
+      workspaceDir: input.workspaceDir
+    });
+    output.info(`${result.resumed ? 'Resumed' : 'Initialized'} ${result.pages.length} pages for ${result.run.id}.`);
+    output.info('Generation pipeline is queued from config; page writing is implemented by the pipeline tasks.');
     return { exitCode: 0 };
   } finally {
     await backend.close();

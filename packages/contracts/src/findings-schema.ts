@@ -4,9 +4,9 @@ import { identifierSchema, jsonValueSchema, relativePathSchema, severitySchema }
 
 // Findings schema.
 //
-// Every issue raised by a verifier or reviewer is a structured finding, never a raw numeric
-// score (PLAN.md). Severity uses the fixed blocker/major/minor taxonomy. The retry/refinement
-// loop acts on blockers and majors; minors are advisory.
+// Every issue raised by a verifier or reviewer is a structured finding. Quality scores are derived
+// separately from findings and criteria, never stored as opaque raw judge numbers. Severity uses
+// the fixed blocker/major/minor taxonomy.
 
 // Where a finding originated. Deterministic verifiers and persona reviewers both emit findings.
 export const findingOrigins = ['verifier', 'reviewer', 'writer', 'editor'] as const;

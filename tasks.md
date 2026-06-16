@@ -41,7 +41,7 @@ Supervisor runbook for a full implementation pass:
 - Inspect `.docstube-build/logs/` whenever a task fails review or validation.
 - Do not accept fixture-only behavior where `PLAN.md` calls for product behavior. Fixtures prove
   the behavior; they are not the behavior.
-- For UI tasks, smoke through the real local server with `pnpm dev generate --no-open` or a
+- For UI tasks, smoke through the real local server with `pnpm dev wizard --no-open` or a
   focused automated browser/component test.
 - The final handoff must include `pnpm run validate`, the deterministic product smoke, and a
   local UI smoke proving the wizard, dashboard, and review flows are reachable.
@@ -112,7 +112,8 @@ Acceptance:
 - Page/section uniqueness and presence checks are tested.
 - Deterministic-check results and registry component metadata are snapshot-tested.
 - Downstream packages can import these contracts from `@docstube/contracts`.
-- No numeric quality score is introduced.
+- Quality score contracts define an explainable derived page score; config files still reject
+  arbitrary user-authored score fields.
 - `pnpm run validate` passes.
 
 ## Task 03 - State database, StateBackend, and tRPC contracts
@@ -385,13 +386,16 @@ Acceptance:
 - The pipeline uses shared findings and verifier result contracts.
 - `pnpm run validate` passes.
 
-## Task 15 - Retry, cache, transcripts, and changelog pipeline
+## Task 15 - Retry, refinement scoring, cache, transcripts, and changelog pipeline
 
 Goal: complete the non-UI pipeline behaviors after the basic gate works.
 
 Scope:
 
 - Retry/refinement loop.
+- Explainable page quality score derivation from criteria results, deterministic gates, and
+  blocker/major/minor findings.
+- Refinement prioritization that starts with the lowest-scoring pages and failed gates.
 - Persisted transcripts.
 - Content-addressed agent cache keys.
 - Changelog generation over git diffs.
@@ -400,13 +404,16 @@ Scope:
 Acceptance:
 
 - Retry limits and cache hits are tested.
+- Score derivation is deterministic, explainable in UI/API output, and never stores opaque raw
+  judge scores.
+- Refinement ordering fixtures prove worst pages are handled first within configured caps.
 - Transcripts do not store secrets.
 - Changelog entries are fact-checked against diffs in fixtures.
 - `pnpm run validate` passes.
 
-## Task 16 - Incremental engine and LocalBackend
+## Task 16 - Refresh engine and LocalBackend
 
-Goal: make `docstube update` regenerate only affected pages.
+Goal: make `docstube refresh` regenerate stale pages and refresh vendored project assets.
 
 Scope:
 
@@ -419,6 +426,9 @@ Scope:
 - Topology consistency pass: nav-tree references resolve, page slugs remain unique, cross-page
   links to regenerated symbols are revisited, and glossary terms used by changed pages are still
   defined.
+- Theme/project asset refresh: when installed docstube ships compatible updates to the vendored
+  generated-site theme, refresh those files without regenerating documentation content unless the
+  migration requires it.
 - `.docstube/manifest.yml` update.
 - Durable `LocalBackend` implementation over SQLite.
 
@@ -429,6 +439,7 @@ Acceptance:
 - Topology-pass fixtures cover a broken nav reference, stale cross-page link, and missing glossary
   term.
 - Manifest is portable and committed-friendly.
+- Refresh checks all pages by default; no separate `--all` flag is required for the normal path.
 - `pnpm run validate` passes.
 
 ## Task 17 - Local server and browser startup
@@ -441,7 +452,7 @@ Scope:
 - tRPC mount for the AppRouter procedures defined in Task 03.
 - Static serving for the built local UI.
 - Ephemeral session token on localhost URLs.
-- `generate` startup helper that starts the server and opens the wizard URL.
+- `wizard` startup helper that starts the server and opens the wizard URL.
 
 Acceptance:
 
@@ -545,18 +556,36 @@ Goal: make the user-facing CLI drive the implemented core.
 
 Scope:
 
+- `wizard`.
 - `generate`.
-- `generate --yes`.
 - `generate --fresh`.
-- `update`.
+- `refresh`.
+- `refine`.
 - `validate`.
+- `status`.
+- `doctor`.
+- `upgrade`.
+- `help [command]`.
+- `version`.
+- `check --all`.
 - `check <d2|mdx|snippet|config> <file>`.
 - Lazy command loading.
 - `NODE_COMPILE_CACHE` where appropriate.
 - Runtime telemetry opt-out and disclosure.
 - No dedicated `docstube telemetry` command.
 - Development command path: `pnpm dev <docstube-command>` runs the TypeScript source CLI; for
-  `generate`, it also starts the Vite local UI and proxies it through the local control plane.
+  `wizard`, it also starts the Vite local UI and proxies it through the local control plane.
+
+Hard behavior placeholders to replace:
+
+- `generate` must run the real generation pipeline from existing config, not only initialize a
+  queued run.
+- `refresh` must resolve stale pages, run the topology pass, regenerate dirty pages, refresh
+  vendored theme/project assets, and update the manifest.
+- `refine` must use persisted quality scores to work on the worst pages first.
+- `upgrade` must self-update standalone installs and guide npm installs; `upgrade --project` must
+  apply compatible project/theme migrations.
+- `doctor` must check optional tools and configured agent CLI availability.
 
 Out of scope:
 
@@ -567,21 +596,23 @@ Acceptance:
 
 - CLI startup stays light.
 - Command tests cover success, failure, `--fresh`, resumability, and progress output.
-- `generate` and `generate --yes` drive the real local server/pipeline path rather than printing
-  placeholder readiness messages.
+- `wizard` drives the real local server/UI path.
+- `generate` drives the real config-based pipeline path rather than opening the wizard.
+- `refresh` and `refine` drive real maintenance/refinement pipelines rather than placeholder
+  readiness messages.
 - Runtime telemetry tests prove forbidden data is not sent, without adding a telemetry command.
-- Source-dev smoke covers `pnpm dev generate --no-open`.
+- Source-dev smoke covers `pnpm dev wizard --no-open`.
 - Add a Changeset for user-facing CLI behavior if release notes would matter.
 - `pnpm run validate` passes.
 
 ## Task 22 - GitHub Action
 
-Goal: make the Action wrap `docstube update` and open PRs.
+Goal: make the Action wrap `docstube refresh` and open PRs.
 
 Scope:
 
 - Action inputs and outputs.
-- Checkout/update flow.
+- Checkout/refresh flow.
 - Secret handling.
 - PR creation with changed pages and reasons.
 - Idempotent reruns.
@@ -606,17 +637,19 @@ Goal: prove the integrated product works before adding eval complexity.
 
 Scope:
 
-- TS fixture repo through CLI `generate --yes`.
-- Python fixture repo through CLI `generate --yes`.
+- TS fixture repo through CLI `wizard` setup plus `generate`.
+- Python fixture repo through CLI `wizard` setup plus `generate`.
 - Rendered site build for both fixtures.
-- `docstube update` after a small source change in both fixtures.
+- `docstube refresh` after a small source change in both fixtures.
 - Assertions for generated docs, manifest updates, and verifier findings.
+- `docstube refine` prioritizes the lowest-quality fixture page before cleaner pages.
 
 Acceptance:
 
 - Smoke tests use mocks/replay, not live AI.
 - Both fixture sites build.
-- Update regenerates or flags the expected pages.
+- Refresh regenerates or flags the expected pages.
+- Refine ordering starts from persisted quality scores and failed gates.
 - The smoke asserts product behavior, not only token plumbing: generated pages contain
   source-grounded facts, manifest provenance, verifier results, and usable navigation.
 - `pnpm run validate` passes.
