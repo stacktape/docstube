@@ -1,4 +1,6 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { dirname } from 'node:path/posix';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
 import { findingSchema, generatedPageFrontmatterSchema } from '@docstube/contracts';
@@ -50,7 +52,7 @@ const defaultTimestamp = '2026-06-16T00:00:00.000Z';
 
 const safeTaskId = (prefix: string, pageId: string): string => `${prefix}-${pageId.replaceAll('/', '-')}`;
 
-const docsRoot = (repoRoot: string): string => resolve(repoRoot, 'docs');
+const writableRootForPage = (repoRoot: string, page: ScheduledPage): string => resolve(repoRoot, dirname(page.slug));
 
 export const createWriterRunInput = (input: {
   model?: string;
@@ -62,14 +64,15 @@ export const createWriterRunInput = (input: {
   model: input.model ?? 'replay-fixture',
   prompt: [
     `Run: ${input.runId}`,
-    `Write page ${input.page.id} at ${input.page.slug}.`,
+    `Write page ${input.page.id} at repo-relative path ${input.page.slug}.`,
     `Title: ${input.page.title}`,
     input.page.brief ? `Brief: ${input.page.brief}` : 'Brief: none',
-    'Return one docstube-generated MDX artifact.'
+    'The file must contain one docstube-generated MDX page with valid frontmatter and section markers.',
+    'If your adapter supports artifacts, also return that MDX artifact.'
   ].join('\n'),
   sandbox: {
     readOnlyRoots: [resolve(input.repoRoot)],
-    writableRoots: [docsRoot(input.repoRoot)],
+    writableRoots: [writableRootForPage(input.repoRoot, input.page)],
     allowNetwork: false,
     shell: 'none'
   }
@@ -119,6 +122,21 @@ const splitGeneratedPageArtifact = (artifact: AgentTextArtifact): GeneratedMdxPa
 
   const frontmatter = generatedPageFrontmatterSchema.parse(document.toJS()) as GeneratedPageFrontmatter;
   return { path: artifact.path, frontmatter, body };
+};
+
+const readGeneratedArtifactFromWorkspace = async (input: {
+  page: ScheduledPage;
+  repoRoot: string;
+}): Promise<AgentTextArtifact | null> => {
+  try {
+    return {
+      path: input.page.slug,
+      content: await readFile(resolve(input.repoRoot, input.page.slug), 'utf8'),
+      encoding: 'utf8'
+    };
+  } catch {
+    return null;
+  }
 };
 
 const reviewerOutputSchema = z.union([
@@ -196,7 +214,9 @@ export const runReplayPageGeneration = async (options: PageGenerationOptions): P
     throw new PageGenerationError(writerResult.error);
   }
 
-  const artifact = writerResult.artifacts.find((candidate) => candidate.path === options.page.slug);
+  const artifact =
+    writerResult.artifacts.find((candidate) => candidate.path === options.page.slug) ??
+    (await readGeneratedArtifactFromWorkspace({ repoRoot: options.repoRoot, page: options.page }));
   if (!artifact) {
     throw new PageGenerationError(`writer did not produce expected artifact: ${options.page.slug}`);
   }

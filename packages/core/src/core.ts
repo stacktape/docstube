@@ -40,11 +40,56 @@ export type {
   TerminalProgressState
 } from './pipeline-run.ts';
 
-export { initializeProjectGeneration } from './project-generation.ts';
-export type {
-  ProjectGenerationInitializationOptions,
-  ProjectGenerationInitializationResult
+export {
+  createConfiguredProjectGenerationAdapters,
+  createDeterministicProjectGenerationAdapters,
+  generateConfiguredProjectPages,
+  generateProjectDocumentation,
+  initializeProjectGeneration
 } from './project-generation.ts';
+export type {
+  GeneratedProjectPage,
+  GenerateConfiguredProjectPagesResult,
+  ProjectGenerationAdapterFactory,
+  ProjectGenerationAdapters,
+  ProjectGenerationOptions,
+  ProjectGenerationInitializationOptions,
+  ProjectGenerationInitializationResult,
+  ProjectGenerationResult
+} from './project-generation.ts';
+
+export { refreshProjectDocumentation } from './project-refresh.ts';
+export type {
+  ProjectAssetRefreshResult,
+  ProjectRefreshOptions,
+  ProjectRefreshPageChange,
+  ProjectRefreshResult
+} from './project-refresh.ts';
+
+export {
+  derivePageQualitySummary,
+  rankRefinementCandidates,
+  refineProjectDocumentation
+} from './project-refinement.ts';
+export type {
+  PageQualitySummary,
+  ProjectRefinementOptions,
+  ProjectRefinementResult,
+  RefinementCandidate
+} from './project-refinement.ts';
+
+export { getProjectStatus } from './project-status.ts';
+export type {
+  ProjectConfigStatus,
+  ProjectManifestStatus,
+  ProjectStateStatus,
+  ProjectStatusCounts,
+  ProjectStatusOptions,
+  ProjectStatusResult
+} from './project-status.ts';
+
+export { doctorProject } from './project-doctor.ts';
+export type { DoctorCheck, DoctorCheckStatus, ProjectDoctorOptions, ProjectDoctorResult } from './project-doctor.ts';
 
 export {
   createReviewerRunInput,

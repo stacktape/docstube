@@ -25,8 +25,7 @@
     "packages/**/*.tsx",
     "scripts/**/*.ts",
     "*.config.ts",
-    "stacktape.ts",
-    "run-overnight.ts"
+    "stacktape.ts"
   ],
   "exclude": ["node_modules", "dist", "build", "coverage", ".docstube", ".docstube-build"]
 }

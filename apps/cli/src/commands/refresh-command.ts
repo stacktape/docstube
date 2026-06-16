@@ -5,6 +5,16 @@ import { manifestPath, pathExists } from '../workspace-paths.ts';
 
 export type RefreshCommandOptions = {
   configPath?: string;
+  refresh?: (input: { configPath?: string; workspaceDir: string }) => Promise<{
+    assetRefresh: { files?: readonly string[]; reason?: string; status: 'refreshed' | 'skipped' };
+    changedPages: readonly {
+      action: string;
+      findings: readonly { message: string; severity: string }[];
+      id: string;
+      reasons: readonly string[];
+    }[];
+    manifest: { pages: readonly unknown[] };
+  }>;
   workspaceDir?: string;
 };
 
@@ -25,10 +35,23 @@ export const runRefreshCommand = async (
     return { exitCode: 1 };
   }
 
-  const { readManifestFile } = await import('@docstube/core');
-  const manifest = await readManifestFile(path);
-  output.info(`Loaded manifest with ${manifest.pages.length} pages.`);
-  output.info('Refresh checks all pages by default, regenerates stale pages, and updates vendored theme assets.');
-  output.info('Refresh engine is ready to resolve stale pages.');
+  const refresh = options.refresh ?? (await import('@docstube/core')).refreshProjectDocumentation;
+  const result = await refresh({ configPath, workspaceDir });
+  output.info(`Loaded manifest with ${result.manifest.pages.length} pages.`);
+  if (result.changedPages.length === 0) {
+    output.info('No stale pages found.');
+  } else {
+    for (const page of result.changedPages) {
+      output.info(`${page.action}: ${page.id} (${page.reasons.join(', ')})`);
+      for (const finding of page.findings) {
+        output.error(`${finding.severity}: ${finding.message}`);
+      }
+    }
+  }
+  output.info(
+    result.assetRefresh.status === 'refreshed'
+      ? `Refreshed ${result.assetRefresh.files?.length ?? 0} vendored asset files.`
+      : `Vendored assets: skipped (${result.assetRefresh.reason}).`
+  );
   return { exitCode: 0 };
 };

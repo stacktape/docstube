@@ -93,6 +93,7 @@ export type TopologyConsistencyInput = {
   glossary: Glossary;
   ia: Ia;
   manifest: Manifest;
+  outputDir?: RelativePath;
   pages: readonly TopologyPage[];
   regeneratedPageIds?: readonly PageId[];
 };
@@ -404,25 +405,28 @@ export const runTopologyConsistencyPass = (input: TopologyConsistencyInput): Fin
 
   for (const page of scheduledPages) {
     const manifestPage = manifestById.get(page.id);
+    const expectedPath = input.outputDir
+      ? relativePathSchema.parse(posixNormalize(posixJoin(input.outputDir, page.slug)))
+      : page.slug;
     if (!manifestPage) {
       findings.push(
         topologyFinding({
           code: 'nav-reference-missing',
-          message: `IA page ${page.id} points to ${page.slug}, but the manifest has no matching page.`,
+          message: `IA page ${page.id} points to ${expectedPath}, but the manifest has no matching page.`,
           pageId: page.id,
-          meta: { path: page.slug }
+          meta: { path: expectedPath }
         })
       );
       continue;
     }
 
-    if (manifestPage.path !== page.slug) {
+    if (manifestPage.path !== expectedPath) {
       findings.push(
         topologyFinding({
           code: 'nav-path-mismatch',
-          message: `IA page ${page.id} points to ${page.slug}, but the manifest records ${manifestPage.path}.`,
+          message: `IA page ${page.id} points to ${expectedPath}, but the manifest records ${manifestPage.path}.`,
           pageId: page.id,
-          meta: { expected: page.slug, actual: manifestPage.path }
+          meta: { expected: expectedPath, actual: manifestPage.path }
         })
       );
     }

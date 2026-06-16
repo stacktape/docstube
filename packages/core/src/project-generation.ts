@@ -1,8 +1,53 @@
-import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import {
+  createClaudeAdapter,
+  createCodexAdapter,
+  createDirectApiAdapter,
+  createGeminiAdapter,
+  createMockAgentAdapter
+} from '@docstube/agent';
+import { buildSectionMarker } from '@docstube/contracts';
+import {
+  checkGeneratedPageSections,
+  checkMdxCompiles,
+  generatedPageSectionCheckId,
+  mdxCompileCheckId
+} from '@docstube/verifiers';
+import type { AgentAdapter, AgentTextArtifact } from '@docstube/agent';
+import type {
+  AgentChoice,
+  DocstubeConfig,
+  Finding,
+  Manifest,
+  ManifestPage,
+  PageId,
+  RelativePath,
+  SectionId,
+  Timestamp
+} from '@docstube/contracts';
 import { openDocstubeDatabase } from './db-migrations.ts';
+import { createPageProvenance, updateManifest, writeManifestFile } from './incremental-engine.ts';
+import type { ManifestPageUpdate } from './incremental-engine.ts';
 import { createLocalBackend } from './local-backend.ts';
-import { initializeRunFromConfigFamily } from './pipeline-run.ts';
+import { runReplayPageGeneration } from './page-orchestrator.ts';
+import type { PageDeterministicVerifier } from './page-orchestrator.ts';
+import type { PersonaReviewer } from './page-orchestrator.ts';
+import { initializeRunFromConfigFamily, transitionRunStatus } from './pipeline-run.ts';
+import type { ScheduledPage } from './pipeline-run.ts';
+import {
+  collectProjectSourceFiles,
+  createPageSeedContext,
+  defaultConfigPath,
+  ensureDocstubeDir,
+  projectDbPath,
+  projectManifestPath,
+  resolveWorkspacePath,
+  withOutputPaths
+} from './project-workspace.ts';
+import type { PageSeedContext, ProjectSourceFile } from './project-workspace.ts';
+import { sourceFilesForPage } from './project-workspace.ts';
+import type { StateBackend } from './state-backend.ts';
 
 export type ProjectGenerationInitializationOptions = {
   configPath?: string;
@@ -16,22 +61,321 @@ export type ProjectGenerationInitializationResult = {
   runId: string;
 };
 
+export type GeneratedProjectPage = {
+  findings: Finding[];
+  id: PageId;
+  path: RelativePath;
+  sections: SectionId[];
+  status: ManifestPage['status'];
+  title: string;
+};
+
+export type ProjectGenerationOptions = ProjectGenerationInitializationOptions & {
+  adapterFactory?: ProjectGenerationAdapterFactory;
+  now?: () => Timestamp;
+};
+
+export type ProjectGenerationResult = ProjectGenerationInitializationResult & {
+  generatedPages: GeneratedProjectPage[];
+  manifest: Manifest;
+  manifestPath: string;
+  sourceFilesCount: number;
+};
+
+const docstubeVersion = '0.0.2';
+const defaultTimestamp: Timestamp = '2026-06-16T00:00:00.000Z';
+
+export type ProjectGenerationAdapters = {
+  model?: string;
+  reviewers: readonly PersonaReviewer[];
+  writer: AgentAdapter;
+};
+
+export type ProjectGenerationAdapterFactory = (input: {
+  config: DocstubeConfig;
+  generatedAt: Timestamp;
+  pages: readonly ScheduledPage[];
+  sourceFiles: readonly ProjectSourceFile[];
+  workspaceDir: string;
+}) => ProjectGenerationAdapters;
+
+const escapeMarkdownText = (value: string): string =>
+  value.replaceAll('\\', '\\\\').replaceAll('{', '\\{').replaceAll('}', '\\}').replaceAll('<', '&lt;');
+
+const escapeCodeText = (value: string): string => value.replaceAll('`', '\\`');
+
+const yamlString = (value: string): string => JSON.stringify(value);
+
+const artifactContentForPage = (input: {
+  generatedAt: Timestamp;
+  page: ScheduledPage;
+  seedContext: PageSeedContext;
+  sourceFiles: readonly ProjectSourceFile[];
+}): string => {
+  const sourceLines =
+    input.sourceFiles.length > 0
+      ? input.sourceFiles.slice(0, 12).map((source) => `- \`${escapeCodeText(source.path)}\``)
+      : ['- No configured source files were discovered for this deterministic run.'];
+  const personaLines = input.seedContext.personas.map((persona) => `  - ${persona}`);
+
+  return [
+    '---',
+    `id: ${input.page.id}`,
+    `title: ${yamlString(input.page.title)}`,
+    input.seedContext.site.description ? `description: ${yamlString(input.seedContext.site.description)}` : undefined,
+    `layout: ${input.seedContext.layout}`,
+    'personas:',
+    ...personaLines,
+    'sections:',
+    '  - intro',
+    'generated:',
+    '  by: docstube',
+    `  version: ${yamlString(docstubeVersion)}`,
+    `  at: ${yamlString(input.generatedAt)}`,
+    '---',
+    buildSectionMarker('start', 'intro'),
+    '',
+    `## ${escapeMarkdownText(input.page.title)}`,
+    '',
+    `${escapeMarkdownText(input.seedContext.site.name)} documentation page generated from the configured IA.`,
+    input.page.brief ? `Brief: ${escapeMarkdownText(input.page.brief)}` : undefined,
+    '',
+    'Source context:',
+    ...sourceLines,
+    '',
+    buildSectionMarker('end', 'intro')
+  ]
+    .filter((line): line is string => line !== undefined)
+    .join('\n');
+};
+
+const writeArtifact = async (workspaceDir: string, artifact: AgentTextArtifact): Promise<void> => {
+  const target = resolveWorkspacePath(workspaceDir, artifact.path);
+  await mkdir(dirname(target), { recursive: true });
+  await writeFile(target, artifact.content, 'utf8');
+};
+
+const pageManifestUpdate = (input: {
+  page: ScheduledPage;
+  result: Awaited<ReturnType<typeof runReplayPageGeneration>>;
+  seedContext: PageSeedContext;
+  sourceFiles: readonly ProjectSourceFile[];
+}): ManifestPageUpdate => ({
+  id: input.result.generatedPage.frontmatter.id,
+  path: input.result.artifact.path,
+  title: input.result.generatedPage.frontmatter.title,
+  status: input.result.page.status === 'flagged' ? 'flagged' : 'passed',
+  sections: input.result.generatedPage.frontmatter.sections ?? [],
+  provenance: createPageProvenance({
+    seedContext: input.seedContext,
+    reads: input.sourceFiles.map((source) => source.path),
+    citations: input.sourceFiles.map((source) => ({ path: source.path }))
+  })
+});
+
+const modelForChoice = (choice: AgentChoice): string => choice.model ?? 'default';
+
+const apiKeyForChoice = (choice: AgentChoice): string => {
+  const provider = choice.provider ?? 'openai';
+  const keyName = provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+  const value = process.env[keyName];
+  if (!value) {
+    throw new Error(`The ${choice.adapter} adapter requires ${keyName} in the environment.`);
+  }
+  return value;
+};
+
+const adapterForChoice = (choice: AgentChoice) => {
+  if (choice.adapter === 'codex') {
+    return createCodexAdapter({ version: '0.0.0' });
+  }
+  if (choice.adapter === 'claude') {
+    return createClaudeAdapter({ version: '0.0.0' });
+  }
+  if (choice.adapter === 'gemini') {
+    return createGeminiAdapter({ version: '0.0.0' });
+  }
+  return createDirectApiAdapter({
+    provider: choice.provider ?? 'openai',
+    baseUrl: choice.baseUrl,
+    apiKey: apiKeyForChoice(choice)
+  });
+};
+
+export const createConfiguredProjectGenerationAdapters: ProjectGenerationAdapterFactory = (input) => {
+  const reviewerChoice = input.config.agents.reviewer ?? input.config.agents.writer;
+  const reviewerAdapter = adapterForChoice(reviewerChoice);
+  return {
+    writer: adapterForChoice(input.config.agents.writer),
+    model: modelForChoice(input.config.agents.writer),
+    reviewers: input.config.personas.map((persona) => ({
+      personaId: persona.id,
+      adapter: reviewerAdapter
+    }))
+  };
+};
+
+export const createDeterministicProjectGenerationAdapters: ProjectGenerationAdapterFactory = (input) => {
+  const artifacts = input.pages.map((page): AgentTextArtifact => {
+    const pageSources = sourceFilesForPage(page, input.sourceFiles);
+    const seedContext = createPageSeedContext({ config: input.config, page, sources: pageSources });
+    return {
+      path: page.slug,
+      content: artifactContentForPage({
+        generatedAt: input.generatedAt,
+        page,
+        seedContext,
+        sourceFiles: pageSources
+      }),
+      encoding: 'utf8'
+    };
+  });
+  const reviewer = createMockAgentAdapter({
+    id: 'project-review-replay',
+    version: '0.0.0',
+    output: { findings: [] }
+  });
+  return {
+    writer: createMockAgentAdapter({ id: 'project-generation-replay', version: '0.0.0', artifacts }),
+    model: 'replay-fixture',
+    reviewers: input.config.personas.map((persona) => ({ personaId: persona.id, adapter: reviewer }))
+  };
+};
+
+export type GenerateConfiguredProjectPagesResult = {
+  generatedPages: GeneratedProjectPage[];
+  manifestPages: ManifestPageUpdate[];
+};
+
+export const generateConfiguredProjectPages = async (input: {
+  adapterFactory?: ProjectGenerationAdapterFactory;
+  backend: StateBackend;
+  config: DocstubeConfig;
+  generatedAt: Timestamp;
+  pages: readonly ScheduledPage[];
+  runId: string;
+  sourceFiles: readonly ProjectSourceFile[];
+  workspaceDir: string;
+}): Promise<GenerateConfiguredProjectPagesResult> => {
+  const adapters = (input.adapterFactory ?? createConfiguredProjectGenerationAdapters)({
+    config: input.config,
+    generatedAt: input.generatedAt,
+    pages: input.pages,
+    sourceFiles: input.sourceFiles,
+    workspaceDir: input.workspaceDir
+  });
+  const verifiers = [
+    { id: generatedPageSectionCheckId, run: checkGeneratedPageSections },
+    {
+      id: mdxCompileCheckId,
+      run: (page) => checkMdxCompiles({ path: page.path, body: page.body })
+    }
+  ] satisfies readonly PageDeterministicVerifier[];
+  const generatedPages: GeneratedProjectPage[] = [];
+  const manifestPages: ManifestPageUpdate[] = [];
+
+  await input.pages.reduce(async (previous, page) => {
+    await previous;
+    const pageSources = sourceFilesForPage(page, input.sourceFiles);
+    const seedContext = createPageSeedContext({ config: input.config, page, sources: pageSources });
+    const result = await runReplayPageGeneration({
+      backend: input.backend,
+      runId: input.runId,
+      repoRoot: input.workspaceDir,
+      page,
+      writer: adapters.writer,
+      reviewers: adapters.reviewers,
+      verifiers,
+      model: adapters.model,
+      now: () => input.generatedAt
+    });
+    await writeArtifact(input.workspaceDir, result.artifact);
+    manifestPages.push(pageManifestUpdate({ page, result, seedContext, sourceFiles: pageSources }));
+    generatedPages.push({
+      id: result.generatedPage.frontmatter.id,
+      path: result.artifact.path,
+      title: result.generatedPage.frontmatter.title,
+      status: result.page.status === 'flagged' ? 'flagged' : 'passed',
+      sections: result.generatedPage.frontmatter.sections ?? [],
+      findings: result.page.findings
+    });
+  }, Promise.resolve());
+
+  return { generatedPages, manifestPages };
+};
+
 export const initializeProjectGeneration = async (
   input: ProjectGenerationInitializationOptions
 ): Promise<ProjectGenerationInitializationResult> => {
-  const dbPath = input.dbPath ?? join(input.workspaceDir, '.docstube', 'db.sqlite');
-  await mkdir(join(input.workspaceDir, '.docstube'), { recursive: true });
+  const dbPath = input.dbPath ?? projectDbPath(input.workspaceDir);
+  await ensureDocstubeDir(input.workspaceDir);
   const backend = createLocalBackend(openDocstubeDatabase(dbPath));
   try {
     const result = await initializeRunFromConfigFamily({
       backend,
-      configPath: input.configPath,
+      configPath: input.configPath ?? defaultConfigPath,
       workspaceDir: input.workspaceDir
     });
     return {
       pagesCount: result.pages.length,
       resumed: result.resumed,
       runId: result.run.id
+    };
+  } finally {
+    await backend.close();
+  }
+};
+
+export const generateProjectDocumentation = async (
+  input: ProjectGenerationOptions
+): Promise<ProjectGenerationResult> => {
+  const dbPath = input.dbPath ?? projectDbPath(input.workspaceDir);
+  const manifestPath = projectManifestPath(input.workspaceDir);
+  const now = input.now ?? (() => defaultTimestamp);
+
+  await ensureDocstubeDir(input.workspaceDir);
+  const backend = createLocalBackend(openDocstubeDatabase(dbPath));
+  try {
+    const initialized = await initializeRunFromConfigFamily({
+      backend,
+      configPath: input.configPath ?? defaultConfigPath,
+      workspaceDir: input.workspaceDir,
+      now
+    });
+    await transitionRunStatus({ backend, runId: initialized.run.id, status: 'running', now });
+
+    const sourceFiles = await collectProjectSourceFiles({
+      workspaceDir: input.workspaceDir,
+      config: initialized.config
+    });
+    const pages = withOutputPaths(initialized.config, initialized.scheduledPages);
+    const generatedAt = now();
+    const generation = await generateConfiguredProjectPages({
+      adapterFactory: input.adapterFactory,
+      backend,
+      config: initialized.config,
+      generatedAt,
+      pages,
+      runId: initialized.run.id,
+      sourceFiles,
+      workspaceDir: input.workspaceDir
+    });
+    const manifest = updateManifest({
+      generatedWith: { name: 'docstube', version: docstubeVersion },
+      pages: generation.manifestPages
+    });
+
+    await writeManifestFile(manifestPath, manifest);
+    await transitionRunStatus({ backend, runId: initialized.run.id, status: 'completed', now });
+
+    return {
+      generatedPages: generation.generatedPages,
+      manifest,
+      manifestPath,
+      pagesCount: generation.generatedPages.length,
+      resumed: initialized.resumed,
+      runId: initialized.run.id,
+      sourceFilesCount: sourceFiles.length
     };
   } finally {
     await backend.close();

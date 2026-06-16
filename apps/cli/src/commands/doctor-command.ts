@@ -1,8 +1,5 @@
-import { join } from 'node:path';
 import { defaultOutput } from '../cli-output.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
-import { pathExists } from '../workspace-paths.ts';
-import { runValidateCommand } from './validate-command.ts';
 
 export type DoctorCommandOptions = {
   configPath?: string;
@@ -15,14 +12,15 @@ export const runDoctorCommand = async (
 ): Promise<CliCommandResult> => {
   const workspaceDir = options.workspaceDir ?? process.cwd();
   const configPath = options.configPath ?? 'docstube.yml';
-  output.info(`Node: ${process.version}`);
-  output.info(`Platform: ${process.platform}/${process.arch}`);
-
-  if (!(await pathExists(join(workspaceDir, configPath)))) {
-    output.error(`Config: missing ${configPath}. Run docstube wizard first.`);
-    return { exitCode: 1 };
+  const { doctorProject } = await import('@docstube/core');
+  const result = await doctorProject({ configPath, workspaceDir });
+  for (const check of result.checks) {
+    const line = `${check.id}: ${check.status} - ${check.message}`;
+    if (check.status === 'failed') {
+      output.error(line);
+    } else {
+      output.info(line);
+    }
   }
-
-  const validate = await runValidateCommand({ configPath, workspaceDir }, output);
-  return { exitCode: validate.exitCode };
+  return { exitCode: result.ok ? 0 : 1 };
 };

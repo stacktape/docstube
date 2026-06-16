@@ -28,13 +28,25 @@ export const runRefineCommand = async (
     return { exitCode: 1 };
   }
 
-  const { readManifestFile } = await import('@docstube/core');
-  const manifest = await readManifestFile(path);
-  const target = options.target ? ` for ${options.target}` : '';
-  const rounds = options.maxRounds ? ` up to ${options.maxRounds} rounds` : '';
-  const scope = options.failed ? 'failed pages' : 'the lowest quality scores';
-  output.info(`Loaded manifest with ${manifest.pages.length} pages.`);
-  output.info(`Refinement will prioritize ${scope} first${target}${rounds}.`);
-  output.error('The score-driven refinement pipeline is not implemented yet.');
+  const { refineProjectDocumentation } = await import('@docstube/core');
+  const result = await refineProjectDocumentation({
+    configPath,
+    failedOnly: options.failed,
+    maxRounds: options.maxRounds,
+    target: options.target,
+    workspaceDir
+  });
+  output.info(`Loaded manifest with ${result.manifest.pages.length} pages.`);
+  output.info(`Ranked ${result.candidates.length} refinement candidates.`);
+
+  if (result.plannedPages.length === 0) {
+    output.info('No pages require deterministic refinement planning.');
+    return { exitCode: 0 };
+  }
+
+  for (const page of result.plannedPages) {
+    output.info(`planned: ${page.id} score=${page.score} (${page.reasons.join(', ')})`);
+  }
+  output.error('Agent-backed refinement rewriting is not available yet; selected pages were flagged for refinement.');
   return { exitCode: 1 };
 };

@@ -595,15 +595,13 @@ export const createCliAgentAdapter = (definition: CliAdapterDefinition): AgentAd
 };
 
 const adapterCwd = (input: AgentRunInput): string =>
-  input.sandbox.writableRoots[0] ?? input.sandbox.readOnlyRoots[0] ?? process.cwd();
+  input.sandbox.readOnlyRoots[0] ?? input.sandbox.writableRoots[0] ?? process.cwd();
 
 export const buildCodexCliRequest = (input: AgentRunInput): AdapterProcessRequest => {
   const cwd = adapterCwd(input);
   const args = [
     'exec',
     '--json',
-    '--model',
-    input.model,
     '--sandbox',
     input.sandbox.writableRoots.length > 0 ? 'workspace-write' : 'read-only',
     '--ask-for-approval',
@@ -612,6 +610,9 @@ export const buildCodexCliRequest = (input: AgentRunInput): AdapterProcessReques
     cwd,
     '-'
   ];
+  if (input.model !== 'default') {
+    args.splice(2, 0, '--model', input.model);
+  }
   for (const root of input.sandbox.writableRoots.slice(1)) {
     args.push('--add-dir', root);
   }
@@ -620,17 +621,10 @@ export const buildCodexCliRequest = (input: AgentRunInput): AdapterProcessReques
 
 export const buildClaudeCliRequest = (input: AgentRunInput): AdapterProcessRequest => {
   const cwd = adapterCwd(input);
-  const args = [
-    '-p',
-    '--input-format',
-    'text',
-    '--output-format',
-    'stream-json',
-    '--permission-mode',
-    'acceptEdits',
-    '--model',
-    input.model
-  ];
+  const args = ['-p', '--input-format', 'text', '--output-format', 'stream-json', '--permission-mode', 'acceptEdits'];
+  if (input.model !== 'default') {
+    args.push('--model', input.model);
+  }
   if (input.sandbox.shell === 'none') {
     args.push('--disallowedTools', 'Bash');
   }
@@ -642,7 +636,10 @@ export const buildClaudeCliRequest = (input: AgentRunInput): AdapterProcessReque
 
 export const buildGeminiCliRequest = (input: AgentRunInput): AdapterProcessRequest => ({
   command: 'gemini',
-  args: ['-p', input.prompt, '--output-format', 'stream-json', '--model', input.model],
+  args:
+    input.model === 'default'
+      ? ['-p', input.prompt, '--output-format', 'stream-json']
+      : ['-p', input.prompt, '--output-format', 'stream-json', '--model', input.model],
   cwd: adapterCwd(input),
   timeoutMs: 20 * 60_000
 });

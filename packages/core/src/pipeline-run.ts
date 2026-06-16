@@ -1,9 +1,7 @@
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { glossarySchema, iaSchema, pageIdSchema } from '@docstube/contracts';
+import { iaSchema, pageIdSchema } from '@docstube/contracts';
 import type { DocstubeConfig, Glossary, Ia, IaNode, PageId } from '@docstube/contracts';
-import { loadDocstubeConfig, loadGlossary, loadIa } from './config-yaml.ts';
+import { loadProjectConfigFamily } from './project-workspace.ts';
 import { StateBackendError, pageProgressStatuses } from './state-backend.ts';
 import type { PageDetail, PageProgress, RunRecord, RunStatus, StateBackend } from './state-backend.ts';
 
@@ -93,20 +91,6 @@ export const schedulePagesFromIa = (ia: Ia): ScheduledPage[] => {
   return pages;
 };
 
-const loadConfigFamily = async (workspaceDir: string, configPath: string) => {
-  const config = loadDocstubeConfig(await readFile(join(workspaceDir, configPath), 'utf8'));
-  const [ia, glossary] = await Promise.all([
-    readFile(join(workspaceDir, config.ia), 'utf8').then(loadIa),
-    readFile(join(workspaceDir, config.glossary), 'utf8').then(loadGlossary)
-  ]);
-
-  return {
-    config,
-    ia: iaSchema.parse(ia),
-    glossary: glossarySchema.parse(glossary)
-  };
-};
-
 const scheduledPageToDetail = (runId: string, page: ScheduledPage, updatedAt: string): PageDetail => ({
   id: page.id,
   runId,
@@ -123,7 +107,7 @@ export const initializeRunFromConfigFamily = async (
 ): Promise<RunInitializationResult> => {
   const now = options.now ?? defaultNow;
   const configPath = options.configPath ?? 'docstube.yml';
-  const { config, ia, glossary } = await loadConfigFamily(options.workspaceDir, configPath);
+  const { config, ia, glossary } = await loadProjectConfigFamily(options.workspaceDir, configPath);
   const scheduledPages = schedulePagesFromIa(ia);
   const runId = options.runId ?? deriveRunId(config, ia);
 

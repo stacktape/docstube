@@ -6,6 +6,14 @@ import { deleteMachineState, pathExists, stateFiles } from '../workspace-paths.t
 export type GenerateCommandOptions = {
   configPath?: string;
   fresh?: boolean;
+  generate?: (input: { configPath?: string; workspaceDir: string }) => Promise<{
+    generatedPages: readonly { path: string; status: string }[];
+    manifestPath: string;
+    pagesCount: number;
+    resumed: boolean;
+    runId: string;
+    sourceFilesCount: number;
+  }>;
   workspaceDir?: string;
 };
 
@@ -28,9 +36,13 @@ export const runGenerateCommand = async (
     output.info('Resuming existing local generation state.');
   }
 
-  const { initializeProjectGeneration } = await import('@docstube/core');
-  const result = await initializeProjectGeneration({ configPath, workspaceDir });
-  output.info(`${result.resumed ? 'Resumed' : 'Initialized'} ${result.pagesCount} pages for ${result.runId}.`);
-  output.info('Generation pipeline is queued from config; page writing is implemented by the pipeline tasks.');
+  const generate = options.generate ?? (await import('@docstube/core')).generateProjectDocumentation;
+  const result = await generate({ configPath, workspaceDir });
+  output.info(`${result.resumed ? 'Resumed' : 'Generated'} ${result.pagesCount} pages for ${result.runId}.`);
+  output.info(`Wrote manifest: ${result.manifestPath}`);
+  output.info(`Source files considered: ${result.sourceFilesCount}`);
+  for (const page of result.generatedPages) {
+    output.info(`${page.status}: ${page.path}`);
+  }
   return { exitCode: 0 };
 };

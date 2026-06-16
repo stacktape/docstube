@@ -35,8 +35,6 @@ Useful commands:
 pnpm install
 pnpm run validate
 pnpm dev wizard
-pnpm run overnight:dry
-pnpm run overnight
 pnpm run typecheck
 pnpm run lint
 pnpm run test
@@ -46,8 +44,8 @@ pnpm run upg
 ```
 
 `validate` is the normal handoff command. Keep caches under `node_modules/.cache` when adding tools.
-`overnight` runs the ordered implementation queue from `tasks.md`; use `overnight:dry` to check
-the runner without calling agents or committing.
+The historical overnight runner has been removed; use `tasks.md` as an ordered implementation
+guide and supervise agent work directly.
 
 `pnpm dev <docstube-command>` runs the CLI from TypeScript source with Node's native type
 stripping and the `docstube-source` package-export condition. `pnpm dev wizard` also starts the
@@ -75,13 +73,12 @@ migration-import, hosted-backend internals, or additional agent adapters beyond 
 Marketing-web implementation lives in `apps/web` and is handled by another agent/workstream; leave
 only infrastructure placeholders unless explicitly assigned that work.
 
-When running the overnight queue:
+When supervising the implementation queue:
 
 - `tasks.md` is the ordered task list.
-- `.docstube-build/` contains runner logs and resume state and is intentionally ignored.
 - Each task should produce a focused commit.
-- If a task fails review repeatedly, inspect `.docstube-build/logs/`, fix manually or adjust the
-  task, then rerun; the runner resumes at the failed task.
+- If a task fails review repeatedly, inspect the failing diff and tests, fix manually or adjust the
+  task prompt, then rerun that bounded task.
 
 ## Package layout
 

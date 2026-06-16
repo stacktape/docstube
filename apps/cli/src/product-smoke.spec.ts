@@ -8,12 +8,15 @@ import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import {
   createLocalBackend,
+  createDeterministicProjectGenerationAdapters,
   createPageProvenance,
   createS0WalkingSkeletonReplayFixture,
   createSourceSnapshot,
   detectChangedSources,
+  generateProjectDocumentation,
   openDocstubeDatabase,
   readManifestFile,
+  refreshProjectDocumentation,
   resolveDirtyPages,
   runS0WalkingSkeleton,
   updateManifest,
@@ -86,6 +89,12 @@ const captureOutput = (): { lines: string[]; output: CliOutput } => {
   };
 };
 
+const deterministicGenerate = (input: { configPath?: string; workspaceDir: string }) =>
+  generateProjectDocumentation({ ...input, adapterFactory: createDeterministicProjectGenerationAdapters });
+
+const deterministicRefresh = (input: { configPath?: string; workspaceDir: string }) =>
+  refreshProjectDocumentation({ ...input, adapterFactory: createDeterministicProjectGenerationAdapters });
+
 const writeConfigFamily = async (repoRoot: string): Promise<void> => {
   await Promise.all([
     copyFile(coreFixturePath('docstube.yml'), join(repoRoot, 'docstube.yml')),
@@ -109,10 +118,10 @@ const makeFixtureRepo = async (fixture: ProductSmokeFixture): Promise<string> =>
 
 const runCliGenerate = async (repoRoot: string): Promise<readonly string[]> => {
   const output = captureOutput();
-  const result = await runGenerateCommand({ workspaceDir: repoRoot }, output.output);
+  const result = await runGenerateCommand({ workspaceDir: repoRoot, generate: deterministicGenerate }, output.output);
 
   expect(result.exitCode).toBe(0);
-  expect(output.lines.some((line) => line.includes('Initialized 2 pages for run-'))).toBe(true);
+  expect(output.lines.some((line) => line.includes('Generated 2 pages for run-'))).toBe(true);
   return output.lines;
 };
 
@@ -235,9 +244,9 @@ const runCliRefreshAndResolveDirtyPages = async (repoRoot: string, fixture: Prod
   await writeSource(repoRoot, fixture, fixture.changedSource);
 
   const output = captureOutput();
-  const refresh = await runRefreshCommand({ workspaceDir: repoRoot }, output.output);
+  const refresh = await runRefreshCommand({ workspaceDir: repoRoot, refresh: deterministicRefresh }, output.output);
   expect(refresh.exitCode).toBe(0);
-  expect(output.lines).toContain('info:Loaded manifest with 1 pages.');
+  expect(output.lines).toContain('info:Loaded manifest with 2 pages.');
 
   const changed = detectChangedSources({
     current: [
@@ -254,7 +263,9 @@ const runCliRefreshAndResolveDirtyPages = async (repoRoot: string, fixture: Prod
 
   expect(changed).toMatchObject([{ kind: 'modified', path: fixture.sourcePath }]);
   expect(dirty.dirtyPageIds).toEqual(['overview']);
-  expect(dirty.decisions[0]?.reasons).toContain('changed-provenance-input');
+  expect(dirty.decisions.find((decision) => decision.pageId === 'overview')?.reasons).toContain(
+    'changed-provenance-input'
+  );
 };
 
 describe('deterministic product smoke', () => {

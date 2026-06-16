@@ -1,6 +1,6 @@
 # docstube implementation tasks
 
-This file is the ordered queue for `node run-overnight.ts`.
+This file is the ordered queue for supervised implementation work.
 
 The queue is intended to implement the full docstube product described in `PLAN.md`. Existing
 placeholder, fixture-only, or "ready to..." code is not task completion evidence. When a task owns
@@ -35,10 +35,8 @@ Rules for every task:
 Supervisor runbook for a full implementation pass:
 
 - Start from a clean worktree.
-- If rerunning after an earlier incomplete pass, reset the ignored runner state by deleting
-  `.docstube-build/state` or setting it to `0`; then run `pnpm run overnight:dry`.
-- Run `pnpm run overnight`.
-- Inspect `.docstube-build/logs/` whenever a task fails review or validation.
+- Work through tasks in order with bounded implementation prompts and review passes.
+- Inspect the failing diff, tests, and agent transcript whenever a task fails review or validation.
 - Do not accept fixture-only behavior where `PLAN.md` calls for product behavior. Fixtures prove
   the behavior; they are not the behavior.
 - For UI tasks, smoke through the real local server with `pnpm dev wizard` or a

@@ -2,9 +2,8 @@
 
 This is the source of truth for the desired docstube product end state.
 
-The operational task queue for the overnight implementation runner is
-[`tasks.md`](tasks.md). `PLAN.md` defines the architecture and boundaries; `tasks.md` turns it
-into ordered, reviewable implementation work.
+The operational task queue is [`tasks.md`](tasks.md). `PLAN.md` defines the architecture and
+boundaries; `tasks.md` turns it into ordered, reviewable implementation work.
 
 ## What docstube is
 

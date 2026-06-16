@@ -4,9 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  createDeterministicProjectGenerationAdapters,
+  generateProjectDocumentation,
+  refreshProjectDocumentation
+} from '@docstube/core';
 import { runCheckAllCommand, runCheckCommand } from './commands/check-command.ts';
 import { runGenerateCommand } from './commands/generate-command.ts';
+import { runRefineCommand } from './commands/refine-command.ts';
 import { runRefreshCommand } from './commands/refresh-command.ts';
+import { runStatusCommand } from './commands/status-command.ts';
 import { runUpgradeCommand } from './commands/upgrade-command.ts';
 import { runValidateCommand } from './commands/validate-command.ts';
 import { runWizardCommand } from './commands/wizard-command.ts';
@@ -20,6 +27,12 @@ import type { RuntimeTelemetryEvent } from './runtime-telemetry.ts';
 
 const fixturePath = (name: string): string =>
   fileURLToPath(new URL(`../../../packages/core/src/fixtures/${name}`, import.meta.url));
+
+const deterministicGenerate = (input: { configPath?: string; workspaceDir: string }) =>
+  generateProjectDocumentation({ ...input, adapterFactory: createDeterministicProjectGenerationAdapters });
+
+const deterministicRefresh = (input: { configPath?: string; workspaceDir: string }) =>
+  refreshProjectDocumentation({ ...input, adapterFactory: createDeterministicProjectGenerationAdapters });
 
 const pathExists = async (path: string): Promise<boolean> => {
   try {
@@ -132,11 +145,12 @@ describe('CLI commands', () => {
   it('starts generation from existing config without opening the wizard', async () => {
     await withWorkspace(async (dir) => {
       const { lines, output } = captureOutput();
-      await expect(runGenerateCommand({ workspaceDir: dir }, output)).resolves.toEqual({ exitCode: 0 });
-      expect(lines.some((line) => line.includes('Initialized 2 pages for run-'))).toBe(true);
-      expect(lines).toContain(
-        'info:Generation pipeline is queued from config; page writing is implemented by the pipeline tasks.'
+      await expect(runGenerateCommand({ workspaceDir: dir, generate: deterministicGenerate }, output)).resolves.toEqual(
+        { exitCode: 0 }
       );
+      expect(lines.some((line) => line.includes('Generated 2 pages for run-'))).toBe(true);
+      expect(lines).toContain(`info:passed: docs/overview.mdx`);
+      await expect(readFile(join(dir, 'docs', 'overview.mdx'), 'utf8')).resolves.toContain('## Overview');
     });
   });
 
@@ -188,12 +202,32 @@ describe('CLI commands', () => {
       );
       const { lines, output } = captureOutput();
 
-      await expect(runRefreshCommand({ workspaceDir: dir }, output)).resolves.toEqual({ exitCode: 0 });
-      expect(lines).toContain('info:Loaded manifest with 0 pages.');
-      expect(lines).toContain(
-        'info:Refresh checks all pages by default, regenerates stale pages, and updates vendored theme assets.'
-      );
-      expect(lines).toContain('info:Refresh engine is ready to resolve stale pages.');
+      await expect(runRefreshCommand({ workspaceDir: dir, refresh: deterministicRefresh }, output)).resolves.toEqual({
+        exitCode: 0
+      });
+      expect(lines).toContain('info:Loaded manifest with 2 pages.');
+      expect(lines).toContain('info:regenerated: guides/install (nav-page-missing)');
+      expect(lines).toContain('info:regenerated: overview (nav-page-missing)');
+      expect(lines.some((line) => line.startsWith('info:Vendored assets: skipped'))).toBe(true);
+    });
+  });
+
+  it('reports status and handles a clean deterministic refinement plan', async () => {
+    await withWorkspace(async (dir) => {
+      await expect(
+        runGenerateCommand({ workspaceDir: dir, generate: deterministicGenerate }, captureOutput().output)
+      ).resolves.toEqual({ exitCode: 0 });
+
+      const status = captureOutput();
+      await expect(runStatusCommand({ workspaceDir: dir }, status.output)).resolves.toEqual({ exitCode: 0 });
+      expect(status.lines).toContain('info:Config: valid (docstube.yml)');
+      expect(status.lines).toContain('info:Pages: passed:2');
+      expect(status.lines).toContain('info:Stale pages: 0');
+
+      const refine = captureOutput();
+      await expect(runRefineCommand({ workspaceDir: dir }, refine.output)).resolves.toEqual({ exitCode: 0 });
+      expect(refine.lines).toContain('info:Ranked 2 refinement candidates.');
+      expect(refine.lines).toContain('info:No pages require deterministic refinement planning.');
     });
   });
 
