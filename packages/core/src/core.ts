@@ -40,6 +40,19 @@ export type {
   TerminalProgressState
 } from './pipeline-run';
 
+export {
+  createReviewerRunInput,
+  createWriterRunInput,
+  mergeFindings,
+  runReplayPageGeneration
+} from './page-orchestrator';
+export type {
+  PageDeterministicVerifier,
+  PageGenerationOptions,
+  PageGenerationResult,
+  PersonaReviewer
+} from './page-orchestrator';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
