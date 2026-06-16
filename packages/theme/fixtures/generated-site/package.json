@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "astro build"
+    "build": "astro build && node scripts/postbuild.mjs"
   },
   "dependencies": {
     "@astrojs/mdx": "^6.0.3",

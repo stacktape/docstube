@@ -3,6 +3,7 @@ import {
   createDocstubeCommandRunner,
   createDocstubeActionBranchName,
   createDocstubeActionConcurrencyGroup,
+  parseChangedPagesFromDocstubeOutput,
   readGitHubActionInputsFromEnv,
   runGitHubAction
 } from './github-action.ts';
@@ -250,7 +251,7 @@ describe('GitHub Action wrapper', () => {
         configPath: 'config/docstube.yml',
         workspaceDir: '/repo'
       })
-    ).resolves.toEqual({ exitCode: 0, output: 'ok' });
+    ).resolves.toEqual({ changedPages: [], exitCode: 0, output: 'ok' });
     expect(calls).toEqual([
       {
         command: 'npx',
@@ -258,6 +259,14 @@ describe('GitHub Action wrapper', () => {
         cwd: '/repo'
       }
     ]);
+  });
+
+  it('parses changed page reasons from docstube refresh output', () => {
+    expect(
+      parseChangedPagesFromDocstubeOutput(
+        ['Loaded manifest with 2 pages.', 'regenerated: overview (changed-provenance-input, topology-pass)'].join('\n')
+      )
+    ).toEqual([{ path: 'overview', reasons: ['changed-provenance-input', 'topology-pass'] }]);
   });
 
   it('creates deterministic branch names and concurrency groups', () => {

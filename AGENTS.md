@@ -59,24 +59,26 @@ documented reason.
 
 ## Build order
 
-Implement sequentially per `tasks.md`, which is derived from `PLAN.md`: S0 contracts first, then
-S1 through S9. Do not skip ahead into UI, adapters, or theme polish before S0 contracts and the
-walking skeleton are frozen and tested.
+`tasks.md` is derived from `PLAN.md` and records the S0 through S9 dependency order. The
+supervised implementation pass has completed that queue in source, so use `tasks.md` as an
+acceptance ledger and regression checklist. Do not restart the whole queue unless the repo is
+intentionally reset; fix the failing task-owned area directly.
 
-The project infrastructure is already in place: workspace layout, tooling, CI, deployment,
-release workflow, npm publishing, standalone binaries, Stacktape-hosted install scripts, and
-installer telemetry. Product implementation agents should not rework that infrastructure unless a
-task explicitly requires a narrow fix.
+The project infrastructure and product surfaces are in place: workspace layout, tooling, CI,
+deployment, release workflow, npm publishing, standalone binaries, Stacktape-hosted install
+scripts, installer telemetry, CLI, local UI, generated theme, core generation, refresh, refine,
+GitHub Action, evals, and dogfood build. Agents should not rework broad infrastructure or
+architecture unless a focused failing check requires it.
 
 TBD boundaries are hard boundaries. Do not implement or improvise screenshot capture,
 migration-import, hosted-backend internals, or additional agent adapters beyond the built-in four.
 Marketing-web implementation lives in `apps/web` and is handled by another agent/workstream; leave
 only infrastructure placeholders unless explicitly assigned that work.
 
-When supervising the implementation queue:
+When supervising future fixes:
 
-- `tasks.md` is the ordered task list.
-- Each task should produce a focused commit.
+- Use `tasks.md` to identify the owning task and acceptance evidence.
+- Each fix should produce a focused commit.
 - If a task fails review repeatedly, inspect the failing diff and tests, fix manually or adjust the
   task prompt, then rerun that bounded task.
 

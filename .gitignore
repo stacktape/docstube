@@ -6,6 +6,7 @@ dist/
 build/
 dist-release/
 dist-dogfood/
+apps/cli/local-ui/
 *.tsbuildinfo
 compiled-template.yaml
 .stacktape-stack-info/
@@ -30,6 +31,7 @@ Thumbs.db
 !.vscode/extensions.json
 
 # docstube local state (machine-only; manifest/criteria/instructions ARE committed)
+.docstube/telemetry.json
 .docstube/db.sqlite*
 .docstube/cache/
 .docstube/runs/

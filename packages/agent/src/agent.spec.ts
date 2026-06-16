@@ -237,11 +237,39 @@ describe('built-in adapter process helpers', () => {
       provider: 'anthropic',
       apiKey: 'test-key',
       now: () => '2026-06-16T00:00:00.000Z',
-      fetchJson: async () => ({ content: 'ok' })
+      fetchJson: async () => ({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              path: 'docs/src/pages/index.mdx',
+              content: '---\nid: overview\n---\n# Overview'
+            })
+          }
+        ]
+      })
     });
 
     const result = await adapter.run(input);
     expect(result.status).toBe('completed');
-    expect(result.output).toEqual({ content: 'ok' });
+    expect(result.artifacts).toEqual([
+      {
+        path: 'docs/src/pages/index.mdx',
+        content: '---\nid: overview\n---\n# Overview',
+        encoding: 'utf8'
+      }
+    ]);
+  });
+
+  it('requires an explicit model for direct API adapter runs', async () => {
+    const adapter = createDirectApiAdapter({
+      provider: 'openai',
+      apiKey: 'test-key',
+      fetchJson: async () => ({ output_text: 'unused' })
+    });
+
+    await expect(adapter.run({ ...input, model: 'default' })).rejects.toMatchObject({
+      code: 'process_failed'
+    });
   });
 });

@@ -205,7 +205,12 @@ const pageManifestUpdate = (input: {
   })
 });
 
-const modelForChoice = (choice: AgentChoice): string => choice.model ?? 'default';
+const modelForChoice = (choice: AgentChoice): string => {
+  if (choice.adapter === 'api' && !choice.model) {
+    throw new Error('The direct API adapter requires agents.writer.model or agents.reviewer.model.');
+  }
+  return choice.model ?? 'default';
+};
 
 const apiKeyForChoice = (choice: AgentChoice): string => {
   const provider = choice.provider ?? 'openai';
@@ -236,10 +241,12 @@ const adapterForChoice = (choice: AgentChoice) => {
 
 export const createConfiguredProjectGenerationAdapters: ProjectGenerationAdapterFactory = (input) => {
   const reviewerChoice = input.config.agents.reviewer ?? input.config.agents.writer;
+  const writerModel = modelForChoice(input.config.agents.writer);
+  modelForChoice(reviewerChoice);
   const reviewerAdapter = adapterForChoice(reviewerChoice);
   return {
     writer: adapterForChoice(input.config.agents.writer),
-    model: modelForChoice(input.config.agents.writer),
+    model: writerModel,
     reviewers: input.config.personas.map((persona) => ({
       personaId: persona.id,
       adapter: reviewerAdapter

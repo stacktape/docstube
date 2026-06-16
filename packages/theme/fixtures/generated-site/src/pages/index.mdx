@@ -13,13 +13,22 @@ faq:
 import { architectureDiagramSvg } from '../generated/generated-artifacts.ts';
 import {
   Callout,
+  ApiReference,
+  Badge,
   Card,
   CardGrid,
   CodeBlock,
+  CodeGroup,
+  ComparisonTable,
+  DecisionTree,
   Diagram,
   Divider,
+  FileTree,
+  ParamTable,
+  PreviousNext,
   Steps,
   Tabs,
+  Term,
   Terminal
 } from '../components/theme-components.tsx';
 
@@ -51,6 +60,43 @@ Codemap entries and deterministic verifiers are linked by the generated glossary
 />
 
 <CodeBlock title="Generated command" language="bash" code={'docstube generate'} />
+
+<CodeGroup title="Install commands">
+  <CodeBlock language="bash" code={'npm install docstube'} />
+  <CodeBlock language="bash" code={'pnpm add -D docstube'} />
+</CodeGroup>
+
+<FileTree entries={[{ path: 'docs/src/pages/index.mdx' }, { path: 'docs/src/components', kind: 'directory' }]} />
+
+<ComparisonTable
+  columns={['Mode', 'Output']}
+  rows={[
+    ['generate', 'verified MDX'],
+    ['refresh', 'stale pages']
+  ]}
+/>
+
+<ParamTable params={[{ name: 'config', type: 'string', description: 'Path to docstube.yml' }]} />
+
+<DecisionTree
+  title="Next action"
+  decisions={[{ title: 'Review generated pages', href: '/guides/install/', description: 'Open the review flow.' }]}
+/>
+
+<Badge tone="success" label="Verified" />
+
+<ApiReference
+  symbol="generateProjectDocumentation"
+  kind="function"
+  sourcePath="packages/core/src/project-generation.ts"
+/>
+
+<Term id="codemap" label="codemap" />
+
+<PreviousNext
+  previous={{ title: 'Glossary', href: '/glossary/' }}
+  next={{ title: 'Install', href: '/guides/install/' }}
+/>
 
 <Diagram title="D2 fixture diagram" svg={architectureDiagramSvg} />
 

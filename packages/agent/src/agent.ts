@@ -696,6 +696,97 @@ export const buildDirectApiRequest = (
   };
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const textFromContent = (content: unknown): string | undefined => {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  return content
+    .map((part) => (isRecord(part) && typeof part.text === 'string' ? part.text : ''))
+    .filter(Boolean)
+    .join('\n');
+};
+
+const textFromApiOutput = (output: JsonValue): string | undefined => {
+  if (typeof output === 'string') {
+    return output;
+  }
+  if (!isRecord(output)) {
+    return undefined;
+  }
+  if (typeof output.output_text === 'string') {
+    return output.output_text;
+  }
+  const contentText = textFromContent(output.content);
+  if (contentText) {
+    return contentText;
+  }
+  if (Array.isArray(output.output)) {
+    return output.output
+      .map((item) => (isRecord(item) ? textFromContent(item.content) : undefined))
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (Array.isArray(output.choices)) {
+    return output.choices
+      .map((choice) => {
+        if (!isRecord(choice)) {
+          return undefined;
+        }
+        return isRecord(choice.message) ? textFromContent(choice.message.content) : undefined;
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  return undefined;
+};
+
+const jsonFromText = (text: string): unknown | undefined => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
+
+const artifactFromApiText = (text: string | undefined, input: AgentRunInput): AgentTextArtifact[] => {
+  if (!text) {
+    return [];
+  }
+  const parsed = jsonFromText(text);
+  const artifactCandidate = isRecord(parsed)
+    ? Array.isArray(parsed.artifacts)
+      ? parsed.artifacts[0]
+      : parsed
+    : undefined;
+  if (isRecord(artifactCandidate)) {
+    const candidate = agentTextArtifactSchema.safeParse({
+      path: artifactCandidate.path,
+      content: artifactCandidate.content,
+      encoding: artifactCandidate.encoding ?? 'utf8'
+    });
+    if (candidate.success) {
+      return [candidate.data];
+    }
+  }
+
+  const fenced = /```(?:mdx|markdown)?\s*(?<content>[\s\S]*?)```/u.exec(text);
+  const content = fenced?.groups?.content?.trim() ?? text.trim();
+  const pagePath =
+    isRecord(input.metadata) && typeof input.metadata.pagePath === 'string' ? input.metadata.pagePath : undefined;
+  const fallback = agentTextArtifactSchema.safeParse({
+    path: pagePath,
+    content,
+    encoding: 'utf8'
+  });
+  return fallback.success ? [fallback.data] : [];
+};
+
 export const createDirectApiAdapter = (options: DirectApiAdapterOptions): AgentAdapter => {
   const version = options.version ?? '0.0.0';
   const now = options.now ?? (() => new Date().toISOString());
@@ -717,10 +808,17 @@ export const createDirectApiAdapter = (options: DirectApiAdapterOptions): AgentA
     version,
     async run(input) {
       const parsedInput = agentRunInputSchema.parse(input);
+      if (parsedInput.model === 'default' || parsedInput.model === 'replay-fixture') {
+        throw new AgentAdapterExecutionError(
+          'process_failed',
+          'Direct API adapter requires an explicit provider model.'
+        );
+      }
       const startedAt = now();
       const request = buildDirectApiRequest(options.provider, parsedInput, options);
       const output = await fetchJson(request.url, { method: 'POST', headers: request.headers, body: request.body });
       const completedAt = now();
+      const artifacts = artifactFromApiText(textFromApiOutput(output), parsedInput);
       return agentRunResultSchema.parse({
         adapterId: 'api',
         adapterVersion: version,
@@ -734,6 +832,7 @@ export const createDirectApiAdapter = (options: DirectApiAdapterOptions): AgentA
           completedAt,
           exitCode: 0
         }),
+        artifacts,
         output
       });
     }

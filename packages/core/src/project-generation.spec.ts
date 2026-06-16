@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { readManifestFile } from './incremental-engine.ts';
+import { createPageGenerationContext } from './page-generation-context.ts';
 import {
   createConfiguredProjectGenerationAdapters,
   createDeterministicProjectGenerationAdapters,
@@ -104,6 +105,43 @@ describe('initializeProjectGeneration', () => {
     });
   });
 
+  it('uses real API extractors in page generation context when available', async () => {
+    await withWorkspace(async (workspaceDir) => {
+      await mkdir(join(workspaceDir, 'src'), { recursive: true });
+      const source = 'export function add(left: number, right: number): number { return left + right; }\n';
+      await writeFile(join(workspaceDir, 'src', 'toolkit.ts'), source, 'utf8');
+      const family = await loadProjectConfigFamily(workspaceDir);
+
+      const context = await createPageGenerationContext({
+        config: family.config,
+        glossary: family.glossary,
+        page: {
+          id: 'overview',
+          title: 'Overview',
+          slug: 'docs/src/pages/index.mdx',
+          depth: 0,
+          order: 0
+        },
+        sources: [
+          {
+            path: 'src/toolkit.ts',
+            content: source,
+            hash: '6c459e3ea1cab7d44f60bf914a96a75145d4a35069e7f0f48f43585b1e43c8d5'
+          }
+        ],
+        workspaceDir
+      });
+
+      expect(context.apiSymbols).toContainEqual(
+        expect.objectContaining({
+          name: 'add',
+          sourcePath: 'src/toolkit.ts',
+          source: 'typedoc'
+        })
+      );
+    });
+  });
+
   it('resolves IA and glossary paths relative to a nested config file', async () => {
     const workspaceDir = await mkdtemp(join(tmpdir(), 'docstube-nested-config-'));
     try {
@@ -141,5 +179,22 @@ describe('initializeProjectGeneration', () => {
 
     expect(adapters.writer.id).toBe('codex');
     expect(adapters.reviewers.map((reviewer) => reviewer.adapter.id)).toEqual(['claude', 'claude']);
+  });
+
+  it('requires explicit provider models for direct API adapters', async () => {
+    const configFamily = await loadProjectConfigFamily(fileURLToPath(new URL('./fixtures/', import.meta.url)));
+
+    expect(() =>
+      createConfiguredProjectGenerationAdapters({
+        config: {
+          ...configFamily.config,
+          agents: { writer: { adapter: 'api', provider: 'openai' } }
+        },
+        generatedAt: '2026-06-16T00:00:00.000Z',
+        pages: [],
+        sourceFiles: [],
+        workspaceDir: fileURLToPath(new URL('./fixtures/', import.meta.url))
+      })
+    ).toThrow('direct API adapter requires');
   });
 });

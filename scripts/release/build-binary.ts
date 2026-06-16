@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 
@@ -191,6 +191,7 @@ const main = async () => {
     await chmod(executablePath, 0o755);
   }
 
+  await cp(resolve('apps/cli/local-ui'), join(stagingDir, 'local-ui'), { recursive: true });
   await writeFile(join(stagingDir, 'release-data.json'), `${JSON.stringify({ platform, version }, null, 2)}\n`);
   await rm(archivePath, { force: true });
 

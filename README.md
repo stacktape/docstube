@@ -2,56 +2,101 @@
 
 # docstube
 
-**Verified, always-current documentation - generated from your code.**
+**Verified, always-current documentation generated from your code.**
 
-docstube reads your codebase, writes your docs, fact-checks every claim against the source, and keeps everything in sync as your code changes. Open-source, and it runs on the AI you already pay for.
+docstube reads a repository, asks your own coding agents or API keys to write source-grounded MDX,
+checks the output deterministically, and renders a self-contained Astro docs site that you own.
 
 [Website](https://docstube.dev) · [Discussions](../../discussions)
 
 </div>
 
-> [!WARNING]
-> **docstube is in early development and not yet released.** There's nothing to install yet. Star and watch the repo to follow along, and join the waitlist at [docstube.dev](https://docstube.dev) for early access.
+## Current Status
 
-## What it is
+The repository contains the product implementation described in [PLAN.md](PLAN.md):
 
-Documentation rots the moment it's written, and generic AI writers make it worse - confident prose that was never tied to your actual code. docstube takes the opposite approach: a small team of AI agents reads your real source, writes each page for the readers you choose, and fact-checks it against the code before anything ships. When your code changes, only the affected pages regenerate.
+- CLI commands: `wizard`, `generate`, `refresh`, `refine`, `validate`, `check`, `status`,
+  `doctor`, `upgrade`, `version`, and `help`.
+- Local web UI: setup wizard, generation dashboard, and review/feedback flows.
+- Core pipeline: source mapping, extraction, writer/reviewer orchestration, deterministic gates,
+  provenance, refresh, refinement ranking, cache, transcripts, and generated docs assets.
+- Distribution infrastructure: npm package, GitHub Release binaries, Stacktape-hosted install
+  scripts, installer telemetry, and release workflows.
 
-## Why docstube
+The checked-in source is ahead of the last public npm ownership release until the release workflow
+is run again. Use the source workflow below for local testing.
 
-- **Verified, not hallucinated** - every factual claim is checked against your source; code samples are compiled and imports resolved.
-- **Complete** - nothing important is left undocumented.
-- **Written for your readers** - define personas; each page is reviewed for the right depth and tone.
-- **Always current** - change your code, and only the affected docs regenerate (locally or via a GitHub Action).
-- **Bring your own AI** - runs on your existing Claude, Codex, or Gemini subscription (or an API key), with spend caps you control.
-- **Yours to keep** - clean MDX and a beautiful docs site, MIT-licensed, no lock-in.
-
-## How it works (planned)
+## Local Development
 
 ```bash
-# Not available yet - shown to illustrate the intended workflow.
-npx docstube wizard
+pnpm install
+pnpm run validate
+pnpm dev wizard
 ```
 
-1. Point docstube at your repo; a local web UI opens.
-2. Choose the doc type, define your reader personas, add a little context.
-3. A writer agent reads your code; reviewer and verifier agents check it for fit and accuracy.
-4. Review the result as it'll look live, leave feedback on any element, and publish a docs site you own.
-5. On every change, only the affected pages regenerate.
+`pnpm dev <docstube-command>` runs the TypeScript source CLI directly with Node's native type
+stripping. `pnpm dev wizard` also starts the Vite local UI and proxies it through the localhost
+control plane. Other commands run without starting Vite:
 
-## Status & roadmap
+```bash
+pnpm dev generate
+pnpm dev refresh
+pnpm dev refine --failed --max-rounds 1
+pnpm dev status
+pnpm dev check --all
+pnpm dev doctor
+```
 
-docstube is being built in the open. Watch the repo and follow [Discussions](../../discussions) for progress.
+## User Workflow
 
-- [ ] Core generation pipeline (writer / reviewer / verifier)
-- [ ] Local web UI (setup + review)
-- [ ] Incremental updates + GitHub Action
-- [ ] Docs site renderer (Astro)
-- [ ] First public release
+After a release is published, the normal Node path is:
 
-## Contributing
+```bash
+npx docstube wizard
+npx docstube generate
+npx docstube refresh
+npx docstube refine
+```
 
-Early contributors and ideas are very welcome - see [CONTRIBUTING.md](CONTRIBUTING.md) and start a thread in [Discussions](../../discussions). Please also read the [Code of Conduct](CODE_OF_CONDUCT.md).
+No-Node users install a standalone binary through the Stacktape-hosted scripts, which download
+GitHub Release assets:
+
+```bash
+curl -L https://installs.docstube.dev/linux.sh | sh
+```
+
+Windows uses `https://installs.docstube.dev/windows.ps1`.
+
+## Verification
+
+The main handoff gate is:
+
+```bash
+pnpm run validate
+```
+
+Additional high-signal checks:
+
+```bash
+pnpm run dogfood:build
+pnpm run evals
+```
+
+`pnpm run evals:live` is secrets-gated and requires a configured judge model/provider.
+
+## Repository Map
+
+- [PLAN.md](PLAN.md): authoritative product end-state and architecture.
+- [tasks.md](tasks.md): implementation acceptance ledger and regression checklist.
+- [AGENTS.md](AGENTS.md): coding style, package ownership, and agent operating rules.
+- `apps/cli`: published `docstube` CLI package.
+- `apps/local-ui`: localhost web UI.
+- `apps/github-action`: GitHub Action wrapper around `docstube refresh`.
+- `apps/install-events`: install telemetry Lambda.
+- `packages/core`: config, state, pipeline, local server, refresh/refine/status/doctor workflows.
+- `packages/theme`: vendored Astro/React generated-site source.
+
+The public marketing website in `apps/web` is intentionally owned by a separate workstream.
 
 ## License
 

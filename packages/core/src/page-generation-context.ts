@@ -1,7 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import { buildSourceMap } from '@docstube/codemap';
-import { apiReferenceSymbolSchema } from '@docstube/extractors';
+import {
+  apiReferenceSymbolSchema,
+  extractPythonApiReferencesWithGriffe,
+  extractTypeScriptApiReferences
+} from '@docstube/extractors';
 import { stableThemeComponentNames } from '@docstube/theme';
 import type { CodemapLanguage, CodemapSymbol, CodemapSymbolKind } from '@docstube/codemap';
 import type { DocstubeConfig, Glossary, ProvenanceCitation, RelativePath, Sha256 } from '@docstube/contracts';
@@ -163,6 +167,63 @@ const provenanceCitationsForSources = (sources: readonly PageGenerationSource[])
     return symbols.map((symbol) => ({ path: source.path, symbol: symbol.name }));
   });
 
+const typedocExtensions = new Set(['.cjs', '.js', '.jsx', '.mjs', '.ts', '.tsx']);
+
+const apiSymbolKey = (symbol: ApiReferenceSymbol): string => `${symbol.sourcePath}:${symbol.name}`;
+
+const pythonModuleName = (path: RelativePath): string => {
+  const fileName = basename(path);
+  if (fileName === '__init__.py') {
+    return basename(dirname(path));
+  }
+  return basename(path, '.py');
+};
+
+const extractApiSymbolsWithTools = async (input: {
+  fallbackSymbols: readonly ApiReferenceSymbol[];
+  sources: readonly ProjectSourceFile[];
+  workspaceDir: string;
+}): Promise<ApiReferenceSymbol[]> => {
+  const extracted: ApiReferenceSymbol[] = [];
+  const typedocEntryPoints = input.sources
+    .filter((source) => typedocExtensions.has(extname(source.path).toLowerCase()))
+    .map((source) => join(input.workspaceDir, source.path));
+
+  if (typedocEntryPoints.length > 0) {
+    try {
+      const result = await extractTypeScriptApiReferences({
+        cwd: input.workspaceDir,
+        entryPoints: typedocEntryPoints
+      });
+      if (result.status === 'completed') {
+        extracted.push(...result.symbols);
+      }
+    } catch {
+      // TypeDoc can fail on partial workspaces; codemap fallback still keeps source grounding.
+    }
+  }
+
+  const pythonResults = await Promise.all(
+    input.sources
+      .filter((candidate) => extname(candidate.path).toLowerCase() === '.py')
+      .map((source) =>
+        extractPythonApiReferencesWithGriffe({
+          moduleName: pythonModuleName(source.path),
+          searchPath: join(input.workspaceDir, dirname(source.path))
+        })
+      )
+  );
+  for (const result of pythonResults) {
+    if (result.status === 'completed') {
+      extracted.push(...result.symbols);
+    }
+  }
+
+  const extractedKeys = new Set(extracted.map(apiSymbolKey));
+  const missingFallbacks = input.fallbackSymbols.filter((symbol) => !extractedKeys.has(apiSymbolKey(symbol)));
+  return [...extracted, ...missingFallbacks].toSorted((left, right) => left.id.localeCompare(right.id));
+};
+
 export const createSourceGroundingContext = (sourcesInput: readonly ProjectSourceFile[]): SourceGroundingContext => {
   const sourceMap = buildSourceMap(sourcesInput.map((source) => ({ path: source.path, content: source.content })));
   const fileMapsByPath = new Map(sourceMap.files.map((file) => [file.path, file]));
@@ -203,9 +264,15 @@ export const createPageGenerationContext = async (input: {
 }): Promise<PageGenerationContext> => {
   const sourceGrounding = createSourceGroundingContext(input.sources);
   const guidance = await readCommittedGuidance(input.workspaceDir);
+  const apiSymbols = await extractApiSymbolsWithTools({
+    fallbackSymbols: sourceGrounding.apiSymbols,
+    sources: input.sources,
+    workspaceDir: input.workspaceDir
+  });
 
   return {
     ...sourceGrounding,
+    apiSymbols,
     componentNames: componentNamesForConfig(input.config),
     criteria: guidance.criteria,
     glossaryTerms: glossaryTermsForContext(input.glossary),

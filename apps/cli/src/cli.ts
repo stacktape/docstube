@@ -33,6 +33,7 @@ const runCliCommand = async (
   const { runCliCommandWithTelemetry } = await import('./runtime-telemetry.ts');
   const result = await runCliCommandWithTelemetry({
     command,
+    onDisclosure: output.info,
     run,
     workspaceDir: process.cwd()
   });

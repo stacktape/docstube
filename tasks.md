@@ -1,11 +1,35 @@
 # docstube implementation tasks
 
-This file is the ordered queue for supervised implementation work.
+This file is the implementation acceptance ledger for the product described in `PLAN.md`.
 
-The queue is intended to implement the full docstube product described in `PLAN.md`. Existing
-placeholder, fixture-only, or "ready to..." code is not task completion evidence. When a task owns
-an area, upgrade or replace the placeholder with real product behavior behind the planned
-interfaces.
+The supervised implementation pass has completed Tasks 00-24 in source. Keep the task list below
+as a regression checklist and as the ordered dependency map for future fixes. Do not restart from
+Task 00 unless the repo is intentionally reset or a task's acceptance evidence regresses.
+
+Current high-signal evidence:
+
+- `pnpm run validate` passes.
+- `apps/cli/src/product-smoke.spec.ts` runs TS and Python fixture repos through the real CLI
+  generate, generated-site build/postbuild, refresh, and refine paths.
+- `scripts/dogfood/build-dogfood.ts` generates docstube's own reviewable docs artifact through
+  the real generation pipeline without live agents.
+- `scripts/evals/run-evals.ts` keeps normal evals deterministic and supports a secrets-gated live
+  OpenAI/Anthropic judge path.
+- Local UI product tests cover the wizard, generation dashboard, and review flows over the real
+  local-control-plane data shape.
+
+Known non-product or externally gated follow-ups:
+
+- `apps/web` is a marketing-site placeholder owned by a separate workstream.
+- `.github/workflows/dogfood.yml` builds and uploads a real dogfood review artifact. Its deploy
+  job is intentionally only an approval/download gate until the marketing/deployment workstream
+  chooses the destination.
+- `pnpm run evals:live` requires `DOCSTUBE_LIVE_EVAL_MODEL` plus a supported provider key.
+- End-to-end release testing requires the human-owned npm/GitHub/AWS/Stacktape configuration.
+
+If a future agent finds placeholder, fixture-only, or "ready to..." behavior in a task-owned area,
+treat it as a regression or incomplete implementation and replace it with real product behavior
+behind the planned interfaces.
 
 Rules for every task:
 
@@ -590,7 +614,7 @@ Hard behavior placeholders to replace:
   safe, and print exact commands for ephemeral or ambiguous installs.
 - `doctor` must check optional tools and configured agent CLI availability.
 - Do not reintroduce old command vocabulary such as `update`, `upgrade --project`, `wizard
-  --no-open`, or `refine --all`.
+--no-open`, or `refine --all`.
 
 Out of scope:
 
@@ -666,13 +690,14 @@ Goal: add quality proof after the integrated product works.
 
 Scope:
 
-- Pick and wire promptfoo or evalite.
+- Wire an eval runner. The current implementation uses `scripts/evals/run-evals.ts`; promptfoo or
+  evalite are optional future replacements, not requirements.
 - Gold-set fixtures.
 - Judge-vs-human agreement checks.
 - Context ablations.
 - Skill-on/off comparisons.
 - Secrets-gated live workflow.
-- Dogfood workflow that generates docstube's own docs and deploys the result.
+- Dogfood workflow that generates docstube's own docs as a reviewable artifact.
 
 Out of scope:
 
@@ -683,5 +708,6 @@ Acceptance:
 
 - Normal CI remains deterministic and does not call live agents.
 - Live workflow is manual/nightly and secrets-gated.
-- Dogfood output is reviewable before deploy.
+- Dogfood output is reviewable before deploy; deployment is a separate approved deployment
+  workstream.
 - `pnpm run validate` passes.

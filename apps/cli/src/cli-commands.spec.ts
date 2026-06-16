@@ -20,6 +20,7 @@ import { runWizardCommand } from './commands/wizard-command.ts';
 import type { CliOutput } from './cli-output.ts';
 import {
   createRuntimeTelemetryEvent,
+  discloseRuntimeTelemetryOnFirstRun,
   readRuntimeTelemetryEnabled,
   runCliCommandWithTelemetry,
   sendRuntimeTelemetry,
@@ -189,7 +190,30 @@ describe('CLI commands', () => {
       const config = await readFile(configPath, 'utf8');
       await writeFile(configPath, config.replace('dir: docs', 'dir: site-docs'), 'utf8');
       await mkdir(join(dir, 'site-docs'), { recursive: true });
-      await writeFile(join(dir, 'site-docs', 'page.mdx'), '# Hello\n\nWorld\n', 'utf8');
+      await writeFile(
+        join(dir, 'site-docs', 'page.mdx'),
+        [
+          '---',
+          'id: overview',
+          'title: Overview',
+          'sections:',
+          '  - intro',
+          'generated:',
+          '  by: docstube',
+          '  version: 0.0.2',
+          '  at: 2026-01-01T00:00:00.000Z',
+          '---',
+          '# Hello',
+          '',
+          '{/* docstube:section:start id=intro */}',
+          '',
+          'World',
+          '',
+          '{/* docstube:section:end id=intro */}',
+          ''
+        ].join('\n'),
+        'utf8'
+      );
       const output = captureOutput();
       const doctorInputs: unknown[] = [];
 
@@ -210,7 +234,13 @@ describe('CLI commands', () => {
       ).resolves.toEqual({ exitCode: 0 });
       expect(output.lines).toContain('info:config-family: passed');
       expect(output.lines).toContain('info:config: passed - docstube.yml trust gate passed');
+      expect(output.lines).toContain('info:generated-frontmatter: passed');
+      expect(output.lines).toContain('info:page-section-ids: passed');
+      expect(output.lines).toContain('info:section-presence: passed');
       expect(output.lines).toContain('info:mdx-compile: passed');
+      expect(output.lines).toContain('info:component-props: passed');
+      expect(output.lines).toContain('info:typescript-snippet: skipped');
+      expect(output.lines).toContain('info:api-reference-consistency: skipped');
       expect(doctorInputs).toEqual([{ configPath: 'docstube.yml', workspaceDir: dir }]);
       expect(output.lines.some((line) => line.includes('No docs/*.mdx'))).toBe(false);
     });
@@ -443,6 +473,46 @@ describe('CLI commands', () => {
         }
       });
       expect(disabled.sent).toBe(false);
+    });
+  });
+
+  it('discloses runtime telemetry once before the first CLI telemetry run', async () => {
+    await withWorkspace(async (dir) => {
+      const disclosures: string[] = [];
+
+      await expect(
+        discloseRuntimeTelemetryOnFirstRun({
+          workspaceDir: dir,
+          now: () => new Date('2026-01-01T00:00:00.000Z'),
+          onDisclosure: (message) => disclosures.push(message)
+        })
+      ).resolves.toEqual({ disclosed: true });
+      await expect(readFile(join(dir, '.docstube', 'telemetry.json'), 'utf8')).resolves.toContain(
+        '"disclosedAt": "2026-01-01T00:00:00.000Z"'
+      );
+      expect(disclosures[0]).toContain('never sends source code');
+
+      await expect(
+        discloseRuntimeTelemetryOnFirstRun({
+          workspaceDir: dir,
+          onDisclosure: (message) => disclosures.push(message)
+        })
+      ).resolves.toEqual({ disclosed: false });
+      expect(disclosures).toHaveLength(1);
+
+      const optedOutDir = await mkdtemp(join(tmpdir(), 'docstube-cli-optout-'));
+      try {
+        await expect(
+          discloseRuntimeTelemetryOnFirstRun({
+            workspaceDir: optedOutDir,
+            env: { DOCSTUBE_TELEMETRY: 'false' },
+            onDisclosure: (message) => disclosures.push(message)
+          })
+        ).resolves.toEqual({ disclosed: false });
+        await expect(pathExists(join(optedOutDir, '.docstube', 'telemetry.json'))).resolves.toBe(false);
+      } finally {
+        await rm(optedOutDir, { recursive: true, force: true });
+      }
     });
   });
 

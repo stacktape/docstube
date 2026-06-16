@@ -4,7 +4,9 @@ import { mkdir, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { platform } from 'node:os';
-import { extname, join, resolve, sep } from 'node:path';
+import { execPath } from 'node:process';
+import { dirname, extname, join, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { Hono } from 'hono';
 import { appRouter } from './trpc-router.ts';
@@ -306,6 +308,39 @@ const defaultOpenBrowser: OpenBrowser = (url) => {
   child.unref();
 };
 
+const currentModuleDir = dirname(fileURLToPath(import.meta.url));
+
+const localUiCandidates = (input: { explicit?: string; workspaceDir: string }): string[] =>
+  [
+    input.explicit,
+    process.env.DOCSTUBE_LOCAL_UI_DIST_DIR,
+    join(currentModuleDir, '..', 'local-ui'),
+    join(dirname(execPath), 'local-ui'),
+    join(input.workspaceDir, 'apps', 'local-ui', 'dist')
+  ].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0);
+
+const resolveLocalUiDistDir = async (input: { explicit?: string; workspaceDir: string }): Promise<string> => {
+  const candidates = localUiCandidates(input);
+  const existing = await Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        await stat(join(candidate, 'index.html'));
+        return candidate;
+      } catch {
+        return null;
+      }
+    })
+  );
+  const found = existing.find((candidate): candidate is string => candidate !== null);
+  if (found) {
+    return found;
+  }
+
+  throw new Error(
+    `Local UI build not found. Checked: ${candidates.join(', ')}. Run pnpm --filter @docstube/web-ui build first.`
+  );
+};
+
 export const startLocalControlPlane = async (
   options: StartLocalControlPlaneOptions
 ): Promise<StartedLocalControlPlane> => {
@@ -343,16 +378,10 @@ export const startGenerateSession = async (options: GenerateStartupOptions = {})
 
   const backend = options.backend ?? createLocalBackend(openDocstubeDatabase(dbPath));
   const ownsBackend = options.backend === undefined;
-  const uiDistDir = options.uiDistDir ?? join(workspaceDir, 'apps', 'local-ui', 'dist');
   const uiDevServerUrl = options.uiDevServerUrl ?? process.env.DOCSTUBE_UI_DEV_SERVER_URL;
-
-  if (!uiDevServerUrl) {
-    try {
-      await stat(uiDistDir);
-    } catch {
-      throw new Error(`Local UI build not found at ${uiDistDir}. Run pnpm --filter @docstube/web-ui build first.`);
-    }
-  }
+  const uiDistDir = uiDevServerUrl
+    ? options.uiDistDir
+    : await resolveLocalUiDistDir({ explicit: options.uiDistDir, workspaceDir });
 
   const started = await startLocalControlPlane({
     backend,

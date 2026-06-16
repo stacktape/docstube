@@ -67,6 +67,9 @@ export type {
   SourceGroundingContext
 } from './page-generation-context.ts';
 
+export { collectProjectSourceFiles, loadProjectConfigFamily } from './project-workspace.ts';
+export type { ProjectConfigFamily, ProjectSourceFile } from './project-workspace.ts';
+
 export { createProjectPageVerifiers, extractMdxComponentUsages } from './page-verifier-gate.ts';
 
 export { refreshProjectDocumentation } from './project-refresh.ts';

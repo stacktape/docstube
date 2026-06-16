@@ -7,7 +7,7 @@ import type { DocstubeConfig } from '@docstube/contracts';
 import { describe, expect, it } from 'vitest';
 import { openDocstubeDatabase } from './db-migrations.ts';
 import { createLocalBackend } from './local-backend.ts';
-import { createLocalControlPlaneApp, startLocalControlPlane } from './local-server.ts';
+import { createLocalControlPlaneApp, startGenerateSession, startLocalControlPlane } from './local-server.ts';
 import type { StateBackend } from './state-backend.ts';
 
 const config: DocstubeConfig = {
@@ -161,6 +161,35 @@ describe('local control plane app', () => {
 });
 
 describe('local control plane startup', () => {
+  it('starts a generate session from staged UI assets outside the workspace', async () => {
+    await withUiDist(async (uiDistDir) => {
+      const workspaceDir = await mkdtemp(join(tmpdir(), 'docstube-generate-session-'));
+      const openedUrls: string[] = [];
+      try {
+        const started = await startGenerateSession({
+          workspaceDir,
+          uiDistDir,
+          sessionToken: 'staged-token',
+          openBrowser: (url) => {
+            openedUrls.push(url);
+          }
+        });
+
+        try {
+          const response = await fetch(started.url);
+
+          expect(openedUrls).toEqual([started.url]);
+          expect(response.status).toBe(200);
+          expect(await response.text()).toContain('docstube local ui');
+        } finally {
+          await started.close();
+        }
+      } finally {
+        await rm(workspaceDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   it('binds to localhost, opens the wizard URL, and serves it over HTTP', async () => {
     await withBackend(async (backend) => {
       await withUiDist(async (uiDistDir) => {

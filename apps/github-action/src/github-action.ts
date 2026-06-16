@@ -233,6 +233,17 @@ const formatSummary = (input: {
   return lines.join('\n');
 };
 
+const refreshOutputPagePattern = /^regenerated:\s+(?<path>.+?)\s+\((?<reason>.+)\)$/gmu;
+
+export const parseChangedPagesFromDocstubeOutput = (output: string): readonly GitHubActionChangedPage[] =>
+  [...output.matchAll(refreshOutputPagePattern)].map((match) => ({
+    path: match.groups?.path ?? 'unknown',
+    reasons: (match.groups?.reason ?? 'changed by docstube refresh')
+      .split(',')
+      .map((reason) => reason.trim())
+      .filter(Boolean)
+  }));
+
 const setActionOutputs = async (reporter: GitHubActionReporter, result: GitHubActionResult): Promise<void> => {
   await reporter.setOutput('changed', String(result.changed));
   await reporter.setOutput('branch-name', result.branchName);
@@ -614,6 +625,7 @@ export const createDocstubeCommandRunner =
     const result = await processRunner('npx', args, { cwd: input.workspaceDir });
     return {
       exitCode: result.exitCode,
+      changedPages: parseChangedPagesFromDocstubeOutput([result.stdout, result.stderr].filter(Boolean).join('\n')),
       output: [result.stdout, result.stderr].filter(Boolean).join('\n')
     };
   };

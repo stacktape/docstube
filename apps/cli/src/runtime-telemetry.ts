@@ -24,6 +24,10 @@ export type RuntimeTelemetryCommandResult = {
   exitCode: number;
 };
 
+export type RuntimeTelemetryDisclosureResult = {
+  disclosed: boolean;
+};
+
 const knownRuntimeTelemetryCommands = new Set([
   'check',
   'doctor',
@@ -64,6 +68,12 @@ const envDisablesTelemetry = (env: NodeJS.ProcessEnv): boolean =>
   envBoolean(env.DOCSTUBE_TELEMETRY) === false ||
   envBoolean(env.DOCSTUBE_TELEMETRY_DISABLED) === true;
 
+const envHasTelemetryPreference = (env: NodeJS.ProcessEnv): boolean =>
+  envBoolean(env.DOCSTUBE_TELEMETRY) !== undefined || envBoolean(env.DOCSTUBE_TELEMETRY_DISABLED) !== undefined;
+
+const runtimeTelemetryDisclosureMessage =
+  'docstube collects privacy-preserving runtime telemetry by default: command names, durations, coarse errors, and anonymous environment facts. It never sends source code, prompts, generated docs, paths, project names, repo contents, or secrets. Disable it with DOCSTUBE_TELEMETRY=false or DO_NOT_TRACK=1.';
+
 export const createRuntimeTelemetryEvent = (input: {
   command: string;
   durationMs?: number;
@@ -103,6 +113,35 @@ export const writeRuntimeTelemetryEnabled = async (workspaceDir: string, enabled
   const path = telemetryPath(workspaceDir);
   await mkdir(join(workspaceDir, '.docstube'), { recursive: true });
   await writeFile(path, `${JSON.stringify({ enabled }, null, 2)}\n`, 'utf8');
+};
+
+export const discloseRuntimeTelemetryOnFirstRun = async (
+  input: {
+    env?: NodeJS.ProcessEnv;
+    now?: () => Date;
+    onDisclosure?: (message: string) => void;
+    workspaceDir?: string;
+  } = {}
+): Promise<RuntimeTelemetryDisclosureResult> => {
+  const env = input.env ?? process.env;
+  const workspaceDir = input.workspaceDir ?? process.cwd();
+  if (envDisablesTelemetry(env) || envHasTelemetryPreference(env)) {
+    return { disclosed: false };
+  }
+
+  try {
+    await readFile(telemetryPath(workspaceDir), 'utf8');
+    return { disclosed: false };
+  } catch {
+    await mkdir(join(workspaceDir, '.docstube'), { recursive: true });
+    await writeFile(
+      telemetryPath(workspaceDir),
+      `${JSON.stringify({ enabled: true, disclosedAt: (input.now ?? (() => new Date()))().toISOString() }, null, 2)}\n`,
+      'utf8'
+    );
+    input.onDisclosure?.(runtimeTelemetryDisclosureMessage);
+    return { disclosed: true };
+  }
 };
 
 export const createPostHogRuntimeTelemetryTransport =
@@ -147,12 +186,19 @@ export const runCliCommandWithTelemetry = async (input: {
   command: string;
   env?: NodeJS.ProcessEnv;
   now?: () => number;
+  onDisclosure?: (message: string) => void;
   run: () => Promise<RuntimeTelemetryCommandResult> | RuntimeTelemetryCommandResult;
   transport?: RuntimeTelemetryTransport;
   workspaceDir?: string;
 }): Promise<RuntimeTelemetryCommandResult> => {
   const now = input.now ?? Date.now;
   const startedAt = now();
+
+  await discloseRuntimeTelemetryOnFirstRun({
+    workspaceDir: input.workspaceDir,
+    env: input.env,
+    onDisclosure: input.onDisclosure
+  });
 
   await sendRuntimeTelemetry({
     workspaceDir: input.workspaceDir,

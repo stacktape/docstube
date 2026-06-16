@@ -24,13 +24,24 @@ const updatePackageJson = async (packageJsonPath: string, version: string) => {
   await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 };
 
+const updateSourceVersionFile = async (path: string, replacements: readonly [RegExp, string][]) => {
+  let content = await readFile(path, 'utf8');
+  for (const [pattern, replacement] of replacements) {
+    content = content.replace(pattern, replacement);
+  }
+  await writeFile(path, content);
+};
+
 const updateSourceVersion = async (version: string) => {
-  const corePath = resolve('packages/core/src/core.ts');
-  const content = await readFile(corePath, 'utf8');
-  await writeFile(
-    corePath,
-    content.replace(/export const docstubeVersion = '[^']+';/, `export const docstubeVersion = '${version}';`)
-  );
+  await updateSourceVersionFile(resolve('packages/core/src/core.ts'), [
+    [/export const docstubeVersion = '[^']+';/, `export const docstubeVersion = '${version}';`]
+  ]);
+  await updateSourceVersionFile(resolve('apps/cli/src/cli.ts'), [
+    [/const docstubeVersion = '[^']+';/, `const docstubeVersion = '${version}';`]
+  ]);
+  await updateSourceVersionFile(resolve('apps/cli/src/runtime-telemetry.ts'), [
+    [/const docstubeVersion = '[^']+';/, `const docstubeVersion = '${version}';`]
+  ]);
 };
 
 const main = async () => {
