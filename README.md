@@ -30,7 +30,7 @@ Documentation rots the moment it's written, and generic AI writers make it worse
 
 ```bash
 # Not available yet - shown to illustrate the intended workflow.
-npx docstube generate
+npx docstube wizard
 ```
 
 1. Point docstube at your repo; a local web UI opens.

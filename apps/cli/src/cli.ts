@@ -3,6 +3,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineCommand, runMain } from 'citty';
+import { getCommandHelp } from './cli-help.ts';
 
 const docstubeVersion = '0.0.2';
 
@@ -21,45 +22,8 @@ const output = {
   error: (message: string) => console.error(message)
 };
 
-const commandHelp = [
-  'Usage: docstube <command> [options]',
-  '',
-  'Commands:',
-  '  wizard                 Open the local setup wizard and control plane.',
-  '  generate               Generate docs from existing config.',
-  '  refresh                Refresh stale pages and vendored theme assets.',
-  '  refine                 Improve the lowest-quality generated pages first.',
-  '  validate               Validate the docstube config family.',
-  '  check                  Run deterministic checks.',
-  '  status                 Show config, manifest, and page status.',
-  '  doctor                 Check local runtime and project setup.',
-  '  upgrade                Upgrade the docstube tool itself.',
-  '  version                Print the docstube version.',
-  '  help [command]         Print command help.'
-].join('\n');
-
 const printHelp = (command?: string): void => {
-  if (!command) {
-    output.info(commandHelp);
-    return;
-  }
-
-  const helpByCommand: Record<string, string> = {
-    wizard: 'Usage: docstube wizard [--fresh]\n\nOpen the local setup wizard and control plane.',
-    generate: 'Usage: docstube generate [--fresh] [--config <path>]\n\nGenerate docs from existing config.',
-    refresh: 'Usage: docstube refresh [--config <path>]\n\nRefresh all stale pages and vendored theme assets.',
-    refine:
-      'Usage: docstube refine [page] [--failed] [--max-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
-    validate: 'Usage: docstube validate [--config <path>]\n\nValidate the docstube config family.',
-    check:
-      'Usage: docstube check --all\n       docstube check <d2|mdx|snippet|config> <file>\n\nRun deterministic checks.',
-    status: 'Usage: docstube status\n\nShow config, manifest, and page status.',
-    doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
-    upgrade: 'Usage: docstube upgrade [--check] [--to <version>]\n\nUpgrade the docstube tool itself.',
-    version: 'Usage: docstube version\n\nPrint the docstube version.'
-  };
-
-  output.info(helpByCommand[command] ?? `Unknown help topic: ${command}`);
+  output.info(getCommandHelp(command));
 };
 
 const wizard = defineCommand({
@@ -72,7 +36,7 @@ const wizard = defineCommand({
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runWizardCommand } = await import('./cli-commands.ts');
+    const { runWizardCommand } = await import('./commands/wizard-command.ts');
     const result = await runWizardCommand(
       {
         fresh: args.fresh === true,
@@ -95,7 +59,7 @@ const generate = defineCommand({
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runGenerateCommand } = await import('./cli-commands.ts');
+    const { runGenerateCommand } = await import('./commands/generate-command.ts');
     const result = await runGenerateCommand(
       {
         configPath: typeof args.config === 'string' ? args.config : undefined,
@@ -117,7 +81,7 @@ const refresh = defineCommand({
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runRefreshCommand } = await import('./cli-commands.ts');
+    const { runRefreshCommand } = await import('./commands/refresh-command.ts');
     const result = await runRefreshCommand(
       {
         configPath: typeof args.config === 'string' ? args.config : undefined
@@ -135,6 +99,7 @@ const refine = defineCommand({
   },
   args: {
     target: { type: 'positional', required: false, description: 'Optional page path or page id to refine.' },
+    config: { type: 'string', description: 'Path to docstube.yml.' },
     failed: { type: 'boolean', description: 'Consider only pages with failing checks.' },
     'max-rounds': { type: 'string', description: 'Maximum refinement rounds.' }
   },
@@ -147,9 +112,10 @@ const refine = defineCommand({
       return;
     }
 
-    const { runRefineCommand } = await import('./cli-commands.ts');
+    const { runRefineCommand } = await import('./commands/refine-command.ts');
     const result = await runRefineCommand(
       {
+        configPath: typeof args.config === 'string' ? args.config : undefined,
         failed: args.failed === true,
         maxRounds,
         target: typeof args.target === 'string' ? args.target : undefined
@@ -170,7 +136,7 @@ const validate = defineCommand({
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runValidateCommand } = await import('./cli-commands.ts');
+    const { runValidateCommand } = await import('./commands/validate-command.ts');
     const result = await runValidateCommand(
       {
         configPath: typeof args.config === 'string' ? args.config : undefined
@@ -189,13 +155,19 @@ const check = defineCommand({
   args: {
     kind: { type: 'positional', required: false, description: 'd2, mdx, snippet, or config' },
     file: { type: 'positional', required: false, description: 'File to check' },
-    all: { type: 'boolean', description: 'Run all deterministic checks for the project.' }
+    all: { type: 'boolean', description: 'Run all deterministic checks for the project.' },
+    config: { type: 'string', description: 'Path to docstube.yml for --all.' }
   },
   async run({ args }) {
     enableNodeCompileCache();
     if (args.all === true) {
-      const { runCheckAllCommand } = await import('./cli-commands.ts');
-      const result = await runCheckAllCommand({}, output);
+      const { runCheckAllCommand } = await import('./commands/check-command.ts');
+      const result = await runCheckAllCommand(
+        {
+          configPath: typeof args.config === 'string' ? args.config : undefined
+        },
+        output
+      );
       process.exitCode = result.exitCode;
       return;
     }
@@ -213,7 +185,7 @@ const check = defineCommand({
       return;
     }
 
-    const { runCheckCommand } = await import('./cli-commands.ts');
+    const { runCheckCommand } = await import('./commands/check-command.ts');
     const result = await runCheckCommand({ kind, file: args.file }, output);
     process.exitCode = result.exitCode;
   }
@@ -224,10 +196,18 @@ const status = defineCommand({
     description: 'Show config, manifest, and page status.',
     name: 'status'
   },
-  async run() {
+  args: {
+    config: { type: 'string', description: 'Path to docstube.yml.' }
+  },
+  async run({ args }) {
     enableNodeCompileCache();
-    const { runStatusCommand } = await import('./cli-commands.ts');
-    const result = await runStatusCommand({}, output);
+    const { runStatusCommand } = await import('./commands/status-command.ts');
+    const result = await runStatusCommand(
+      {
+        configPath: typeof args.config === 'string' ? args.config : undefined
+      },
+      output
+    );
     process.exitCode = result.exitCode;
   }
 });
@@ -237,10 +217,18 @@ const doctor = defineCommand({
     description: 'Check local runtime and project setup.',
     name: 'doctor'
   },
-  async run() {
+  args: {
+    config: { type: 'string', description: 'Path to docstube.yml.' }
+  },
+  async run({ args }) {
     enableNodeCompileCache();
-    const { runDoctorCommand } = await import('./cli-commands.ts');
-    const result = await runDoctorCommand({}, output);
+    const { runDoctorCommand } = await import('./commands/doctor-command.ts');
+    const result = await runDoctorCommand(
+      {
+        configPath: typeof args.config === 'string' ? args.config : undefined
+      },
+      output
+    );
     process.exitCode = result.exitCode;
   }
 });
@@ -256,7 +244,7 @@ const upgrade = defineCommand({
   },
   async run({ args }) {
     enableNodeCompileCache();
-    const { runUpgradeCommand } = await import('./cli-commands.ts');
+    const { runUpgradeCommand } = await import('./commands/upgrade-command.ts');
     const result = await runUpgradeCommand(
       {
         check: args.check === true,

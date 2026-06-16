@@ -4,19 +4,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { runCheckAllCommand, runCheckCommand } from './commands/check-command.ts';
+import { runGenerateCommand } from './commands/generate-command.ts';
+import { runRefreshCommand } from './commands/refresh-command.ts';
+import { runUpgradeCommand } from './commands/upgrade-command.ts';
+import { runValidateCommand } from './commands/validate-command.ts';
+import { runWizardCommand } from './commands/wizard-command.ts';
+import type { CliOutput } from './cli-output.ts';
 import {
   createRuntimeTelemetryEvent,
-  runCheckAllCommand,
-  runCheckCommand,
-  runGenerateCommand,
-  runRefreshCommand,
-  runUpgradeCommand,
-  runValidateCommand,
-  runWizardCommand,
   sendRuntimeTelemetry,
   writeRuntimeTelemetryEnabled
-} from './cli-commands.ts';
-import type { CliOutput, RuntimeTelemetryEvent } from './cli-commands.ts';
+} from './runtime-telemetry.ts';
+import type { RuntimeTelemetryEvent } from './runtime-telemetry.ts';
 
 const fixturePath = (name: string): string =>
   fileURLToPath(new URL(`../../../packages/core/src/fixtures/${name}`, import.meta.url));

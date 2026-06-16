@@ -569,12 +569,17 @@ Scope:
 - `version`.
 - `check --all`.
 - `check <d2|mdx|snippet|config> <file>`.
+- Consistent `--config <path>` support for project-aware commands:
+  `generate`, `refresh`, `refine`, `validate`, `check --all`, `status`, and `doctor`.
 - Lazy command loading.
 - `NODE_COMPILE_CACHE` where appropriate.
 - Runtime telemetry opt-out and disclosure.
 - No dedicated `docstube telemetry` command.
 - Development command path: `pnpm dev <docstube-command>` runs the TypeScript source CLI; for
   `wizard`, it also starts the Vite local UI and proxies it through the local control plane.
+- Command architecture: keep `apps/cli/src/cli.ts` as argv parsing only, keep each command in a
+  concrete `apps/cli/src/commands/*-command.ts` module, and put product workflows in
+  `packages/core` instead of embedding orchestration in CLI command modules.
 
 Hard behavior placeholders to replace:
 
@@ -586,6 +591,8 @@ Hard behavior placeholders to replace:
 - `upgrade` must self-update standalone installs, update detected package-manager installs when
   safe, and print exact commands for ephemeral or ambiguous installs.
 - `doctor` must check optional tools and configured agent CLI availability.
+- Do not reintroduce old command vocabulary such as `update`, `upgrade --project`, `wizard
+  --no-open`, or `refine --all`.
 
 Out of scope:
 
@@ -595,6 +602,7 @@ Out of scope:
 Acceptance:
 
 - CLI startup stays light.
+- Help-surface tests pin command names and reject removed command concepts.
 - Command tests cover success, failure, `--fresh`, resumability, and progress output.
 - `wizard` drives the real local server/UI path.
 - `generate` drives the real config-based pipeline path rather than opening the wizard.

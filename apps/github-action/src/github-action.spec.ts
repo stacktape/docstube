@@ -267,4 +267,13 @@ describe('GitHub Action wrapper', () => {
       workflowName: 'Docs Update'
     });
   });
+
+  it('rejects the removed update mode alias', () => {
+    expect(() =>
+      readGitHubActionInputsFromEnv({
+        GITHUB_WORKSPACE: '/repo',
+        INPUT_MODE: 'update'
+      })
+    ).toThrow('Unsupported docstube Action mode: update.');
+  });
 });

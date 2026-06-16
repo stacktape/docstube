@@ -40,6 +40,12 @@ export type {
   TerminalProgressState
 } from './pipeline-run.ts';
 
+export { initializeProjectGeneration } from './project-generation.ts';
+export type {
+  ProjectGenerationInitializationOptions,
+  ProjectGenerationInitializationResult
+} from './project-generation.ts';
+
 export {
   createReviewerRunInput,
   createWriterRunInput,

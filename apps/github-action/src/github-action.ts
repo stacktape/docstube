@@ -660,7 +660,7 @@ const readBooleanActionInput = (env: NodeJS.ProcessEnv, name: string): boolean |
 
 const readActionMode = (env: NodeJS.ProcessEnv): GitHubActionMode => {
   const raw = readActionInput(env, 'mode') ?? 'refresh';
-  if (raw === 'update' || raw === 'refresh') {
+  if (raw === 'refresh') {
     return 'refresh';
   }
   if (raw === 'validate') {

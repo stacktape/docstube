@@ -132,19 +132,19 @@ Commands:
 - `docstube generate`: runs generation from existing config. It fails with a clear instruction to
   run `docstube wizard` when config is missing.
 - `docstube generate --fresh`: discards machine-local generation state and regenerates from config.
-- `docstube refresh`: default maintenance command used locally and by the GitHub Action. It checks
-  all pages by default, regenerates stale pages, and refreshes vendored theme/project assets when
-  the installed docstube version changes them.
-- `docstube refine`: improves existing generated pages, prioritizing the lowest quality scores and
-  failed deterministic gates first.
-- `docstube validate`: deterministic validation of config-family files.
-- `docstube check --all`: run all deterministic checks over the project.
+- `docstube refresh [--config <path>]`: default maintenance command used locally and by the
+  GitHub Action. It checks all pages by default, regenerates stale pages, and refreshes vendored
+  theme/project assets when the installed docstube version changes them.
+- `docstube refine [page] [--failed] [--max-rounds <n>] [--config <path>]`: improves existing
+  generated pages, prioritizing the lowest quality scores and failed deterministic gates first.
+- `docstube validate [--config <path>]`: deterministic validation of config-family files.
+- `docstube check --all [--config <path>]`: run all deterministic checks over the project.
 - `docstube check <d2|mdx|snippet|config> <file>`: single deterministic check for agents and
   humans.
-- `docstube status`: summarize config, manifest, page status, dirty/stale pages, and refinement
-  candidates.
-- `docstube doctor`: check the local runtime, optional tools, agent CLI availability, and project
-  setup without leaking secrets.
+- `docstube status [--config <path>]`: summarize config, manifest, page status, dirty/stale
+  pages, and refinement candidates.
+- `docstube doctor [--config <path>]`: check the local runtime, optional tools, agent CLI
+  availability, and project setup without leaking secrets.
 - `docstube upgrade`: update the docstube tool itself. Standalone installs self-update from
   GitHub Releases; package-manager installs use the detected package manager when safe or print
   the exact command when the current invocation is ephemeral.
@@ -152,6 +152,10 @@ Commands:
 
 Long runs are resumable. Re-running continues from durable state; `--fresh` discards state.
 Progress streams to terminal and web UI.
+
+The CLI argv layer stays thin: each command has a concrete module in `apps/cli/src/commands/`.
+Product workflows such as generation, refresh, refinement, status, and doctor logic live in
+`packages/core`; CLI modules parse options, call core workflows, and format terminal output.
 
 Usage caps are approximate by design. Read vendor local usage logs where possible, freeze with
 margin at the configured cap, persist state, and make resume obvious.
