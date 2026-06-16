@@ -72,6 +72,38 @@ export type {
   RetryLoopResult
 } from './pipeline-artifacts';
 
+export {
+  createPageProvenance,
+  createSourceSnapshot,
+  detectChangedSources,
+  extractGlossaryReferences,
+  extractMarkdownDocLinks,
+  hashNormalizedSource,
+  hashSeedContext,
+  mapChangedSymbolsToPages,
+  normalizeSourceForHash,
+  readManifestFile,
+  resolveDirtyPages,
+  runTopologyConsistencyPass,
+  updateManifest,
+  writeManifestFile
+} from './incremental-engine';
+export type {
+  ChangedSource,
+  ChangedSymbolRef,
+  CreatePageProvenanceInput,
+  DirtyPageAction,
+  DirtyPageDecision,
+  DirtyPagesResult,
+  ManifestPageUpdate,
+  ResolveDirtyPagesInput,
+  SourceSnapshot,
+  SourceSnapshotInput,
+  TopologyConsistencyInput,
+  TopologyPage,
+  UpdateManifestInput
+} from './incremental-engine';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
