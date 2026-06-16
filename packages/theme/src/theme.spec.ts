@@ -12,17 +12,21 @@ import {
   createDocsMcpResources,
   createDocsMcpServer,
   createGlossaryRemarkPlugin,
+  createCanonicalUrl,
   createLlmsFullText,
   createLlmsText,
+  createSeoMetadata,
+  createSitemapXml,
   defaultThemeLayout,
   docstubeThemeRegistry,
   renderD2DiagramSvg,
   stableThemeComponentNames,
   themeComponentPropSchemas,
   themeLayouts,
-  writeLlmsFiles
+  writeLlmsFiles,
+  writeSeoFiles
 } from './theme';
-import type { LlmsInput, MarkdownAstNode } from './theme';
+import type { LlmsInput, MarkdownAstNode, SeoInput } from './theme';
 
 const execFileAsync = promisify(execFile);
 
@@ -46,6 +50,7 @@ const sourceFiles = [
   'src/components/theme-components.tsx',
   'src/layouts/DocLayout.astro',
   'src/pages/index.mdx',
+  'src/pages/credit-disabled.mdx',
   'src/pages/glossary.mdx',
   'src/pages/guides/install.mdx'
 ] as const;
@@ -71,6 +76,39 @@ const fixtureLlmsInput: LlmsInput = {
       url: '/glossary/',
       description: 'Generated glossary entries.',
       content: 'Codemap: A structural map of the source repository.'
+    }
+  ]
+};
+
+const fixtureSeoInput: SeoInput = {
+  siteName: 'docstube fixture',
+  siteUrl: 'https://docs.example.test',
+  pages: [
+    {
+      title: 'Install',
+      url: '/guides/install/',
+      description: 'Sectioned layout fixture page.'
+    },
+    {
+      title: 'Overview',
+      url: '/',
+      description: 'Representative generated MDX page.',
+      faq: [
+        {
+          question: 'What does docstube generate?',
+          answer: 'A self-contained Astro docs site with verified MDX output.'
+        }
+      ]
+    },
+    {
+      title: 'Credit Disabled',
+      url: '/credit-disabled/',
+      description: 'Footer credit opt-out fixture.'
+    },
+    {
+      title: 'Glossary',
+      url: '/glossary/',
+      description: 'Generated glossary entries.'
     }
   ]
 };
@@ -226,6 +264,48 @@ describe('docstube theme contract', () => {
     });
   });
 
+  it('generates deterministic SEO metadata and sitemap output', () => {
+    const overviewPage = fixtureSeoInput.pages[1]!;
+    const metadata = createSeoMetadata({ ...fixtureSeoInput, page: overviewPage });
+
+    expect(createCanonicalUrl(fixtureSeoInput.siteUrl, '/guides/install/')).toBe(
+      'https://docs.example.test/guides/install/'
+    );
+    expect(metadata).toMatchObject({
+      title: 'Overview | docstube fixture',
+      canonicalUrl: 'https://docs.example.test/',
+      openGraph: {
+        title: 'Overview | docstube fixture',
+        type: 'article',
+        url: 'https://docs.example.test/'
+      }
+    });
+    expect(metadata.structuredData).toEqual([
+      expect.objectContaining({ '@type': 'TechArticle', headline: 'Overview' }),
+      expect.objectContaining({ '@type': 'FAQPage' })
+    ]);
+    expect(createSitemapXml(fixtureSeoInput)).toBe(
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        '  <url>',
+        '    <loc>https://docs.example.test/</loc>',
+        '  </url>',
+        '  <url>',
+        '    <loc>https://docs.example.test/credit-disabled/</loc>',
+        '  </url>',
+        '  <url>',
+        '    <loc>https://docs.example.test/glossary/</loc>',
+        '  </url>',
+        '  <url>',
+        '    <loc>https://docs.example.test/guides/install/</loc>',
+        '  </url>',
+        '</urlset>',
+        ''
+      ].join('\n')
+    );
+  });
+
   it('builds the self-contained generated Astro docs-site fixture', async () => {
     const packageJson = JSON.parse(await readFile(join(fixtureRoot, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>;
@@ -248,14 +328,17 @@ describe('docstube theme contract', () => {
 
       const distDir = join(fixtureRoot, 'dist');
       await writeLlmsFiles(distDir, fixtureLlmsInput);
+      await writeSeoFiles(distDir, fixtureSeoInput);
       const pagefind = await buildPagefindSearchIndex({ siteDir: distDir });
       const indexHtml = await readFile(join(fixtureRoot, 'dist', 'index.html'), 'utf8');
+      const creditDisabledHtml = await readFile(join(fixtureRoot, 'dist', 'credit-disabled', 'index.html'), 'utf8');
       const installHtml = await readFile(join(fixtureRoot, 'dist', 'guides', 'install', 'index.html'), 'utf8');
       const glossaryHtml = await readFile(join(fixtureRoot, 'dist', 'glossary', 'index.html'), 'utf8');
       const llmsText = await readFile(join(fixtureRoot, 'dist', 'llms.txt'), 'utf8');
+      const sitemapXml = await readFile(join(fixtureRoot, 'dist', 'sitemap.xml'), 'utf8');
 
       expect(pagefind.errors).toEqual([]);
-      expect(pagefind.pageCount).toBeGreaterThanOrEqual(3);
+      expect(pagefind.pageCount).toBeGreaterThanOrEqual(4);
       expect(pagefind.files).toContain('pagefind.js');
       expect(indexHtml).toContain('DOCSTUBE_THEME_FIXTURE_TOKEN');
       expect(indexHtml).toContain('data-component="Callout"');
@@ -263,9 +346,17 @@ describe('docstube theme contract', () => {
       expect(indexHtml).toContain('<svg');
       expect(indexHtml).toContain('/glossary/#codemap');
       expect(indexHtml).toContain('/glossary/#deterministic-verifier');
+      expect(indexHtml).toContain('<link rel="canonical" href="https://docs.example.test/">');
+      expect(indexHtml).toContain('property="og:title" content="Overview | docstube fixture"');
+      expect(indexHtml).toContain('"@type":"TechArticle"');
+      expect(indexHtml).toContain('"@type":"FAQPage"');
+      expect(indexHtml).toContain('What does docstube generate?');
+      expect(indexHtml).toContain('Generated by <a href="https://docstube.dev">docstube</a>');
+      expect(creditDisabledHtml).not.toContain('Generated by <a href="https://docstube.dev">docstube</a>');
       expect(installHtml).toContain('site-shell--sectioned');
       expect(glossaryHtml).toContain('id="codemap"');
       expect(llmsText).toBe(createLlmsText(fixtureLlmsInput));
+      expect(sitemapXml).toBe(createSitemapXml(fixtureSeoInput));
     } finally {
       await cleanFixtureOutputs();
     }

@@ -713,3 +713,126 @@ export const createDocsMcpServer = (resources: readonly DocsMcpResource[]) => {
     }
   };
 };
+
+export type FaqItem = {
+  answer: string;
+  question: string;
+};
+
+export type SeoPage = {
+  description?: string;
+  faq?: readonly FaqItem[];
+  title: string;
+  url: string;
+};
+
+export type SeoInput = {
+  pages: readonly SeoPage[];
+  siteName: string;
+  siteUrl: string;
+};
+
+export type SeoMetadata = {
+  canonicalUrl: string;
+  description?: string;
+  openGraph: {
+    description?: string;
+    title: string;
+    type: 'article';
+    url: string;
+  };
+  structuredData: Record<string, unknown> | Record<string, unknown>[];
+  title: string;
+};
+
+export const faqItemSchema = z.strictObject({
+  answer: z.string().min(1),
+  question: z.string().min(1)
+});
+
+export const seoPageSchema = z.strictObject({
+  description: z.string().min(1).optional(),
+  faq: z.array(faqItemSchema).optional(),
+  title: z.string().min(1),
+  url: z.string().min(1)
+});
+
+const normalizedSiteUrl = (siteUrl: string): string => (siteUrl.endsWith('/') ? siteUrl : `${siteUrl}/`);
+
+export const createCanonicalUrl = (siteUrl: string, path: string): string =>
+  new URL(normalizeLlmsUrl(path), normalizedSiteUrl(siteUrl)).href;
+
+const escapeXml = (value: string): string =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+
+export const createSitemapXml = (input: SeoInput): string => {
+  const urls = normalizedLlmsPages(input.pages).map(
+    (page) => `  <url>\n    <loc>${escapeXml(createCanonicalUrl(input.siteUrl, page.url))}</loc>\n  </url>`
+  );
+
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...urls,
+    '</urlset>',
+    ''
+  ].join('\n');
+};
+
+export const createPageStructuredData = (input: SeoInput & { page: SeoPage }): Record<string, unknown> => ({
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: input.page.title,
+  description: input.page.description,
+  url: createCanonicalUrl(input.siteUrl, input.page.url),
+  mainEntityOfPage: createCanonicalUrl(input.siteUrl, input.page.url),
+  publisher: {
+    '@type': 'Organization',
+    name: input.siteName
+  }
+});
+
+export const createFaqStructuredData = (faq: readonly FaqItem[]): Record<string, unknown> => ({
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faq.map((item) => ({
+    '@type': 'Question',
+    name: item.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.answer
+    }
+  }))
+});
+
+export const createSeoMetadata = (input: SeoInput & { page: SeoPage }): SeoMetadata => {
+  const canonicalUrl = createCanonicalUrl(input.siteUrl, input.page.url);
+  const title = `${input.page.title} | ${input.siteName}`;
+  const structuredData = input.page.faq?.length
+    ? [createPageStructuredData(input), createFaqStructuredData(input.page.faq)]
+    : createPageStructuredData(input);
+
+  return {
+    canonicalUrl,
+    description: input.page.description,
+    openGraph: {
+      title,
+      description: input.page.description,
+      type: 'article',
+      url: canonicalUrl
+    },
+    structuredData,
+    title
+  };
+};
+
+export const writeSeoFiles = async (outputDir: string, input: SeoInput): Promise<{ sitemapPath: string }> => {
+  const sitemapPath = join(outputDir, 'sitemap.xml');
+  await writeFile(sitemapPath, createSitemapXml(input), 'utf8');
+  return { sitemapPath };
+};
