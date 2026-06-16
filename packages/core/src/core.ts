@@ -24,6 +24,22 @@ export type {
 export { createLocalBackend } from './local-backend';
 export type { LocalBackendOptions } from './local-backend';
 
+export {
+  createTerminalProgressState,
+  deriveRunId,
+  freezeRunForCaps,
+  initializeRunFromConfigFamily,
+  resumeRunAfterCapIncrease,
+  schedulePagesFromIa,
+  transitionRunStatus
+} from './pipeline-run';
+export type {
+  RunInitializationOptions,
+  RunInitializationResult,
+  ScheduledPage,
+  TerminalProgressState
+} from './pipeline-run';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
