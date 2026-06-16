@@ -1,0 +1,50 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AppRouter contract > snapshots the AppRouter procedure surface 1`] = `
+[
+  {
+    "path": "config.read",
+    "type": "query",
+  },
+  {
+    "path": "config.write",
+    "type": "mutation",
+  },
+  {
+    "path": "feedback.submit",
+    "type": "mutation",
+  },
+  {
+    "path": "ia.proposals",
+    "type": "query",
+  },
+  {
+    "path": "pages.approve",
+    "type": "mutation",
+  },
+  {
+    "path": "pages.detail",
+    "type": "query",
+  },
+  {
+    "path": "pages.list",
+    "type": "query",
+  },
+  {
+    "path": "pages.regenerate",
+    "type": "mutation",
+  },
+  {
+    "path": "run.status",
+    "type": "query",
+  },
+  {
+    "path": "theme.readTokens",
+    "type": "query",
+  },
+  {
+    "path": "theme.writeTokens",
+    "type": "mutation",
+  },
+]
+`;

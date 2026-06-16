@@ -1,6 +1,32 @@
 export { editYamlDocument, loadDocstubeConfig, loadGlossary, loadIa, parseYaml, setYamlIn } from './config-yaml';
 export type { YamlPath } from './config-yaml';
 
+export { appConfig, feedback, iaProposals, pages, runs, themeTokens } from './db-schema';
+export { migrate, migrations, openDocstubeDatabase } from './db-migrations';
+export type { Migration, MigrateResult, OpenDatabaseOptions, SqliteDatabase } from './db-migrations';
+
+export { scaffoldDocstubeDir } from './scaffold';
+export type { ScaffoldOptions, ScaffoldResult } from './scaffold';
+
+export { pageProgressStatuses, runStatuses, STATE_BACKEND_VERSION, StateBackendError } from './state-backend';
+export type {
+  IaProposal,
+  PageDetail,
+  PageProgress,
+  PageSummary,
+  RunRecord,
+  RunStatus,
+  StateBackend,
+  StateBackendErrorCode,
+  ThemeTokens
+} from './state-backend';
+
+export { createLocalBackend } from './local-backend';
+export type { LocalBackendOptions } from './local-backend';
+
+export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
+export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
+
 export type DocstubeWorkspacePackage =
   | '@docstube/agent'
   | '@docstube/codemap'
