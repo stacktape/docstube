@@ -26,7 +26,10 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.5.1",
-    "citty": "^0.2.2"
+    "@docstube/core": "workspace:*",
+    "@docstube/verifiers": "workspace:*",
+    "citty": "^0.2.2",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@yao-pkg/pkg": "^6.20.0"

@@ -1,18 +1,120 @@
 #!/usr/bin/env node
 
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { defineCommand, runMain } from 'citty';
 
 const docstubeVersion = '0.0.2';
+
+const enableNodeCompileCache = () => {
+  if (process.env.NODE_COMPILE_CACHE) {
+    return;
+  }
+
+  const cacheDir = join(process.cwd(), 'node_modules', '.cache', 'docstube-node-compile-cache');
+  mkdirSync(cacheDir, { recursive: true });
+  process.env.NODE_COMPILE_CACHE = cacheDir;
+};
+
+const output = {
+  info: (message: string) => console.info(message),
+  error: (message: string) => console.error(message)
+};
 
 const generate = defineCommand({
   meta: {
     description: 'Start the local setup wizard and generation control plane.',
     name: 'generate'
   },
+  args: {
+    yes: { type: 'boolean', description: 'Run without setup questions.' },
+    fresh: { type: 'boolean', description: 'Discard local machine state before starting.' },
+    'no-open': { type: 'boolean', description: 'Print the local URL without opening a browser.' }
+  },
+  async run({ args }) {
+    enableNodeCompileCache();
+    const { runGenerateCommand } = await import('./cli-commands');
+    const result = await runGenerateCommand(
+      {
+        yes: args.yes === true,
+        fresh: args.fresh === true,
+        openBrowser: args['no-open'] === true ? () => {} : undefined
+      },
+      output
+    );
+    process.exitCode = result.exitCode;
+  }
+});
+
+const update = defineCommand({
+  meta: {
+    description: 'Run an incremental documentation update.',
+    name: 'update'
+  },
   async run() {
-    const { startGenerateSession } = await import('@docstube/core');
-    const started = await startGenerateSession();
-    console.info(`docstube local UI: ${started.url}`);
+    enableNodeCompileCache();
+    const { runUpdateCommand } = await import('./cli-commands');
+    const result = await runUpdateCommand({}, output);
+    process.exitCode = result.exitCode;
+  }
+});
+
+const validate = defineCommand({
+  meta: {
+    description: 'Validate the docstube config family.',
+    name: 'validate'
+  },
+  async run() {
+    enableNodeCompileCache();
+    const { runValidateCommand } = await import('./cli-commands');
+    const result = await runValidateCommand({}, output);
+    process.exitCode = result.exitCode;
+  }
+});
+
+const check = defineCommand({
+  meta: {
+    description: 'Run one deterministic check.',
+    name: 'check'
+  },
+  args: {
+    kind: { type: 'positional', required: true, description: 'd2, mdx, snippet, or config' },
+    file: { type: 'positional', required: true, description: 'File to check' }
+  },
+  async run({ args }) {
+    enableNodeCompileCache();
+    const kind = args.kind;
+    if (kind !== 'd2' && kind !== 'mdx' && kind !== 'snippet' && kind !== 'config') {
+      output.error(`Unknown check kind: ${kind}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const { runCheckCommand } = await import('./cli-commands');
+    const result = await runCheckCommand({ kind, file: args.file }, output);
+    process.exitCode = result.exitCode;
+  }
+});
+
+const telemetry = defineCommand({
+  meta: {
+    description: 'Manage runtime telemetry preference.',
+    name: 'telemetry'
+  },
+  args: {
+    action: { type: 'positional', required: true, description: 'enable, disable, or status' }
+  },
+  async run({ args }) {
+    const action = args.action;
+    if (action !== 'enable' && action !== 'disable' && action !== 'status') {
+      output.error(`Unknown telemetry action: ${action}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const { runTelemetryCommand } = await import('./cli-commands');
+    const result = await runTelemetryCommand({ action }, output);
+    process.exitCode = result.exitCode;
   }
 });
 
@@ -23,7 +125,11 @@ const main = defineCommand({
     version: docstubeVersion
   },
   subCommands: {
-    generate
+    generate,
+    update,
+    validate,
+    check,
+    telemetry
   },
   run: () => {
     console.info('Run `docstube generate` to start the local control plane.');

@@ -47,9 +47,18 @@ importers:
       '@clack/prompts':
         specifier: ^1.5.1
         version: 1.5.1
+      '@docstube/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@docstube/verifiers':
+        specifier: workspace:*
+        version: link:../../packages/verifiers
       citty:
         specifier: ^0.2.2
         version: 0.2.2
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
     devDependencies:
       '@yao-pkg/pkg':
         specifier: ^6.20.0
