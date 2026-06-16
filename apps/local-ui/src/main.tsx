@@ -2,6 +2,8 @@ import { createRoot } from 'react-dom/client';
 import type { DocstubeConfig, Ia } from '@docstube/contracts';
 import { GenerationDashboard } from './generation-dashboard';
 import type { DashboardPage } from './generation-dashboard';
+import { ReviewRoom } from './review-room';
+import type { ReviewPage } from './review-room';
 import { createSetupWizardSaver } from './setup-trpc';
 import { SetupWizard } from './setup-wizard';
 // oxlint-disable-next-line import/no-unassigned-import -- Vite loads app-level CSS from the entry module.
@@ -52,6 +54,18 @@ const dashboardPages: DashboardPage[] = [
   }
 ];
 
+const reviewPages: ReviewPage[] = [
+  {
+    id: 'overview',
+    title: 'Overview',
+    slug: 'overview.mdx',
+    approved: false,
+    findings: [],
+    sections: [{ id: 'intro', title: 'Intro' }],
+    renderedHtml: '<article><h1>Overview</h1><p data-review-target>Generated docs preview.</p></article>'
+  }
+];
+
 const sessionToken = new URLSearchParams(window.location.search).get('session');
 const currentView = new URLSearchParams(window.location.search).get('view');
 const saveDraft = sessionToken
@@ -67,7 +81,9 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  currentView === 'dashboard' ? (
+  currentView === 'review' ? (
+    <ReviewRoom pages={reviewPages} />
+  ) : currentView === 'dashboard' ? (
     <GenerationDashboard
       run={{
         id: 'local-run',
