@@ -1,9 +1,13 @@
 import { createRoot } from 'react-dom/client';
 import type { DocstubeConfig, Ia } from '@docstube/contracts';
+import { GenerationDashboard } from './generation-dashboard';
+import type { DashboardPage } from './generation-dashboard';
 import { createSetupWizardSaver } from './setup-trpc';
 import { SetupWizard } from './setup-wizard';
 // oxlint-disable-next-line import/no-unassigned-import -- Vite loads app-level CSS from the entry module.
 import './styles.css';
+
+const timestamp = new Date().toISOString();
 
 const initialConfig: DocstubeConfig = {
   version: 1,
@@ -30,7 +34,26 @@ const initialIa: Ia = {
   ]
 };
 
+const dashboardPages: DashboardPage[] = [
+  {
+    id: 'overview',
+    runId: 'local-run',
+    title: 'Overview',
+    slug: 'overview.mdx',
+    status: 'running',
+    approved: false,
+    findings: [],
+    updatedAt: timestamp,
+    preview: '# Overview\n\nGeneration output appears here as each page completes.',
+    timeline: [
+      { at: timestamp, status: 'queued', label: 'Queued for generation' },
+      { at: timestamp, status: 'running', label: 'Writer is drafting the page' }
+    ]
+  }
+];
+
 const sessionToken = new URLSearchParams(window.location.search).get('session');
+const currentView = new URLSearchParams(window.location.search).get('view');
 const saveDraft = sessionToken
   ? createSetupWizardSaver(sessionToken)
   : async () => {
@@ -44,10 +67,23 @@ if (!rootElement) {
 }
 
 createRoot(rootElement).render(
-  <SetupWizard
-    initialConfig={initialConfig}
-    initialIa={initialIa}
-    initialThemeTokens={initialConfig.theme?.tokens}
-    onSave={saveDraft}
-  />
+  currentView === 'dashboard' ? (
+    <GenerationDashboard
+      run={{
+        id: 'local-run',
+        status: 'running',
+        capFrozen: false,
+        startedAt: timestamp,
+        updatedAt: timestamp
+      }}
+      pages={dashboardPages}
+    />
+  ) : (
+    <SetupWizard
+      initialConfig={initialConfig}
+      initialIa={initialIa}
+      initialThemeTokens={initialConfig.theme?.tokens}
+      onSave={saveDraft}
+    />
+  )
 );
