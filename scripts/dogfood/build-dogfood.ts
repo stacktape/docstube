@@ -1,15 +1,28 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
+import { env, execPath } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import type {
+  ProjectGenerationAdapterFactory,
+  ProjectGenerationOptions,
+  ProjectGenerationResult
+} from '@docstube/core';
 
 export type DogfoodBuildInput = {
+  buildSite?: boolean;
+  core?: DogfoodCore;
   outputDir?: string;
   workspaceDir?: string;
 };
 
 export type DogfoodBuildResult = {
   files: readonly string[];
+  generatedPages: readonly { id: string; path: string; status: string }[];
   outputDir: string;
+  siteDir: string;
+  siteDistDir?: string;
 };
 
 type PackageJson = {
@@ -18,15 +31,15 @@ type PackageJson = {
   workspaces?: unknown;
 };
 
-const defaultOutputDir = 'dist-dogfood';
+type DogfoodCore = {
+  createDeterministicProjectGenerationAdapters: ProjectGenerationAdapterFactory;
+  generateProjectDocumentation: (input: ProjectGenerationOptions) => Promise<ProjectGenerationResult>;
+};
 
-const escapeHtml = (value: string): string =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+const execFileAsync = promisify(execFile);
+const defaultOutputDir = 'dist-dogfood';
+const dogfoodBuildCacheRoot = fileURLToPath(new URL('../../packages/theme/node_modules/.cache/', import.meta.url));
+const astroCli = fileURLToPath(new URL('../../packages/theme/node_modules/astro/bin/astro.mjs', import.meta.url));
 
 const planSummary = (plan: string): string => {
   const lines = plan
@@ -38,21 +51,139 @@ const planSummary = (plan: string): string => {
   return [firstHeading.replace(/^#\s*/, ''), productLine].join('\n');
 };
 
-const packageRows = (packageJson: PackageJson): string =>
-  (
-    [
-      ['version', packageJson.version ?? 'unknown'],
-      ['package manager', packageJson.packageManager ?? 'unknown'],
-      ['workspace style', 'apps/* and packages/*']
-    ] satisfies Array<readonly [string, string]>
-  )
-    .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
-    .join('\n');
+const collectFiles = async (rootDir: string, currentDir = rootDir): Promise<string[]> => {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+  const children = await Promise.all(
+    entries.map(async (entry): Promise<string[]> => {
+      const entryPath = join(currentDir, entry.name);
+      if (entry.name === 'node_modules' || entry.name === '.astro') {
+        return [];
+      }
+      if (entry.isDirectory()) {
+        return collectFiles(rootDir, entryPath);
+      }
+      if (!entry.isFile()) {
+        return [];
+      }
+      return [entryPath];
+    })
+  );
+
+  return children.flat().toSorted((left, right) => left.localeCompare(right));
+};
+
+const loadBuiltCore = async (): Promise<DogfoodCore> => {
+  const coreModulePath = new URL('../../packages/core/dist/core.mjs', import.meta.url).href;
+  const core = (await import(coreModulePath)) as Partial<DogfoodCore>;
+  if (
+    typeof core.generateProjectDocumentation !== 'function' ||
+    typeof core.createDeterministicProjectGenerationAdapters !== 'function'
+  ) {
+    throw new Error('Built @docstube/core is unavailable. Run `pnpm --filter @docstube/core build` first.');
+  }
+  return core as DogfoodCore;
+};
+
+const writeDogfoodProject = async (input: {
+  packageRaw: string;
+  plan: string;
+  summary: string;
+  tasks: string;
+  workspaceDir: string;
+}): Promise<void> => {
+  const srcDir = join(input.workspaceDir, 'src');
+  await mkdir(srcDir, { recursive: true });
+  await Promise.all([
+    writeFile(join(srcDir, 'PLAN.md'), input.plan, 'utf8'),
+    writeFile(join(srcDir, 'tasks.md'), input.tasks, 'utf8'),
+    writeFile(join(srcDir, 'package.json'), input.packageRaw, 'utf8'),
+    writeFile(join(srcDir, 'summary.md'), input.summary, 'utf8'),
+    writeFile(
+      join(input.workspaceDir, 'docstube.yml'),
+      [
+        'version: 1',
+        'site:',
+        '  name: docstube dogfood',
+        '  description: Deterministic docs generated from the docstube repository plan.',
+        '  url: https://docstube.dev',
+        'docsType: application',
+        'output:',
+        '  dir: docs',
+        '  layout: single-tree',
+        'personas:',
+        '  - id: maintainer',
+        '    title: Maintainer',
+        '    goals:',
+        '      - review release readiness',
+        'agents:',
+        '  writer:',
+        '    adapter: codex',
+        '  reviewer:',
+        '    adapter: claude',
+        'sources:',
+        '  - kind: path',
+        '    path: src',
+        'ia: ia.yml',
+        'glossary: glossary.yaml',
+        ''
+      ].join('\n'),
+      'utf8'
+    ),
+    writeFile(
+      join(input.workspaceDir, 'ia.yml'),
+      [
+        'version: 1',
+        'nav:',
+        '  - id: overview',
+        '    title: Overview',
+        '    brief: Explain what docstube is using the repository plan and package facts.',
+        '  - id: tasks',
+        '    title: Implementation',
+        '    path: tasks.mdx',
+        '    brief: Summarize implementation status from PLAN.md and tasks.md.',
+        ''
+      ].join('\n'),
+      'utf8'
+    ),
+    writeFile(
+      join(input.workspaceDir, 'glossary.yaml'),
+      [
+        'version: 1',
+        'terms:',
+        '  - id: source-grounding',
+        '    term: Source grounding',
+        '    definition: Documentation claims tied to concrete source files, symbols, or committed project facts.',
+        '  - id: deterministic-verifier',
+        '    term: Deterministic verifier',
+        '    definition: A repeatable check that returns structured findings without calling live AI services.',
+        ''
+      ].join('\n'),
+      'utf8'
+    )
+  ]);
+};
+
+const buildGeneratedSite = async (siteDir: string): Promise<string> => {
+  await execFileAsync(execPath, [astroCli, 'build'], {
+    cwd: siteDir,
+    env: { ...env, CI: '1', NO_COLOR: '1' },
+    maxBuffer: 10 * 1024 * 1024
+  });
+  await execFileAsync(execPath, [join(siteDir, 'scripts', 'postbuild.mjs')], {
+    cwd: siteDir,
+    env: { ...env, CI: '1', NO_COLOR: '1' },
+    maxBuffer: 10 * 1024 * 1024
+  });
+  return join(siteDir, 'dist');
+};
 
 export const buildDogfoodDocs = async (input: DogfoodBuildInput = {}): Promise<DogfoodBuildResult> => {
   const workspaceDir = resolve(input.workspaceDir ?? '.');
   const outputDir = resolve(workspaceDir, input.outputDir ?? defaultOutputDir);
-  const docsDir = join(outputDir, 'docs');
+  if (outputDir === workspaceDir) {
+    throw new Error('Dogfood outputDir must not be the repository workspace directory.');
+  }
+
   const [plan, tasks, packageRaw] = await Promise.all([
     readFile(join(workspaceDir, 'PLAN.md'), 'utf8'),
     readFile(join(workspaceDir, 'tasks.md'), 'utf8'),
@@ -61,71 +192,80 @@ export const buildDogfoodDocs = async (input: DogfoodBuildInput = {}): Promise<D
   const packageJson = JSON.parse(packageRaw) as PackageJson;
   const taskCount = tasks.split(/\r?\n/g).filter((line) => /^## Task \d+/.test(line)).length;
   const summary = planSummary(plan);
+  const core = input.core ?? (await loadBuiltCore());
 
-  await mkdir(docsDir, { recursive: true });
-  const manifest = {
-    generatedBy: 'docstube dogfood',
-    generatedWith: packageJson.version ?? '0.0.0',
-    reviewRequired: true,
-    taskCount
-  };
-  const readme = [
-    '# docstube dogfood docs',
-    '',
-    'This artifact is generated deterministically for review before any deploy step.',
-    '',
-    `- Version: ${packageJson.version ?? 'unknown'}`,
-    `- Planned tasks: ${taskCount}`,
-    '- Live agents: not used in this build',
-    ''
-  ].join('\n');
-  const html = [
-    '<!doctype html>',
-    '<html lang="en">',
-    '<head>',
-    '<meta charset="utf-8" />',
-    '<meta name="viewport" content="width=device-width, initial-scale=1" />',
-    '<title>docstube dogfood docs</title>',
-    '<style>',
-    'body{font-family:Inter,system-ui,sans-serif;margin:0;background:#f7f7f4;color:#1f2933}',
-    'main{max-width:920px;margin:0 auto;padding:48px 24px}',
-    'h1{font-size:40px;line-height:1.1;margin:0 0 16px}',
-    'section{border-top:1px solid #d8d7ce;padding:24px 0}',
-    'table{border-collapse:collapse;width:100%;max-width:620px}',
-    'th,td{text-align:left;border-bottom:1px solid #d8d7ce;padding:10px 12px}',
-    'th{width:180px;color:#4b5563}',
-    'code{background:#e8e7df;padding:2px 5px;border-radius:4px}',
-    '</style>',
-    '</head>',
-    '<body>',
-    '<main>',
-    '<h1>docstube dogfood docs</h1>',
-    '<p>This generated artifact is uploaded for review before deployment.</p>',
-    '<section>',
-    '<h2>Plan Summary</h2>',
-    `<pre>${escapeHtml(summary)}</pre>`,
-    '</section>',
-    '<section>',
-    '<h2>Build Facts</h2>',
-    `<table>${packageRows(packageJson)}<tr><th>planned tasks</th><td>${taskCount}</td></tr></table>`,
-    '</section>',
-    '<section>',
-    '<h2>Safety</h2>',
-    '<p>No live agents or provider keys are used by this dogfood build.</p>',
-    '</section>',
-    '</main>',
-    '</body>',
-    '</html>',
-    ''
-  ].join('\n');
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+  await mkdir(dogfoodBuildCacheRoot, { recursive: true });
+  const tempRoot = await mkdtemp(join(dogfoodBuildCacheRoot, 'dogfood-'));
+  try {
+    const dogfoodWorkspaceDir = join(tempRoot, 'workspace');
+    await writeDogfoodProject({
+      packageRaw,
+      plan,
+      summary,
+      tasks,
+      workspaceDir: dogfoodWorkspaceDir
+    });
+    const generation = await core.generateProjectDocumentation({
+      workspaceDir: dogfoodWorkspaceDir,
+      adapterFactory: core.createDeterministicProjectGenerationAdapters
+    });
+    const generatedSiteDir = join(dogfoodWorkspaceDir, 'docs');
+    const generatedSiteDistDir = input.buildSite === false ? undefined : await buildGeneratedSite(generatedSiteDir);
+    const outputWorkspaceDir = join(outputDir, 'workspace');
+    await cp(dogfoodWorkspaceDir, outputWorkspaceDir, { recursive: true });
 
-  const files = [join(outputDir, 'README.md'), join(outputDir, 'manifest.json'), join(docsDir, 'index.html')];
-  await Promise.all([
-    writeFile(files[0]!, readme, 'utf8'),
-    writeFile(files[1]!, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8'),
-    writeFile(files[2]!, html, 'utf8')
-  ]);
-  return { files, outputDir };
+    const siteDir = join(outputWorkspaceDir, 'docs');
+    const siteDistDir = generatedSiteDistDir ? join(siteDir, 'dist') : undefined;
+    const manifest = {
+      generatedBy: 'docstube dogfood',
+      generatedWith: packageJson.version ?? '0.0.0',
+      generatedPages: generation.generatedPages.map((page) => ({
+        id: page.id,
+        path: page.path,
+        status: page.status
+      })),
+      liveAgents: false,
+      reviewRequired: true,
+      runId: generation.runId,
+      siteBuilt: siteDistDir !== undefined,
+      sourceFilesCount: generation.sourceFilesCount,
+      taskCount
+    };
+    const readme = [
+      '# docstube dogfood docs',
+      '',
+      'This artifact is generated by the real docstube generation pipeline with deterministic replay adapters.',
+      '',
+      `- Version: ${packageJson.version ?? 'unknown'}`,
+      `- Planned tasks: ${taskCount}`,
+      `- Generated pages: ${generation.generatedPages.length}`,
+      `- Site build: ${siteDistDir ? 'passed' : 'skipped'}`,
+      '- Live agents: not used in this build',
+      ''
+    ].join('\n');
+
+    const files = [join(outputDir, 'README.md'), join(outputDir, 'manifest.json')];
+    await Promise.all([
+      writeFile(files[0]!, readme, 'utf8'),
+      writeFile(files[1]!, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+    ]);
+    const generatedFiles = await collectFiles(outputDir);
+    return {
+      files: generatedFiles.map((file) => relative(outputDir, file).replaceAll('\\', '/')),
+      generatedPages: generation.generatedPages.map((page) => ({
+        id: page.id,
+        path: page.path,
+        status: page.status
+      })),
+      outputDir,
+      siteDir,
+      siteDistDir
+    };
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
 };
 
 const runDirectly = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;

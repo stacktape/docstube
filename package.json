@@ -9,7 +9,7 @@
     "changeset": "changeset",
     "dev": "node scripts/dev.ts",
     "dev:ui": "pnpm --filter @docstube/web-ui dev",
-    "dogfood:build": "node scripts/dogfood/build-dogfood.ts",
+    "dogfood:build": "pnpm --filter @docstube/core... build && node scripts/dogfood/build-dogfood.ts",
     "evals": "node scripts/evals/run-evals.ts",
     "evals:live": "node scripts/evals/run-evals.ts --live",
     "format": "oxfmt --write package.json pnpm-workspace.yaml tsconfig.json tsconfig.base.json .oxlintrc.json .oxfmtrc.json stacktape.ts vitest.config.ts apps packages scripts evals .github/workflows",

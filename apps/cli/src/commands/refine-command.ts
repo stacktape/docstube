@@ -7,6 +7,18 @@ export type RefineCommandOptions = {
   configPath?: string;
   failed?: boolean;
   maxRounds?: number;
+  refine?: (input: {
+    configPath?: string;
+    failedOnly?: boolean;
+    maxRounds?: number;
+    target?: string;
+    workspaceDir: string;
+  }) => Promise<{
+    candidates: readonly unknown[];
+    manifest: { pages: readonly unknown[] };
+    plannedPages: readonly unknown[];
+    refinedPages: readonly { id: string; path: string; status: string }[];
+  }>;
   target?: string;
   workspaceDir?: string;
 };
@@ -28,8 +40,8 @@ export const runRefineCommand = async (
     return { exitCode: 1 };
   }
 
-  const { refineProjectDocumentation } = await import('@docstube/core');
-  const result = await refineProjectDocumentation({
+  const refine = options.refine ?? (await import('@docstube/core')).refineProjectDocumentation;
+  const result = await refine({
     configPath,
     failedOnly: options.failed,
     maxRounds: options.maxRounds,

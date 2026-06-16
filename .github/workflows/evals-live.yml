@@ -29,14 +29,19 @@ jobs:
       - run: pnpm run evals
       - name: Run live gate
         env:
+          DOCSTUBE_LIVE_EVAL_MODEL: ${{ vars.DOCSTUBE_LIVE_EVAL_MODEL }}
+          DOCSTUBE_LIVE_EVAL_PROVIDER: ${{ vars.DOCSTUBE_LIVE_EVAL_PROVIDER }}
           DOCSTUBE_LIVE_EVAL_TOKEN: ${{ secrets.DOCSTUBE_LIVE_EVAL_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         shell: bash
         run: |
-          if [ -z "$DOCSTUBE_LIVE_EVAL_TOKEN$OPENAI_API_KEY$ANTHROPIC_API_KEY$GEMINI_API_KEY" ]; then
-            echo "No live eval secret configured; skipping live evals."
+          if [ -z "$DOCSTUBE_LIVE_EVAL_MODEL" ]; then
+            echo "DOCSTUBE_LIVE_EVAL_MODEL is not configured; skipping live evals."
+            exit 0
+          fi
+          if [ -z "$DOCSTUBE_LIVE_EVAL_TOKEN$OPENAI_API_KEY$ANTHROPIC_API_KEY" ]; then
+            echo "No supported live eval secret configured; skipping live evals."
             exit 0
           fi
           pnpm run evals:live

@@ -163,6 +163,7 @@ describe('docstube theme contract', () => {
     expect([...byPath.keys()].toSorted()).toEqual([
       'astro.config.mjs',
       'package.json',
+      'scripts/postbuild.mjs',
       'src/components/theme-components.tsx',
       'src/layouts/DocLayout.astro',
       'src/theme-build/glossary-data.mjs',
@@ -171,6 +172,9 @@ describe('docstube theme contract', () => {
     ]);
     expect(byPath.get('src/theme-build/site-data.mjs')).toContain('"href": "/"');
     expect(byPath.get('src/theme-build/site-data.mjs')).toContain('"href": "/guides/install/"');
+    expect(byPath.get('scripts/postbuild.mjs')).toContain('llms.txt');
+    expect(byPath.get('scripts/postbuild.mjs')).toContain('pagefind');
+    expect(byPath.get('package.json')).toContain('scripts/postbuild.mjs');
     expect(byPath.get('package.json')).not.toContain('@docstube/theme');
   });
 

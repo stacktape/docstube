@@ -72,6 +72,8 @@ export type EvalRunResult = {
   summary: EvalRunSummary;
 };
 
+export type LiveEvalJudge = (prompt: string) => Promise<string>;
+
 const defaultGoldSetPath = fileURLToPath(new URL('../../evals/gold-set.json', import.meta.url));
 const defaultOutputPath = resolve('.docstube-build', 'evals', 'latest.json');
 
@@ -262,28 +264,263 @@ export const runDeterministicEvals = (goldSet: GoldEvalSet, options: { live?: bo
   };
 };
 
-const assertLiveGate = (): void => {
-  const hasSecret =
-    Boolean(process.env.DOCSTUBE_LIVE_EVAL_TOKEN) ||
-    Boolean(process.env.OPENAI_API_KEY) ||
-    Boolean(process.env.ANTHROPIC_API_KEY) ||
-    Boolean(process.env.GEMINI_API_KEY);
-  if (!hasSecret) {
-    throw new Error('Live evals require DOCSTUBE_LIVE_EVAL_TOKEN or a provider API key.');
+const jsonFromJudgeText = (text: string): Record<string, unknown> => {
+  const direct = JSON.parse(text) as unknown;
+  if (isRecord(direct)) {
+    return direct;
   }
+  throw new Error('judge did not return a JSON object');
+};
+
+const parseLiveJudgeJson = (text: string): Record<string, unknown> => {
+  try {
+    return jsonFromJudgeText(text.trim());
+  } catch {
+    const match = /\{[\s\S]*\}/u.exec(text);
+    if (!match) {
+      throw new Error('judge response did not contain JSON');
+    }
+    return jsonFromJudgeText(match[0]!);
+  }
+};
+
+const liveJudgeCasePrompt = (testCase: JudgeVsHumanEvalCase): string =>
+  [
+    'You are evaluating docstube documentation quality.',
+    'Return only JSON: {"label":"pass"|"fail","reason":"short reason"}.',
+    '',
+    `Case: ${testCase.id}`,
+    `Candidate: ${testCase.candidate}`,
+    `Must contain: ${testCase.expect.mustContain.join(', ') || 'none'}`,
+    `Must not contain: ${testCase.expect.mustNotContain.join(', ') || 'none'}`
+  ].join('\n');
+
+const liveComparativePrompt = (testCase: ComparativeEvalCase): string =>
+  [
+    'You are comparing two docstube documentation candidates.',
+    'Return only JSON: {"winner":"<variant name>","reason":"short reason"}.',
+    '',
+    `Case: ${testCase.id}`,
+    `Required evidence: ${testCase.variants[0]!.expect.mustContain.join(', ') || 'none'}`,
+    `Forbidden evidence: ${testCase.variants[0]!.expect.mustNotContain.join(', ') || 'none'}`,
+    ...testCase.variants.map((variant) => [`Variant ${variant.name}:`, variant.candidate].join('\n'))
+  ].join('\n\n');
+
+const labelFromLiveJudge = (response: Record<string, unknown>): EvalLabel => {
+  if (response.label === 'pass' || response.label === 'fail') {
+    return response.label;
+  }
+  throw new Error('judge JSON label must be pass or fail');
+};
+
+const reasonFromLiveJudge = (response: Record<string, unknown>): string =>
+  typeof response.reason === 'string' && response.reason.length > 0 ? response.reason : 'live judge returned no reason';
+
+const runLiveJudgeVsHumanCase = async (
+  testCase: JudgeVsHumanEvalCase,
+  judge: LiveEvalJudge
+): Promise<EvalCaseResult> => {
+  try {
+    const response = parseLiveJudgeJson(await judge(liveJudgeCasePrompt(testCase)));
+    const label = labelFromLiveJudge(response);
+    const agreement = label === testCase.humanLabel;
+    return {
+      agreement,
+      id: testCase.id,
+      kind: testCase.kind,
+      passed: agreement,
+      reason: agreement ? `live judge agreed: ${reasonFromLiveJudge(response)}` : `live judge=${label}`,
+      scores: { candidate: scoreCandidate(testCase.candidate, testCase.expect) }
+    };
+  } catch (error) {
+    return {
+      agreement: false,
+      id: testCase.id,
+      kind: testCase.kind,
+      passed: false,
+      reason: error instanceof Error ? error.message : 'live judge failed',
+      scores: { candidate: scoreCandidate(testCase.candidate, testCase.expect) }
+    };
+  }
+};
+
+const runLiveComparativeCase = async (testCase: ComparativeEvalCase, judge: LiveEvalJudge): Promise<EvalCaseResult> => {
+  const left = testCase.variants[0]!;
+  const right = testCase.variants[1]!;
+  const leftScore = scoreCandidate(left.candidate, left.expect);
+  const rightScore = scoreCandidate(right.candidate, right.expect);
+  try {
+    const response = parseLiveJudgeJson(await judge(liveComparativePrompt(testCase)));
+    const winner = typeof response.winner === 'string' ? response.winner : '';
+    const passed = winner === left.name && leftScore.label === 'pass';
+    return {
+      id: testCase.id,
+      kind: testCase.kind,
+      passed,
+      reason: passed ? `live judge preferred ${winner}` : `live judge preferred ${winner || 'no winner'}`,
+      scores: { [left.name]: leftScore, [right.name]: rightScore }
+    };
+  } catch (error) {
+    return {
+      id: testCase.id,
+      kind: testCase.kind,
+      passed: false,
+      reason: error instanceof Error ? error.message : 'live comparative judge failed',
+      scores: { [left.name]: leftScore, [right.name]: rightScore }
+    };
+  }
+};
+
+export const runLiveEvals = async (goldSet: GoldEvalSet, judge: LiveEvalJudge): Promise<EvalRunResult> => {
+  const cases = await Promise.all(
+    goldSet.cases.map((testCase) =>
+      testCase.kind === 'judge-vs-human'
+        ? runLiveJudgeVsHumanCase(testCase, judge)
+        : runLiveComparativeCase(testCase, judge)
+    )
+  );
+  const passed = cases.filter((testCase) => testCase.passed).length;
+  const agreementCases = cases.filter((testCase) => typeof testCase.agreement === 'boolean');
+  const agreements = agreementCases.filter((testCase) => testCase.agreement === true).length;
+  const agreementRate = agreementCases.length === 0 ? 1 : agreements / agreementCases.length;
+  const passRate = cases.length === 0 ? 1 : passed / cases.length;
+
+  return {
+    cases,
+    ok: agreementRate >= goldSet.thresholds.minAgreement && passRate >= goldSet.thresholds.minPassRate,
+    summary: {
+      agreementRate,
+      failed: cases.length - passed,
+      live: true,
+      passed,
+      passRate,
+      total: cases.length
+    }
+  };
+};
+
+const readRequiredEnv = (env: NodeJS.ProcessEnv, key: string): string => {
+  const value = env[key];
+  if (!value) {
+    throw new Error(`Live evals require ${key}.`);
+  }
+  return value;
+};
+
+const extractResponseText = (value: unknown): string => {
+  if (isRecord(value)) {
+    if (typeof value.output_text === 'string') {
+      return value.output_text;
+    }
+
+    const content = value.content;
+    if (Array.isArray(content)) {
+      return content
+        .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text : ''))
+        .filter(Boolean)
+        .join('\n');
+    }
+
+    const output = value.output;
+    if (Array.isArray(output)) {
+      return output
+        .flatMap((item) => (isRecord(item) && Array.isArray(item.content) ? item.content : []))
+        .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text : ''))
+        .filter(Boolean)
+        .join('\n');
+    }
+  }
+
+  return '';
+};
+
+const createOpenAiLiveJudge = (input: { apiKey: string; baseUrl?: string; model: string }): LiveEvalJudge => {
+  const baseUrl = (input.baseUrl ?? 'https://api.openai.com/v1').replace(/\/+$/u, '');
+  return async (prompt) => {
+    const response = await fetch(`${baseUrl}/responses`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${input.apiKey}`,
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: input.model,
+        input: prompt
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`OpenAI live eval request failed: ${response.status}`);
+    }
+    const text = extractResponseText(await response.json());
+    if (!text) {
+      throw new Error('OpenAI live eval response did not contain text');
+    }
+    return text;
+  };
+};
+
+const createAnthropicLiveJudge = (input: { apiKey: string; baseUrl?: string; model: string }): LiveEvalJudge => {
+  const baseUrl = (input.baseUrl ?? 'https://api.anthropic.com').replace(/\/+$/u, '');
+  return async (prompt) => {
+    const response = await fetch(`${baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'x-api-key': input.apiKey
+      },
+      body: JSON.stringify({
+        model: input.model,
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic live eval request failed: ${response.status}`);
+    }
+    const text = extractResponseText(await response.json());
+    if (!text) {
+      throw new Error('Anthropic live eval response did not contain text');
+    }
+    return text;
+  };
+};
+
+export const createLiveEvalJudgeFromEnv = (env: NodeJS.ProcessEnv = process.env): LiveEvalJudge => {
+  const provider =
+    env.DOCSTUBE_LIVE_EVAL_PROVIDER ??
+    (env.ANTHROPIC_API_KEY && !env.OPENAI_API_KEY && !env.DOCSTUBE_LIVE_EVAL_TOKEN ? 'anthropic' : 'openai');
+  const model = readRequiredEnv(env, 'DOCSTUBE_LIVE_EVAL_MODEL');
+
+  if (provider === 'anthropic') {
+    return createAnthropicLiveJudge({
+      apiKey: env.ANTHROPIC_API_KEY ?? readRequiredEnv(env, 'DOCSTUBE_LIVE_EVAL_TOKEN'),
+      baseUrl: env.ANTHROPIC_BASE_URL,
+      model
+    });
+  }
+
+  if (provider !== 'openai') {
+    throw new Error(`Unsupported DOCSTUBE_LIVE_EVAL_PROVIDER: ${provider}`);
+  }
+
+  return createOpenAiLiveJudge({
+    apiKey: env.OPENAI_API_KEY ?? readRequiredEnv(env, 'DOCSTUBE_LIVE_EVAL_TOKEN'),
+    baseUrl: env.OPENAI_BASE_URL,
+    model
+  });
 };
 
 export const runEvalFile = async (input: {
   goldSetPath?: string;
+  judge?: LiveEvalJudge;
   live?: boolean;
   outputPath?: string;
 }): Promise<EvalRunResult> => {
-  if (input.live) {
-    assertLiveGate();
-  }
-
   const goldSet = parseGoldEvalSet(JSON.parse(await readFile(input.goldSetPath ?? defaultGoldSetPath, 'utf8')));
-  const result = runDeterministicEvals(goldSet, { live: input.live });
+  const result = input.live
+    ? await runLiveEvals(goldSet, input.judge ?? createLiveEvalJudgeFromEnv())
+    : runDeterministicEvals(goldSet, { live: false });
   const outputPath = input.outputPath ?? defaultOutputPath;
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');

@@ -9,21 +9,18 @@ import { describe, expect, it } from 'vitest';
 import {
   createLocalBackend,
   createDeterministicProjectGenerationAdapters,
-  createPageProvenance,
-  createS0WalkingSkeletonReplayFixture,
   createSourceSnapshot,
   detectChangedSources,
   generateProjectDocumentation,
   openDocstubeDatabase,
   readManifestFile,
+  refineProjectDocumentation,
   refreshProjectDocumentation,
-  resolveDirtyPages,
-  runS0WalkingSkeleton,
-  updateManifest,
-  writeManifestFile
+  resolveDirtyPages
 } from '@docstube/core';
 import { runGenerateCommand } from './commands/generate-command.ts';
 import { runRefreshCommand } from './commands/refresh-command.ts';
+import { runRefineCommand } from './commands/refine-command.ts';
 import type { CliOutput } from './cli-output.ts';
 
 type ProductSmokeFixture = {
@@ -38,7 +35,6 @@ type ProductSmokeFixture = {
 const execFileAsync = promisify(execFile);
 const coreFixturePath = (name: string): string =>
   fileURLToPath(new URL(`../../../packages/core/src/fixtures/${name}`, import.meta.url));
-const themeFixtureRoot = fileURLToPath(new URL('../../../packages/theme/fixtures/generated-site/', import.meta.url));
 const themeCacheRoot = fileURLToPath(new URL('../../../packages/theme/node_modules/.cache/', import.meta.url));
 const astroCli = fileURLToPath(new URL('../../../packages/theme/node_modules/astro/bin/astro.mjs', import.meta.url));
 const manifestPath = (repoRoot: string): string => join(repoRoot, '.docstube', 'manifest.yml');
@@ -95,6 +91,14 @@ const deterministicGenerate = (input: { configPath?: string; workspaceDir: strin
 const deterministicRefresh = (input: { configPath?: string; workspaceDir: string }) =>
   refreshProjectDocumentation({ ...input, adapterFactory: createDeterministicProjectGenerationAdapters });
 
+const deterministicRefine = (input: {
+  configPath?: string;
+  failedOnly?: boolean;
+  maxRounds?: number;
+  target?: string;
+  workspaceDir: string;
+}) => refineProjectDocumentation({ ...input, adapterFactory: createDeterministicProjectGenerationAdapters });
+
 const writeConfigFamily = async (repoRoot: string): Promise<void> => {
   await Promise.all([
     copyFile(coreFixturePath('docstube.yml'), join(repoRoot, 'docstube.yml')),
@@ -125,103 +129,25 @@ const runCliGenerate = async (repoRoot: string): Promise<readonly string[]> => {
   return output.lines;
 };
 
-const runReplayGeneration = async (repoRoot: string, fixture: ProductSmokeFixture): Promise<string> => {
-  const backend = createLocalBackend(openDocstubeDatabase(':memory:'));
-  try {
-    const replay = await createS0WalkingSkeletonReplayFixture(repoRoot, {
-      sourcePath: fixture.sourcePath,
-      token: fixture.token
-    });
-    const adapter = {
-      id: 'product-smoke-replay',
-      version: '0.0.0',
-      run: async (input: unknown) => {
-        expect(input).toEqual(replay.input);
-        return replay.result;
-      }
-    };
-    const result = await runS0WalkingSkeleton({
-      adapter,
-      backend,
-      repoRoot,
-      sourcePath: fixture.sourcePath
-    });
-
-    expect(result.checkResult).toEqual({ checkId: 'section-presence', status: 'passed' });
-    expect(result.html).toContain(fixture.token);
-    return readFile(join(repoRoot, 'docs', 'overview.mdx'), 'utf8');
-  } finally {
-    await backend.close();
-  }
-};
-
-const writeSmokeManifest = async (repoRoot: string, fixture: ProductSmokeFixture): Promise<void> => {
-  const manifest = updateManifest({
-    generatedWith: { name: 'docstube', version: '0.0.2' },
-    pages: [
-      {
-        id: 'overview',
-        path: 'docs/src/pages/index.mdx',
-        provenance: createPageProvenance({
-          seedContext: { fixture: fixture.name, page: 'overview' },
-          reads: [fixture.sourcePath],
-          citations: [{ path: fixture.sourcePath, symbol: fixture.symbol }]
-        }),
-        sections: ['intro'],
-        status: 'passed',
-        title: 'Overview'
-      }
-    ]
-  });
-
-  await writeManifestFile(manifestPath(repoRoot), manifest);
-};
-
-const bodyWithoutFrontmatter = (mdx: string): string => {
-  const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?(?<body>[\s\S]*)$/u.exec(mdx);
-  return match?.groups?.body ?? mdx;
-};
-
-const prepareCopiedSite = async (fixture: ProductSmokeFixture, generatedMdx: string): Promise<string> => {
+const prepareGeneratedSiteBuild = async (repoRoot: string, fixture: ProductSmokeFixture): Promise<string> => {
   await mkdir(themeCacheRoot, { recursive: true });
-  const tempRoot = await mkdtemp(join(themeCacheRoot, `product-smoke-${fixture.name}-`));
+  const tempRoot = await mkdtemp(join(themeCacheRoot, `product-smoke-generated-${fixture.name}-`));
   const siteRoot = join(tempRoot, 'site');
-  await cp(themeFixtureRoot, siteRoot, {
+  await cp(join(repoRoot, 'docs'), siteRoot, {
     recursive: true,
     filter: (source) => {
-      const relativePath = source.slice(themeFixtureRoot.length).replaceAll('\\', '/');
+      const relativePath = source.slice(join(repoRoot, 'docs').length).replaceAll('\\', '/');
       return !['dist', '.astro', 'node_modules'].some(
         (dir) => relativePath === dir || relativePath.startsWith(`${dir}/`)
       );
     }
   });
 
-  await mkdir(join(siteRoot, 'src', 'generated'), { recursive: true });
-  await writeFile(
-    join(siteRoot, 'src', 'generated', 'generated-artifacts.ts'),
-    'export const architectureDiagramSvg = "<svg xmlns=\\"http://www.w3.org/2000/svg\\" viewBox=\\"0 0 1 1\\"></svg>";\n',
-    'utf8'
-  );
-  await writeFile(
-    join(siteRoot, 'src', 'pages', `product-smoke-${fixture.name}.mdx`),
-    [
-      '---',
-      'layout: ../layouts/DocLayout.astro',
-      `${fixture.name === 'typescript' ? 'title: TypeScript Smoke' : 'title: Python Smoke'}`,
-      `description: ${fixture.name} product smoke page.`,
-      'layoutMode: single-tree',
-      '---',
-      '',
-      bodyWithoutFrontmatter(generatedMdx)
-    ].join('\n'),
-    'utf8'
-  );
-
   return tempRoot;
 };
 
-const buildCopiedSite = async (fixture: ProductSmokeFixture, generatedMdx: string): Promise<string> => {
-  const tempRoot = await prepareCopiedSite(fixture, generatedMdx);
+const buildGeneratedSite = async (repoRoot: string, fixture: ProductSmokeFixture): Promise<string> => {
+  const tempRoot = await prepareGeneratedSiteBuild(repoRoot, fixture);
   try {
     const siteRoot = join(tempRoot, 'site');
     await execFileAsync(execPath, [astroCli, 'build'], {
@@ -229,7 +155,15 @@ const buildCopiedSite = async (fixture: ProductSmokeFixture, generatedMdx: strin
       env: { ...env, CI: '1', NO_COLOR: '1' },
       maxBuffer: 10 * 1024 * 1024
     });
-    return readFile(join(siteRoot, 'dist', `product-smoke-${fixture.name}`, 'index.html'), 'utf8');
+    await execFileAsync(execPath, [join(siteRoot, 'scripts', 'postbuild.mjs')], {
+      cwd: siteRoot,
+      env: { ...env, CI: '1', NO_COLOR: '1' },
+      maxBuffer: 10 * 1024 * 1024
+    });
+    await expect(readFile(join(siteRoot, 'dist', 'llms.txt'), 'utf8')).resolves.toContain('Acme Toolkit');
+    await expect(readFile(join(siteRoot, 'dist', 'sitemap.xml'), 'utf8')).resolves.toContain('https://docs.acme.dev/');
+    await expect(readFile(join(siteRoot, 'dist', 'pagefind', 'pagefind.js'), 'utf8')).resolves.toContain('pagefind');
+    return readFile(join(siteRoot, 'dist', 'index.html'), 'utf8');
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
@@ -247,6 +181,7 @@ const runCliRefreshAndResolveDirtyPages = async (repoRoot: string, fixture: Prod
   const refresh = await runRefreshCommand({ workspaceDir: repoRoot, refresh: deterministicRefresh }, output.output);
   expect(refresh.exitCode).toBe(0);
   expect(output.lines).toContain('info:Loaded manifest with 2 pages.');
+  expect(output.lines.some((line) => line.startsWith('info:regenerated: overview'))).toBe(true);
 
   const changed = detectChangedSources({
     current: [
@@ -259,6 +194,7 @@ const runCliRefreshAndResolveDirtyPages = async (repoRoot: string, fixture: Prod
     previous: [previous]
   });
   const manifest = await readManifestFile(manifestPath(repoRoot));
+  expect(manifest.pages.find((page) => page.id === 'overview')).toMatchObject({ status: 'passed' });
   const dirty = resolveDirtyPages({ changedSources: changed, manifest });
 
   expect(changed).toMatchObject([{ kind: 'modified', path: fixture.sourcePath }]);
@@ -268,6 +204,52 @@ const runCliRefreshAndResolveDirtyPages = async (repoRoot: string, fixture: Prod
   );
 };
 
+const flagOverviewForRefinement = async (repoRoot: string): Promise<void> => {
+  const backend = createLocalBackend(openDocstubeDatabase(join(repoRoot, '.docstube', 'db.sqlite')));
+  try {
+    const page = await backend.getPage('overview');
+    if (!page) {
+      throw new Error('overview page missing before refinement smoke');
+    }
+
+    await backend.upsertPage({
+      ...page,
+      status: 'flagged',
+      findings: [
+        {
+          code: 'product-smoke-refine',
+          severity: 'major',
+          origin: 'verifier',
+          message: 'Product smoke injected a refinement finding.',
+          pageId: 'overview',
+          location: { path: page.slug ?? 'docs/src/pages/index.mdx' }
+        }
+      ],
+      updatedAt: '2026-06-16T00:00:00.000Z'
+    });
+  } finally {
+    await backend.close();
+  }
+};
+
+const runCliRefineFailedPage = async (repoRoot: string): Promise<void> => {
+  await flagOverviewForRefinement(repoRoot);
+  const output = captureOutput();
+  const result = await runRefineCommand(
+    {
+      workspaceDir: repoRoot,
+      failed: true,
+      maxRounds: 1,
+      refine: deterministicRefine
+    },
+    output.output
+  );
+
+  expect(result.exitCode).toBe(0);
+  expect(output.lines).toContain('info:Ranked 2 refinement candidates.');
+  expect(output.lines).toContain('info:refined: overview status=passed path=docs/src/pages/index.mdx');
+};
+
 describe('deterministic product smoke', () => {
   it.each(smokeFixtures)(
     'runs the $name fixture through CLI generate, site build, and refresh',
@@ -275,18 +257,29 @@ describe('deterministic product smoke', () => {
       const repoRoot = await makeFixtureRepo(fixture);
       try {
         await runCliGenerate(repoRoot);
-        const generatedMdx = await runReplayGeneration(repoRoot, fixture);
-        expect(generatedMdx).toContain(fixture.token);
+        const generatedMdx = await readFile(join(repoRoot, 'docs', 'src', 'pages', 'index.mdx'), 'utf8');
+        const expectedMdxTokens = [
+          'Source facts:',
+          fixture.sourcePath,
+          fixture.symbol,
+          ...(fixture.name === 'typescript' ? [fixture.token] : [])
+        ];
+        for (const token of expectedMdxTokens) {
+          expect(generatedMdx).toContain(token);
+        }
 
-        await writeSmokeManifest(repoRoot, fixture);
         const manifest = await readManifestFile(manifestPath(repoRoot));
-        expect(manifest.pages).toMatchObject([{ id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' }]);
+        const overview = manifest.pages.find((page) => page.id === 'overview');
+        expect(overview).toMatchObject({ id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' });
+        expect(overview?.provenance.reads).toEqual([fixture.sourcePath]);
+        expect(overview?.provenance.citations).toContainEqual({ path: fixture.sourcePath, symbol: fixture.symbol });
 
-        const html = await buildCopiedSite(fixture, generatedMdx);
-        expect(html).toContain(fixture.token);
+        const html = await buildGeneratedSite(repoRoot, fixture);
+        expect(html).toContain(fixture.name === 'typescript' ? fixture.token : fixture.symbol);
         expect(html).toContain('Generated by <a href="https://docstube.dev">docstube</a>');
 
         await runCliRefreshAndResolveDirtyPages(repoRoot, fixture);
+        await runCliRefineFailedPage(repoRoot);
       } finally {
         await rm(repoRoot, { recursive: true, force: true });
       }

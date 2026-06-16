@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseGoldEvalSet, runDeterministicEvals, runEvalFile, scoreCandidate } from './run-evals.ts';
+import { parseGoldEvalSet, runDeterministicEvals, runEvalFile, runLiveEvals, scoreCandidate } from './run-evals.ts';
 
 const goldSetPath = fileURLToPath(new URL('../../evals/gold-set.json', import.meta.url));
 
@@ -40,6 +40,30 @@ describe('deterministic eval runner', () => {
     expect(result.cases.map((testCase) => testCase.kind)).toContain('skill-comparison');
   });
 
+  it('can run live eval semantics through an injected judge without network', async () => {
+    const goldSet = parseGoldEvalSet(JSON.parse(await readFile(goldSetPath, 'utf8')));
+    const result = await runLiveEvals(goldSet, async (prompt) => {
+      if (prompt.includes('secret-leak-regression')) {
+        return '{"label":"fail","reason":"contains a fake secret"}';
+      }
+      if (prompt.includes('overview-grounding')) {
+        return '{"label":"pass","reason":"contains grounded workflow details"}';
+      }
+      if (prompt.includes('manifest-context-ablation')) {
+        return '{"winner":"full-context","reason":"more provenance detail"}';
+      }
+      return '{"winner":"skills-on","reason":"uses shipped skill guidance"}';
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.summary).toMatchObject({
+      failed: 0,
+      live: true,
+      passed: 4,
+      total: 4
+    });
+  });
+
   it('fails agreement when the deterministic judge and human label diverge', async () => {
     const goldSet = parseGoldEvalSet(JSON.parse(await readFile(goldSetPath, 'utf8')));
     const first = goldSet.cases[0]!;
@@ -65,6 +89,14 @@ describe('deterministic eval runner', () => {
       await expect(runEvalFile({ goldSetPath, live: true, outputPath: join(dir, 'live.json') })).rejects.toThrow(
         'Live evals require'
       );
+      await expect(
+        runEvalFile({
+          goldSetPath,
+          live: true,
+          outputPath: join(dir, 'mock-live.json'),
+          judge: async () => '{"label":"pass","reason":"mocked"}'
+        })
+      ).resolves.toMatchObject({ summary: { live: true } });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

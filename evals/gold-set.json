@@ -9,9 +9,9 @@
       "id": "overview-grounding",
       "kind": "judge-vs-human",
       "humanLabel": "pass",
-      "candidate": "Run docstube generate --yes, review deterministic verifiers, commit the portable manifest, and keep prompts, transcripts, source code, and secrets out of telemetry.",
+      "candidate": "Run docstube generate, review deterministic verifiers, commit the portable manifest, and keep prompts, transcripts, source code, and secrets out of telemetry.",
       "expect": {
-        "mustContain": ["docstube generate --yes", "deterministic verifiers", "portable manifest", "secrets"],
+        "mustContain": ["docstube generate", "deterministic verifiers", "portable manifest", "secrets"],
         "mustNotContain": ["sk-", "api_key", "transcript body"]
       }
     },
