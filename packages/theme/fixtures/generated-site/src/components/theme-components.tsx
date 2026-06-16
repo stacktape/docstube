@@ -138,3 +138,17 @@ export function Divider({ label }: { label?: string }) {
     </div>
   );
 }
+
+type DiagramProps = {
+  svg: string;
+  title?: string;
+};
+
+export function Diagram({ svg, title }: DiagramProps) {
+  return (
+    <figure className="dt-diagram" data-component="Diagram">
+      {title ? <figcaption>{title}</figcaption> : null}
+      <div dangerouslySetInnerHTML={{ __html: svg }} />
+    </figure>
+  );
+}

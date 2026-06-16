@@ -5,11 +5,24 @@ description: Representative generated MDX page.
 layoutMode: single-tree
 ---
 
-import { Callout, Card, CardGrid, CodeBlock, Divider, Steps, Tabs, Terminal } from '../components/theme-components.tsx';
+import { architectureDiagramSvg } from '../generated/generated-artifacts.ts';
+import {
+  Callout,
+  Card,
+  CardGrid,
+  CodeBlock,
+  Diagram,
+  Divider,
+  Steps,
+  Tabs,
+  Terminal
+} from '../components/theme-components.tsx';
 
 # Overview
 
 DOCSTUBE_THEME_FIXTURE_TOKEN
+
+Codemap entries and deterministic verifiers are linked by the generated glossary plugin.
 
 <Callout tone="info" title="Generated source">
   This fixture is self-contained and owns its generated component source.
@@ -33,5 +46,7 @@ DOCSTUBE_THEME_FIXTURE_TOKEN
 />
 
 <CodeBlock title="Generated command" language="bash" code={'docstube generate --yes'} />
+
+<Diagram title="D2 fixture diagram" svg={architectureDiagramSvg} />
 
 <Terminal title="Validate" command="docstube validate" output="passed" />

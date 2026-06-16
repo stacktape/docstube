@@ -3,7 +3,8 @@ const { frontmatter } = Astro.props;
 const layoutMode = frontmatter.layoutMode === 'sectioned' ? 'sectioned' : 'single-tree';
 const navItems = [
   { href: '/', label: 'Overview' },
-  { href: '/guides/install/', label: 'Install' }
+  { href: '/guides/install/', label: 'Install' },
+  { href: '/glossary/', label: 'Glossary' }
 ];
 ---
 
@@ -30,7 +31,7 @@ const navItems = [
           }
         </nav>
       </aside>
-      <main id="content" class="content">
+      <main id="content" class="content" data-pagefind-body>
         <slot />
       </main>
     </div>
@@ -160,6 +161,7 @@ const navItems = [
   .dt-callout,
   .dt-card,
   .dt-code-block,
+  .dt-diagram,
   .dt-terminal {
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -206,10 +208,26 @@ const navItems = [
   }
 
   .dt-code-block figcaption,
+  .dt-diagram figcaption,
   .dt-terminal figcaption {
     border-bottom: 1px solid #293638;
     color: #b9c8c9;
     padding: 10px 14px;
+  }
+
+  .dt-diagram {
+    background: #ffffff;
+    overflow-x: auto;
+  }
+
+  .dt-diagram figcaption {
+    background: #101718;
+  }
+
+  .dt-diagram svg {
+    display: block;
+    height: auto;
+    max-width: 100%;
   }
 
   .dt-code-block pre,

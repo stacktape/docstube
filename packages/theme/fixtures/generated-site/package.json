@@ -8,7 +8,9 @@
   "dependencies": {
     "@astrojs/mdx": "^6.0.3",
     "@astrojs/react": "^5.0.7",
+    "@terrastruct/d2": "^0.1.33",
     "astro": "^6.4.6",
+    "pagefind": "^1.5.2",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   }
