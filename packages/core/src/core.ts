@@ -53,6 +53,25 @@ export type {
   PersonaReviewer
 } from './page-orchestrator';
 
+export {
+  createFaqAeoWriterGuidance,
+  deriveAgentCacheKey,
+  generateChangelogFromDiff,
+  readCachedAgentRun,
+  redactTranscriptValue,
+  runCachedAgentStep,
+  runRetryLoop,
+  writeAgentTranscript,
+  writeCachedAgentRun
+} from './pipeline-artifacts';
+export type {
+  AgentCacheKeyInput,
+  CachedAgentRun,
+  DiffChangelogEntry,
+  RetryAttemptResult,
+  RetryLoopResult
+} from './pipeline-artifacts';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
