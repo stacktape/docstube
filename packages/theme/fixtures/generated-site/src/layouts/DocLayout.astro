@@ -1,0 +1,305 @@
+---
+const { frontmatter } = Astro.props;
+const layoutMode = frontmatter.layoutMode === 'sectioned' ? 'sectioned' : 'single-tree';
+const navItems = [
+  { href: '/', label: 'Overview' },
+  { href: '/guides/install/', label: 'Install' }
+];
+---
+
+<!doctype html>
+<html lang="en" data-layout={layoutMode}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{frontmatter.title} | docstube fixture</title>
+    <meta name="description" content={frontmatter.description ?? 'Generated docstube fixture'} />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <div class={`site-shell site-shell--${layoutMode}`}>
+      <aside class="site-nav" aria-label="Documentation">
+        <strong>docstube fixture</strong>
+        <nav>
+          {
+            navItems.map((item) => (
+              <a href={item.href} aria-current={Astro.url.pathname === item.href ? 'page' : undefined}>
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+      </aside>
+      <main id="content" class="content">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    color-scheme: light;
+    --surface: #ffffff;
+    --surface-muted: #f4f7f8;
+    --surface-raised: #eef4f3;
+    --text: #192122;
+    --text-muted: #526061;
+    --border: #d5dfdf;
+    --accent: #087f7b;
+    --accent-strong: #075f63;
+    --warning: #8f5d00;
+    --danger: #b42318;
+    font-family:
+      Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  a {
+    color: var(--accent-strong);
+  }
+
+  .skip-link {
+    left: 16px;
+    padding: 8px 12px;
+    position: fixed;
+    top: -48px;
+  }
+
+  .skip-link:focus {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    top: 16px;
+    z-index: 2;
+  }
+
+  .site-shell {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    min-height: 100vh;
+  }
+
+  .site-shell--sectioned .content {
+    max-width: 1040px;
+  }
+
+  .site-nav {
+    background: var(--surface-muted);
+    border-right: 1px solid var(--border);
+    padding: 24px;
+  }
+
+  .site-nav strong {
+    display: block;
+    margin-bottom: 20px;
+  }
+
+  .site-nav nav {
+    display: grid;
+    gap: 8px;
+  }
+
+  .site-nav a {
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 10px;
+    text-decoration: none;
+  }
+
+  .site-nav a[aria-current="page"] {
+    background: var(--surface-raised);
+    color: var(--accent-strong);
+  }
+
+  .content {
+    max-width: 860px;
+    padding: 48px;
+    width: 100%;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: 0;
+    line-height: 1.15;
+  }
+
+  h1 {
+    font-size: 2.6rem;
+    margin: 0 0 20px;
+  }
+
+  h2 {
+    border-top: 1px solid var(--border);
+    font-size: 1.6rem;
+    margin: 36px 0 16px;
+    padding-top: 28px;
+  }
+
+  p,
+  li {
+    color: var(--text-muted);
+    line-height: 1.65;
+  }
+
+  code {
+    background: var(--surface-muted);
+    border-radius: 4px;
+    padding: 2px 5px;
+  }
+
+  .dt-callout,
+  .dt-card,
+  .dt-code-block,
+  .dt-terminal {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 20px 0;
+  }
+
+  .dt-callout {
+    background: var(--surface-muted);
+    border-left: 4px solid var(--accent);
+    padding: 16px 18px;
+  }
+
+  .dt-callout--warning {
+    border-left-color: var(--warning);
+  }
+
+  .dt-callout--danger {
+    border-left-color: var(--danger);
+  }
+
+  .dt-card-grid {
+    display: grid;
+    gap: 14px;
+    margin: 20px 0;
+  }
+
+  .dt-card {
+    color: var(--text);
+    display: grid;
+    gap: 8px;
+    padding: 16px;
+    text-decoration: none;
+  }
+
+  .dt-card span {
+    color: var(--text-muted);
+  }
+
+  .dt-code-block,
+  .dt-terminal {
+    background: #101718;
+    color: #eef4f3;
+    overflow: hidden;
+  }
+
+  .dt-code-block figcaption,
+  .dt-terminal figcaption {
+    border-bottom: 1px solid #293638;
+    color: #b9c8c9;
+    padding: 10px 14px;
+  }
+
+  .dt-code-block pre,
+  .dt-terminal pre {
+    margin: 0;
+    overflow-x: auto;
+    padding: 16px;
+  }
+
+  .dt-code-block code,
+  .dt-terminal code {
+    background: transparent;
+    color: inherit;
+    display: block;
+    padding: 0;
+  }
+
+  .dt-steps {
+    counter-reset: steps;
+    display: grid;
+    gap: 10px;
+    list-style: none;
+    padding: 0;
+  }
+
+  .dt-steps li {
+    background: var(--surface-muted);
+    border-radius: 8px;
+    counter-increment: steps;
+    padding: 12px 14px;
+  }
+
+  .dt-steps li::before {
+    color: var(--accent-strong);
+    content: counter(steps) ". ";
+    font-weight: 700;
+  }
+
+  .dt-tab-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 20px 0;
+  }
+
+  .dt-tab-list button {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 12px;
+  }
+
+  .dt-tab-list button[aria-selected="true"] {
+    background: var(--accent);
+    color: #ffffff;
+  }
+
+  .dt-divider {
+    align-items: center;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    margin: 28px 0;
+  }
+
+  .dt-divider::before,
+  .dt-divider::after {
+    background: var(--border);
+    content: "";
+    flex: 1;
+    height: 1px;
+  }
+
+  @media (max-width: 760px) {
+    .site-shell {
+      grid-template-columns: 1fr;
+    }
+
+    .site-nav {
+      border-bottom: 1px solid var(--border);
+      border-right: 0;
+    }
+
+    .content {
+      padding: 28px 20px 40px;
+    }
+
+    .dt-card-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+</style>

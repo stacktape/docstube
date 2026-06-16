@@ -1,0 +1,20 @@
+---
+layout: ../../layouts/DocLayout.astro
+title: Install
+description: Sectioned layout fixture page.
+layoutMode: sectioned
+---
+
+import { Callout, CodeBlock, Steps } from '../../components/theme-components.tsx';
+
+# Install
+
+<Callout tone="warning" title="Fixture page">
+  The generated site owns these components directly.
+</Callout>
+
+## Local CLI
+
+<Steps items={['Install docstube', 'Run generation', 'Review generated pages']} />
+
+<CodeBlock title="Install script" language="bash" code={'curl -fsSL https://installs.docstube.dev/install.sh | sh'} />

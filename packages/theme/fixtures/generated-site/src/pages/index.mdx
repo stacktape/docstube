@@ -1,0 +1,37 @@
+---
+layout: ../layouts/DocLayout.astro
+title: Overview
+description: Representative generated MDX page.
+layoutMode: single-tree
+---
+
+import { Callout, Card, CardGrid, CodeBlock, Divider, Steps, Tabs, Terminal } from '../components/theme-components.tsx';
+
+# Overview
+
+DOCSTUBE_THEME_FIXTURE_TOKEN
+
+<Callout tone="info" title="Generated source">
+  This fixture is self-contained and owns its generated component source.
+</Callout>
+
+<CardGrid columns={2}>
+  <Card title="Install" href="/guides/install/" description="Set up the generated docs site." />
+  <Card title="Validate" description="Run deterministic checks before publishing." />
+</CardGrid>
+
+<Divider label="Workflow" />
+
+<Steps items={['Read the source map', 'Write persona-targeted MDX', 'Run deterministic verifiers']} />
+
+<Tabs
+  tabs={[
+    { label: 'pnpm', value: 'pnpm' },
+    { label: 'npm', value: 'npm' }
+  ]}
+  defaultValue="pnpm"
+/>
+
+<CodeBlock title="Generated command" language="bash" code={'docstube generate --yes'} />
+
+<Terminal title="Validate" command="docstube validate" output="passed" />

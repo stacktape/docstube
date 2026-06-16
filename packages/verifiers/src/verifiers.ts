@@ -366,6 +366,15 @@ export const checkComponentProps = (input: ComponentPropsCheckInput): CheckResul
       continue;
     }
 
+    if (component.status === 'reserved') {
+      findings.push(
+        finding(componentPropsCheckId, `Component is reserved and cannot be used yet: ${usage.name}`, {
+          location: usage.location
+        })
+      );
+      continue;
+    }
+
     const propSchema = parsed.propSchemas[component.props.ref];
     if (!propSchema) {
       findings.push(
