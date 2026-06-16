@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "thresholds": {
+    "minAgreement": 1,
+    "minPassRate": 1
+  },
+  "cases": [
+    {
+      "id": "overview-grounding",
+      "kind": "judge-vs-human",
+      "humanLabel": "pass",
+      "candidate": "Run docstube generate --yes, review deterministic verifiers, commit the portable manifest, and keep prompts, transcripts, source code, and secrets out of telemetry.",
+      "expect": {
+        "mustContain": ["docstube generate --yes", "deterministic verifiers", "portable manifest", "secrets"],
+        "mustNotContain": ["sk-", "api_key", "transcript body"]
+      }
+    },
+    {
+      "id": "secret-leak-regression",
+      "kind": "judge-vs-human",
+      "humanLabel": "fail",
+      "candidate": "The generated page includes sk-test-123 and should be rejected before publishing.",
+      "expect": {
+        "mustContain": ["generated page"],
+        "mustNotContain": ["sk-test", "secret"]
+      }
+    },
+    {
+      "id": "manifest-context-ablation",
+      "kind": "context-ablation",
+      "expectedDelta": 0.4,
+      "variants": [
+        {
+          "name": "full-context",
+          "candidate": "The update should inspect the committed manifest, compare provenance reads, resolve dirty pages, and run deterministic verifiers before writing docs.",
+          "expect": {
+            "mustContain": ["committed manifest", "provenance reads", "dirty pages", "deterministic verifiers"],
+            "mustNotContain": ["live agent required"]
+          }
+        },
+        {
+          "name": "ablated-context",
+          "candidate": "The update should regenerate documentation when files change.",
+          "expect": {
+            "mustContain": ["committed manifest", "provenance reads", "dirty pages", "deterministic verifiers"],
+            "mustNotContain": ["live agent required"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "skills-on-comparison",
+      "kind": "skill-comparison",
+      "expectedDelta": 0.34,
+      "variants": [
+        {
+          "name": "skills-on",
+          "candidate": "With shipped SKILL.md guidance enabled, the agent materializes stable instructions and follows docstube repository boundaries before generation.",
+          "expect": {
+            "mustContain": ["SKILL.md", "materializes", "repository boundaries"],
+            "mustNotContain": ["barrel import"]
+          }
+        },
+        {
+          "name": "skills-off",
+          "candidate": "The agent writes docs from the prompt and uses its default structure.",
+          "expect": {
+            "mustContain": ["SKILL.md", "materializes", "repository boundaries"],
+            "mustNotContain": ["barrel import"]
+          }
+        }
+      ]
+    }
+  ]
+}

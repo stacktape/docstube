@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 dist-release/
+dist-dogfood/
 *.tsbuildinfo
 compiled-template.yaml
 .stacktape-stack-info/

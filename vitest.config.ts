@@ -27,7 +27,7 @@ export default defineConfig({
       provider: 'v8',
       reportsDirectory: 'coverage'
     },
-    include: ['apps/**/*.{spec,test}.{ts,tsx}', 'packages/**/*.{spec,test}.{ts,tsx}'],
+    include: ['apps/**/*.{spec,test}.{ts,tsx}', 'packages/**/*.{spec,test}.{ts,tsx}', 'scripts/**/*.{spec,test}.ts'],
     watch: false
   }
 });

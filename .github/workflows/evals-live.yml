@@ -1,0 +1,42 @@
+name: Live Evals
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docstube-live-evals-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  live-evals:
+    name: Secrets-gated live evals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run evals
+      - name: Run live gate
+        env:
+          DOCSTUBE_LIVE_EVAL_TOKEN: ${{ secrets.DOCSTUBE_LIVE_EVAL_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$DOCSTUBE_LIVE_EVAL_TOKEN$OPENAI_API_KEY$ANTHROPIC_API_KEY$GEMINI_API_KEY" ]; then
+            echo "No live eval secret configured; skipping live evals."
+            exit 0
+          fi
+          pnpm run evals:live

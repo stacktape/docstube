@@ -1,0 +1,57 @@
+name: Dogfood Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy after reviewing the generated artifact
+        required: true
+        default: false
+        type: boolean
+  schedule:
+    - cron: '41 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docstube-dogfood-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-dogfood:
+    name: Build review artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run dogfood:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docstube-dogfood-docs
+          path: dist-dogfood
+          retention-days: 14
+
+  deploy-dogfood:
+    name: Deploy reviewed artifact
+    needs: build-dogfood
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy == true }}
+    runs-on: ubuntu-latest
+    environment: docstube-dogfood
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docstube-dogfood-docs
+          path: dist-dogfood
+      - name: Deployment gate
+        shell: bash
+        run: |
+          echo "Dogfood artifact downloaded to dist-dogfood."
+          echo "Production Stacktape app deployment is intentionally left to the deployment task."
