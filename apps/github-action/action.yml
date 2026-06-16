@@ -1,0 +1,51 @@
+name: docstube
+description: Regenerate docstube documentation and open or update a pull request.
+inputs:
+  mode:
+    description: Run docstube update or validate.
+    required: false
+    default: update
+  github-token:
+    description: GitHub token used by the gh CLI to open or update the PR.
+    required: false
+  base-branch:
+    description: Branch to update from and target with the PR.
+    required: false
+  branch-prefix:
+    description: Prefix for the generated update branch.
+    required: false
+    default: docstube/update
+  commit-message:
+    description: Commit message for generated documentation changes.
+    required: false
+    default: 'docs: update docstube output'
+  config-path:
+    description: Optional docstube config path.
+    required: false
+  docstube-package:
+    description: npm package spec used by npx to run docstube.
+    required: false
+    default: docstube@latest
+  workspace:
+    description: Checked-out repository path.
+    required: false
+  dry-run:
+    description: Run update and report the PR body without committing, pushing, or opening a PR.
+    required: false
+    default: 'false'
+outputs:
+  changed:
+    description: Whether docstube left generated documentation changes.
+  branch-name:
+    description: Branch name used for docstube update changes.
+  changed-files:
+    description: JSON array of changed files.
+  changed-pages:
+    description: JSON array of changed pages and reasons.
+  pull-request-url:
+    description: URL of the opened or updated pull request.
+  concurrency-group:
+    description: Suggested workflow concurrency group for this update run.
+runs:
+  using: node24
+  main: dist/github-action.mjs
