@@ -42,13 +42,6 @@ export type CheckCommandOptions = {
   workspaceDir?: string;
 };
 
-export type TelemetryAction = 'disable' | 'enable' | 'status';
-
-export type TelemetryCommandOptions = {
-  action: TelemetryAction;
-  workspaceDir?: string;
-};
-
 export type RuntimeTelemetryStatus = 'failed' | 'started' | 'succeeded';
 
 export type RuntimeTelemetryEvent = {
@@ -245,22 +238,6 @@ export const runCheckCommand = async (
 
   printCheckResult(output, result);
   return { exitCode: resultFailed(result) ? 1 : 0 };
-};
-
-export const runTelemetryCommand = async (
-  options: TelemetryCommandOptions,
-  output: CliOutput = defaultOutput
-): Promise<CliCommandResult> => {
-  const workspaceDir = options.workspaceDir ?? process.cwd();
-  if (options.action === 'enable' || options.action === 'disable') {
-    await writeRuntimeTelemetryEnabled(workspaceDir, options.action === 'enable');
-  }
-
-  const enabled = await readRuntimeTelemetryEnabled(workspaceDir);
-  output.info(`Runtime telemetry is ${enabled ? 'enabled' : 'disabled'}.`);
-  output.info('Runtime telemetry sends command name, status, version, and runtime surface only.');
-  output.info('It never sends prompts, file contents, config, source code, transcripts, secrets, or paths.');
-  return { exitCode: 0 };
 };
 
 export const runGenerateYesInitialization = async (

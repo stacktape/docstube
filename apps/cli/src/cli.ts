@@ -97,28 +97,6 @@ const check = defineCommand({
   }
 });
 
-const telemetry = defineCommand({
-  meta: {
-    description: 'Manage runtime telemetry preference.',
-    name: 'telemetry'
-  },
-  args: {
-    action: { type: 'positional', required: true, description: 'enable, disable, or status' }
-  },
-  async run({ args }) {
-    const action = args.action;
-    if (action !== 'enable' && action !== 'disable' && action !== 'status') {
-      output.error(`Unknown telemetry action: ${action}`);
-      process.exitCode = 1;
-      return;
-    }
-
-    const { runTelemetryCommand } = await import('./cli-commands.ts');
-    const result = await runTelemetryCommand({ action }, output);
-    process.exitCode = result.exitCode;
-  }
-});
-
 const main = defineCommand({
   meta: {
     description: 'Generate verified, always-current documentation from source code.',
@@ -129,8 +107,7 @@ const main = defineCommand({
     generate,
     update,
     validate,
-    check,
-    telemetry
+    check
   },
   run: ({ rawArgs }) => {
     if (rawArgs.length === 0) {

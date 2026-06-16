@@ -7,10 +7,10 @@ import {
   createRuntimeTelemetryEvent,
   runCheckCommand,
   runGenerateCommand,
-  runTelemetryCommand,
   runUpdateCommand,
   runValidateCommand,
-  sendRuntimeTelemetry
+  sendRuntimeTelemetry,
+  writeRuntimeTelemetryEnabled
 } from './cli-commands.ts';
 import type { CliOutput, RuntimeTelemetryEvent } from './cli-commands.ts';
 
@@ -166,11 +166,9 @@ describe('CLI commands', () => {
     });
   });
 
-  it('manages telemetry preference and never sends forbidden runtime data', async () => {
+  it('keeps runtime telemetry opt-in and never sends forbidden runtime data', async () => {
     await withWorkspace(async (dir) => {
-      const output = captureOutput();
-      await runTelemetryCommand({ workspaceDir: dir, action: 'enable' }, output.output);
-      expect(output.lines).toContain('info:Runtime telemetry is enabled.');
+      await writeRuntimeTelemetryEnabled(dir, true);
 
       const sent: RuntimeTelemetryEvent[] = [];
       const event = createRuntimeTelemetryEvent({ command: 'generate', status: 'succeeded' });
@@ -189,7 +187,7 @@ describe('CLI commands', () => {
         expect(serialized).not.toContain(forbidden);
       }
 
-      await runTelemetryCommand({ workspaceDir: dir, action: 'disable' }, output.output);
+      await writeRuntimeTelemetryEnabled(dir, false);
       const disabled = await sendRuntimeTelemetry({
         workspaceDir: dir,
         event,

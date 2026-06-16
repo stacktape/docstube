@@ -134,7 +134,6 @@ Commands:
 - `docstube validate`: deterministic validation of config-family files.
 - `docstube check <d2|mdx|snippet|config> <file>`: single deterministic check for agents and
   humans.
-- `docstube telemetry <enable|disable|status>`.
 
 Long runs are resumable. Re-running continues from durable state; `--fresh` discards state.
 Progress streams to terminal and web UI.
@@ -313,6 +312,8 @@ corrupt shared state.
 ## Telemetry
 
 Runtime telemetry is PostHog, opt-out, and disclosed on first run.
+Do not add a dedicated `docstube telemetry` command. Telemetry preference belongs in first-run
+UI/config/env handling.
 
 Allowed runtime telemetry:
 

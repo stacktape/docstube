@@ -551,10 +551,10 @@ Scope:
 - `update`.
 - `validate`.
 - `check <d2|mdx|snippet|config> <file>`.
-- `telemetry <enable|disable|status>`.
 - Lazy command loading.
 - `NODE_COMPILE_CACHE` where appropriate.
 - Runtime telemetry opt-out and disclosure.
+- No dedicated `docstube telemetry` command.
 - Development command path: `pnpm dev <docstube-command>` runs the TypeScript source CLI; for
   `generate`, it also starts the Vite local UI and proxies it through the local control plane.
 
@@ -569,7 +569,7 @@ Acceptance:
 - Command tests cover success, failure, `--fresh`, resumability, and progress output.
 - `generate` and `generate --yes` drive the real local server/pipeline path rather than printing
   placeholder readiness messages.
-- Telemetry tests prove forbidden data is not sent.
+- Runtime telemetry tests prove forbidden data is not sent, without adding a telemetry command.
 - Source-dev smoke covers `pnpm dev generate --no-open`.
 - Add a Changeset for user-facing CLI behavior if release notes would matter.
 - `pnpm run validate` passes.
