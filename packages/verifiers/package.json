@@ -24,6 +24,7 @@
     "@terrastruct/d2": "^0.1.33",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "typescript": "^6.0.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
