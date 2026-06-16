@@ -191,7 +191,15 @@ const prepareCopiedSite = async (fixture: ProductSmokeFixture, generatedMdx: str
   await mkdir(themeCacheRoot, { recursive: true });
   const tempRoot = await mkdtemp(join(themeCacheRoot, `product-smoke-${fixture.name}-`));
   const siteRoot = join(tempRoot, 'site');
-  await cp(themeFixtureRoot, siteRoot, { recursive: true });
+  await cp(themeFixtureRoot, siteRoot, {
+    recursive: true,
+    filter: (source) => {
+      const relativePath = source.slice(themeFixtureRoot.length).replaceAll('\\', '/');
+      return !['dist', '.astro', 'node_modules'].some(
+        (dir) => relativePath === dir || relativePath.startsWith(`${dir}/`)
+      );
+    }
+  });
 
   await mkdir(join(siteRoot, 'src', 'generated'), { recursive: true });
   await writeFile(

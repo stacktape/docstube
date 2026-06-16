@@ -1,50 +1,10 @@
 # docstube implementation plan
 
-This is the source of truth for implementing docstube product logic after the project
-infrastructure bootstrap.
+This is the source of truth for the desired docstube product end state.
 
 The operational task queue for the overnight implementation runner is
 [`tasks.md`](tasks.md). `PLAN.md` defines the architecture and boundaries; `tasks.md` turns it
 into ordered, reviewable implementation work.
-
-## Current status
-
-The project infrastructure is done. Do not spend implementation time rebuilding it unless a task
-explicitly requires a narrow fix.
-
-Already implemented and verified:
-
-- Monorepo layout with `apps/` for runnable surfaces and `packages/` for reusable units.
-- Node 24.12+ baseline, pnpm 11 workspaces, TypeScript 6, ESM, strict typechecking.
-- Native Node TypeScript execution for repo scripts. Do not add `tsx`, `ts-node`, or custom
-  loaders.
-- `tsdown` package builds, Vite for `apps/local-ui`, Oxlint/Oxfmt, Vitest, Changesets.
-- CI on Linux, macOS, and Windows, with LF checkout policy via `.gitattributes`.
-- npm package name and ownership established: `docstube`.
-- GitHub trusted publishing with npm provenance works.
-- Standalone binary release pipeline works with `@yao-pkg/pkg` for Linux x64, Linux arm64,
-  macOS x64, macOS arm64, and Windows x64.
-- GitHub Releases carry binaries, checksums, install scripts, and `SHA256SUMS`.
-- Stacktape deployment works for:
-  - `https://docstube.dev`
-  - `https://www.docstube.dev`
-  - `https://installs.docstube.dev`
-  - `https://events.docstube.dev`
-- Stacktape-hosted install scripts are the canonical no-Node install path and download binaries
-  from GitHub Releases.
-- Installer telemetry endpoint exists in `apps/install-events` and forwards anonymous,
-  no-source install events to PostHog using Stacktape secrets.
-- Release `v0.0.2` completed end to end: CI, npm publish, GitHub Release, standalone binaries,
-  Stacktape install-script sync, and live install smoke test.
-
-Current scaffold state:
-
-- The packages and apps mostly contain placeholders. Treat them as ownership boundaries, not
-  completed product logic.
-- `apps/web` is only a public website placeholder. Its implementation is handled by another
-  workstream.
-- Internal workspace packages are private. Publish only `docstube` until a task explicitly
-  promotes another package.
 
 ## What docstube is
 
@@ -103,7 +63,7 @@ Runnable apps in `apps/`:
 - `local-ui`: Vite + React localhost setup, progress, and review UI.
 - `github-action`: wrapper around `docstube update` that opens PRs.
 - `install-events`: public install telemetry Lambda.
-- `web`: public website placeholder, handled separately.
+- `web`: public marketing website, handled by a separate workstream.
 
 Entry files are named by responsibility, such as `core.ts`, `agent.ts`, and `cli.ts`. Do not add
 `index.ts` barrels.
@@ -373,7 +333,7 @@ Forbidden telemetry:
 - repo contents
 - secrets
 
-Installer telemetry is already implemented separately and is narrower:
+Installer telemetry is narrower than runtime telemetry:
 
 - started/succeeded/failed
 - version
@@ -415,7 +375,7 @@ verified, polished docs site, then `docstube update` keeps it current.
 
 ## Release and deployment reference
 
-The release and deployment system is already working:
+End-state release and deployment behavior:
 
 - `pnpm deploy:prod` deploys Stacktape production resources.
 - Release workflow input `version=0.0.x` publishes npm, binaries, checksums, scripts, and the

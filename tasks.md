@@ -2,16 +2,26 @@
 
 This file is the ordered queue for `node run-overnight.ts`.
 
+The queue is intended to implement the full docstube product described in `PLAN.md`. Existing
+placeholder, fixture-only, or "ready to..." code is not task completion evidence. When a task owns
+an area, upgrade or replace the placeholder with real product behavior behind the planned
+interfaces.
+
 Rules for every task:
 
 - Read `AGENTS.md` and `PLAN.md` first.
 - Implement only the current task.
-- Do not rebuild or redesign project infrastructure that `PLAN.md` marks as already done.
+- Do not rebuild or redesign release, deployment, CI, package-manager, or formatting
+  infrastructure unless the task explicitly requires it.
 - Do not edit `PLAN.md`, `AGENTS.md`, `tasks.md`, release workflows, deployment files, or package
   infrastructure unless the task explicitly says to.
 - Do not implement anything under the hard TBD boundaries.
 - Keep packages private unless the task explicitly says otherwise.
 - Prefer tests and fixtures close to the code being implemented.
+- Acceptance criteria are minimum gates, not permission to leave stubbed behavior in place.
+- Do not satisfy product tasks with static demo arrays, hard-coded success strings, or fake
+  "ready" responses unless the task explicitly asks for a mock/replay fixture. Real app surfaces
+  must use the real package boundary and persisted state for that task's scope.
 - A task that touches a package or app is not done if Vitest collects zero tests for that touched
   package or app. Add at least one focused test file under that workspace before claiming the task.
 - Workspace package dependencies for the planned `@docstube/*` imports are pre-wired. If a task
@@ -21,6 +31,20 @@ Rules for every task:
   internal CLI imports instead.
 - Run `pnpm run validate` before marking the task done unless a narrower check is explicitly
   justified in the task output.
+
+Supervisor runbook for a full implementation pass:
+
+- Start from a clean worktree.
+- If rerunning after an earlier incomplete pass, reset the ignored runner state by deleting
+  `.docstube-build/state` or setting it to `0`; then run `pnpm run overnight:dry`.
+- Run `pnpm run overnight`.
+- Inspect `.docstube-build/logs/` whenever a task fails review or validation.
+- Do not accept fixture-only behavior where `PLAN.md` calls for product behavior. Fixtures prove
+  the behavior; they are not the behavior.
+- For UI tasks, smoke through the real local server with `pnpm dev generate --no-open` or a
+  focused automated browser/component test.
+- The final handoff must include `pnpm run validate`, the deterministic product smoke, and a
+  local UI smoke proving the wizard, dashboard, and review flows are reachable.
 
 ## Task 00 - Contract foundation and fixture helpers
 
@@ -434,17 +458,31 @@ Goal: implement the setup path over the real config and tRPC surfaces.
 Scope:
 
 - Shared in-flow `NavTree` foundation.
-- Setup wizard.
-- IA proposal editing.
+- Setup wizard loaded from the real local server/session, not static app-entry demo data.
+- Doc type selection.
+- Project context fields: project description, source roots, docs goals, and optional reference
+  sources.
+- Persona management: add/edit/remove personas, pick titles, audience notes, and defaults.
+- Agent selection for writer/reviewer roles using the config contract.
+- Optional source references.
+- IA proposal list, proposal selection, and editable `NavTree`.
 - Theme token editor with preview.
+- Site metadata: site name, locale, canonical URL/base path where supported by the config schema.
+- Component selection based on the registry metadata.
 - Comment-preserving writes to `docstube.yml` and `ia.yml`.
+- Scaffolding flow when config files are missing: create the config family through the same
+  comment-preserving write path, then reload through tRPC.
 
 Acceptance:
 
 - Component tests render the wizard at 375px and 1280px widths, assert named `data-testid`
   anchors are present/non-empty, and include a layout guard such as `scrollWidth <= clientWidth`
   for the primary shell.
+- Tests cover project context, personas, source references, component selection, IA proposal
+  selection/editing, and theme preview changes.
 - Wizard writes config-family files that validate.
+- The app entrypoint does not ship hard-coded wizard demo state as the product path; fixtures live
+  in tests or explicit story/demo helpers only.
 - No screenshot-capture product feature is implemented.
 - `pnpm run validate` passes.
 
@@ -456,14 +494,18 @@ Scope:
 
 - NavTree progress statuses.
 - Generation dashboard.
-- Page status timelines.
-- Live preview pane.
+- Page status timelines from persisted run/page state.
+- Live preview pane for generated page output as pages complete or become flagged.
 - Cap-freeze banner.
 - Terminal progress mirror integration where needed.
+- tRPC polling or subscription-like refresh over the real `AppRouter` procedures from Task 03.
+- Empty, loading, error, running, retrying, passed, flagged, and cap-frozen states.
 
 Acceptance:
 
 - Dashboard fixtures cover queued/running/retrying/passed/flagged states.
+- Dashboard uses real local-server data loading in the product path, not static app-entry demo
+  arrays.
 - No node-graph pipeline canvas.
 - Component tests render the dashboard at 375px and 1280px widths, assert named `data-testid`
   anchors are present/non-empty, and include a layout guard such as `scrollWidth <= clientWidth`
@@ -481,12 +523,17 @@ Scope:
 - Feedback categorizer integration through mocks/replay.
 - Approve and regenerate actions.
 - Findings badges in review navigation.
+- Feedback writes through the backend to the correct target: criteria, writing instructions,
+  glossary, or config changes.
+- Review state reloads from persisted run/page state and reflects approvals/regeneration requests.
 
 Acceptance:
 
 - Review fixtures cover findings, approvals, and regeneration requests.
 - Feedback writes to the correct criteria/instructions/glossary/config target through tested
   mocks.
+- Review UI uses product data from the local server; hard-coded review demo pages are allowed only
+  in tests or explicit story/demo helpers.
 - Component tests render review at 375px and 1280px widths, assert named `data-testid` anchors
   are present/non-empty, and include a layout guard such as `scrollWidth <= clientWidth` for the
   primary shell.
@@ -508,6 +555,8 @@ Scope:
 - Lazy command loading.
 - `NODE_COMPILE_CACHE` where appropriate.
 - Runtime telemetry opt-out and disclosure.
+- Development command path: `pnpm dev <docstube-command>` runs the TypeScript source CLI; for
+  `generate`, it also starts the Vite local UI and proxies it through the local control plane.
 
 Out of scope:
 
@@ -518,7 +567,10 @@ Acceptance:
 
 - CLI startup stays light.
 - Command tests cover success, failure, `--fresh`, resumability, and progress output.
+- `generate` and `generate --yes` drive the real local server/pipeline path rather than printing
+  placeholder readiness messages.
 - Telemetry tests prove forbidden data is not sent.
+- Source-dev smoke covers `pnpm dev generate --no-open`.
 - Add a Changeset for user-facing CLI behavior if release notes would matter.
 - `pnpm run validate` passes.
 
@@ -565,6 +617,8 @@ Acceptance:
 - Smoke tests use mocks/replay, not live AI.
 - Both fixture sites build.
 - Update regenerates or flags the expected pages.
+- The smoke asserts product behavior, not only token plumbing: generated pages contain
+  source-grounded facts, manifest provenance, verifier results, and usable navigation.
 - `pnpm run validate` passes.
 
 ## Task 24 - Evals, live gated workflow, and dogfood

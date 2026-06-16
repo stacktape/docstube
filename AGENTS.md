@@ -34,8 +34,7 @@ Useful commands:
 ```bash
 pnpm install
 pnpm run validate
-pnpm run dev
-pnpm run dev:cli -- telemetry status
+pnpm dev generate --no-open
 pnpm run overnight:dry
 pnpm run overnight
 pnpm run typecheck
@@ -50,11 +49,10 @@ pnpm run upg
 `overnight` runs the ordered implementation queue from `tasks.md`; use `overnight:dry` to check
 the runner without calling agents or committing.
 
-`dev:cli` runs the CLI from TypeScript source with Node's native type stripping and the
-`docstube-source` package-export condition. `dev` is the local product dev mode: it starts the
-Vite local UI, runs the source CLI, and proxies the UI through the session-guarded local control
-plane. Running `pnpm run dev` with no extra args defaults to `docstube generate`; pass CLI args
-after `--`, for example `pnpm run dev -- validate`.
+`pnpm dev <docstube-command>` runs the CLI from TypeScript source with Node's native type
+stripping and the `docstube-source` package-export condition. `pnpm dev generate` also starts the
+Vite local UI and proxies it through the session-guarded local control plane. Running `pnpm dev`
+with no extra args defaults to `pnpm dev generate`.
 
 Node-run TypeScript should use Node's built-in type stripping: run `node path/to/script.ts`
 directly, keep syntax erasable, use extensionful relative imports, and do not add `tsx`,
@@ -164,14 +162,14 @@ Examples:
 import type { AgentAdapter } from '@docstube/agent';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseDocstubeConfig } from './config-schema';
+import { parseDocstubeConfig } from './config-schema.ts';
 ```
 
 Avoid:
 
 ```ts
 import * as fs from 'fs';
-import { parseDocstubeConfig } from './config';
+import { parseDocstubeConfig } from './config.ts';
 export * from './config-schema';
 ```
 

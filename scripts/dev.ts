@@ -10,7 +10,6 @@ type ChildExit = {
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 const cliSourceEntry = fileURLToPath(new URL('../apps/cli/src/cli.ts', import.meta.url));
-const sourceCliOnlyFlag = '--source-cli-only';
 
 const parsePort = (): number => {
   const raw = process.env.DOCSTUBE_UI_DEV_PORT ?? '5173';
@@ -132,22 +131,17 @@ const runSourceCli = async (input: {
   return waitForExit(child);
 };
 
-const readRunOptions = (): { args: string[]; sourceCliOnly: boolean } => {
+const readRunArgs = (): string[] => {
   const rawArgs = process.argv.slice(2);
-  const sourceCliOnly = rawArgs[0] === sourceCliOnlyFlag;
-  const forwardedArgs = sourceCliOnly ? rawArgs.slice(1) : rawArgs;
-  const args = forwardedArgs[0] === '--' ? forwardedArgs.slice(1) : forwardedArgs;
-  return {
-    args: args.length === 0 && !sourceCliOnly ? ['generate'] : args,
-    sourceCliOnly
-  };
+  const args = rawArgs[0] === '--' ? rawArgs.slice(1) : rawArgs;
+  return args.length === 0 ? ['generate'] : args;
 };
 
 const main = async (): Promise<void> => {
-  const { args, sourceCliOnly } = readRunOptions();
+  const args = readRunArgs();
   const command = args[0];
 
-  if (sourceCliOnly || command !== 'generate') {
+  if (command !== 'generate') {
     const result = await runSourceCli({ args });
     process.exitCode = result.code ?? (result.signal === 'SIGINT' ? 130 : 1);
     return;
