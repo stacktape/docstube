@@ -114,6 +114,9 @@ export type {
   StartLocalControlPlaneOptions
 } from './local-server';
 
+export { writeSetupWizardFiles } from './setup-files';
+export type { SetupWizardFileWriteInput, SetupWizardFileWriteResult } from './setup-files';
+
 export { appRouter, appRouterContract, appRouterProcedures } from './trpc-router';
 export type { AppRouter, AppRouterProcedure, AppRouterProcedureContract, JsonSchema, TrpcContext } from './trpc-router';
 
