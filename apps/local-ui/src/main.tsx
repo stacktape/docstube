@@ -1,78 +1,16 @@
 import { createRoot } from 'react-dom/client';
-import type { DocstubeConfig, Ia } from '@docstube/contracts';
-import { GenerationDashboard } from './generation-dashboard.tsx';
-import type { DashboardPage } from './generation-dashboard.tsx';
-import { ReviewRoom } from './review-room.tsx';
-import type { ReviewPage } from './review-room.tsx';
-import { createSetupWizardSaver } from './setup-trpc.ts';
-import { SetupWizard } from './setup-wizard.tsx';
+import { ProductApp } from './product-app.tsx';
+import type { ProductView } from './product-app.tsx';
+import { createLocalUiClient } from './setup-trpc.ts';
 // oxlint-disable-next-line import/no-unassigned-import -- Vite loads app-level CSS from the entry module.
 import './styles.css';
 
-const timestamp = new Date().toISOString();
+const productViews = new Set<ProductView>(['dashboard', 'review', 'setup']);
 
-const initialConfig: DocstubeConfig = {
-  version: 1,
-  site: { name: 'docstube', locale: 'en' },
-  docsType: 'library',
-  output: { dir: 'docs', layout: 'single-tree' },
-  personas: [{ id: 'developer', title: 'Developer' }],
-  agents: { writer: { adapter: 'codex', model: 'default' } },
-  ia: 'ia.yml',
-  glossary: 'glossary.yaml',
-  theme: { credit: true, tokens: { accent: '#2563eb', surface: '#f8fafc', radius: 8 } }
+const viewFromSearch = (search: URLSearchParams): ProductView => {
+  const view = search.get('view');
+  return view && productViews.has(view as ProductView) ? (view as ProductView) : 'setup';
 };
-
-const initialIa: Ia = {
-  version: 1,
-  layout: 'single-tree',
-  nav: [
-    {
-      id: 'overview',
-      title: 'Overview',
-      path: 'overview.mdx',
-      brief: 'Project overview and primary concepts.'
-    }
-  ]
-};
-
-const dashboardPages: DashboardPage[] = [
-  {
-    id: 'overview',
-    runId: 'local-run',
-    title: 'Overview',
-    slug: 'overview.mdx',
-    status: 'running',
-    approved: false,
-    findings: [],
-    updatedAt: timestamp,
-    preview: '# Overview\n\nGeneration output appears here as each page completes.',
-    timeline: [
-      { at: timestamp, status: 'queued', label: 'Queued for generation' },
-      { at: timestamp, status: 'running', label: 'Writer is drafting the page' }
-    ]
-  }
-];
-
-const reviewPages: ReviewPage[] = [
-  {
-    id: 'overview',
-    title: 'Overview',
-    slug: 'overview.mdx',
-    approved: false,
-    findings: [],
-    sections: [{ id: 'intro', title: 'Intro' }],
-    renderedHtml: '<article><h1>Overview</h1><p data-review-target>Generated docs preview.</p></article>'
-  }
-];
-
-const sessionToken = new URLSearchParams(window.location.search).get('session');
-const currentView = new URLSearchParams(window.location.search).get('view');
-const saveDraft = sessionToken
-  ? createSetupWizardSaver(sessionToken)
-  : async () => {
-      console.info('docstube setup draft updated.');
-    };
 
 const rootElement = document.getElementById('root');
 
@@ -80,26 +18,26 @@ if (!rootElement) {
   throw new Error('Root element not found.');
 }
 
-createRoot(rootElement).render(
-  currentView === 'review' ? (
-    <ReviewRoom pages={reviewPages} />
-  ) : currentView === 'dashboard' ? (
-    <GenerationDashboard
-      run={{
-        id: 'local-run',
-        status: 'running',
-        capFrozen: false,
-        startedAt: timestamp,
-        updatedAt: timestamp
-      }}
-      pages={dashboardPages}
+const search = new URLSearchParams(window.location.search);
+const sessionToken = search.get('session');
+
+if (!sessionToken) {
+  createRoot(rootElement).render(
+    <main className="setup-shell" data-testid="app-error">
+      <section className="setup-panel">
+        <div className="panel-heading">
+          <h2>Missing session</h2>
+        </div>
+        <p className="empty-note">Open docstube through the local control plane so the session token is available.</p>
+      </section>
+    </main>
+  );
+} else {
+  createRoot(rootElement).render(
+    <ProductApp
+      client={createLocalUiClient(sessionToken)}
+      configPath={search.get('configPath') ?? undefined}
+      view={viewFromSearch(search)}
     />
-  ) : (
-    <SetupWizard
-      initialConfig={initialConfig}
-      initialIa={initialIa}
-      initialThemeTokens={initialConfig.theme?.tokens}
-      onSave={saveDraft}
-    />
-  )
-);
+  );
+}

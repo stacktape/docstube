@@ -35,6 +35,7 @@ export type CategorizedFeedback = {
 
 export type ReviewRoomProps = {
   categorizeFeedback?: (record: FeedbackRecord) => Promise<CategorizedFeedback> | CategorizedFeedback;
+  feedback?: readonly FeedbackRecord[];
   initialPageId?: string;
   now?: () => string;
   onApprove?: (pageId: string) => Promise<void> | void;
@@ -234,12 +235,38 @@ function FeedbackComposer(props: {
   );
 }
 
+function FeedbackHistory(props: { feedback: readonly FeedbackRecord[] }) {
+  return (
+    <section className="review-panel feedback-history" data-testid="feedback-history">
+      <div className="panel-heading">
+        <MessageSquare aria-hidden="true" size={18} />
+        <h2>Open feedback</h2>
+      </div>
+      {props.feedback.length > 0 ? (
+        <ol className="feedback-list">
+          {props.feedback.map((record) => (
+            <li key={record.id}>
+              <strong>{feedbackScopeLabels[record.scope]}</strong>
+              <span>{record.message}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="empty-note">No open feedback for this page.</p>
+      )}
+    </section>
+  );
+}
+
 export function ReviewRoom(props: ReviewRoomProps) {
   const [selectedPageId, setSelectedPageId] = useState(props.initialPageId ?? props.pages[0]?.id ?? '');
-  const [feedbackCount, setFeedbackCount] = useState(0);
+  const [feedbackCount, setFeedbackCount] = useState(props.feedback?.length ?? 0);
   const selectedPage = props.pages.find((page) => page.id === selectedPageId) ?? props.pages[0];
   const categorizeFeedback = props.categorizeFeedback ?? defaultCategorizeReviewFeedback;
   const now = props.now ?? defaultNow;
+  const pageFeedback = (props.feedback ?? []).filter(
+    (record) => record.scope === 'docs' || record.pageId === selectedPage?.id
+  );
 
   const submitFeedback = async (record: FeedbackRecord) => {
     const categorized = await categorizeFeedback(record);
@@ -291,6 +318,7 @@ export function ReviewRoom(props: ReviewRoomProps) {
         </section>
         <aside className="review-side">
           <FindingsPanel findings={selectedPage.findings} />
+          <FeedbackHistory feedback={pageFeedback} />
           <FeedbackComposer feedbackCount={feedbackCount} now={now} page={selectedPage} onSubmit={submitFeedback} />
         </aside>
       </div>

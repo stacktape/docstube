@@ -16,9 +16,11 @@ export type OpenBrowser = (url: string) => Promise<void> | void;
 
 export type LocalControlPlaneAppOptions = {
   backend: StateBackend;
+  configPath?: string;
   sessionToken?: string;
   uiDevServerUrl?: string;
   uiDistDir?: string;
+  workspaceDir?: string;
 };
 
 export type LocalControlPlaneApp = {
@@ -184,7 +186,11 @@ export const createLocalControlPlaneApp = (options: LocalControlPlaneAppOptions)
       endpoint: '/trpc',
       req: context.req.raw,
       router: appRouter,
-      createContext: () => ({ backend: options.backend })
+      createContext: () => ({
+        backend: options.backend,
+        configPath: options.configPath,
+        workspaceDir: options.workspaceDir
+      })
     })
   );
 
@@ -355,6 +361,7 @@ export const startGenerateSession = async (options: GenerateStartupOptions = {})
     host: options.host,
     port: options.port,
     sessionToken: options.sessionToken,
+    workspaceDir,
     openBrowser: options.openBrowser
   });
 

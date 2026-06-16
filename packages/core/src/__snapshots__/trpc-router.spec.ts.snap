@@ -11,6 +11,14 @@ exports[`AppRouter contract > snapshots the AppRouter procedure surface 1`] = `
     "type": "mutation",
   },
   {
+    "path": "dashboard.read",
+    "type": "query",
+  },
+  {
+    "path": "feedback.list",
+    "type": "query",
+  },
+  {
     "path": "feedback.submit",
     "type": "mutation",
   },
@@ -35,8 +43,20 @@ exports[`AppRouter contract > snapshots the AppRouter procedure surface 1`] = `
     "type": "mutation",
   },
   {
+    "path": "review.read",
+    "type": "query",
+  },
+  {
     "path": "run.status",
     "type": "query",
+  },
+  {
+    "path": "setup.read",
+    "type": "query",
+  },
+  {
+    "path": "setup.save",
+    "type": "mutation",
   },
   {
     "path": "theme.readTokens",

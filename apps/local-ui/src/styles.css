@@ -621,6 +621,34 @@ button {
   width: 100%;
 }
 
+.feedback-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feedback-list li {
+  background: #f8fafc;
+  border: 1px solid #d7deea;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.feedback-list strong {
+  color: #34425e;
+  font-size: 13px;
+}
+
+.feedback-list span {
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 @media (max-width: 900px) {
   .setup-shell,
   .dashboard-shell,

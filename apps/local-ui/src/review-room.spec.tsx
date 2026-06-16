@@ -47,9 +47,22 @@ const categoryByScope: Record<FeedbackRecord['scope'], FeedbackCategory> = {
   element: 'config'
 };
 
+const feedback: FeedbackRecord[] = [
+  {
+    id: 'feedback-existing',
+    createdAt: timestamp,
+    scope: 'page',
+    message: 'Keep the install flow near the top.',
+    pageId: 'overview',
+    category: 'instruction',
+    status: 'open'
+  }
+];
+
 const renderAtWidth = (
   width: number,
   options: {
+    feedback?: FeedbackRecord[];
     onApprove?: (pageId: string) => void;
     onRegenerate?: (pageId: string) => void;
     onWriteFeedback?: (target: FeedbackWriteTarget, record: FeedbackRecord) => void;
@@ -63,6 +76,7 @@ const renderAtWidth = (
 
   render(
     <ReviewRoom
+      feedback={options.feedback ?? feedback}
       pages={pages}
       now={() => timestamp}
       categorizeFeedback={categorizeFeedback}
@@ -95,10 +109,17 @@ describe('ReviewRoom', () => {
     expectAnchor('review-navigation');
     expectAnchor('production-preview');
     expectAnchor('review-findings');
+    expectAnchor('feedback-history');
     expectAnchor('feedback-composer');
     expectAnchor('feedback-scopes');
     expectAnchor('review-actions');
     expect(shell.scrollWidth).toBeLessThanOrEqual(shell.clientWidth);
+  });
+
+  it('shows existing backend feedback for the selected page', () => {
+    renderAtWidth(1280);
+
+    expect(screen.getByTestId('feedback-history').textContent).toContain('Keep the install flow near the top.');
   });
 
   it('covers findings badges, approvals, and regeneration requests', () => {

@@ -1,6 +1,23 @@
-import { docstubeConfigSchema, feedbackRecordSchema, pageIdSchema } from '@docstube/contracts';
+import { readFile } from 'node:fs/promises';
+import {
+  docstubeConfigSchema,
+  feedbackRecordSchema,
+  iaSchema,
+  pageIdSchema,
+  relativePathSchema
+} from '@docstube/contracts';
+import { compileMdxBodyToHtml } from '@docstube/verifiers';
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
+import { extractSectionMarkers } from '@docstube/contracts';
+import { createTerminalProgressState } from './pipeline-run.ts';
+import {
+  loadProjectConfigFamily,
+  normalizeRelativePath,
+  pathExists,
+  resolveWorkspacePath
+} from './project-workspace.ts';
+import { writeSetupWizardFiles } from './setup-files.ts';
 import type { StateBackend } from './state-backend.ts';
 
 // tRPC router skeleton mounted by the local server (Task 17). It exposes the minimum procedures the
@@ -9,6 +26,8 @@ import type { StateBackend } from './state-backend.ts';
 
 export type TrpcContext = {
   backend: StateBackend;
+  configPath?: string;
+  workspaceDir?: string;
 };
 
 const t = initTRPC.context<TrpcContext>().create();
@@ -16,11 +35,158 @@ const t = initTRPC.context<TrpcContext>().create();
 const themeTokensInput = z.record(z.string(), z.union([z.string(), z.number()]));
 const runStatusInput = z.object({ runId: z.string().min(1) });
 const pageListInput = z.object({ runId: z.string().min(1).optional() }).optional();
+const setupReadInput = z.object({ configPath: relativePathSchema.optional() }).optional();
+const setupSaveInput = z.strictObject({
+  config: docstubeConfigSchema,
+  configPath: relativePathSchema.optional(),
+  ia: iaSchema,
+  themeTokens: themeTokensInput.default({})
+});
+const feedbackListInput = z.object({ pageId: pageIdSchema.optional() }).optional();
 // Page references validate `pageId` with the frozen S0 page-ID rules, never an ad-hoc string, so
 // the API cannot accept IDs the rest of the contracts reject.
 const pageRefInput = z.object({ pageId: pageIdSchema });
 
+const pageStatusLabel = (status: string): string => {
+  if (status === 'queued') {
+    return 'Queued for generation';
+  }
+  if (status === 'running') {
+    return 'Writer is drafting the page';
+  }
+  if (status === 'retrying') {
+    return 'Queued for refinement retry';
+  }
+  if (status === 'passed') {
+    return 'Passed deterministic checks';
+  }
+  return 'Flagged for review';
+};
+
+const splitMdxBody = (content: string): string => {
+  const match = /^---\r?\n[\s\S]*?\r?\n---\r?\n?(?<body>[\s\S]*)$/u.exec(content);
+  return match?.groups?.body ?? content;
+};
+
+const readGeneratedPageContent = async (input: { ctx: TrpcContext; slug?: string }): Promise<string> => {
+  if (!input.ctx.workspaceDir || !input.slug) {
+    return '';
+  }
+
+  try {
+    return await readFile(resolveWorkspacePath(input.ctx.workspaceDir, input.slug), 'utf8');
+  } catch {
+    return '';
+  }
+};
+
+const setupState = async (ctx: TrpcContext, configPath?: string) => {
+  const effectiveConfigPath = configPath ?? ctx.configPath ?? 'docstube.yml';
+  const themeTokens = await ctx.backend.getThemeTokens();
+
+  if (ctx.workspaceDir) {
+    const configExists = await pathExists(
+      resolveWorkspacePath(ctx.workspaceDir, normalizeRelativePath(effectiveConfigPath))
+    );
+    if (configExists) {
+      const family = await loadProjectConfigFamily(ctx.workspaceDir, effectiveConfigPath);
+      await ctx.backend.setConfig(family.config);
+      return {
+        config: family.config,
+        configPath: family.configPath,
+        ia: family.ia,
+        themeTokens: Object.keys(themeTokens).length > 0 ? themeTokens : (family.config.theme?.tokens ?? {})
+      };
+    }
+  }
+
+  const [config, proposals] = await Promise.all([ctx.backend.getConfig(), ctx.backend.listIaProposals()]);
+  return {
+    config,
+    configPath: effectiveConfigPath,
+    ia: proposals.toSorted((left, right) => right.createdAt.localeCompare(left.createdAt))[0]?.ia ?? null,
+    themeTokens
+  };
+};
+
+const dashboardState = async (ctx: TrpcContext) => {
+  const pageSummaries = await ctx.backend.listPages();
+  const pageDetails = await Promise.all(pageSummaries.map((page) => ctx.backend.getPage(page.id))).then((pages) =>
+    pages.filter((page) => page !== null)
+  );
+  const run = pageDetails[0]?.runId ? await ctx.backend.getRun(pageDetails[0].runId) : null;
+  const pages = await Promise.all(
+    pageDetails.map(async (page) => ({
+      ...page,
+      preview: await readGeneratedPageContent({ ctx, slug: page.slug }),
+      timeline: [{ at: page.updatedAt, label: pageStatusLabel(page.status), status: page.status }]
+    }))
+  );
+
+  return {
+    run,
+    pages,
+    terminalProgress: run ? createTerminalProgressState(run, pageDetails) : null
+  };
+};
+
+const reviewState = async (ctx: TrpcContext) => {
+  const pageSummaries = await ctx.backend.listPages();
+  const pageDetails = await Promise.all(pageSummaries.map((page) => ctx.backend.getPage(page.id))).then((pages) =>
+    pages.filter((page) => page !== null)
+  );
+  const pages = await Promise.all(
+    pageDetails.map(async (page) => {
+      const content = await readGeneratedPageContent({ ctx, slug: page.slug });
+      const body = splitMdxBody(content);
+      const renderedHtml = body
+        ? await compileMdxBodyToHtml(body)
+        : '<article><p>No generated preview yet.</p></article>';
+      const markerIds = [...new Set(extractSectionMarkers(body).map((marker) => marker.sectionId))];
+      return {
+        ...page,
+        renderedHtml,
+        sections: markerIds.map((id) => ({ id, title: id }))
+      };
+    })
+  );
+
+  return {
+    feedback: await ctx.backend.listFeedback(),
+    pages
+  };
+};
+
 export const appRouter = t.router({
+  setup: t.router({
+    read: t.procedure.input(setupReadInput).query(({ ctx, input }) => setupState(ctx, input?.configPath)),
+    save: t.procedure.input(setupSaveInput).mutation(async ({ ctx, input }) => {
+      const effectiveConfigPath = input.configPath ?? ctx.configPath ?? 'docstube.yml';
+      let config = input.config;
+      let ia = input.ia;
+      if (ctx.workspaceDir) {
+        const written = await writeSetupWizardFiles({
+          config,
+          configPath: effectiveConfigPath,
+          ia,
+          workspaceDir: ctx.workspaceDir
+        });
+        config = written.config;
+        ia = written.ia;
+      }
+      await Promise.all([
+        ctx.backend.setConfig(config),
+        ctx.backend.setThemeTokens(input.themeTokens),
+        ctx.backend.saveIaProposal({
+          id: 'current-config',
+          label: 'Current config',
+          ia,
+          createdAt: new Date().toISOString()
+        })
+      ]);
+      return { config, configPath: effectiveConfigPath, ia, themeTokens: input.themeTokens };
+    })
+  }),
   config: t.router({
     read: t.procedure.query(({ ctx }) => ctx.backend.getConfig()),
     write: t.procedure.input(docstubeConfigSchema).mutation(async ({ ctx, input }) => {
@@ -41,6 +207,12 @@ export const appRouter = t.router({
   run: t.router({
     status: t.procedure.input(runStatusInput).query(({ ctx, input }) => ctx.backend.getRun(input.runId))
   }),
+  dashboard: t.router({
+    read: t.procedure.query(({ ctx }) => dashboardState(ctx))
+  }),
+  review: t.router({
+    read: t.procedure.query(({ ctx }) => reviewState(ctx))
+  }),
   pages: t.router({
     list: t.procedure.input(pageListInput).query(({ ctx, input }) => ctx.backend.listPages(input?.runId)),
     detail: t.procedure.input(pageRefInput).query(({ ctx, input }) => ctx.backend.getPage(input.pageId)),
@@ -48,6 +220,7 @@ export const appRouter = t.router({
     regenerate: t.procedure.input(pageRefInput).mutation(({ ctx, input }) => ctx.backend.regeneratePage(input.pageId))
   }),
   feedback: t.router({
+    list: t.procedure.input(feedbackListInput).query(({ ctx, input }) => ctx.backend.listFeedback(input?.pageId)),
     submit: t.procedure.input(feedbackRecordSchema).mutation(({ ctx, input }) => ctx.backend.submitFeedback(input))
   })
 });
