@@ -66,7 +66,7 @@ describe('project maintenance workflows', () => {
     });
   });
 
-  it('ranks the worst persisted page first and records deterministic refinement planning', async () => {
+  it('ranks the worst persisted page first and regenerates it through the page pipeline', async () => {
     await withWorkspace(async (workspaceDir) => {
       const generation = await generateProjectDocumentation({
         workspaceDir,
@@ -92,7 +92,7 @@ describe('project maintenance workflows', () => {
           id: 'overview',
           runId: generation.runId,
           title: 'Overview',
-          slug: 'docs/overview.mdx',
+          slug: 'docs/src/pages/index.mdx',
           status: 'flagged',
           approved: false,
           findings: [majorFinding],
@@ -102,16 +102,24 @@ describe('project maintenance workflows', () => {
         await backend.close();
       }
 
-      const result = await refineProjectDocumentation({ workspaceDir, failedOnly: true, maxRounds: 1 });
+      const result = await refineProjectDocumentation({
+        workspaceDir,
+        adapterFactory: createDeterministicProjectGenerationAdapters,
+        failedOnly: true,
+        maxRounds: 1
+      });
 
       expect(result.candidates[0]).toMatchObject({ id: 'overview', score: 60 });
       expect(result.plannedPages).toHaveLength(1);
       expect(result.plannedPages[0]?.id).toBe('overview');
+      expect(result.refinedPages).toEqual([
+        expect.objectContaining({ id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' })
+      ]);
 
       const stored = createLocalBackend(openDocstubeDatabase(join(workspaceDir, '.docstube', 'db.sqlite')));
       try {
         const page = await stored.getPage('overview');
-        expect(page?.findings.map((finding) => finding.code)).toEqual(['mdx-compile', 'refinement-planned']);
+        expect(page).toMatchObject({ id: 'overview', status: 'passed', findings: [] });
       } finally {
         await stored.close();
       }

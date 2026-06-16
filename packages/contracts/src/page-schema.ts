@@ -50,7 +50,10 @@ export const generatedPageFrontmatterSchema = z.strictObject({
   id: pageIdSchema,
   title: z.string().min(1, { error: 'page title must not be empty' }),
   description: z.string().optional(),
-  layout: layoutSchema.optional(),
+  // Astro layout import path, relative to the generated MDX file.
+  layout: z.string().min(1).optional(),
+  // docstube layout mode consumed by the generated Astro layout.
+  layoutMode: layoutSchema.optional(),
   personas: z.array(identifierSchema).optional(),
   // Ordered section IDs declared by the page; must match the body's section markers.
   sections: z.array(sectionIdSchema).optional(),

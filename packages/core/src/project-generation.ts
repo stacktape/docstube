@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { dirname as posixDirname, join as posixJoin, relative as posixRelative } from 'node:path/posix';
 import {
   createClaudeAdapter,
   createCodexAdapter,
@@ -35,6 +36,8 @@ import type { PageDeterministicVerifier } from './page-orchestrator.ts';
 import type { PersonaReviewer } from './page-orchestrator.ts';
 import { initializeRunFromConfigFamily, transitionRunStatus } from './pipeline-run.ts';
 import type { ScheduledPage } from './pipeline-run.ts';
+import { refreshGeneratedSiteAssets } from './project-assets.ts';
+import type { ProjectAssetRefreshResult } from './project-assets.ts';
 import {
   collectProjectSourceFiles,
   createPageSeedContext,
@@ -76,6 +79,7 @@ export type ProjectGenerationOptions = ProjectGenerationInitializationOptions & 
 };
 
 export type ProjectGenerationResult = ProjectGenerationInitializationResult & {
+  assetRefresh: ProjectAssetRefreshResult;
   generatedPages: GeneratedProjectPage[];
   manifest: Manifest;
   manifestPath: string;
@@ -106,6 +110,17 @@ const escapeCodeText = (value: string): string => value.replaceAll('`', '\\`');
 
 const yamlString = (value: string): string => JSON.stringify(value);
 
+const astroLayoutPathForPage = (pagePath: RelativePath): string => {
+  const marker = '/src/pages/';
+  const markerIndex = pagePath.indexOf(marker);
+  const layoutPath =
+    markerIndex >= 0
+      ? posixJoin(pagePath.slice(0, markerIndex), 'src/layouts/DocLayout.astro')
+      : posixJoin(posixDirname(pagePath), '../layouts/DocLayout.astro');
+  const relativePath = posixRelative(posixDirname(pagePath), layoutPath);
+  return relativePath.startsWith('.') ? relativePath : `./${relativePath}`;
+};
+
 const artifactContentForPage = (input: {
   generatedAt: Timestamp;
   page: ScheduledPage;
@@ -123,7 +138,8 @@ const artifactContentForPage = (input: {
     `id: ${input.page.id}`,
     `title: ${yamlString(input.page.title)}`,
     input.seedContext.site.description ? `description: ${yamlString(input.seedContext.site.description)}` : undefined,
-    `layout: ${input.seedContext.layout}`,
+    `layout: ${yamlString(astroLayoutPathForPage(input.page.slug))}`,
+    `layoutMode: ${input.seedContext.layout}`,
     'personas:',
     ...personaLines,
     'sections:',
@@ -366,9 +382,16 @@ export const generateProjectDocumentation = async (
     });
 
     await writeManifestFile(manifestPath, manifest);
+    const assetRefresh = await refreshGeneratedSiteAssets({
+      config: initialized.config,
+      glossary: initialized.glossary,
+      ia: initialized.ia,
+      workspaceDir: input.workspaceDir
+    });
     await transitionRunStatus({ backend, runId: initialized.run.id, status: 'completed', now });
 
     return {
+      assetRefresh,
       generatedPages: generation.generatedPages,
       manifest,
       manifestPath,

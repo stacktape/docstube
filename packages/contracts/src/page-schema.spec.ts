@@ -128,9 +128,12 @@ describe('generatedPageFrontmatterSchema', () => {
     const parsed = generatedPageFrontmatterSchema.parse({
       id: 'guides/install',
       title: 'Install',
+      layout: '../../layouts/DocLayout.astro',
+      layoutMode: 'sectioned',
       sections: ['requirements', 'quick-start'],
       generated: { by: 'docstube', version: '0.0.2', at: '2026-06-16T12:00:00Z' }
     });
     expect(parsed.sections).toEqual(['requirements', 'quick-start']);
+    expect(parsed.layoutMode).toBe('sectioned');
   });
 });

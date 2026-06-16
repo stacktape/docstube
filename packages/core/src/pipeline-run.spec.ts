@@ -44,7 +44,7 @@ describe('pipeline run initialization', () => {
     expect(result.glossary.terms.map((term) => term.id)).toEqual(['codemap', 'persona']);
     expect(result.run).toMatchObject({ id: 'run-fixture', status: 'queued', capFrozen: false });
     expect(result.scheduledPages.map((page) => [page.id, page.slug, page.depth])).toEqual([
-      ['overview', 'overview.mdx', 0],
+      ['overview', 'index.mdx', 0],
       ['guides/install', 'guides/install.mdx', 1]
     ]);
     expect(await backend.listPages('run-fixture')).toEqual([

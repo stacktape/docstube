@@ -161,7 +161,7 @@ const writeSmokeManifest = async (repoRoot: string, fixture: ProductSmokeFixture
     pages: [
       {
         id: 'overview',
-        path: 'docs/overview.mdx',
+        path: 'docs/src/pages/index.mdx',
         provenance: createPageProvenance({
           seedContext: { fixture: fixture.name, page: 'overview' },
           reads: [fixture.sourcePath],
@@ -280,7 +280,7 @@ describe('deterministic product smoke', () => {
 
         await writeSmokeManifest(repoRoot, fixture);
         const manifest = await readManifestFile(manifestPath(repoRoot));
-        expect(manifest.pages).toMatchObject([{ id: 'overview', path: 'docs/overview.mdx', status: 'passed' }]);
+        expect(manifest.pages).toMatchObject([{ id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' }]);
 
         const html = await buildCopiedSite(fixture, generatedMdx);
         expect(html).toContain(fixture.token);

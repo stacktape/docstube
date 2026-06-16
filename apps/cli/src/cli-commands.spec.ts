@@ -149,8 +149,9 @@ describe('CLI commands', () => {
         { exitCode: 0 }
       );
       expect(lines.some((line) => line.includes('Generated 2 pages for run-'))).toBe(true);
-      expect(lines).toContain(`info:passed: docs/overview.mdx`);
-      await expect(readFile(join(dir, 'docs', 'overview.mdx'), 'utf8')).resolves.toContain('## Overview');
+      expect(lines).toContain('info:Generated site assets: 7 files.');
+      expect(lines).toContain(`info:passed: docs/src/pages/index.mdx`);
+      await expect(readFile(join(dir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain('## Overview');
     });
   });
 
@@ -208,7 +209,7 @@ describe('CLI commands', () => {
       expect(lines).toContain('info:Loaded manifest with 2 pages.');
       expect(lines).toContain('info:regenerated: guides/install (nav-page-missing)');
       expect(lines).toContain('info:regenerated: overview (nav-page-missing)');
-      expect(lines.some((line) => line.startsWith('info:Vendored assets: skipped'))).toBe(true);
+      expect(lines).toContain('info:Refreshed 7 vendored asset files.');
     });
   });
 
@@ -227,7 +228,7 @@ describe('CLI commands', () => {
       const refine = captureOutput();
       await expect(runRefineCommand({ workspaceDir: dir }, refine.output)).resolves.toEqual({ exitCode: 0 });
       expect(refine.lines).toContain('info:Ranked 2 refinement candidates.');
-      expect(refine.lines).toContain('info:No pages require deterministic refinement planning.');
+      expect(refine.lines).toContain('info:No pages require refinement.');
     });
   });
 

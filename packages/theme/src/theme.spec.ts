@@ -11,6 +11,7 @@ import {
   buildPagefindSearchIndex,
   createDocsMcpResources,
   createDocsMcpServer,
+  createGeneratedSiteAssets,
   createGlossaryRemarkPlugin,
   createCanonicalUrl,
   createLlmsFullText,
@@ -133,6 +134,44 @@ describe('docstube theme contract', () => {
     expect(screenshot?.status).toBe('reserved');
     expect(stableThemeComponentNames).not.toContain('Screenshot');
     expect(Object.keys(themeComponentPropSchemas)).not.toContain('screenshot-props');
+  });
+
+  it('creates self-contained generated-site assets from IA, glossary, and site metadata', () => {
+    const assets = createGeneratedSiteAssets({
+      siteName: 'Acme Docs',
+      siteDescription: 'Acme generated docs.',
+      siteUrl: 'https://docs.acme.test',
+      credit: true,
+      glossary: {
+        version: 1,
+        terms: [{ id: 'codemap', term: 'Codemap', definition: 'A structural map.' }]
+      },
+      ia: {
+        version: 1,
+        nav: [
+          { id: 'overview', title: 'Overview' },
+          {
+            id: 'guides',
+            title: 'Guides',
+            children: [{ id: 'install', title: 'Install', path: 'guides/install.mdx' }]
+          }
+        ]
+      }
+    });
+    const byPath = new Map(assets.map((asset) => [asset.path, asset.content]));
+
+    expect([...byPath.keys()].toSorted()).toEqual([
+      'astro.config.mjs',
+      'package.json',
+      'src/components/theme-components.tsx',
+      'src/layouts/DocLayout.astro',
+      'src/theme-build/glossary-data.mjs',
+      'src/theme-build/glossary-remark.mjs',
+      'src/theme-build/site-data.mjs'
+    ]);
+    expect(byPath.get('src/theme-build/site-data.mjs')).toContain('"href": "/"');
+    expect(byPath.get('src/theme-build/site-data.mjs')).toContain('"href": "/guides/install/"');
+    expect(byPath.get('package.json')).not.toContain('@docstube/theme');
   });
 
   it('validates component usage through shared registry metadata', () => {

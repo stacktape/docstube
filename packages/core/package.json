@@ -24,6 +24,7 @@
     "@docstube/contracts": "workspace:*",
     "@docstube/extractors": "workspace:*",
     "@docstube/skills": "workspace:*",
+    "@docstube/theme": "workspace:*",
     "@docstube/verifiers": "workspace:*",
     "@trpc/server": "^11.17.0",
     "better-sqlite3": "^12.10.1",

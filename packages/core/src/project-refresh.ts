@@ -11,6 +11,8 @@ import {
 } from './incremental-engine.ts';
 import type { DirtyPageDecision, ManifestPageUpdate, TopologyPage } from './incremental-engine.ts';
 import { createLocalBackend } from './local-backend.ts';
+import { refreshGeneratedSiteAssets } from './project-assets.ts';
+import type { ProjectAssetRefreshResult } from './project-assets.ts';
 import { generateConfiguredProjectPages } from './project-generation.ts';
 import type { ProjectGenerationAdapterFactory } from './project-generation.ts';
 import { initializeRunFromConfigFamily, transitionRunStatus } from './pipeline-run.ts';
@@ -19,6 +21,7 @@ import {
   createCurrentSeedHashes,
   defaultConfigPath,
   ensureDocstubeDir,
+  outputPagesDir,
   pathExists,
   projectDbPath,
   projectManifestPath,
@@ -34,10 +37,6 @@ export type ProjectRefreshOptions = {
   now?: () => Timestamp;
   workspaceDir: string;
 };
-
-export type ProjectAssetRefreshResult =
-  | { status: 'refreshed'; files: RelativePath[] }
-  | { status: 'skipped'; reason: string };
 
 export type ProjectRefreshPageChange = {
   action: 'flagged' | 'regenerated';
@@ -258,7 +257,7 @@ export const refreshProjectDocumentation = async (input: ProjectRefreshOptions):
         ia: initialized.ia,
         glossary: initialized.glossary,
         manifest: preliminaryManifest,
-        outputDir: initialized.config.output.dir,
+        outputDir: outputPagesDir(initialized.config.output.dir),
         pages: topologyInput.pages,
         regeneratedPageIds: generation.generatedPages.map((page) => page.id)
       })
@@ -301,13 +300,16 @@ export const refreshProjectDocumentation = async (input: ProjectRefreshOptions):
       pages: finalStatusUpdates
     });
     await writeManifestFile(manifestPath, finalManifest);
+    const assetRefresh = await refreshGeneratedSiteAssets({
+      config: initialized.config,
+      glossary: initialized.glossary,
+      ia: initialized.ia,
+      workspaceDir: input.workspaceDir
+    });
     await transitionRunStatus({ backend, runId: initialized.run.id, status: 'completed', now });
 
     return {
-      assetRefresh: {
-        status: 'skipped',
-        reason: 'no compatible vendored theme/project asset refresh helper is available in this slice'
-      },
+      assetRefresh,
       changedPages: [...changedPages.values()].toSorted((left, right) => left.id.localeCompare(right.id)),
       manifest: finalManifest,
       manifestPath,

@@ -52,7 +52,8 @@ export const deriveRunId = (config: DocstubeConfig, ia: Ia): string =>
 const pageIdForNode = (parentIds: readonly string[], node: IaNode): PageId =>
   pageIdSchema.parse([...parentIds, node.id].join('/'));
 
-const slugForPage = (pageId: PageId, node: IaNode): string => node.path ?? `${pageId}.mdx`;
+const slugForPage = (pageId: PageId, node: IaNode): string =>
+  node.path ?? (pageId === 'overview' ? 'index.mdx' : `${pageId}.mdx`);
 
 const scheduleNode = (
   node: IaNode,

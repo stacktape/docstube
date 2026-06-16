@@ -43,7 +43,15 @@ describe('refreshProjectDocumentation', () => {
         ['overview', 'regenerated', ['seed-context-changed']]
       ]);
       expect(result.topologyFindings).toEqual([]);
-      await expect(readFile(join(workspaceDir, 'docs', 'overview.mdx'), 'utf8')).resolves.toContain('src/toolkit.ts');
+      await expect(readFile(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain(
+        'src/toolkit.ts'
+      );
+      expect(result.assetRefresh).toEqual(
+        expect.objectContaining({
+          status: 'refreshed',
+          files: expect.arrayContaining(['docs/astro.config.mjs', 'docs/src/layouts/DocLayout.astro'])
+        })
+      );
       const manifest = await readManifestFile(join(workspaceDir, '.docstube', 'manifest.yml'));
       expect(manifest.pages.every((page) => page.status === 'passed')).toBe(true);
     });
@@ -55,7 +63,7 @@ describe('refreshProjectDocumentation', () => {
         workspaceDir,
         adapterFactory: createDeterministicProjectGenerationAdapters
       });
-      await unlink(join(workspaceDir, 'docs', 'overview.mdx'));
+      await unlink(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'));
 
       const result = await refreshProjectDocumentation({
         workspaceDir,

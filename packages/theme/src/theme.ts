@@ -1,10 +1,10 @@
-import { readdir, writeFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 import { z } from 'zod';
 import { glossarySchema, layouts, registrySchema, reservedComponentNames } from '@docstube/contracts';
 import type { PagefindServiceConfig } from 'pagefind';
 import type { CompileOptions } from '@terrastruct/d2';
-import type { ComponentRegistry, Glossary, Layout, RegistryComponent } from '@docstube/contracts';
+import type { ComponentRegistry, Glossary, Ia, IaNode, Layout, RegistryComponent } from '@docstube/contracts';
 
 export type BuiltInComponentName =
   | 'ApiReference'
@@ -318,6 +318,329 @@ const collectRelativeFiles = async (rootDir: string, currentDir = rootDir): Prom
   );
 
   return files.flat().toSorted((left, right) => left.localeCompare(right));
+};
+
+export type GeneratedSiteNavItem = {
+  href: string;
+  label: string;
+};
+
+export type GeneratedSiteAssetsInput = {
+  credit?: boolean;
+  glossary: Glossary;
+  ia: Ia;
+  siteDescription?: string;
+  siteName: string;
+  siteUrl?: string;
+};
+
+export type GeneratedSiteAsset = {
+  content: string;
+  path: string;
+};
+
+const slugToHref = (slug: string): string => {
+  if (slug === 'index.mdx') {
+    return '/';
+  }
+  const withoutExtension = slug.replace(/\.mdx$/u, '');
+  return `/${withoutExtension}/`;
+};
+
+const navItemsFromNode = (node: IaNode, parentIds: readonly string[] = []): GeneratedSiteNavItem[] => {
+  const children = node.children ?? [];
+  const pageId = [...parentIds, node.id].join('/');
+  const shouldRenderPage = node.path !== undefined || children.length === 0;
+  const current = shouldRenderPage
+    ? [
+        {
+          href: slugToHref(node.path ?? (pageId === 'overview' ? 'index.mdx' : `${pageId}.mdx`)),
+          label: node.title
+        }
+      ]
+    : [];
+
+  return [...current, ...children.flatMap((child) => navItemsFromNode(child, [...parentIds, node.id]))];
+};
+
+export const createGeneratedSiteNavItems = (ia: Ia): GeneratedSiteNavItem[] =>
+  ia.nav.flatMap((node) => navItemsFromNode(node));
+
+const generatedSitePackageJson = () =>
+  `${JSON.stringify(
+    {
+      name: 'docstube-generated-site',
+      private: true,
+      type: 'module',
+      scripts: {
+        build: 'astro build'
+      },
+      dependencies: {
+        '@astrojs/mdx': '^6.0.3',
+        '@astrojs/react': '^5.0.7',
+        '@terrastruct/d2': '^0.1.33',
+        astro: '^6.4.6',
+        pagefind: '^1.5.2',
+        react: '^19.2.7',
+        'react-dom': '^19.2.7'
+      }
+    },
+    null,
+    2
+  )}\n`;
+
+const astroConfigMjs = () =>
+  [
+    "import mdx from '@astrojs/mdx';",
+    "import react from '@astrojs/react';",
+    "import { defineConfig } from 'astro/config';",
+    "import glossary from './src/theme-build/glossary-data.mjs';",
+    "import { siteUrl } from './src/theme-build/site-data.mjs';",
+    "import { createGlossaryRemarkPlugin } from './src/theme-build/glossary-remark.mjs';",
+    '',
+    'export default defineConfig({',
+    '  integrations: [mdx({ remarkPlugins: [createGlossaryRemarkPlugin(glossary)] }), react()],',
+    "  output: 'static',",
+    '  site: siteUrl',
+    '});',
+    ''
+  ].join('\n');
+
+const glossaryDataMjs = (glossary: Glossary) =>
+  [`const glossary = ${JSON.stringify(glossary, null, 2)};`, '', 'export default glossary;', ''].join('\n');
+
+const siteDataMjs = (input: GeneratedSiteAssetsInput) =>
+  [
+    `export const siteName = ${JSON.stringify(input.siteName)};`,
+    `export const siteDescription = ${JSON.stringify(input.siteDescription ?? '')};`,
+    `export const siteUrl = ${JSON.stringify(input.siteUrl ?? 'https://docs.example.test')};`,
+    `export const credit = ${JSON.stringify(input.credit ?? true)};`,
+    `export const navItems = ${JSON.stringify(createGeneratedSiteNavItems(input.ia), null, 2)};`,
+    ''
+  ].join('\n');
+
+const glossaryRemarkMjs = () =>
+  [
+    "const skippedParentTypes = new Set(['code', 'definition', 'inlineCode', 'link', 'linkReference', 'mdxJsxFlowElement', 'mdxJsxTextElement']);",
+    '',
+    "const escapeRegExp = (value) => value.replaceAll(/[\\\\^$.*+?()[\\]{}|]/gu, '\\\\$&');",
+    '',
+    'const glossaryMatches = (glossary) =>',
+    '  glossary.terms',
+    '    .flatMap((term) => [term.term, ...(term.aliases ?? [])].map((label) => ({ ...term, label })))',
+    '    .toSorted((left, right) => right.label.length - left.label.length || left.label.localeCompare(right.label));',
+    '',
+    'const linkedGlossaryNodes = (value, matchesByLabel, pattern) => {',
+    '  const nodes = [];',
+    '  let cursor = 0;',
+    '',
+    '  for (const match of value.matchAll(pattern)) {',
+    '    const matchText = match[0];',
+    '    const index = match.index;',
+    '    const glossaryMatch = matchesByLabel.get(matchText.toLowerCase());',
+    '    if (!glossaryMatch) continue;',
+    '    if (index > cursor) nodes.push({ type: "text", value: value.slice(cursor, index) });',
+    '    nodes.push({',
+    '      type: "link",',
+    '      url: `/glossary/#${glossaryMatch.id}`,',
+    '      title: glossaryMatch.definition,',
+    '      children: [{ type: "text", value: matchText }]',
+    '    });',
+    '    cursor = index + matchText.length;',
+    '  }',
+    '',
+    '  if (cursor < value.length) nodes.push({ type: "text", value: value.slice(cursor) });',
+    '  return nodes.length > 0 ? nodes : [{ type: "text", value }];',
+    '};',
+    '',
+    'const linkGlossaryChildren = (node, matchesByLabel, pattern) => {',
+    '  if (!node.children || skippedParentTypes.has(node.type ?? "")) return;',
+    '  const nextChildren = [];',
+    '  for (const child of node.children) {',
+    '    if (child.type === "text" && child.value) {',
+    '      nextChildren.push(...linkedGlossaryNodes(child.value, matchesByLabel, pattern));',
+    '    } else {',
+    '      linkGlossaryChildren(child, matchesByLabel, pattern);',
+    '      nextChildren.push(child);',
+    '    }',
+    '  }',
+    '  node.children = nextChildren;',
+    '};',
+    '',
+    'export const createGlossaryRemarkPlugin = (glossary) => {',
+    '  const matches = glossaryMatches(glossary);',
+    '  const pattern = matches.length > 0',
+    '    ? new RegExp(`(?<![\\\\p{L}\\\\p{N}_])(${matches.map((match) => escapeRegExp(match.label)).join("|")})(?![\\\\p{L}\\\\p{N}_])`, "giu")',
+    '    : undefined;',
+    '  const matchesByLabel = new Map(matches.map((match) => [match.label.toLowerCase(), match]));',
+    '  return () => (tree) => {',
+    '    if (pattern) linkGlossaryChildren(tree, matchesByLabel, pattern);',
+    '  };',
+    '};',
+    ''
+  ].join('\n');
+
+const docLayoutAstro = () =>
+  [
+    '---',
+    "import { credit, navItems, siteDescription, siteName, siteUrl as configuredSiteUrl } from '../theme-build/site-data.mjs';",
+    'const { frontmatter } = Astro.props;',
+    "const layoutMode = frontmatter.layoutMode === 'sectioned' ? 'sectioned' : 'single-tree';",
+    'const siteUrl = Astro.site ?? new URL(configuredSiteUrl);',
+    'const canonicalUrl = new URL(Astro.url.pathname, siteUrl).href;',
+    'const title = `${frontmatter.title} | ${siteName}`;',
+    'const description = frontmatter.description ?? siteDescription;',
+    'const showCredit = credit !== false && frontmatter.credit !== false;',
+    'const articleStructuredData = {',
+    "  '@context': 'https://schema.org',",
+    "  '@type': 'TechArticle',",
+    '  headline: frontmatter.title,',
+    '  description,',
+    '  url: canonicalUrl,',
+    '  mainEntityOfPage: canonicalUrl,',
+    "  publisher: { '@type': 'Organization', name: siteName }",
+    '};',
+    '---',
+    '',
+    '<!doctype html>',
+    '<html lang="en" data-layout={layoutMode}>',
+    '  <head>',
+    '    <meta charset="utf-8" />',
+    '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
+    '    <title>{title}</title>',
+    '    <meta name="description" content={description} />',
+    '    <link rel="canonical" href={canonicalUrl} />',
+    '    <meta property="og:title" content={title} />',
+    '    <meta property="og:description" content={description} />',
+    '    <meta property="og:url" content={canonicalUrl} />',
+    '    <meta property="og:type" content="article" />',
+    '    <script type="application/ld+json" set:html={JSON.stringify(articleStructuredData)} />',
+    '  </head>',
+    '  <body>',
+    '    <a class="skip-link" href="#content">Skip to content</a>',
+    '    <div class={`site-shell site-shell--${layoutMode}`}>',
+    '      <aside class="site-nav" aria-label="Documentation">',
+    '        <strong>{siteName}</strong>',
+    '        <nav>',
+    '          {navItems.map((item) => <a href={item.href} aria-current={Astro.url.pathname === item.href ? "page" : undefined}>{item.label}</a>)}',
+    '        </nav>',
+    '      </aside>',
+    '      <main id="content" class="content" data-pagefind-body>',
+    '        <slot />',
+    '        {showCredit ? <footer class="site-footer">Generated by <a href="https://docstube.dev">docstube</a></footer> : null}',
+    '      </main>',
+    '    </div>',
+    '  </body>',
+    '</html>',
+    '',
+    '<style is:global>',
+    '  :root { color-scheme: light; --surface: #ffffff; --surface-muted: #f4f7f8; --surface-raised: #eef4f3; --text: #192122; --text-muted: #526061; --border: #d5dfdf; --accent: #087f7b; --accent-strong: #075f63; --warning: #8f5d00; --danger: #b42318; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }',
+    '  * { box-sizing: border-box; }',
+    '  body { margin: 0; background: var(--surface); color: var(--text); }',
+    '  a { color: var(--accent-strong); }',
+    '  .skip-link { left: 16px; padding: 8px 12px; position: fixed; top: -48px; }',
+    '  .skip-link:focus { background: var(--surface); border: 1px solid var(--border); top: 16px; z-index: 2; }',
+    '  .site-shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }',
+    '  .site-shell--sectioned .content { max-width: 1040px; }',
+    '  .site-nav { background: var(--surface-muted); border-right: 1px solid var(--border); padding: 24px; }',
+    '  .site-nav strong { display: block; margin-bottom: 20px; }',
+    '  .site-nav nav { display: grid; gap: 8px; }',
+    '  .site-nav a { border-radius: 8px; color: var(--text); padding: 8px 10px; text-decoration: none; }',
+    '  .site-nav a[aria-current="page"] { background: var(--surface-raised); color: var(--accent-strong); }',
+    '  .content { max-width: 860px; padding: 48px; width: 100%; }',
+    '  .site-footer { border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.9rem; margin-top: 48px; padding-top: 20px; }',
+    '  h1, h2, h3 { letter-spacing: 0; line-height: 1.15; }',
+    '  h1 { font-size: 2.6rem; margin: 0 0 20px; }',
+    '  h2 { border-top: 1px solid var(--border); font-size: 1.6rem; margin: 36px 0 16px; padding-top: 28px; }',
+    '  p, li { color: var(--text-muted); line-height: 1.65; }',
+    '  code { background: var(--surface-muted); border-radius: 4px; padding: 2px 5px; }',
+    '  .dt-callout, .dt-card, .dt-code-block, .dt-diagram, .dt-terminal { border: 1px solid var(--border); border-radius: 8px; margin: 20px 0; }',
+    '  .dt-callout { background: var(--surface-muted); border-left: 4px solid var(--accent); padding: 16px 18px; }',
+    '  .dt-card-grid { display: grid; gap: 14px; margin: 20px 0; }',
+    '  .dt-card { color: var(--text); display: grid; gap: 8px; padding: 16px; text-decoration: none; }',
+    '  .dt-code-block, .dt-terminal { background: #101718; color: #eef4f3; overflow: hidden; }',
+    '  .dt-code-block pre, .dt-terminal pre { margin: 0; overflow-x: auto; padding: 16px; }',
+    '  .dt-steps { counter-reset: steps; display: grid; gap: 10px; list-style: none; padding: 0; }',
+    '  .dt-steps li { background: var(--surface-muted); border-radius: 8px; counter-increment: steps; padding: 12px 14px; }',
+    '  .dt-steps li::before { color: var(--accent-strong); content: counter(steps) ". "; font-weight: 700; }',
+    '  .dt-tab-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }',
+    '  .dt-tab-list button { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 12px; }',
+    '  .dt-tab-list button[aria-selected="true"] { background: var(--accent); color: #ffffff; }',
+    '  @media (max-width: 760px) { .site-shell { grid-template-columns: 1fr; } .site-nav { border-bottom: 1px solid var(--border); border-right: 0; } .content { padding: 28px 20px 40px; } .dt-card-grid { grid-template-columns: 1fr !important; } }',
+    '</style>',
+    ''
+  ].join('\n');
+
+const themeComponentsTsx = () =>
+  [
+    "import type { ReactNode } from 'react';",
+    '',
+    "type Tone = 'info' | 'note' | 'success' | 'warning' | 'danger';",
+    '',
+    'export function Callout({ children, title, tone = "info" }: { children?: ReactNode; title?: string; tone?: Tone }) {',
+    '  return <aside className={`dt-callout dt-callout--${tone}`} data-component="Callout">{title ? <strong>{title}</strong> : null}<div>{children}</div></aside>;',
+    '}',
+    '',
+    'export function Card({ description, href, title }: { description?: string; href?: string; title: string }) {',
+    '  const content = <><strong>{title}</strong>{description ? <span>{description}</span> : null}</>;',
+    '  return href ? <a className="dt-card" data-component="Card" href={href}>{content}</a> : <section className="dt-card" data-component="Card">{content}</section>;',
+    '}',
+    '',
+    'export function CardGrid({ children, columns = 2 }: { children?: ReactNode; columns?: number }) {',
+    '  const columnCount = Math.min(Math.max(columns, 1), 4);',
+    '  return <div className="dt-card-grid" data-component="CardGrid" style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}>{children}</div>;',
+    '}',
+    '',
+    'export function CodeBlock({ code, language, title }: { code?: string; language?: string; title?: string }) {',
+    '  return <figure className="dt-code-block" data-component="CodeBlock">{title ? <figcaption>{title}</figcaption> : null}<pre><code data-language={language}>{code}</code></pre></figure>;',
+    '}',
+    '',
+    'export function Steps({ items = [] }: { items?: string[] }) {',
+    '  return <ol className="dt-steps" data-component="Steps">{items.map((item) => <li key={item}>{item}</li>)}</ol>;',
+    '}',
+    '',
+    'export function Tabs({ defaultValue, tabs }: { defaultValue?: string; tabs: { label: string; value: string }[] }) {',
+    '  const activeValue = defaultValue ?? tabs[0]?.value;',
+    '  return <div className="dt-tabs" data-component="Tabs"><div className="dt-tab-list" role="tablist">{tabs.map((tab) => <button aria-selected={tab.value === activeValue} key={tab.value} role="tab" type="button">{tab.label}</button>)}</div></div>;',
+    '}',
+    '',
+    'export function Terminal({ command, output, title }: { command?: string; output?: string; title?: string }) {',
+    '  return <figure className="dt-terminal" data-component="Terminal">{title ? <figcaption>{title}</figcaption> : null}<pre>{command ? <code>$ {command}</code> : null}{output ? <code>{output}</code> : null}</pre></figure>;',
+    '}',
+    '',
+    'export function Divider({ label }: { label?: string }) {',
+    '  return <div className="dt-divider" data-component="Divider">{label ? <span>{label}</span> : null}</div>;',
+    '}',
+    '',
+    'export function Diagram({ svg, title }: { svg: string; title?: string }) {',
+    '  return <figure className="dt-diagram" data-component="Diagram">{title ? <figcaption>{title}</figcaption> : null}<div dangerouslySetInnerHTML={{ __html: svg }} /></figure>;',
+    '}',
+    ''
+  ].join('\n');
+
+export const createGeneratedSiteAssets = (input: GeneratedSiteAssetsInput): GeneratedSiteAsset[] => [
+  { path: 'package.json', content: generatedSitePackageJson() },
+  { path: 'astro.config.mjs', content: astroConfigMjs() },
+  { path: 'src/theme-build/glossary-data.mjs', content: glossaryDataMjs(input.glossary) },
+  { path: 'src/theme-build/site-data.mjs', content: siteDataMjs(input) },
+  { path: 'src/theme-build/glossary-remark.mjs', content: glossaryRemarkMjs() },
+  { path: 'src/layouts/DocLayout.astro', content: docLayoutAstro() },
+  { path: 'src/components/theme-components.tsx', content: themeComponentsTsx() }
+];
+
+export const writeGeneratedSiteAssets = async (
+  outputDir: string,
+  input: GeneratedSiteAssetsInput
+): Promise<{ files: string[] }> => {
+  const assets = createGeneratedSiteAssets(input);
+  await Promise.all(
+    assets.map(async (asset) => {
+      const target = join(outputDir, asset.path);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, asset.content, 'utf8');
+    })
+  );
+  return { files: assets.map((asset) => asset.path).toSorted((left, right) => left.localeCompare(right)) };
 };
 
 export type PagefindSearchIndexInput = {

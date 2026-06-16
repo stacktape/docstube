@@ -2,13 +2,23 @@ import { findingSchema } from '@docstube/contracts';
 import type { Finding, Manifest, ManifestPage, PageId, RelativePath, Timestamp } from '@docstube/contracts';
 import { openDocstubeDatabase } from './db-migrations.ts';
 import { readManifestFile, updateManifest, writeManifestFile } from './incremental-engine.ts';
-import type { ManifestPageUpdate } from './incremental-engine.ts';
 import { createLocalBackend } from './local-backend.ts';
+import { generateConfiguredProjectPages } from './project-generation.ts';
+import type { GeneratedProjectPage, ProjectGenerationAdapterFactory } from './project-generation.ts';
 import { initializeRunFromConfigFamily, transitionRunStatus } from './pipeline-run.ts';
-import { defaultConfigPath, ensureDocstubeDir, projectDbPath, projectManifestPath } from './project-workspace.ts';
+import type { ScheduledPage } from './pipeline-run.ts';
+import {
+  collectProjectSourceFiles,
+  defaultConfigPath,
+  ensureDocstubeDir,
+  projectDbPath,
+  projectManifestPath,
+  withOutputPaths
+} from './project-workspace.ts';
 import type { PageDetail } from './state-backend.ts';
 
 export type ProjectRefinementOptions = {
+  adapterFactory?: ProjectGenerationAdapterFactory;
   configPath?: string;
   dbPath?: string;
   failedOnly?: boolean;
@@ -37,6 +47,7 @@ export type RefinementCandidate = PageQualitySummary & {
 
 export type ProjectRefinementResult = {
   candidates: RefinementCandidate[];
+  refinedPages: GeneratedProjectPage[];
   manifest: Manifest;
   manifestPath: string;
   plannedPages: RefinementCandidate[];
@@ -138,33 +149,52 @@ const shouldConsiderFailedOnly = (candidate: RefinementCandidate): boolean =>
   candidate.majorFindings > 0 ||
   candidate.findings.some((finding) => finding.origin === 'verifier');
 
-const refinementPlannedFinding = (candidate: RefinementCandidate): Finding =>
+const refinementMissedScheduleFinding = (candidate: RefinementCandidate): Finding =>
   findingSchema.parse({
-    code: 'refinement-planned',
-    severity: 'minor',
+    code: 'refinement-page-not-in-ia',
+    severity: 'major',
     origin: 'editor',
-    message:
-      'Page was selected for deterministic refinement planning; agent-backed rewriting is not available in this slice.',
-    pageId: candidate.id,
-    meta: {
-      score: candidate.score,
-      reasons: candidate.reasons
-    }
+    message: `Page was selected for refinement but is not present in the configured information architecture: ${candidate.id}`,
+    pageId: candidate.id
   });
 
-const mergePlannedFinding = (findings: readonly Finding[], planned: Finding): Finding[] => {
-  const withoutOldPlanned = findings.filter((finding) => finding.code !== planned.code);
-  return [...withoutOldPlanned, planned];
+const refinementBrief = (page: ScheduledPage, candidate: RefinementCandidate): string => {
+  const findingLines = candidate.findings
+    .slice(0, 8)
+    .map((finding) => `- ${finding.severity} ${finding.code}: ${finding.message}`);
+  return [
+    page.brief,
+    `Refine this page because its quality score is ${candidate.score}.`,
+    `Priority reasons: ${candidate.reasons.join(', ')}.`,
+    findingLines.length > 0 ? ['Previous findings to address:', ...findingLines].join('\n') : undefined
+  ]
+    .filter((line): line is string => line !== undefined && line.length > 0)
+    .join('\n');
 };
 
-const manifestUpdateFromPage = (page: ManifestPage): ManifestPageUpdate => ({
-  id: page.id,
-  path: page.path,
-  title: page.title,
-  status: 'flagged',
-  sections: page.sections,
-  provenance: page.provenance
-});
+const scheduledRefinementPages = (input: {
+  candidates: readonly RefinementCandidate[];
+  pages: readonly ScheduledPage[];
+}): { missing: Finding[]; pages: ScheduledPage[] } => {
+  const byId = new Map(input.pages.map((page) => [page.id, page]));
+  const missing: Finding[] = [];
+  const pages = input.candidates.flatMap((candidate): ScheduledPage[] => {
+    const page = byId.get(candidate.id);
+    if (!page) {
+      missing.push(refinementMissedScheduleFinding(candidate));
+      return [];
+    }
+
+    return [
+      {
+        ...page,
+        brief: refinementBrief(page, candidate)
+      }
+    ];
+  });
+
+  return { missing, pages };
+};
 
 export const refineProjectDocumentation = async (input: ProjectRefinementOptions): Promise<ProjectRefinementResult> => {
   const dbPath = input.dbPath ?? projectDbPath(input.workspaceDir);
@@ -192,54 +222,60 @@ export const refineProjectDocumentation = async (input: ProjectRefinementOptions
       .filter((candidate) => (input.target ? matchesTarget(candidate, input.target) : true))
       .filter((candidate) => (input.failedOnly ? shouldConsiderFailedOnly(candidate) : candidate.score < 100));
     const plannedPages = scoped.slice(0, input.maxRounds ?? 1);
-    const manifestById = new Map(manifest.pages.map((page) => [page.id, page]));
-    const timestamp = now();
-    const plannedUpdates = plannedPages.flatMap((candidate) => {
-      const manifestPage = manifestById.get(candidate.id);
-      if (!manifestPage) {
-        return [];
-      }
-
-      const plannedFinding = refinementPlannedFinding(candidate);
-      const findings = mergePlannedFinding(candidate.findings, plannedFinding);
-      return [
-        {
-          findings,
-          manifestPage,
-          candidate
-        }
-      ];
+    const scheduled = scheduledRefinementPages({
+      candidates: plannedPages,
+      pages: withOutputPaths(initialized.config, initialized.scheduledPages)
     });
-    await Promise.all(
-      plannedUpdates.map(({ candidate, findings, manifestPage }) =>
-        backend.upsertPage({
-          id: candidate.id,
-          runId: initialized.run.id,
-          title: candidate.title ?? manifestPage.title ?? candidate.id,
-          slug: manifestPage.path,
-          status: 'flagged',
-          approved: false,
-          findings,
-          updatedAt: timestamp
-        })
-      )
-    );
-    const updates = plannedUpdates.map(({ manifestPage }) => manifestUpdateFromPage(manifestPage));
+    const sourceFiles = await collectProjectSourceFiles({
+      workspaceDir: input.workspaceDir,
+      config: initialized.config
+    });
+    const generation =
+      scheduled.pages.length > 0
+        ? await generateConfiguredProjectPages({
+            adapterFactory: input.adapterFactory,
+            backend,
+            config: initialized.config,
+            generatedAt: now(),
+            pages: scheduled.pages,
+            runId: initialized.run.id,
+            sourceFiles,
+            workspaceDir: input.workspaceDir
+          })
+        : { generatedPages: [], manifestPages: [] };
 
-    const nextManifest = updates.length
+    if (scheduled.missing.length > 0) {
+      await Promise.all(
+        scheduled.missing.map((finding) =>
+          backend.upsertPage({
+            id: finding.pageId ?? 'unknown',
+            runId: initialized.run.id,
+            title: finding.pageId ?? 'Unknown page',
+            slug: finding.location?.path ?? 'unknown',
+            status: 'flagged',
+            approved: false,
+            findings: [finding],
+            updatedAt: now()
+          })
+        )
+      );
+    }
+
+    const nextManifest = generation.manifestPages.length
       ? updateManifest({
           existing: manifest,
           generatedWith: { name: 'docstube', version: docstubeVersion },
-          pages: updates
+          pages: generation.manifestPages
         })
       : manifest;
-    if (updates.length > 0) {
+    if (generation.manifestPages.length > 0) {
       await writeManifestFile(manifestPath, nextManifest);
     }
     await transitionRunStatus({ backend, runId: initialized.run.id, status: 'completed', now });
 
     return {
       candidates,
+      refinedPages: generation.generatedPages,
       manifest: nextManifest,
       manifestPath,
       plannedPages,

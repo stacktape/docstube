@@ -59,12 +59,8 @@ export type {
 } from './project-generation.ts';
 
 export { refreshProjectDocumentation } from './project-refresh.ts';
-export type {
-  ProjectAssetRefreshResult,
-  ProjectRefreshOptions,
-  ProjectRefreshPageChange,
-  ProjectRefreshResult
-} from './project-refresh.ts';
+export type { ProjectAssetRefreshResult } from './project-assets.ts';
+export type { ProjectRefreshOptions, ProjectRefreshPageChange, ProjectRefreshResult } from './project-refresh.ts';
 
 export {
   derivePageQualitySummary,

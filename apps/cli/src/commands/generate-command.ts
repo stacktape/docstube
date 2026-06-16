@@ -7,6 +7,7 @@ export type GenerateCommandOptions = {
   configPath?: string;
   fresh?: boolean;
   generate?: (input: { configPath?: string; workspaceDir: string }) => Promise<{
+    assetRefresh?: { files?: readonly string[]; reason?: string; status: 'refreshed' | 'skipped' };
     generatedPages: readonly { path: string; status: string }[];
     manifestPath: string;
     pagesCount: number;
@@ -41,6 +42,13 @@ export const runGenerateCommand = async (
   output.info(`${result.resumed ? 'Resumed' : 'Generated'} ${result.pagesCount} pages for ${result.runId}.`);
   output.info(`Wrote manifest: ${result.manifestPath}`);
   output.info(`Source files considered: ${result.sourceFilesCount}`);
+  if (result.assetRefresh) {
+    output.info(
+      result.assetRefresh.status === 'refreshed'
+        ? `Generated site assets: ${result.assetRefresh.files?.length ?? 0} files.`
+        : `Generated site assets: skipped (${result.assetRefresh.reason}).`
+    );
+  }
   for (const page of result.generatedPages) {
     output.info(`${page.status}: ${page.path}`);
   }

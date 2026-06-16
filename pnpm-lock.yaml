@@ -170,6 +170,9 @@ importers:
       '@docstube/skills':
         specifier: workspace:*
         version: link:../skills
+      '@docstube/theme':
+        specifier: workspace:*
+        version: link:../theme
       '@docstube/verifiers':
         specifier: workspace:*
         version: link:../verifiers

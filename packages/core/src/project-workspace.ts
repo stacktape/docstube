@@ -83,8 +83,11 @@ export const resolveWorkspacePath = (workspaceDir: string, path: RelativePath): 
 export const relativeFromWorkspace = (workspaceDir: string, path: string): RelativePath =>
   normalizeRelativePath(relative(workspaceDir, path));
 
+export const outputPagesDir = (outputDir: RelativePath): RelativePath =>
+  normalizeRelativePath(posixNormalize(posixJoin(outputDir, 'src/pages')));
+
 export const outputPathForPage = (config: DocstubeConfig, page: ScheduledPage): RelativePath =>
-  normalizeRelativePath(posixNormalize(posixJoin(config.output.dir, page.slug)));
+  normalizeRelativePath(posixNormalize(posixJoin(outputPagesDir(config.output.dir), page.slug)));
 
 export const withOutputPaths = (config: DocstubeConfig, pages: readonly ScheduledPage[]): ScheduledPage[] =>
   pages.map((page) => ({ ...page, slug: outputPathForPage(config, page) }));

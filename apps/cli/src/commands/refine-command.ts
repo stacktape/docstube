@@ -40,13 +40,12 @@ export const runRefineCommand = async (
   output.info(`Ranked ${result.candidates.length} refinement candidates.`);
 
   if (result.plannedPages.length === 0) {
-    output.info('No pages require deterministic refinement planning.');
+    output.info('No pages require refinement.');
     return { exitCode: 0 };
   }
 
-  for (const page of result.plannedPages) {
-    output.info(`planned: ${page.id} score=${page.score} (${page.reasons.join(', ')})`);
+  for (const page of result.refinedPages) {
+    output.info(`refined: ${page.id} status=${page.status} path=${page.path}`);
   }
-  output.error('Agent-backed refinement rewriting is not available yet; selected pages were flagged for refinement.');
-  return { exitCode: 1 };
+  return { exitCode: 0 };
 };

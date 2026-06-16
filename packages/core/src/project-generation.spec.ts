@@ -70,15 +70,21 @@ describe('initializeProjectGeneration', () => {
         resumed: true,
         runId: first.runId
       });
-      await expect(readFile(join(workspaceDir, 'docs', 'overview.mdx'), 'utf8')).resolves.toContain('Source context:');
-      await expect(readFile(join(workspaceDir, 'docs', 'guides', 'install.mdx'), 'utf8')).resolves.toContain(
-        '## Install'
+      await expect(readFile(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain(
+        'layout: "../layouts/DocLayout.astro"'
       );
+      await expect(readFile(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain(
+        'Source context:'
+      );
+      await expect(
+        readFile(join(workspaceDir, 'docs', 'src', 'pages', 'guides', 'install.mdx'), 'utf8')
+      ).resolves.toContain('## Install');
+      await expect(readFile(join(workspaceDir, 'docs', 'astro.config.mjs'), 'utf8')).resolves.toContain('defineConfig');
 
       const manifest = await readManifestFile(join(workspaceDir, '.docstube', 'manifest.yml'));
       expect(manifest.pages.map((page) => [page.id, page.path, page.status])).toEqual([
-        ['guides/install', 'docs/guides/install.mdx', 'passed'],
-        ['overview', 'docs/overview.mdx', 'passed']
+        ['guides/install', 'docs/src/pages/guides/install.mdx', 'passed'],
+        ['overview', 'docs/src/pages/index.mdx', 'passed']
       ]);
       expect(manifest.pages.find((page) => page.id === 'guides/install')?.provenance.reads).toEqual([]);
       expect(manifest.pages.find((page) => page.id === 'overview')?.provenance.reads).toEqual(['src/toolkit.ts']);
@@ -102,7 +108,9 @@ describe('initializeProjectGeneration', () => {
       });
 
       expect(result.pagesCount).toBe(2);
-      await expect(readFile(join(workspaceDir, 'docs', 'overview.mdx'), 'utf8')).resolves.toContain('## Overview');
+      await expect(readFile(join(workspaceDir, 'docs', 'src', 'pages', 'index.mdx'), 'utf8')).resolves.toContain(
+        '## Overview'
+      );
     } finally {
       await rm(workspaceDir, { recursive: true, force: true });
     }
