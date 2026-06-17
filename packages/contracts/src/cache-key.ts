@@ -4,7 +4,7 @@ import { semverSchema } from './primitives.ts';
 
 // Cache-key derivation for agent steps.
 //
-// PLAN.md: cache every agent step by prompt hash, input file hashes, model id, adapter id, and
+// PRODUCT.md: cache every agent step by prompt hash, input file hashes, model id, adapter id, and
 // adapter version. The derived key is the SHA-256 of a canonical serialization of those fields.
 // Input file hashes are sorted before serialization so the key is independent of read order;
 // every other field is serialized in a fixed key order. The same inputs always produce the same

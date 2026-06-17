@@ -1,10 +1,9 @@
-# docstube implementation plan
+# docstube product
 
-This is the source of truth for the desired docstube product end state.
+This is the source of truth for the docstube product, architecture, and hard boundaries.
 
-The executable acceptance evidence is summarized in [`ACCEPTANCE.md`](ACCEPTANCE.md). `PLAN.md`
-defines the architecture and boundaries; acceptance should be proven by tests, smoke checks, evals,
-or deliberately run external release/deploy checks.
+Implementation evidence lives in tests, smoke checks, evals, and deliberately run external
+release/deploy checks. Do not add a second prose checklist for behavior that can be tested.
 
 ## What docstube is
 
@@ -387,18 +386,18 @@ usage.
 The implementation was built in this dependency order, which is still useful when debugging a
 regression or choosing the owner for a focused fix:
 
-| Step | Focus | Gate |
-|---|---|---|
-| S0 | contracts, schemas, state skeleton, mock agent, walking skeleton | stable interfaces and fixture proof |
-| S1 | codemap and extractors | deterministic source facts |
-| S2 | verifiers | trust gate before generation |
-| S3 | agent adapters and usage caps | replayable agent execution |
-| S4 | theme and generated site | real render target |
-| S5 | orchestrator, skills, source loaders, changelog | integrated generation loop |
-| S6 | refresh engine and `LocalBackend` | efficient updates |
-| S7 | local UI | wizard, progress, review |
-| S8 | CLI polish, GitHub Action, runtime telemetry | user-facing shells |
-| S9 | evals and dogfood | calibrated quality proof |
+| Step | Focus                                                            | Gate                                |
+| ---- | ---------------------------------------------------------------- | ----------------------------------- |
+| S0   | contracts, schemas, state skeleton, mock agent, walking skeleton | stable interfaces and fixture proof |
+| S1   | codemap and extractors                                           | deterministic source facts          |
+| S2   | verifiers                                                        | trust gate before generation        |
+| S3   | agent adapters and usage caps                                    | replayable agent execution          |
+| S4   | theme and generated site                                         | real render target                  |
+| S5   | orchestrator, skills, source loaders, changelog                  | integrated generation loop          |
+| S6   | refresh engine and `LocalBackend`                                | efficient updates                   |
+| S7   | local UI                                                         | wizard, progress, review            |
+| S8   | CLI polish, GitHub Action, runtime telemetry                     | user-facing shells                  |
+| S9   | evals and dogfood                                                | calibrated quality proof            |
 
 Future changes should close with focused tests or fixtures plus `pnpm run validate` unless a
 narrower check is explicitly justified. Do not make broad UI, adapter, or theme changes that break
@@ -429,7 +428,7 @@ requires it.
 - Judge unreliability: derive explainable quality scores from criteria, deterministic gates, and
   structured findings; do not store opaque raw judge scores.
 - Provenance error: capture seed, observed reads, and citations; regenerate under uncertainty.
-- Scope drift: obey hard TBD boundaries and `ACCEPTANCE.md`.
+- Scope drift: obey hard TBD boundaries and keep acceptance evidence executable.
 - Non-determinism: content-addressed cache, structured outputs, replay fixtures, and evals.
 
 ## Decision log

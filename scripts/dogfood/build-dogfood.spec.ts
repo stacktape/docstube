@@ -13,8 +13,7 @@ describe('dogfood docs builder', () => {
     const dir = await mkdtemp(join(tmpdir(), 'docstube-dogfood-'));
     try {
       await Promise.all([
-        copyFile(repoFile('ACCEPTANCE.md'), join(dir, 'ACCEPTANCE.md')),
-        copyFile(repoFile('PLAN.md'), join(dir, 'PLAN.md')),
+        copyFile(repoFile('PRODUCT.md'), join(dir, 'PRODUCT.md')),
         copyFile(repoFile('package.json'), join(dir, 'package.json'))
       ]);
 
@@ -24,14 +23,14 @@ describe('dogfood docs builder', () => {
       const manifest = JSON.parse(await readFile(join(result.outputDir, 'manifest.json'), 'utf8')) as {
         generatedPages?: unknown;
         liveAgents?: unknown;
+        productSectionCount?: unknown;
         reviewRequired?: unknown;
         siteBuilt?: unknown;
-        acceptanceEvidenceCount?: unknown;
       };
 
       expect(result.generatedPages).toEqual([
         { id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' },
-        { id: 'acceptance', path: 'docs/src/pages/acceptance.mdx', status: 'passed' }
+        { id: 'product', path: 'docs/src/pages/product.mdx', status: 'passed' }
       ]);
       expect(result.files).toContain('workspace/docs/dist/index.html');
       expect(result.files).toContain('workspace/docs/dist/llms.txt');
@@ -39,13 +38,13 @@ describe('dogfood docs builder', () => {
       expect(result.files).toContain('workspace/docs/dist/sitemap.xml');
       expect(html).toContain('docstube dogfood');
       expect(mdx).toContain('Source facts:');
-      expect(mdx).toContain('src/PLAN.md');
+      expect(mdx).toContain('src/PRODUCT.md');
       expect(html).not.toContain('sk-');
       expect(manifest.generatedPages).toHaveLength(2);
       expect(manifest.liveAgents).toBe(false);
       expect(manifest.reviewRequired).toBe(true);
       expect(manifest.siteBuilt).toBe(true);
-      expect(typeof manifest.acceptanceEvidenceCount).toBe('number');
+      expect(typeof manifest.productSectionCount).toBe('number');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

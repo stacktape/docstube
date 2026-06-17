@@ -5,8 +5,8 @@ Guidance for AI coding agents and humans working in this repository.
 
 ## Source of truth
 
-The full implementation plan is [`PLAN.md`](PLAN.md). It is the authoritative design document.
-Read it before any non-trivial work. If this file disagrees with `PLAN.md`, `PLAN.md` wins.
+The product specification is [`PRODUCT.md`](PRODUCT.md). It is the authoritative design document.
+Read it before any non-trivial work. If this file disagrees with `PRODUCT.md`, `PRODUCT.md` wins.
 
 ## What docstube is
 
@@ -44,8 +44,7 @@ pnpm run upg
 ```
 
 `validate` is the normal handoff command. Keep caches under `node_modules/.cache` when adding tools.
-The historical overnight runner has been removed. Use `ACCEPTANCE.md` for acceptance evidence and
-supervise agent work directly.
+The historical overnight runner and task queue have been removed; supervise agent work directly.
 
 `pnpm dev <docstube-command>` runs the CLI from TypeScript source with Node's native type
 stripping and the `docstube-source` package-export condition. `pnpm dev wizard` also starts the
@@ -57,11 +56,11 @@ directly, keep syntax erasable, use extensionful relative imports, and do not ad
 `ts-node`, or custom loaders unless Node's built-in support is insufficient for a specific
 documented reason.
 
-## Acceptance
+## Verification
 
-`ACCEPTANCE.md` summarizes the executable gates for the completed implementation. Do not recreate
-the historical task queue unless the repo is intentionally reset; fix the failing product area
-directly and add or update focused coverage.
+Acceptance evidence should be executable: focused tests, smoke tests, evals, builds, or an explicit
+external release/deploy check. Do not recreate the historical task queue or add prose checklists
+for behavior that can be tested.
 
 The project infrastructure and product surfaces are in place: workspace layout, tooling, CI,
 deployment, release workflow, npm publishing, standalone binaries, Stacktape-hosted install
@@ -76,8 +75,8 @@ only infrastructure placeholders unless explicitly assigned that work.
 
 When supervising future fixes:
 
-- Use `PLAN.md` to identify the owning product area and `ACCEPTANCE.md` to identify existing
-  acceptance evidence.
+- Use `PRODUCT.md` to identify the owning product area.
+- Add or update focused coverage for product behavior whenever practical.
 - Each fix should produce a focused commit.
 - If a fix fails review repeatedly, inspect the failing diff and tests, fix manually or adjust the
   prompt, then rerun that bounded check.
@@ -175,7 +174,7 @@ export * from './config-schema';
 ## Dependency policy
 
 - Use current stable packages, not stale defaults. TypeScript 6 is expected.
-- Prefer proven libraries named in `PLAN.md`: Zod, Hono, tRPC, better-sqlite3, Drizzle, YAML
+- Prefer proven libraries named in `PRODUCT.md`: Zod, Hono, tRPC, better-sqlite3, Drizzle, YAML
   Document API, Vitest, D2, Astro, React, Vite, Tailwind, Pagefind, `@yao-pkg/pkg`.
 - Before major adapter work, re-check vendor CLI flags and output modes from primary sources.
 - Add dependencies to the owning workspace package, not casually to the repo root.

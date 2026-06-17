@@ -5,7 +5,7 @@ import { identifierSchema, severitySchema } from './primitives.ts';
 //
 // Criteria are committed, human-editable checklists that persona reviewers and doc-type reviews
 // evaluate. Each item is a yes/no statement, optionally carrying the severity a failure should
-// produce. Criteria never define numeric scores (PLAN.md).
+// produce. Criteria never define numeric scores (PRODUCT.md).
 
 export const criteriaScopes = ['persona', 'doc-type', 'global'] as const;
 

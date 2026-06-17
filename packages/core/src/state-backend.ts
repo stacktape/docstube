@@ -4,7 +4,7 @@ import type { DocstubeConfig, FeedbackRecord, Finding, Ia, PageId, Timestamp } f
 // Async, versioned `StateBackend` interface.
 //
 // The state backend is the seam between the pipeline/UI and durable state. `LocalBackend` is the
-// SQLite implementation; a future hosted backend implements the same contract (PLAN.md keeps the
+// SQLite implementation; a future hosted backend implements the same contract (PRODUCT.md keeps the
 // client-side seam without designing remote state). Every method is async so a remote backend can
 // satisfy the contract unchanged. The contract is versioned so a client can detect a backend it
 // cannot talk to.

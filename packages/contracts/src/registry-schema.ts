@@ -8,7 +8,7 @@ import { identifierSchema } from './primitives.ts';
 // PascalCase component name and a reference to a Zod prop schema rather than the schema itself, so
 // component metadata stays decoupled from prop-schema implementations. `Screenshot` is a reserved
 // component name for the screenshot capture boundary, registered with `status: reserved`; no
-// capture flow is implemented (PLAN.md hard boundary).
+// capture flow is implemented (PRODUCT.md hard boundary).
 
 export const reservedComponentNames = ['Screenshot'] as const;
 

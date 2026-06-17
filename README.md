@@ -13,7 +13,7 @@ checks the output deterministically, and renders a self-contained Astro docs sit
 
 ## Current Status
 
-The repository contains the product implementation described in [PLAN.md](PLAN.md):
+The repository contains the product implementation described in [PRODUCT.md](PRODUCT.md):
 
 - CLI commands: `wizard`, `generate`, `refresh`, `refine`, `validate`, `check`, `status`,
   `doctor`, `upgrade`, `version`, and `help`.
@@ -84,10 +84,14 @@ pnpm run evals
 
 `pnpm run evals:live` is secrets-gated and requires a configured judge model/provider.
 
+Production release, Stacktape deploy, installer telemetry verification, and live-agent checks
+require the human-owned npm/GitHub/AWS/Stacktape/provider configuration and should be run
+deliberately.
+
 ## Repository Map
 
-- [PLAN.md](PLAN.md): authoritative product end-state and architecture.
-- [ACCEPTANCE.md](ACCEPTANCE.md): executable acceptance evidence and external release/deploy gates.
+- [PRODUCT.md](PRODUCT.md): authoritative product specification, architecture, and hard
+  boundaries.
 - [AGENTS.md](AGENTS.md): coding style, package ownership, and agent operating rules.
 - `apps/cli`: published `docstube` CLI package.
 - `apps/local-ui`: localhost web UI.

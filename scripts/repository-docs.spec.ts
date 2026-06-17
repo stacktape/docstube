@@ -12,57 +12,47 @@ const expectFile = async (path: string): Promise<void> => {
   expect(fileStat.isFile()).toBe(true);
 };
 
-describe('repository acceptance docs', () => {
-  it('uses ACCEPTANCE.md instead of the historical task queue', async () => {
-    await expectFile('ACCEPTANCE.md');
-    await expect(access(join(rootDir, 'tasks.md'))).rejects.toThrow(/ENOENT/u);
+const expectMissing = async (path: string): Promise<void> => {
+  await expect(access(join(rootDir, path))).rejects.toThrow(/ENOENT/u);
+};
+
+describe('repository product docs', () => {
+  it('uses PRODUCT.md as the single product spec', async () => {
+    await expectFile('PRODUCT.md');
+    await Promise.all([expectMissing('PLAN.md'), expectMissing('ACCEPTANCE.md'), expectMissing('tasks.md')]);
 
     const docs = await Promise.all([
-      readRepoFile('ACCEPTANCE.md'),
+      readRepoFile('PRODUCT.md'),
       readRepoFile('AGENTS.md'),
-      readRepoFile('PLAN.md'),
       readRepoFile('README.md'),
       readRepoFile('scripts/dogfood/build-dogfood.ts')
     ]);
 
     for (const doc of docs) {
+      expect(doc).not.toContain('PLAN.md');
+      expect(doc).not.toContain('ACCEPTANCE.md');
       expect(doc).not.toContain('tasks.md');
     }
 
-    expect(docs[0]).not.toContain('## Task 00');
-    expect(docs[0]).not.toContain('## Task 24');
+    expect(docs[0]).toContain('# docstube product');
+    expect(docs[0]).toContain('## What docstube is');
+    expect(docs[0]).toContain('## Hard boundaries');
   });
 
-  it('points acceptance readers at real executable evidence', async () => {
-    const evidenceFiles = [
-      'apps/cli/src/product-smoke.spec.ts',
-      'apps/cli/src/cli-commands.spec.ts',
-      'apps/cli/src/cli-help.spec.ts',
-      'apps/cli/src/package-manifest.spec.ts',
-      'apps/local-ui/src/product-app.spec.tsx',
-      'apps/local-ui/src/setup-wizard.spec.tsx',
-      'apps/local-ui/src/generation-dashboard.spec.tsx',
-      'apps/local-ui/src/review-room.spec.tsx',
-      'packages/core/src/project-generation.spec.ts',
-      'packages/core/src/project-refresh.spec.ts',
-      'packages/core/src/project-maintenance.spec.ts',
-      'packages/core/src/page-orchestrator.spec.ts',
-      'packages/contracts/src/config-schema.spec.ts',
-      'packages/verifiers/src/verifiers.spec.ts',
-      'packages/codemap/src/codemap.spec.ts',
-      'packages/extractors/src/extractors.spec.ts',
-      'packages/theme/src/theme.spec.ts',
-      'packages/agent/src/agent.spec.ts',
-      'apps/github-action/src/github-action.spec.ts',
-      'scripts/dogfood/build-dogfood.spec.ts',
-      'scripts/evals/run-evals.spec.ts'
-    ];
+  it('keeps validation guidance executable instead of checklist based', async () => {
+    const [readme, agents, packageRaw] = await Promise.all([
+      readRepoFile('README.md'),
+      readRepoFile('AGENTS.md'),
+      readRepoFile('package.json')
+    ]);
+    const packageJson = JSON.parse(packageRaw) as { scripts?: Record<string, string> };
 
-    await Promise.all(evidenceFiles.map(expectFile));
-
-    const acceptance = await readRepoFile('ACCEPTANCE.md');
-    for (const file of evidenceFiles) {
-      expect(acceptance).toContain(file);
+    for (const script of ['validate', 'dogfood:build', 'evals']) {
+      expect(packageJson.scripts?.[script]).toBeTypeOf('string');
+      expect(readme).toContain(`pnpm run ${script}`);
     }
+
+    expect(agents).toContain('Acceptance evidence should be executable');
+    expect(agents).toContain('Do not recreate the historical task queue');
   });
 });
