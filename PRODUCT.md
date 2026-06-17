@@ -104,7 +104,7 @@ Machine-local state is ignored:
 - `.docstube/cache/`
 - `.docstube/runs/`
 
-S0 must freeze these contracts before product logic expands:
+These contracts are the baseline product contracts:
 
 - config family schemas: `docstube.yml`, `ia.yml`, `glossary.yaml`
 - findings schema
@@ -212,7 +212,7 @@ Code wins every conflict.
 
 ## Deterministic verifiers
 
-Implement a fixed result taxonomy in S0, then concrete checks in S2.
+The verifier layer uses a fixed result taxonomy plus concrete deterministic checks.
 
 Required verifier families:
 
@@ -419,8 +419,7 @@ End-state release and deployment behavior:
 - no-Node users install standalone binaries through `https://installs.docstube.dev/*.sh` or
   `https://installs.docstube.dev/windows.ps1`.
 
-Do not change release infrastructure during product implementation unless a failing release test
-requires it.
+Do not change release infrastructure unless a failing release test requires it.
 
 ## Risks
 
