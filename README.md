@@ -87,7 +87,7 @@ pnpm run evals
 ## Repository Map
 
 - [PLAN.md](PLAN.md): authoritative product end-state and architecture.
-- [tasks.md](tasks.md): implementation acceptance ledger and regression checklist.
+- [ACCEPTANCE.md](ACCEPTANCE.md): executable acceptance evidence and external release/deploy gates.
 - [AGENTS.md](AGENTS.md): coding style, package ownership, and agent operating rules.
 - `apps/cli`: published `docstube` CLI package.
 - `apps/local-ui`: localhost web UI.

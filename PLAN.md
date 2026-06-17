@@ -2,8 +2,9 @@
 
 This is the source of truth for the desired docstube product end state.
 
-The operational task queue is [`tasks.md`](tasks.md). `PLAN.md` defines the architecture and
-boundaries; `tasks.md` turns it into ordered, reviewable implementation work.
+The executable acceptance evidence is summarized in [`ACCEPTANCE.md`](ACCEPTANCE.md). `PLAN.md`
+defines the architecture and boundaries; acceptance should be proven by tests, smoke checks, evals,
+or deliberately run external release/deploy checks.
 
 ## What docstube is
 
@@ -381,9 +382,10 @@ Privacy wording rule: docstube never sends source to docstube servers; source ma
 user's chosen AI provider through the user's own credentials, exactly like their normal agent
 usage.
 
-## Build order
+## Implementation stages
 
-Use [`tasks.md`](tasks.md) for the concrete queue. It preserves this dependency order:
+The implementation was built in this dependency order, which is still useful when debugging a
+regression or choosing the owner for a focused fix:
 
 | Step | Focus | Gate |
 |---|---|---|
@@ -398,9 +400,9 @@ Use [`tasks.md`](tasks.md) for the concrete queue. It preserves this dependency 
 | S8 | CLI polish, GitHub Action, runtime telemetry | user-facing shells |
 | S9 | evals and dogfood | calibrated quality proof |
 
-Each task must close with focused tests or fixtures plus `pnpm run validate` unless the task file
-states a narrower check. Do not skip ahead to UI, adapters, or theme polish before S0 contracts
-and the walking skeleton pass.
+Future changes should close with focused tests or fixtures plus `pnpm run validate` unless a
+narrower check is explicitly justified. Do not make broad UI, adapter, or theme changes that break
+the earlier contract and walking-skeleton assumptions.
 
 Definition of done: a stranger runs `npx docstube wizard`, accepts generated config, runs
 `npx docstube generate` on a TS or Python repo and gets a verified, polished docs site, then
@@ -427,7 +429,7 @@ requires it.
 - Judge unreliability: derive explainable quality scores from criteria, deterministic gates, and
   structured findings; do not store opaque raw judge scores.
 - Provenance error: capture seed, observed reads, and citations; regenerate under uncertainty.
-- Scope drift: obey hard TBD boundaries and `tasks.md`.
+- Scope drift: obey hard TBD boundaries and `ACCEPTANCE.md`.
 - Non-determinism: content-addressed cache, structured outputs, replay fixtures, and evals.
 
 ## Decision log

@@ -44,8 +44,8 @@ pnpm run upg
 ```
 
 `validate` is the normal handoff command. Keep caches under `node_modules/.cache` when adding tools.
-The historical overnight runner has been removed; use `tasks.md` as an ordered implementation
-guide and supervise agent work directly.
+The historical overnight runner has been removed. Use `ACCEPTANCE.md` for acceptance evidence and
+supervise agent work directly.
 
 `pnpm dev <docstube-command>` runs the CLI from TypeScript source with Node's native type
 stripping and the `docstube-source` package-export condition. `pnpm dev wizard` also starts the
@@ -57,12 +57,11 @@ directly, keep syntax erasable, use extensionful relative imports, and do not ad
 `ts-node`, or custom loaders unless Node's built-in support is insufficient for a specific
 documented reason.
 
-## Build order
+## Acceptance
 
-`tasks.md` is derived from `PLAN.md` and records the S0 through S9 dependency order. The
-supervised implementation pass has completed that queue in source, so use `tasks.md` as an
-acceptance ledger and regression checklist. Do not restart the whole queue unless the repo is
-intentionally reset; fix the failing task-owned area directly.
+`ACCEPTANCE.md` summarizes the executable gates for the completed implementation. Do not recreate
+the historical task queue unless the repo is intentionally reset; fix the failing product area
+directly and add or update focused coverage.
 
 The project infrastructure and product surfaces are in place: workspace layout, tooling, CI,
 deployment, release workflow, npm publishing, standalone binaries, Stacktape-hosted install
@@ -77,10 +76,11 @@ only infrastructure placeholders unless explicitly assigned that work.
 
 When supervising future fixes:
 
-- Use `tasks.md` to identify the owning task and acceptance evidence.
+- Use `PLAN.md` to identify the owning product area and `ACCEPTANCE.md` to identify existing
+  acceptance evidence.
 - Each fix should produce a focused commit.
-- If a task fails review repeatedly, inspect the failing diff and tests, fix manually or adjust the
-  task prompt, then rerun that bounded task.
+- If a fix fails review repeatedly, inspect the failing diff and tests, fix manually or adjust the
+  prompt, then rerun that bounded check.
 
 ## Package layout
 

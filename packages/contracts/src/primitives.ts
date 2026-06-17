@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Lowercase kebab-case identifier shared by page IDs, section IDs, and slugs.
-// Concrete page/section ID rules layer on top of this primitive in later tasks.
+// Concrete page/section ID rules layer on top of this primitive in page contracts.
 export const identifierSchema = z
   .string()
   .min(1, { error: 'identifier must not be empty' })

@@ -13,8 +13,8 @@ describe('dogfood docs builder', () => {
     const dir = await mkdtemp(join(tmpdir(), 'docstube-dogfood-'));
     try {
       await Promise.all([
+        copyFile(repoFile('ACCEPTANCE.md'), join(dir, 'ACCEPTANCE.md')),
         copyFile(repoFile('PLAN.md'), join(dir, 'PLAN.md')),
-        copyFile(repoFile('tasks.md'), join(dir, 'tasks.md')),
         copyFile(repoFile('package.json'), join(dir, 'package.json'))
       ]);
 
@@ -26,12 +26,12 @@ describe('dogfood docs builder', () => {
         liveAgents?: unknown;
         reviewRequired?: unknown;
         siteBuilt?: unknown;
-        taskCount?: unknown;
+        acceptanceEvidenceCount?: unknown;
       };
 
       expect(result.generatedPages).toEqual([
         { id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' },
-        { id: 'tasks', path: 'docs/src/pages/tasks.mdx', status: 'passed' }
+        { id: 'acceptance', path: 'docs/src/pages/acceptance.mdx', status: 'passed' }
       ]);
       expect(result.files).toContain('workspace/docs/dist/index.html');
       expect(result.files).toContain('workspace/docs/dist/llms.txt');
@@ -45,7 +45,7 @@ describe('dogfood docs builder', () => {
       expect(manifest.liveAgents).toBe(false);
       expect(manifest.reviewRequired).toBe(true);
       expect(manifest.siteBuilt).toBe(true);
-      expect(typeof manifest.taskCount).toBe('number');
+      expect(typeof manifest.acceptanceEvidenceCount).toBe('number');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
