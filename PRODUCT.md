@@ -381,31 +381,11 @@ Privacy wording rule: docstube never sends source to docstube servers; source ma
 user's chosen AI provider through the user's own credentials, exactly like their normal agent
 usage.
 
-## Implementation stages
+## Target user outcome
 
-The implementation was built in this dependency order, which is still useful when debugging a
-regression or choosing the owner for a focused fix:
-
-| Step | Focus                                                            | Gate                                |
-| ---- | ---------------------------------------------------------------- | ----------------------------------- |
-| S0   | contracts, schemas, state skeleton, mock agent, walking skeleton | stable interfaces and fixture proof |
-| S1   | codemap and extractors                                           | deterministic source facts          |
-| S2   | verifiers                                                        | trust gate before generation        |
-| S3   | agent adapters and usage caps                                    | replayable agent execution          |
-| S4   | theme and generated site                                         | real render target                  |
-| S5   | orchestrator, skills, source loaders, changelog                  | integrated generation loop          |
-| S6   | refresh engine and `LocalBackend`                                | efficient updates                   |
-| S7   | local UI                                                         | wizard, progress, review            |
-| S8   | CLI polish, GitHub Action, runtime telemetry                     | user-facing shells                  |
-| S9   | evals and dogfood                                                | calibrated quality proof            |
-
-Future changes should close with focused tests or fixtures plus `pnpm run validate` unless a
-narrower check is explicitly justified. Do not make broad UI, adapter, or theme changes that break
-the earlier contract and walking-skeleton assumptions.
-
-Definition of done: a stranger runs `npx docstube wizard`, accepts generated config, runs
-`npx docstube generate` on a TS or Python repo and gets a verified, polished docs site, then
-`docstube refresh` keeps it current and `docstube refine` improves the worst pages first.
+A stranger can run `npx docstube wizard`, accept or edit generated config, run
+`npx docstube generate` on a TS or Python repo, and get a verified, polished docs site. Later,
+`docstube refresh` keeps it current and `docstube refine` improves the weakest pages first.
 
 ## Release and deployment reference
 
