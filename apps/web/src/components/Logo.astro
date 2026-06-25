@@ -1,0 +1,29 @@
+---
+type Props = {
+  size?: number;
+  href?: string | null;
+  wordmark?: boolean;
+  class?: string;
+};
+
+const { size = 34, href = '/', wordmark = true, class: className = '' } = Astro.props;
+const Tag = href ? 'a' : 'div';
+// Tight, icon-forward lockup: small gap, wordmark a touch smaller than the mark.
+const gap = Math.round(size * 0.1);
+const fontSize = Math.round(size * 0.66);
+---
+
+<Tag
+  {...href ? { href } : {}}
+  class={`inline-flex items-center ${className}`}
+  style={`line-height:1;gap:${gap}px`}
+>
+  <img src="/brand/docstube-icon.svg" alt="" width={size} height={size} style={`width:${size}px;height:${size}px`} />
+  {
+    wordmark && (
+      <span class="font-display font-bold tracking-tight text-ink" style={`font-size:${fontSize}px`}>
+        docs<span class="text-brand-500">tube</span>
+      </span>
+    )
+  }
+</Tag>

@@ -1,0 +1,243 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import VerifierCascade from '../components/VerifierCascade.astro';
+import RunsOn from '../components/RunsOn.astro';
+import Steps from '../components/Steps.astro';
+import Pillars from '../components/Pillars.astro';
+import DriftReport from '../components/DriftReport.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import UseCases from '../components/UseCases.astro';
+import BuiltForAgents from '../components/BuiltForAgents.astro';
+import Pricing from '../components/Pricing.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site } from '../data/site.ts';
+
+// Benefit-led "why docstube" list. Each one-liner is anchored to a mechanism,
+// no absolutes - claims map to what the engine actually does.
+const benefits = [
+  {
+    title: 'Verified, not hallucinated',
+    body: 'Samples type-check, imports resolve, and API references are matched to your real compiler signatures - anything unverifiable ships flagged, never silently wrong.'
+  },
+  {
+    title: 'Complete',
+    body: 'Generated from a structural map of your whole codebase, so the things that matter get documented instead of quietly left out.'
+  },
+  {
+    title: 'Written for your readers',
+    body: 'Define your reader personas once. A reviewer agent per persona checks every page for the right depth and tone before it ships.'
+  },
+  {
+    title: 'Efficient regeneration',
+    body: 'Change your code and only the affected pages regenerate, tracked at the symbol level - locally or via a GitHub Action that opens a PR.'
+  },
+  {
+    title: 'Bring your own AI',
+    body: 'Your Claude, Codex, or Gemini subscription or an API key. No token markup, spend caps you control, and your source never leaves your machine.'
+  },
+  {
+    title: 'Beautiful and modern',
+    body: 'A self-contained Astro site you own - fast, with built-in search, rendered D2 diagrams, and an autolinked glossary.'
+  },
+  {
+    title: 'Open source',
+    body: 'Generates plain MDX, MIT-licensed, with zero lock-in. Nothing to keep paying for to keep your docs online.'
+  }
+];
+---
+
+<Base
+  title="docstube - verified, always-current docs generated from your code"
+  description="docstube reads your codebase, writes your docs, fact-checks every claim against the source, and keeps everything in sync as your code changes. Open-source, MIT, and runs on the AI you already pay for."
+  variant="v7 · verified, always-current docs"
+>
+  <Header />
+
+  <main>
+    <!-- Hero - centered, benefit-led, with the verifier cascade beneath -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto flex max-w-4xl flex-col items-center gap-7 px-5 py-20 text-center sm:px-8 lg:py-28">
+        <span class="eyebrow relative z-10">
+          <span class="h-1.5 w-1.5 rounded-full bg-pass"></span>
+          Open source · MIT · bring your own AI
+        </span>
+
+        <h1 class="relative z-10 text-4xl font-extrabold sm:text-[60px] sm:leading-[1.0]">
+          <span class="gradient-text">Verified, always-current</span> documentation,
+          generated from your code.
+        </h1>
+
+        <p class="relative z-10 max-w-2xl text-[18px] leading-relaxed text-muted">
+          docstube reads your codebase, writes your docs, fact-checks every claim against the source, and keeps
+          everything in sync as your code changes. Open-source, and runs on the AI you already pay for.
+        </p>
+
+        <div class="relative z-10 flex flex-col gap-3 sm:flex-row">
+          <a href={site.repo} class="btn btn-primary">Get started</a>
+          <a href="#how" class="btn btn-secondary">How it works</a>
+        </div>
+
+        <div class="relative z-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[12.5px] text-muted">
+          <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> samples type-check</span>
+          <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> no token markup</span>
+          <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> your code stays local</span>
+        </div>
+
+        <div class="relative z-10 mt-4 w-full max-w-2xl text-left float-slow">
+          <VerifierCascade />
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn />
+    </div>
+
+    <!-- Why docstube - the benefit-led, scannable core of this variant -->
+    <Section
+      id="why"
+      eyebrow="Why docstube"
+      title="Docs you can actually trust - and never have to babysit."
+      intro="Everything below maps to something the engine does. No absolutes, no “zero hallucinations” - just verifiable claims and a clear flag when something needs a human."
+    >
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          benefits.map((b) => (
+            <div class="surface hover-lift flex flex-col gap-3 p-6">
+              <div class="flex items-center gap-3">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+                <h3 class="font-display text-[17px] font-semibold text-ink">{b.title}</h3>
+              </div>
+              <p class="text-[14px] leading-relaxed text-muted">{b.body}</p>
+            </div>
+          ))
+        }
+        <div class="surface-tint flex flex-col justify-center gap-3 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">The honest promise</span>
+          <p class="text-[14.5px] leading-relaxed text-ink-soft">
+            We don’t claim perfection. Anything that can’t be mechanically verified ships
+            <span class="font-semibold text-ink"> flagged, never silently wrong</span> - with the finding attached.
+          </p>
+        </div>
+      </div>
+    </Section>
+
+    <!-- How it works -->
+    <Section
+      id="how"
+      eyebrow="How it works"
+      title="Generate, review, verify, ship - then stay in sync."
+      intro="Point it at a repo and it runs autonomously: a structural map, a writer agent, persona reviewers, and deterministic verifiers - every page passes the gate or ships clearly flagged."
+      tone="paper"
+    >
+      <Steps />
+    </Section>
+
+    <!-- Four pillars - balanced, equal weight -->
+    <Section
+      eyebrow="What you get"
+      title="Four pillars, equal weight."
+      intro="Verified, always current, written for your readers, and running on AI you already pay for. None of them is an afterthought."
+    >
+      <Pillars columns={4} />
+    </Section>
+
+    <!-- Verification -->
+    <Section
+      id="verify"
+      eyebrow="Verification"
+      title="Mechanically checked, not vibe-checked."
+      intro="Reviewer agents judge audience fit. But before any page ships, deterministic verifiers run real tools against it - tsc, pyright, link and import resolution, D2 rendering, API references matched to the compiler."
+      tone="paper"
+    >
+      <div class="grid items-start gap-6 lg:grid-cols-2">
+        <div class="flex flex-col gap-6">
+          <VerifierCascade command="npx docstube refresh" caption="api/create-client.mdx" />
+          <div class="surface-tint flex items-center gap-4 p-6">
+            <span class="font-display text-[40px] font-bold leading-none gradient-text">⚠</span>
+            <p class="text-[14.5px] leading-relaxed text-ink-soft">
+              The honest promise isn’t “zero hallucinations.” It’s that anything unverifiable is
+              <span class="font-semibold text-ink"> flagged, never silently wrong</span>.
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-col gap-6">
+          <DriftReport />
+          <div class="surface flex flex-col gap-3 p-6">
+            <h3 class="font-display text-[18px] font-semibold text-ink">Same gate as your CI</h3>
+            <p class="text-[14px] leading-relaxed text-muted">
+              A page that can’t pass doesn’t quietly ship. It retries with the verifier’s feedback, or it ships flagged
+              for a human - with the exact finding attached, so review takes seconds, not an afternoon.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Comparison -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="Active generation. Mechanical verification. Yours."
+      intro="Hosting platforms organize the docs you write by hand. AI tools generate text and hope. docstube generates from your code, verifies the output, and hands you a site you own."
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <Quadrant />
+        <CompareTable />
+      </div>
+    </Section>
+
+    <!-- Use cases -->
+    <Section eyebrow="Use cases" title="One engine, three jobs." tone="paper">
+      <UseCases />
+    </Section>
+
+    <!-- Built for agents -->
+    <Section eyebrow="Built for agents" title="Docs your LLMs can read, too.">
+      <BuiltForAgents />
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Every feature."
+      intro="The open-source tool is the whole product - you pay only for your own AI usage, with caps you set. A hosted Cloud tier is optional, for teams that want everything in one place."
+      tone="paper"
+    >
+      <Pricing />
+    </Section>
+
+    <!-- Open source band -->
+    <Section eyebrow="Open source" title="MIT, free, and yours.">
+      <div class="surface mx-auto flex max-w-3xl flex-col items-center gap-5 p-8 text-center">
+        <p class="text-[16px] leading-relaxed text-muted">
+          docstube generates a self-contained Astro + MDX site into your repo. No platform to pay to keep your docs
+          online, no lock-in, no token markup. Run it locally or wire up the GitHub Action.
+        </p>
+        <a href={site.repo} class="btn btn-secondary">Star on GitHub</a>
+      </div>
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Generate docs you can trust."
+      sub="Point docstube at your repo and get a verified, always-current site you own - on the AI you already pay for. Free and open-source."
+    />
+  </main>
+
+  <Footer current={7} />
+</Base>

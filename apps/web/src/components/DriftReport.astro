@@ -1,0 +1,36 @@
+---
+// Illustrative drift report: where docs disagree with code after a change.
+const items = [
+  { sev: 'flag', code: 'getUser(id)', note: 'signature changed → 2 pages affected' },
+  { sev: 'flag', code: 'POST /v2/sessions', note: 'endpoint removed → 1 page flagged' },
+  { sev: 'new', code: 'export useFlags()', note: 'new export → undocumented' },
+  { sev: 'ok', code: 'auth/overview.mdx', note: 'still matches source' }
+];
+const dot: Record<string, string> = { flag: 'bg-flag', new: 'bg-brand-400', ok: 'bg-pass' };
+---
+
+<div class="surface overflow-hidden">
+  <div class="flex items-center justify-between border-b border-line px-5 py-4">
+    <div class="flex items-center gap-2.5">
+      <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-flag/10 text-flag">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 14V3a1 1 0 011-1h7l-1.5 3L11 8H4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </span>
+      <h3 class="font-display text-[16px] font-semibold text-ink">Drift report</h3>
+    </div>
+    <span class="font-mono text-[11px] text-muted">example</span>
+  </div>
+  <ul class="divide-y divide-line">
+    {
+      items.map((it) => (
+        <li class="flex items-center gap-3 px-5 py-3.5">
+          <span class={`h-2 w-2 shrink-0 rounded-full ${dot[it.sev]}`} />
+          <code class="font-mono text-[13px] text-ink">{it.code}</code>
+          <span class="ml-auto text-right text-[13px] text-muted">{it.note}</span>
+        </li>
+      ))
+    }
+  </ul>
+  <div class="border-t border-line bg-canvas px-5 py-3.5 text-[13px] text-muted">
+    <span class="font-mono text-brand-600">docstube refresh</span> regenerates only the affected pages.
+  </div>
+</div>

@@ -1,0 +1,1075 @@
+---
+// Animated hero demo: a slow, narrated, looping walkthrough of one docstube run.
+// A narration band states what is happening and why; three scenes play below it:
+//   1. Configure  - an obvious wizard: labeled questions get answered, then the
+//                   cursor clicks "Generate docs".
+//   2. Generate   - a writer agent reads your code and writes the page (streaming).
+//   3. Verify+fix - a Verifier checks the page, catches a stale example, and hands
+//                   it back to the Writer agent, which fixes it; the score passes.
+// Pure CSS + a small vanilla controller, no React. Honors prefers-reduced-motion
+// by parking on the resolved "passed" state instead of looping.
+---
+
+<div
+  id="hero-demo"
+  class="relative z-10 w-full"
+  data-state="configure"
+  role="img"
+  aria-label="Animated walkthrough of docstube. Step 1: you answer a few questions in a wizard. Step 2: a writer agent reads your code and writes the documentation page. Step 3: a verifier checks the page, catches an out-of-date code example, and sends it back to the writer agent, which fixes it until the page passes the quality gate."
+>
+  <div class="surface overflow-hidden">
+    <!-- Frame top bar -->
+    <div class="flex items-center gap-2 border-b border-line bg-canvas px-4 py-2.5">
+      <span class="flex gap-1.5" aria-hidden="true">
+        <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+        <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+        <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+      </span>
+      <span class="ml-1 font-mono text-[12px] text-muted">docstube</span>
+      <span class="hd-pill ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[11px]">
+        <span class="hd-pill-dot inline-block h-[7px] w-[7px] rounded-full"></span>
+        <span class="hd-pill-text">setup</span>
+      </span>
+    </div>
+
+    <!-- Narration band: the what + why, in plain words -->
+    <div class="flex items-center gap-3 border-b border-line bg-paper px-4 py-3">
+      <span class="hd-narr-num">1</span>
+      <div class="hd-narr-body min-w-0">
+        <p class="hd-narr-step font-mono text-[10.5px] font-semibold uppercase tracking-wider text-brand-700">Step 1 of 3</p>
+        <p class="hd-narr-title font-display text-[15px] font-semibold leading-tight text-ink">You set it up in a wizard</p>
+        <p class="hd-narr-sub text-[12px] leading-snug text-muted">Pick a doc type and who the docs are for.</p>
+      </div>
+    </div>
+
+    <!-- Stage: scenes cross-fade in place -->
+    <div class="hd-stage" aria-hidden="true">
+      <!-- ---------- Scene 1: Configure (a wizard) ---------- -->
+      <div class="hd-scene hd-scene--configure">
+        <div class="flex h-full flex-col">
+          <!-- Question 1 -->
+          <p class="hd-q">What are you documenting?</p>
+          <div class="hd-slot mt-1.5">
+            <span class="hd-ghost">choose a doc type...</span>
+            <span class="hd-answer hd-answer--type">
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Public docs site
+            </span>
+          </div>
+
+          <!-- Question 2 -->
+          <p class="hd-q mt-4">Who will read it?</p>
+          <div class="hd-slot hd-slot--tall mt-1.5">
+            <span class="hd-ghost">add your readers...</span>
+            <div class="hd-answer hd-answer--readers">
+              <span class="hd-reader hd-reader--1"><span class="hd-ava">N</span> New integrator</span>
+              <span class="hd-reader hd-reader--2"><span class="hd-ava">P</span> Platform engineer</span>
+            </div>
+          </div>
+
+          <!-- Generate -->
+          <div class="relative mt-auto pt-5">
+            <button type="button" class="hd-gen btn btn-primary w-full">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3m0 12v3M5 12H2m20 0h-3M6.3 6.3 4.2 4.2m15.6 15.6-2.1-2.1m0-11.4 2.1-2.1M6.3 17.7l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+              Generate docs
+              <span class="hd-ripple"></span>
+            </button>
+            <svg class="hd-cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 2.3 9.9 18.2l2.4-6.5 6.6-2.2L4.6 2.3Z" fill="#0e2b2d" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Scene 2: Generate ---------- -->
+      <div class="hd-scene hd-scene--writing">
+        <div class="flex h-full flex-col">
+          <div class="flex items-center gap-2.5">
+            <span class="hd-spin"></span>
+            <span class="text-[13.5px] font-semibold text-ink">Writer agent</span>
+            <span class="hd-chip-mono">claude</span>
+          </div>
+
+          <div class="mt-3 flex items-center gap-2 font-mono text-[11.5px] text-muted">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" class="shrink-0 text-brand-500" aria-hidden="true"><path d="M4 2.5h5L12.5 6v7.5H4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M9 2.5V6h3.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            reading <span class="text-ink-soft">src/auth/session.ts</span>
+          </div>
+          <p class="mt-2 inline-flex items-center gap-1.5 font-mono text-[11.5px] text-brand-600">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+            writing guides/authentication.mdx
+          </p>
+
+          <div class="mt-2 flex-1 rounded-xl border border-line bg-paper p-4">
+            <div class="hd-wline hd-wline--title" style="--w:46%;--d:.1s"></div>
+            <div class="hd-wline" style="--w:92%;--d:.7s"></div>
+            <div class="hd-wline" style="--w:80%;--d:1.1s"></div>
+            <div class="hd-code mt-3">
+              <div class="hd-cline" style="--w:56%;--d:1.6s;--c:#3ad0c0"></div>
+              <div class="hd-cline" style="--w:82%;--d:2.0s;--c:#2b4b47"></div>
+              <div class="hd-cline" style="--w:44%;--d:2.4s;--c:#2b4b47"></div>
+            </div>
+            <div class="hd-wline mt-3" style="--w:70%;--d:2.9s"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Scene 3: Verify + fix (two actors, one loop) ---------- -->
+      <div class="hd-scene hd-scene--verify">
+        <div class="flex h-full flex-col">
+          <!-- Writer agent (the one who fixes) -->
+          <div class="hd-actor">
+            <span class="hd-actor-ico hd-actor-ico--writer">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16M5 16l9.5-9.5a1.8 1.8 0 0 1 2.5 0l.5.5a1.8 1.8 0 0 1 0 2.5L8 19l-4 1 1-4Z"/></svg>
+            </span>
+            <div class="min-w-0">
+              <p class="hd-actor-name">Writer agent</p>
+              <p class="hd-actor-state hd-writer-state">wrote the page</p>
+            </div>
+            <span class="hd-writer-spin hd-spin hd-spin--sm ml-auto"></span>
+          </div>
+
+          <!-- The hand-off channel between the two actors -->
+          <div class="hd-wire">
+            <span class="hd-wire-track"></span>
+            <span class="hd-packet"></span>
+            <span class="hd-wire-cap">handing the draft to the verifier</span>
+          </div>
+
+          <!-- Verifier (the one who checks) -->
+          <div class="hd-actor hd-actor--top">
+            <span class="hd-actor-ico hd-actor-ico--verifier">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 11.5l2 2 4-4.5"/></svg>
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="hd-actor-name">Verifier <span class="font-normal text-muted">· runs real checks</span></p>
+              <div class="mt-2 space-y-1.5">
+                <div class="hd-c2" data-row="0">
+                  <span class="hd-c2-ico"></span><span>Code samples run</span>
+                </div>
+                <div class="hd-c2" data-row="1">
+                  <span class="hd-c2-ico"></span><span>Links work</span>
+                </div>
+                <div class="hd-c2 hd-c2--target" data-row="2">
+                  <span class="hd-c2-ico"></span><span class="hd-c2-label">Examples match your code</span>
+                </div>
+                <p class="hd-finding">getSession() example is out of date</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quality score + gate -->
+          <div class="mt-auto pt-3">
+            <div class="flex items-center justify-between">
+              <span class="hd-ey">quality score</span>
+              <span class="font-mono text-[12px] text-ink-soft"><span class="hd-score font-semibold">0.62</span> <span class="text-muted">/ 1.0</span></span>
+            </div>
+            <div class="hd-bar mt-1.5">
+              <div class="hd-bar-fill"></div>
+              <span class="hd-bar-gate"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- shipped toast, overlays on loop close -->
+      <div class="hd-toast">
+        <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Page shipped, verified
+      </div>
+    </div>
+
+    <!-- Footer: three-step progress rail -->
+    <div class="flex items-center justify-center gap-2.5 border-t border-line bg-canvas px-4 py-2.5">
+      <span class="hd-step" data-step="configure">1 · Configure</span>
+      <span class="hd-sep">›</span>
+      <span class="hd-step" data-step="writing">2 · Generate</span>
+      <span class="hd-sep">›</span>
+      <span class="hd-step" data-step="verify">3 · Verify &amp; fix</span>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  #hero-demo .hd-stage {
+    position: relative;
+    height: 332px;
+    overflow: hidden;
+  }
+  @media (min-width: 1024px) {
+    #hero-demo .hd-stage {
+      height: 352px;
+    }
+  }
+
+  /* Narration band */
+  #hero-demo .hd-narr-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-brand-500);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    transition: background 0.4s ease;
+  }
+  #hero-demo .hd-narr-num.is-pass {
+    background: var(--color-pass);
+  }
+  #hero-demo .hd-narr-body {
+    transition: opacity 0.25s ease;
+  }
+  #hero-demo .hd-narr-body.is-swapping {
+    opacity: 0;
+  }
+
+  /* Scene cross-fade */
+  #hero-demo .hd-scene {
+    position: absolute;
+    inset: 0;
+    padding: 18px 18px 16px;
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+    transition:
+      opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+  #hero-demo[data-state='configure'] .hd-scene--configure,
+  #hero-demo[data-state='press'] .hd-scene--configure,
+  #hero-demo[data-state='writing'] .hd-scene--writing,
+  #hero-demo[data-state='verify'] .hd-scene--verify,
+  #hero-demo[data-state='passed'] .hd-scene--verify,
+  #hero-demo[data-state='shipped'] .hd-scene--verify {
+    opacity: 1;
+    transform: none;
+  }
+
+  #hero-demo .hd-ey {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-brand-700);
+  }
+
+  /* Spinner */
+  #hero-demo .hd-spin {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border-radius: 999px;
+    border: 2px solid var(--color-brand-200);
+    border-top-color: var(--color-brand-500);
+    animation: hd-spin 0.8s linear infinite;
+  }
+  #hero-demo .hd-spin--sm {
+    width: 11px;
+    height: 11px;
+    border-width: 1.6px;
+  }
+  @keyframes hd-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* --- Scene 1: wizard form --- */
+  #hero-demo .hd-q {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  #hero-demo .hd-slot {
+    position: relative;
+    min-height: 40px;
+  }
+  #hero-demo .hd-slot--tall {
+    min-height: 80px;
+  }
+  #hero-demo .hd-ghost {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border: 1px dashed var(--color-line-strong);
+    border-radius: 10px;
+    font-size: 12.5px;
+    color: var(--color-muted);
+    background: var(--color-canvas);
+    transition: opacity 0.4s ease;
+  }
+  #hero-demo .hd-answer {
+    opacity: 0;
+    transform: translateY(5px) scale(0.99);
+    transition:
+      opacity 0.45s ease,
+      transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #hero-demo .hd-answer--type {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 13px;
+    border: 1px solid var(--color-brand-300);
+    border-radius: 10px;
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  #hero-demo .hd-answer--readers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #hero-demo .hd-reader {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 11px;
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    background: var(--color-paper);
+    font-size: 13px;
+    color: var(--color-ink-soft);
+    opacity: 0;
+    transform: translateY(5px);
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #hero-demo .hd-ava {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 21px;
+    height: 21px;
+    flex: none;
+    border-radius: 999px;
+    background: var(--color-brand-100);
+    color: var(--color-brand-700);
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  /* progressive fill */
+  #hero-demo.hd-f1 .hd-answer--type {
+    opacity: 1;
+    transform: none;
+  }
+  #hero-demo.hd-f1 .hd-slot:not(.hd-slot--tall) .hd-ghost {
+    opacity: 0;
+  }
+  #hero-demo.hd-f2 .hd-answer--readers,
+  #hero-demo.hd-f3 .hd-answer--readers {
+    opacity: 1;
+    transform: none;
+  }
+  #hero-demo.hd-f2 .hd-slot--tall .hd-ghost,
+  #hero-demo.hd-f3 .hd-slot--tall .hd-ghost {
+    opacity: 0;
+  }
+  #hero-demo.hd-f2 .hd-reader--1,
+  #hero-demo.hd-f3 .hd-reader--1 {
+    opacity: 1;
+    transform: none;
+  }
+  #hero-demo.hd-f3 .hd-reader--2 {
+    opacity: 1;
+    transform: none;
+  }
+
+  #hero-demo .hd-gen {
+    position: relative;
+    overflow: hidden;
+    transition:
+      transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.2s ease;
+  }
+  #hero-demo .hd-gen.is-press {
+    transform: scale(0.975);
+  }
+  #hero-demo .hd-ripple {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.55);
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+    pointer-events: none;
+  }
+  #hero-demo .hd-gen.is-press .hd-ripple {
+    animation: hd-ripple 0.6s ease-out;
+  }
+  @keyframes hd-ripple {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(28);
+      opacity: 0;
+    }
+  }
+  #hero-demo .hd-cursor {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 19px;
+    height: 19px;
+    filter: drop-shadow(0 2px 3px rgba(13, 50, 48, 0.28));
+    transform: translate(64px, 58px);
+    transition: transform 0.85s cubic-bezier(0.5, 0, 0.2, 1);
+    pointer-events: none;
+  }
+  #hero-demo .hd-cursor.is-armed {
+    transform: translate(-8px, 30px);
+  }
+
+  /* --- Scene 2: writing --- */
+  #hero-demo .hd-chip-mono {
+    border: 1px solid var(--color-line);
+    background: var(--color-canvas);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+  #hero-demo .hd-wline {
+    height: 9px;
+    border-radius: 5px;
+    background: var(--color-line);
+    width: 9%;
+    transition: width 0.6s ease;
+    transition-delay: var(--d, 0s);
+  }
+  #hero-demo .hd-wline + .hd-wline {
+    margin-top: 9px;
+  }
+  #hero-demo .hd-wline--title {
+    height: 12px;
+    background: var(--color-brand-100);
+  }
+  #hero-demo[data-state='writing'] .hd-wline {
+    width: var(--w, 80%);
+  }
+  #hero-demo .hd-code {
+    background: var(--color-night);
+    border-radius: 10px;
+    padding: 11px 12px;
+  }
+  #hero-demo .hd-cline {
+    height: 7px;
+    border-radius: 4px;
+    background: var(--c, #2b4b47);
+    width: 11%;
+    transition: width 0.6s ease;
+    transition-delay: var(--d, 0s);
+    opacity: 0.85;
+  }
+  #hero-demo .hd-cline + .hd-cline {
+    margin-top: 7px;
+  }
+  #hero-demo[data-state='writing'] .hd-cline {
+    width: var(--w, 70%);
+  }
+
+  /* --- Scene 3: two actors --- */
+  #hero-demo .hd-actor {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+  #hero-demo .hd-actor-ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: 9px;
+    transition:
+      box-shadow 0.3s ease,
+      background 0.3s ease;
+  }
+  #hero-demo .hd-actor-ico--writer {
+    background: var(--color-brand-50);
+    color: var(--color-brand-600);
+    border: 1px solid var(--color-brand-200);
+  }
+  #hero-demo .hd-actor-ico--writer.is-busy {
+    box-shadow: 0 0 0 4px rgba(0, 151, 161, 0.16);
+  }
+  #hero-demo .hd-actor-ico--verifier {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    border: 1px solid var(--color-line-strong);
+  }
+  #hero-demo .hd-actor-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+  #hero-demo .hd-actor-state {
+    font-size: 11.5px;
+    color: var(--color-muted);
+  }
+  #hero-demo .hd-writer-spin {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  #hero-demo .hd-writer-spin.is-on {
+    opacity: 1;
+  }
+
+  /* Hand-off channel */
+  #hero-demo .hd-wire {
+    position: relative;
+    height: 30px;
+    margin: 2px 0 2px 15px;
+    padding-left: 18px;
+    display: flex;
+    align-items: center;
+  }
+  #hero-demo .hd-wire-track {
+    position: absolute;
+    left: 0;
+    top: -4px;
+    bottom: -4px;
+    width: 0;
+    border-left: 2px dashed var(--color-line-strong);
+  }
+  #hero-demo .hd-packet {
+    position: absolute;
+    left: -4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    background: var(--color-brand-500);
+    box-shadow: 0 0 0 3px rgba(0, 151, 161, 0.16);
+    top: -2px;
+    transition:
+      top 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+      background 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+  #hero-demo .hd-packet.is-down {
+    top: calc(100% - 7px);
+  }
+  #hero-demo .hd-packet.is-flag {
+    background: var(--color-flag);
+    box-shadow: 0 0 0 3px rgba(194, 121, 11, 0.18);
+  }
+  #hero-demo .hd-packet.is-pass {
+    background: var(--color-pass);
+    box-shadow: 0 0 0 3px rgba(21, 160, 107, 0.18);
+  }
+  #hero-demo .hd-wire-cap {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted);
+    transition: color 0.3s ease;
+  }
+  #hero-demo .hd-wire-cap.is-flag {
+    color: var(--color-flag);
+  }
+  #hero-demo .hd-wire-cap.is-pass {
+    color: var(--color-pass);
+  }
+
+  /* Verifier checklist */
+  #hero-demo .hd-c2 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12.5px;
+    color: var(--color-ink-soft);
+    opacity: 0;
+    transform: translateY(3px);
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s ease;
+  }
+  #hero-demo .hd-c2.is-on {
+    opacity: 1;
+    transform: none;
+  }
+  #hero-demo .hd-c2-ico {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    flex: none;
+    border-radius: 999px;
+  }
+  #hero-demo .hd-c2.is-pass .hd-c2-ico {
+    background: rgba(21, 160, 107, 0.14);
+    color: var(--color-pass);
+  }
+  #hero-demo .hd-c2.is-pass .hd-c2-ico::after {
+    content: '';
+    width: 8px;
+    height: 5px;
+    border-left: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+  #hero-demo .hd-c2.is-checking .hd-c2-ico {
+    border: 2px solid var(--color-brand-200);
+    border-top-color: var(--color-brand-500);
+    animation: hd-spin 0.8s linear infinite;
+  }
+  #hero-demo .hd-c2.is-fail .hd-c2-ico,
+  #hero-demo .hd-c2.is-fixing .hd-c2-ico {
+    background: rgba(194, 121, 11, 0.16);
+    color: var(--color-flag);
+  }
+  #hero-demo .hd-c2.is-fail .hd-c2-ico::after {
+    content: '!';
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  #hero-demo .hd-c2.is-fixing .hd-c2-ico {
+    background: transparent;
+    border: 2px solid rgba(194, 121, 11, 0.35);
+    border-top-color: var(--color-flag);
+    animation: hd-spin 0.8s linear infinite;
+  }
+  #hero-demo .hd-c2.is-fail .hd-c2-label,
+  #hero-demo .hd-c2.is-fixing .hd-c2-label {
+    color: var(--color-flag);
+    font-weight: 600;
+  }
+
+  #hero-demo .hd-finding {
+    margin-left: 26px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: var(--color-flag);
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition:
+      opacity 0.35s ease,
+      max-height 0.35s ease,
+      color 0.35s ease;
+  }
+  #hero-demo .hd-finding.is-on {
+    opacity: 1;
+    max-height: 40px;
+  }
+  #hero-demo .hd-finding.is-pass {
+    color: var(--color-pass);
+  }
+
+  /* Score + gate */
+  #hero-demo .hd-bar {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-line);
+    overflow: hidden;
+  }
+  #hero-demo .hd-bar-fill {
+    height: 100%;
+    width: 62%;
+    border-radius: 999px;
+    background: var(--color-flag);
+    transition:
+      width 1s cubic-bezier(0.4, 0, 0.2, 1),
+      background 0.5s ease;
+  }
+  #hero-demo .hd-bar-fill.is-pass {
+    background: linear-gradient(90deg, var(--color-brand-500), var(--color-brand-400));
+  }
+  #hero-demo .hd-bar-gate {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    left: 90%;
+    width: 2px;
+    background: var(--color-paper);
+    box-shadow: 0 0 0 1px var(--color-line-strong);
+  }
+
+  /* Top-right status pill */
+  #hero-demo .hd-pill {
+    background: var(--color-canvas);
+    border-color: var(--color-line);
+    color: var(--color-muted);
+  }
+  #hero-demo .hd-pill-dot {
+    background: var(--color-line-strong);
+  }
+  #hero-demo .hd-pill.is-run {
+    border-color: var(--color-brand-200);
+    background: var(--color-brand-50);
+    color: var(--color-brand-700);
+  }
+  #hero-demo .hd-pill.is-flag {
+    border-color: rgba(194, 121, 11, 0.3);
+    background: rgba(194, 121, 11, 0.1);
+    color: var(--color-flag);
+  }
+  #hero-demo .hd-pill.is-pass {
+    border-color: rgba(21, 160, 107, 0.3);
+    background: rgba(21, 160, 107, 0.1);
+    color: var(--color-pass);
+  }
+  #hero-demo .hd-pill.is-run .hd-pill-dot,
+  #hero-demo .hd-pill.is-flag .hd-pill-dot {
+    border-radius: 999px;
+    border: 1.6px solid currentColor;
+    border-top-color: transparent;
+    background: transparent;
+    animation: hd-spin 0.8s linear infinite;
+  }
+  #hero-demo .hd-pill.is-pass .hd-pill-dot {
+    background: var(--color-pass);
+  }
+
+  /* Shipped toast */
+  #hero-demo .hd-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: var(--color-ink);
+    color: #eafaf6;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: var(--shadow-lift);
+    opacity: 0;
+    transform: translate(-50%, 16px);
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+  }
+  #hero-demo .hd-toast svg {
+    color: #4fd6b0;
+  }
+  #hero-demo[data-state='shipped'] .hd-toast {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  /* Footer step rail */
+  #hero-demo .hd-step {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-muted);
+    transition: color 0.3s ease;
+  }
+  #hero-demo .hd-sep {
+    color: var(--color-line-strong);
+    font-size: 12px;
+  }
+  #hero-demo[data-state='configure'] [data-step='configure'],
+  #hero-demo[data-state='press'] [data-step='configure'],
+  #hero-demo[data-state='writing'] [data-step='writing'],
+  #hero-demo[data-state='verify'] [data-step='verify'],
+  #hero-demo[data-state='passed'] [data-step='verify'],
+  #hero-demo[data-state='shipped'] [data-step='verify'] {
+    color: var(--color-brand-600);
+  }
+
+  /* Freeze inner widgets while snapping back to the top of the loop */
+  #hero-demo.hd-reset .hd-bar-fill,
+  #hero-demo.hd-reset .hd-c2,
+  #hero-demo.hd-reset .hd-finding,
+  #hero-demo.hd-reset .hd-wline,
+  #hero-demo.hd-reset .hd-cline,
+  #hero-demo.hd-reset .hd-cursor,
+  #hero-demo.hd-reset .hd-packet,
+  #hero-demo.hd-reset .hd-answer,
+  #hero-demo.hd-reset .hd-reader,
+  #hero-demo.hd-reset .hd-ghost,
+  #hero-demo.hd-reset .hd-narr-body {
+    transition: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #hero-demo .hd-scene,
+    #hero-demo .hd-c2,
+    #hero-demo .hd-wline,
+    #hero-demo .hd-cline,
+    #hero-demo .hd-answer,
+    #hero-demo .hd-reader {
+      transition: none !important;
+    }
+  }
+</style>
+
+<script>
+  const root = document.getElementById('hero-demo');
+  if (root) {
+    const q = (sel: string) => root.querySelector(sel) as HTMLElement | null;
+    const rows = Array.from(root.querySelectorAll('.hd-c2')) as HTMLElement[];
+
+    const narrNum = q('.hd-narr-num');
+    const narrBody = q('.hd-narr-body');
+    const narrStep = q('.hd-narr-step');
+    const narrTitle = q('.hd-narr-title');
+    const narrSub = q('.hd-narr-sub');
+
+    const finding = q('.hd-finding');
+    const scoreEl = q('.hd-score');
+    const barFill = q('.hd-bar-fill');
+    const pill = q('.hd-pill');
+    const pillText = q('.hd-pill-text');
+    const gen = q('.hd-gen');
+    const cursor = q('.hd-cursor');
+    const writerIco = q('.hd-actor-ico--writer');
+    const writerState = q('.hd-writer-state');
+    const writerSpin = q('.hd-writer-spin');
+    const packet = q('.hd-packet');
+    const wireCap = q('.hd-wire-cap');
+
+    const FINDING_OPEN = 'getSession() example is out of date - it is missing a new argument';
+    const FINDING_FIXED = 'fixed - getSession() example now matches your code';
+
+    const NARR = {
+      configure: ['Step 1 of 3', 'You set it up in a wizard', 'Pick a doc type and who the docs are for.', 'brand'],
+      writing: ['Step 2 of 3', 'It writes the docs from your code', 'A writer agent reads your source and drafts each page.', 'brand'],
+      verify: ['Step 3 of 3', 'It checks every page, and fixes what is wrong', 'A verifier catches mistakes and sends them back to the writer.', 'brand'],
+      shipped: ['Done', 'You get docs you can trust', 'Anything it cannot verify is flagged, never silently wrong.', 'pass']
+    } as const;
+
+    const setState = (s: string) => root.setAttribute('data-state', s);
+
+    const setNarr = (key: keyof typeof NARR, instant = false) => {
+      const [step, title, sub, tone] = NARR[key];
+      const apply = () => {
+        if (narrStep) narrStep.textContent = step;
+        if (narrTitle) narrTitle.textContent = title;
+        if (narrSub) narrSub.textContent = sub;
+        if (narrNum) {
+          narrNum.textContent = key === 'shipped' ? '✓' : step.replace('Step ', '').charAt(0);
+          narrNum.classList.toggle('is-pass', tone === 'pass');
+        }
+      };
+      if (instant || !narrBody) {
+        apply();
+        narrBody?.classList.remove('is-swapping');
+        return;
+      }
+      narrBody.classList.add('is-swapping');
+      window.setTimeout(() => {
+        apply();
+        narrBody.classList.remove('is-swapping');
+      }, 240);
+    };
+
+    const setPill = (text: string, kind: 'idle' | 'run' | 'flag' | 'pass') => {
+      if (!pill || !pillText) return;
+      pillText.textContent = text;
+      pill.classList.remove('is-run', 'is-flag', 'is-pass');
+      if (kind !== 'idle') pill.classList.add(`is-${kind}`);
+    };
+
+    const setRow = (i: number, cls: string) => {
+      const r = rows[i];
+      if (r) r.className = `hd-c2${r.classList.contains('hd-c2--target') ? ' hd-c2--target' : ''} ${cls}`;
+    };
+
+    const setWire = (text: string, dir: 'down' | 'up', tone: 'brand' | 'flag' | 'pass') => {
+      if (wireCap) {
+        wireCap.textContent = text;
+        wireCap.classList.remove('is-flag', 'is-pass');
+        if (tone !== 'brand') wireCap.classList.add(`is-${tone}`);
+      }
+      if (packet) {
+        packet.classList.toggle('is-down', dir === 'down');
+        packet.classList.remove('is-flag', 'is-pass');
+        if (tone !== 'brand') packet.classList.add(`is-${tone}`);
+      }
+    };
+
+    const setWriter = (text: string, busy: boolean) => {
+      if (writerState) writerState.textContent = text;
+      writerIco?.classList.toggle('is-busy', busy);
+      writerSpin?.classList.toggle('is-on', busy);
+    };
+
+    let rafScore = 0;
+    const animateScore = (from: number, to: number, dur: number) => {
+      if (!scoreEl) return;
+      cancelAnimationFrame(rafScore);
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / dur);
+        const e = 1 - Math.pow(1 - t, 3);
+        scoreEl.textContent = (from + (to - from) * e).toFixed(2);
+        if (t < 1) rafScore = requestAnimationFrame(tick);
+      };
+      rafScore = requestAnimationFrame(tick);
+    };
+
+    // --- phase handlers ---
+    const toConfigure = () => {
+      root.classList.add('hd-reset');
+      setState('configure');
+      root.classList.remove('hd-f1', 'hd-f2', 'hd-f3');
+      setNarr('configure', true);
+      setPill('setup', 'idle');
+      gen?.classList.remove('is-press');
+      cursor?.classList.remove('is-armed');
+      // reset verify state
+      setRow(0, '');
+      setRow(1, '');
+      setRow(2, '');
+      finding?.classList.remove('is-on', 'is-pass');
+      if (finding) finding.textContent = FINDING_OPEN;
+      if (scoreEl) scoreEl.textContent = '0.62';
+      if (barFill) {
+        barFill.style.width = '62%';
+        barFill.classList.remove('is-pass');
+      }
+      setWriter('wrote the page', false);
+      if (packet) packet.classList.remove('is-down', 'is-flag', 'is-pass');
+      if (wireCap) wireCap.classList.remove('is-flag', 'is-pass');
+      void root.offsetWidth;
+      root.classList.remove('hd-reset');
+    };
+
+    const fillDocType = () => root.classList.add('hd-f1');
+    const addReader1 = () => root.classList.add('hd-f2');
+    const addReader2 = () => root.classList.add('hd-f3');
+    const armCursor = () => cursor?.classList.add('is-armed');
+    const pressGenerate = () => {
+      setState('press');
+      gen?.classList.add('is-press');
+    };
+
+    const toWriting = () => {
+      setState('writing');
+      setNarr('writing');
+      setPill('writing', 'run');
+    };
+
+    const toVerify = () => {
+      setState('verify');
+      setNarr('verify');
+      setPill('checking', 'run');
+      setWriter('wrote the page', false);
+      setWire('handing the draft to the verifier', 'down', 'brand');
+    };
+    const tick1 = () => setRow(0, 'is-on is-pass');
+    const tick2 = () => {
+      setRow(1, 'is-on is-pass');
+      setRow(2, 'is-on is-checking');
+    };
+    const foundIssue = () => {
+      setRow(2, 'is-on is-fail');
+      finding?.classList.add('is-on');
+      setPill('1 issue found', 'flag');
+      setWire('problem found in the page', 'down', 'flag');
+    };
+    const sendBack = () => {
+      setWire('sending it back to the writer', 'up', 'flag');
+      setWriter('rewriting the example...', true);
+      setRow(2, 'is-on is-fixing');
+    };
+    const reCheck = () => {
+      setWire('re-checking the fixed page', 'down', 'brand');
+      setPill('checking', 'run');
+    };
+    const toPassed = () => {
+      setState('passed');
+      setRow(2, 'is-on is-pass');
+      setWriter('fixed the example', false);
+      if (finding) finding.textContent = FINDING_FIXED;
+      finding?.classList.add('is-pass');
+      if (barFill) {
+        barFill.style.width = '94%';
+        barFill.classList.add('is-pass');
+      }
+      animateScore(0.62, 0.94, 1000);
+      setPill('all passed', 'pass');
+      setWire('all checks pass', 'down', 'pass');
+    };
+    const toShipped = () => {
+      setState('shipped');
+      setNarr('shipped');
+    };
+
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+    const staticPassed = () => {
+      setState('passed');
+      setNarr('shipped', true);
+      setPill('all passed', 'pass');
+      setRow(0, 'is-on is-pass');
+      setRow(1, 'is-on is-pass');
+      setRow(2, 'is-on is-pass');
+      setWriter('fixed the example', false);
+      finding?.classList.add('is-on', 'is-pass');
+      if (finding) finding.textContent = FINDING_FIXED;
+      if (scoreEl) scoreEl.textContent = '0.94';
+      if (barFill) {
+        barFill.style.width = '94%';
+        barFill.classList.add('is-pass');
+      }
+      setWire('all checks pass', 'down', 'pass');
+    };
+
+    // [fn, ms to hold before next]
+    const timeline: [() => void, number][] = [
+      [toConfigure, 900],
+      [fillDocType, 1500],
+      [addReader1, 1200],
+      [addReader2, 1500],
+      [armCursor, 1300],
+      [pressGenerate, 950],
+      [toWriting, 1300],
+      [() => {}, 3300],
+      [toVerify, 1700],
+      [tick1, 1100],
+      [tick2, 1500],
+      [foundIssue, 2000],
+      [sendBack, 2000],
+      [reCheck, 1600],
+      [toPassed, 2400],
+      [toShipped, 2400]
+    ];
+
+    let idx = 0;
+    let timer = 0;
+    const run = () => {
+      const [fn, dur] = timeline[idx];
+      fn();
+      idx = (idx + 1) % timeline.length;
+      timer = window.setTimeout(run, dur);
+    };
+
+    const start = () => {
+      window.clearTimeout(timer);
+      if (reduce.matches) {
+        staticPassed();
+      } else {
+        idx = 0;
+        run();
+      }
+    };
+
+    reduce.addEventListener?.('change', start);
+    start();
+  }
+</script>

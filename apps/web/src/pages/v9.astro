@@ -1,0 +1,280 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import VerifierCascade from '../components/VerifierCascade.astro';
+import CodeWindow from '../components/CodeWindow.astro';
+import RunsOn from '../components/RunsOn.astro';
+import StatStrip from '../components/StatStrip.astro';
+import Steps from '../components/Steps.astro';
+import DriftReport from '../components/DriftReport.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import UseCases from '../components/UseCases.astro';
+import Pricing from '../components/Pricing.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site, verifierChecks } from '../data/site.ts';
+
+// Two outcomes for a page that can't be mechanically verified.
+const outcomes = [
+  {
+    tone: 'pass',
+    head: 'Pass',
+    body: 'Samples type-check, imports and links resolve, API references match your compiler. The page ships clean.'
+  },
+  {
+    tone: 'flag',
+    head: 'Flagged',
+    body: 'Anything unverifiable ships clearly flagged for a human, with the exact finding attached. Never silently wrong.'
+  }
+];
+
+// The mechanics of "only what drifted" regeneration.
+const sync = [
+  {
+    kicker: 'Symbol-level provenance',
+    body: 'Every page records the exact symbols it was written from. Change a function and docstube knows which pages depend on it.'
+  },
+  {
+    kicker: 'Only affected pages regenerate',
+    body: 'No full rebuild, no manual hunt. The diff is the trigger - docstube refresh touches just the pages your change broke.'
+  },
+  {
+    kicker: 'A GitHub Action that opens a PR',
+    body: 'On every push, the affected pages regenerate in CI and land as a reviewable PR - with the reasons attached.'
+  }
+];
+---
+
+<Base
+  title="docstube - find where your docs disagree with your code"
+  description="Your docs were true the day they were written, then the code moved on. docstube finds where your docs disagree with your code and regenerates only what drifted - verified against your compiler, flagged when it can't be, never silently wrong."
+  variant="v9 · your docs are lying"
+>
+  <Header />
+
+  <main>
+    <!-- Hero - problem-first, DriftReport is the star (copy-left, report-right) -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.02fr_1fr] lg:py-28">
+        <div class="relative z-10 flex flex-col items-start gap-6">
+          <span class="eyebrow">
+            <span class="h-1.5 w-1.5 rounded-full bg-flag"></span>
+            The drift report
+          </span>
+          <h1 class="text-5xl font-extrabold sm:text-[68px] sm:leading-[0.98]">
+            Your docs are <span class="gradient-text">lying</span> to you.
+          </h1>
+          <p class="max-w-xl text-[18px] leading-relaxed text-muted">
+            Not on purpose. They were true the day they were written - then the code moved on. docstube finds where
+            your docs disagree with your code, and regenerates only what drifted.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.repo} class="btn btn-primary">Find your drift</a>
+            <a href={site.repo} class="btn btn-secondary">Get started</a>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> MIT licensed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> bring your own AI</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-flag"></span> flagged, never silently wrong</span>
+          </div>
+        </div>
+        <div class="relative z-10 float-slow">
+          <DriftReport />
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn />
+    </div>
+
+    <!-- The problem, named - almost-right docs, and the trust they cost you -->
+    <Section
+      id="why"
+      eyebrow="The problem"
+      title="“Almost right, but not quite” is the most expensive kind of wrong."
+      intro="A doc that’s confidently out of date is worse than no doc at all - you follow it, it fails, and you stop trusting the whole set. As AI writes more of the code, the docs drift faster, and trust is already running out."
+    >
+      <StatStrip keys={['almostRight', 'distrust', 'searching', 'trustFell']} />
+      <p class="mx-auto mt-6 max-w-2xl text-center text-[14px] text-muted">
+        The cost isn’t a typo. It’s the half hour you lose chasing a signature that changed, and the slow erosion of
+        trust in everything the docs claim.
+      </p>
+    </Section>
+
+    <!-- The fix, part 1: mechanical verification (emphasis) -->
+    <Section
+      id="verify"
+      eyebrow="The fix"
+      title="Catch the lie before it ships - mechanically."
+      intro="docstube treats every page like code. Before anything ships, deterministic verifiers run the same tools you’d run in CI against the draft. A page that can’t pass doesn’t quietly go out - it retries with feedback, or it ships flagged."
+      tone="paper"
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr]">
+        <div class="flex flex-col gap-6">
+          <div class="surface p-6 sm:p-8">
+            <h3 class="font-display text-[18px] font-semibold text-ink">Every page clears the same gate</h3>
+            <ul class="mt-5 space-y-2.5">
+              {
+                verifierChecks.map((c) => (
+                  <li class="flex items-center gap-3 text-[14px]">
+                    {c.status === 'pass' ? (
+                      <span class="flex h-5 w-5 items-center justify-center rounded-full bg-pass/12 text-pass">
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                      </span>
+                    ) : (
+                      <span class="flex h-5 w-5 items-center justify-center rounded-full bg-flag/15 text-flag">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.2 10.4 9.6H1.6L6 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+                      </span>
+                    )}
+                    <span class={c.status === 'pass' ? 'text-ink-soft' : 'font-medium text-flag'}>{c.label}</span>
+                  </li>
+                ))
+              }
+            </ul>
+            <p class="mt-6 border-t border-line pt-5 text-[13.5px] text-muted">
+              TypeScript checks with <span class="font-mono text-[13px] text-ink">tsc</span>, Python with
+              <span class="font-mono text-[13px] text-ink"> pyright</span>, links resolve, D2 diagrams render, and API
+              references are matched against your real compiler signatures.
+            </p>
+          </div>
+          <div class="grid gap-4 sm:grid-cols-2">
+            {
+              outcomes.map((o) => (
+                <div class={`surface flex flex-col gap-2 border-l-2 p-5 ${o.tone === 'pass' ? 'border-l-pass' : 'border-l-flag'}`}>
+                  <span class={`inline-flex w-fit items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wider ${o.tone === 'pass' ? 'text-pass' : 'text-flag'}`}>
+                    {o.tone === 'pass' ? (
+                      <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 2.2 10.4 9.6H1.6L6 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+                    )}
+                    {o.head}
+                  </span>
+                  <p class="text-[13.5px] leading-relaxed text-muted">{o.body}</p>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+        <div class="float-slow">
+          <VerifierCascade />
+        </div>
+      </div>
+      <div class="surface-tint mt-6 flex items-center gap-4 p-6">
+        <span class="font-display text-[40px] font-bold leading-none gradient-text">⚠</span>
+        <p class="text-[14.5px] leading-relaxed text-ink-soft">
+          The honest promise isn’t “zero hallucinations.” It’s that anything unverifiable is
+          <span class="font-semibold text-ink"> flagged, never silently wrong</span> - so a page can be wrong, but it
+          can’t lie to you quietly.
+        </p>
+      </div>
+    </Section>
+
+    <!-- The fix, part 2: always-current, only what drifted -->
+    <Section
+      id="how"
+      eyebrow="The fix"
+      title="Then regenerate only what drifted - not the whole book."
+      intro="The reason docs go stale is that nobody rewrites them by hand. docstube tracks every page back to the symbols it was written from, so a code change regenerates exactly the pages it broke - and nothing else."
+    >
+      <div class="grid gap-4 md:grid-cols-3">
+        {
+          sync.map((s, i) => (
+            <div class="surface hover-lift flex flex-col gap-2.5 p-6">
+              <span class="flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 font-mono text-[13px] font-semibold text-white">
+                {i + 1}
+              </span>
+              <h3 class="font-display text-[16px] font-semibold text-ink">{s.kicker}</h3>
+              <p class="text-[13.5px] leading-relaxed text-muted">{s.body}</p>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="mt-6 grid items-stretch gap-6 lg:grid-cols-2">
+        <DriftReport />
+        <div class="flex flex-col">
+          <CodeWindow file="Refresh only the affected pages" lang="bash">
+            <span slot="code"><span style="color:#6f8e8a"># a function signature changed in src/auth/session.ts</span>
+<span style="color:#7fd6c8">❯</span> docstube refresh
+
+<span style="color:#f0b454">~</span> auth/session.mdx     <span style="color:#6f8e8a">getUser(id) signature changed</span>
+<span style="color:#f0b454">~</span> auth/overview.mdx     <span style="color:#6f8e8a">references getUser()</span>
+<span style="color:#7fd6c8">+</span> reference/flags.mdx    <span style="color:#6f8e8a">new export useFlags()</span>
+
+<span style="color:#7fd6c8">❯</span> 3 pages regenerated · 41 unchanged · 0 silent edits</span>
+          </CodeWindow>
+          <p class="mt-4 text-[13.5px] leading-relaxed text-muted">
+            Run it locally, or let the GitHub Action do it on every push and open a PR with only the changed pages -
+            and the reasons why.
+          </p>
+        </div>
+      </div>
+    </Section>
+
+    <!-- How the page gets written in the first place -->
+    <Section
+      eyebrow="Under the hood"
+      title="Map the code, draft, review, verify, ship."
+      intro="Drift detection only works because every page is grounded in source from the start. docstube builds a structural map, a writer agent drafts from the real code, persona reviewers judge fit, and verifiers do the mechanical checking - on the AI you already use."
+      tone="paper"
+    >
+      <Steps />
+    </Section>
+
+    <!-- Where it sits -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="Most tools host the docs you write. None of them tell you they’ve gone stale."
+      intro="Hosting platforms organize docs you maintain by hand. Generic AI tools generate text and hope. docstube is the only one that generates from your code, mechanically verifies it, tells you exactly where it drifted, and hands you a site you own."
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <Quadrant />
+        <CompareTable />
+      </div>
+    </Section>
+
+    <!-- Use cases -->
+    <Section eyebrow="Use cases" title="One engine, three jobs." tone="paper">
+      <UseCases />
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Every feature."
+      intro="The open-source tool is the whole product - bring your own AI, your API key or subscription, any model, no token markup. A hosted Cloud tier is optional, for teams that want everything in one place."
+    >
+      <Pricing />
+    </Section>
+
+    <!-- Open source band -->
+    <Section eyebrow="Open source" title="MIT, free, and yours." tone="paper">
+      <div class="surface mx-auto flex max-w-3xl flex-col items-center gap-5 p-8 text-center">
+        <p class="text-[16px] leading-relaxed text-muted">
+          docstube generates a self-contained Astro + MDX site into your repo. No platform to pay to keep your docs
+          online, no lock-in, no token markup. Your source never leaves your machine for a docstube server - run it
+          locally or wire up the GitHub Action.
+        </p>
+        <a href={site.repo} class="btn btn-secondary">Star on GitHub</a>
+      </div>
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers.">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Stop trusting docs you can’t verify."
+      sub="Point docstube at your repo and get the drift report: exactly where your docs disagree with your code, regenerated and verified. Free, open-source, your own AI."
+    />
+  </main>
+
+  <Footer current={9} />
+</Base>

@@ -1,0 +1,19 @@
+---
+type Props = {
+  file?: string;
+  lang?: string;
+  class?: string;
+};
+const { file = 'docstube.yml', lang, class: className = '' } = Astro.props;
+---
+
+<div class={`terminal ${className}`}>
+  <div class="terminal-bar">
+    <span class="terminal-dot" style="background:#f0716b"></span>
+    <span class="terminal-dot" style="background:#f3c64a"></span>
+    <span class="terminal-dot" style="background:#54c98b"></span>
+    <span class="ml-2 font-mono text-[12px] text-[#6f8e8a]">{file}</span>
+    {lang && <span class="ml-auto font-mono text-[11px] text-[#4d6b67]">{lang}</span>}
+  </div>
+  <pre class="overflow-x-auto p-4 text-[12.5px] leading-relaxed sm:p-5"><code><slot /></code></pre>
+</div>

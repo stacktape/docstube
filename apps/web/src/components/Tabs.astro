@@ -1,0 +1,87 @@
+---
+// Light port of the console-app Tabs: a pill rail with a sliding active
+// indicator. Pass `tabs` labels; provide panels via named slots panel-0..n.
+// Astro forbids dynamic <slot name={expr}>, so panels are resolved through
+// Astro.slots.render(name) (which accepts a dynamic name) and injected as HTML.
+type TabItem = string | { label: string; tag?: string; tagClass?: string };
+type Props = { tabs: TabItem[]; class?: string };
+const { tabs, class: className = '' } = Astro.props;
+
+const panelHtml = await Promise.all(
+  tabs.map((_, i) => (Astro.slots.has(`panel-${i}`) ? Astro.slots.render(`panel-${i}`) : Promise.resolve('')))
+);
+---
+
+<div class={`dt-tabs ${className}`} data-tabs>
+  <div
+    class="dt-tablist relative mx-auto inline-flex items-center gap-1 rounded-[14px] border border-line bg-canvas p-1.5"
+    role="tablist"
+    style="box-shadow: inset 0 1px 3px rgba(13,50,48,0.06)"
+  >
+    <span class="dt-indicator pointer-events-none absolute rounded-[10px] bg-paper" style="box-shadow: var(--shadow-soft); transition: left 350ms var(--ease-spring), width 350ms var(--ease-spring)"></span>
+    {
+      tabs.map((tab, i) => {
+        const label = typeof tab === 'string' ? tab : tab.label;
+        const tag = typeof tab === 'string' ? undefined : tab.tag;
+        const tagClass = typeof tab === 'string' ? '' : (tab.tagClass ?? 'bg-brand-100 text-brand-700');
+        return (
+          <button
+            type="button"
+            role="tab"
+            class="dt-tab relative z-10 flex flex-col items-center justify-center rounded-[10px] px-4 py-2 font-sans text-[14px] font-semibold text-muted transition-colors data-[active]:text-ink"
+            data-tab={i}
+            data-active={i === 0 ? '' : undefined}
+          >
+            <span>{label}</span>
+            {tag && (
+              <span class={`mt-1 rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase leading-none tracking-[0.07em] ${tagClass}`}>
+                {tag}
+              </span>
+            )}
+          </button>
+        );
+      })
+    }
+  </div>
+
+  <div class="dt-panels mt-8">
+    {panelHtml.map((html, i) => <div class="dt-panel" data-panel={i} hidden={i !== 0} set:html={html} />)}
+  </div>
+</div>
+
+<script>
+  const setup = (root: HTMLElement) => {
+    const tablist = root.querySelector<HTMLElement>('.dt-tablist');
+    const indicator = root.querySelector<HTMLElement>('.dt-indicator');
+    const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('.dt-tab'));
+    const panels = Array.from(root.querySelectorAll<HTMLElement>('.dt-panel'));
+    if (!tablist || !indicator || !tabs.length) return;
+
+    const move = (btn: HTMLElement) => {
+      indicator.style.width = `${btn.offsetWidth}px`;
+      indicator.style.left = `${btn.offsetLeft}px`;
+      indicator.style.height = `${btn.offsetHeight}px`;
+      indicator.style.top = `${btn.offsetTop}px`;
+    };
+
+    const activate = (i: number) => {
+      tabs.forEach((t, idx) => {
+        if (idx === i) t.setAttribute('data-active', '');
+        else t.removeAttribute('data-active');
+      });
+      panels.forEach((p, idx) => {
+        p.hidden = idx !== i;
+      });
+      move(tabs[i]);
+    };
+
+    tabs.forEach((t, i) => t.addEventListener('click', () => activate(i)));
+    requestAnimationFrame(() => move(tabs[0]));
+    window.addEventListener('resize', () => {
+      const active = tabs.find((t) => t.hasAttribute('data-active')) ?? tabs[0];
+      move(active);
+    });
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-tabs]').forEach(setup);
+</script>

@@ -4,7 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node src/web.ts",
-    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "4.3.1",
+    "astro": "^6.4.6",
+    "postcss": "^8.5.6",
+    "tailwindcss": "4.3.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "^6.0.3"
   }
 }

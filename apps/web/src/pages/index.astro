@@ -1,0 +1,496 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import VerifierCascade from '../components/VerifierCascade.astro';
+import RunsOn from '../components/RunsOn.astro';
+import DriftReport from '../components/DriftReport.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import BuiltForAgents from '../components/BuiltForAgents.astro';
+import Pricing from '../components/Pricing.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import Tabs from '../components/Tabs.astro';
+import HeroDemo from '../components/HeroDemo.astro';
+import DocsProblem from '../components/DocsProblem.astro';
+import { site } from '../data/site.ts';
+
+// Benefit-led "why docstube" list. Each one-liner is anchored to a mechanism,
+// no absolutes. icon = inline stroke SVG markup for a distinct tile per benefit.
+const benefits = [
+  {
+    title: 'Verified, not hallucinated',
+    body: 'Samples type-check, imports resolve, and API references are matched to your real compiler signatures. Anything unverifiable ships flagged, never silently wrong.',
+    icon: '<path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 11.5l2 2 4-4.5"/>'
+  },
+  {
+    title: 'Complete',
+    body: 'Generated from a structural map of your whole codebase, so the things that matter get documented instead of quietly left out.',
+    icon: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'
+  },
+  {
+    title: 'Written for your readers',
+    body: 'Define your reader personas once. A reviewer agent per persona checks every page for the right depth and tone before it ships.',
+    icon: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0111 0"/><path d="M16 6.2a3 3 0 010 5.6M19.5 19a5.5 5.5 0 00-3.5-5.1"/>'
+  },
+  {
+    title: 'Efficient regeneration',
+    body: 'Change your code and only the affected pages regenerate, tracked at the symbol level. Locally, or automatically via the GitHub Action.',
+    icon: '<path d="M4 12a8 8 0 0113.7-5.6L20 8"/><path d="M20 4v4h-4"/><path d="M20 12a8 8 0 01-13.7 5.6L4 16"/><path d="M4 20v-4h4"/>'
+  },
+  {
+    title: 'Beautiful and modern',
+    body: 'A self-contained Astro site you own. Fast, with built-in search, rendered D2 diagrams, and an autolinked glossary.',
+    icon: '<path d="M12 3l1.7 4.6L18 9l-4.3 1.4L12 15l-1.7-4.6L6 9l4.3-1.4L12 3z"/><path d="M18.5 13.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9z"/>'
+  },
+  {
+    title: 'Fast and efficient',
+    body: 'Every agent step is cached by content hash, so reruns skip unchanged work and you only spend tokens on what actually changed.',
+    icon: '<path d="M13 2 5 13h6l-1 9 9-12h-6l0-8z"/>'
+  }
+];
+
+// "How it works" walkthrough state.
+const navTree = [
+  { label: 'Getting started', depth: 0, kind: 'group' },
+  { label: 'Installation', depth: 1, kind: 'page' },
+  { label: 'Quickstart', depth: 1, kind: 'page' },
+  { label: 'Core concepts', depth: 0, kind: 'group' },
+  { label: 'Configuration', depth: 1, kind: 'page' },
+  { label: 'API reference', depth: 0, kind: 'page' }
+];
+const genTimeline = [
+  { page: 'getting-started/installation', state: 'pass' },
+  { page: 'getting-started/quickstart', state: 'pass' },
+  { page: 'core-concepts/configuration', state: 'pass' },
+  { page: 'guides/authentication', state: 'run' },
+  { page: 'reference/api', state: 'wait' },
+  { page: 'guides/migration', state: 'flag' }
+];
+---
+
+<Base
+  title="docstube - verified, always-current docs generated from your code"
+  description="docstube reads your codebase, writes your docs, fact-checks every claim against the source, and keeps everything in sync as your code changes. Open-source, MIT, and runs on the AI you already pay for."
+>
+  <Header />
+
+  <main>
+    <!-- Hero - copy left, a live generation run on the right -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:gap-14 lg:py-24">
+        <!-- Left: copy -->
+        <div class="relative z-10 flex flex-col items-start gap-6">
+          <h1 class="text-[40px] font-extrabold leading-[1.05] sm:text-[52px] sm:leading-[1.03]">
+            Most technical documentation is trash. <span class="gradient-text">Yours won't be.</span>
+          </h1>
+
+          <p class="max-w-xl text-[18px] leading-relaxed text-muted">
+            docstube generates it from your codebase, fact-checks every claim against the source, writes it for the
+            people actually reading it, and keeps it in sync as your code changes.
+            <span class="font-medium text-ink-soft">Nothing to write. Nothing to maintain.</span>
+          </p>
+
+          <!-- Trust row (understated) -->
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted">
+            <span class="inline-flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-500"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 5-5" /></svg>
+              MIT licensed
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-500"><circle cx="8" cy="8" r="3.2" /><path d="M10.3 10.3 20 20M16.5 16.5l2-2M14.5 18.5l2-2" /></svg>
+              bring your own AI
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-500"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" /></svg>
+              source stays local
+            </span>
+          </div>
+
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.waitlist} class="btn btn-primary">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 5.5L20 7" /></svg>
+              Join the waitlist
+            </a>
+            <a href="#how" class="btn btn-secondary">How it works</a>
+          </div>
+        </div>
+
+        <!-- Right: animated walkthrough of a generation run -->
+        <HeroDemo />
+      </div>
+    </section>
+
+    <!-- Why this matters - the problem, right after the hero -->
+    <DocsProblem />
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn />
+    </div>
+
+    <!-- Why docstube - 2 x 3 benefit grid -->
+    <Section id="why" eyebrow="Why docstube" title="Docs you can actually trust, and never have to babysit.">
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          benefits.map((b) => (
+            <div class="surface hover-lift flex flex-col gap-3.5 p-5">
+              <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" set:html={b.icon} />
+              </span>
+              <h3 class="font-display text-[16px] font-semibold leading-snug text-ink">{b.title}</h3>
+              <p class="text-[13.5px] leading-relaxed text-muted">{b.body}</p>
+            </div>
+          ))
+        }
+      </div>
+    </Section>
+
+    <!-- How it works - four-step walkthrough -->
+    <Section
+      id="how"
+      eyebrow="How it works"
+      title="Four steps. You drive the first one, it does the rest."
+      intro="From npx to a site you own. Walk each step of a real run below."
+      tone="paper"
+    >
+      <Tabs
+        tabs={[
+          { label: '1. Configure', tag: 'you', tagClass: 'bg-ink text-paper' },
+          { label: '2. Generate', tag: 'AI', tagClass: 'bg-brand-100 text-brand-700' },
+          { label: '3. Review & verify', tag: 'AI', tagClass: 'bg-brand-100 text-brand-700' },
+          { label: '4. Stay in sync', tag: 'AI', tagClass: 'bg-brand-100 text-brand-700' }
+        ]}
+      >
+        <!-- Step 1: Configure -->
+        <div slot="panel-0" class="grid items-start gap-8 lg:grid-cols-[1fr_0.95fr]">
+          <div class="surface overflow-hidden">
+            <div class="flex items-center justify-between border-b border-line bg-canvas px-5 py-3">
+              <span class="font-mono text-[12px] text-muted">localhost:4321 · setup</span>
+            </div>
+            <div class="space-y-6 p-6">
+              <div>
+                <p class="eyebrow mb-2.5">Doc type</p>
+                <div class="flex flex-wrap gap-2">
+                  <span class="rounded-lg border border-brand-300 bg-brand-50 px-3 py-1.5 text-[13px] font-medium text-brand-700">Public docs site</span>
+                  <span class="rounded-lg border border-line px-3 py-1.5 text-[13px] text-muted">Internal wiki</span>
+                  <span class="rounded-lg border border-line px-3 py-1.5 text-[13px] text-muted">API reference</span>
+                </div>
+              </div>
+              <div>
+                <p class="eyebrow mb-2.5">Reader personas</p>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-3 rounded-lg border border-line bg-paper px-3 py-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-[11px] font-bold text-brand-700">N</span>
+                    <span class="text-[13.5px] text-ink-soft">New integrator <span class="text-muted">· wants the 5-minute path</span></span>
+                  </div>
+                  <div class="flex items-center gap-3 rounded-lg border border-line bg-paper px-3 py-2">
+                    <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-[11px] font-bold text-brand-700">P</span>
+                    <span class="text-[13.5px] text-ink-soft">Platform engineer <span class="text-muted">· depth, edge cases, config</span></span>
+                  </div>
+                  <button type="button" class="text-[13px] font-medium text-brand-600">+ add persona</button>
+                </div>
+              </div>
+              <div>
+                <div class="mb-2.5 flex items-center justify-between">
+                  <p class="eyebrow">Information architecture</p>
+                  <span class="font-mono text-[11px] text-muted">drag to reorder</span>
+                </div>
+                <ul class="space-y-1">
+                  {
+                    navTree.map((n) => (
+                      <li
+                        class={`flex items-center gap-2 rounded-md py-1.5 text-[13.5px] ${n.kind === 'group' ? 'font-semibold text-ink' : 'text-ink-soft'}`}
+                        style={`padding-left:${10 + n.depth * 20}px`}
+                      >
+                        <span class="text-muted">⋮⋮</span>
+                        {n.kind === 'group' ? <span class="text-brand-500">▸</span> : <span class="text-line-strong">•</span>}
+                        <span>{n.label}</span>
+                      </li>
+                    ))
+                  }
+                  <li class="flex items-center gap-2 rounded-md py-1.5 pl-2.5 text-[13px] font-medium text-brand-600">+ add page</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-5">
+            <h3 class="font-display text-[22px] font-semibold text-ink">Configure it once, then step back.</h3>
+            <p class="text-[15px] leading-relaxed text-muted">
+              The wizard proposes a nav tree from your codebase. You edit it like a list: reorder, rename, add or drop
+              pages. Pick a doc type, name the people who'll read it, paste any context that isn't in the code. That's
+              the whole setup. From here it runs on its own.
+            </p>
+            <ul class="space-y-2.5 text-[14.5px] text-ink-soft">
+              <li class="flex gap-2.5"><span class="text-brand-500">›</span> Personas become per-audience reviewer agents.</li>
+              <li class="flex gap-2.5"><span class="text-brand-500">›</span> The nav tree becomes the page plan.</li>
+              <li class="flex gap-2.5"><span class="text-brand-500">›</span> Your source never leaves your machine.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 2: Generate -->
+        <div slot="panel-1" class="grid items-start gap-8 lg:grid-cols-[1fr_0.95fr]">
+          <div class="surface overflow-hidden">
+            <div class="flex items-center justify-between border-b border-line bg-canvas px-5 py-3">
+              <span class="font-mono text-[12px] text-muted">generating · 6 pages</span>
+            </div>
+            <ul class="divide-y divide-line">
+              {
+                genTimeline.map((row) => (
+                  <li class="flex items-center gap-3 px-5 py-3 font-mono text-[13px]">
+                    {row.state === 'pass' && (
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                      </span>
+                    )}
+                    {row.state === 'run' && <span class="dt-spin inline-block h-5 w-5 shrink-0 rounded-full border-2 border-brand-200 border-t-brand-500" />}
+                    {row.state === 'wait' && <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-strong text-[10px] text-muted">·</span>}
+                    {row.state === 'flag' && (
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-flag/15 text-flag">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.2 10.4 9.6H1.6L6 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+                      </span>
+                    )}
+                    <span class={row.state === 'wait' ? 'text-muted' : row.state === 'flag' ? 'text-flag' : 'text-ink-soft'}>{row.page}</span>
+                    <span class="ml-auto text-[11px] text-muted">
+                      {row.state === 'pass' && 'verified'}
+                      {row.state === 'run' && 'drafting…'}
+                      {row.state === 'wait' && 'queued'}
+                      {row.state === 'flag' && 'needs review'}
+                    </span>
+                  </li>
+                ))
+              }
+            </ul>
+            <div class="flex items-center gap-2 border-t border-line bg-canvas px-5 py-2.5 font-mono text-[11px] text-muted">
+              <span class="h-1.5 w-1.5 rounded-full bg-pass"></span> 3 verified
+              <span class="ml-3 h-1.5 w-1.5 rounded-full bg-brand-400"></span> 1 running
+              <span class="ml-3 h-1.5 w-1.5 rounded-full bg-flag"></span> 1 flagged
+            </div>
+          </div>
+          <div class="flex flex-col gap-5">
+            <div class="surface overflow-hidden">
+              <div class="flex items-center gap-1.5 border-b border-line bg-canvas px-4 py-2.5">
+                <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+                <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+                <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+                <span class="ml-2 font-mono text-[11px] text-muted">live preview · authentication</span>
+              </div>
+              <div class="space-y-2.5 p-5">
+                <div class="h-3 w-2/5 rounded bg-brand-100"></div>
+                <div class="h-2 w-full rounded bg-line"></div>
+                <div class="h-2 w-11/12 rounded bg-line"></div>
+                <div class="mt-3 rounded-lg bg-night px-3 py-2.5">
+                  <div class="h-2 w-1/3 rounded bg-[#2a4a46]"></div>
+                  <div class="mt-1.5 h-2 w-2/3 rounded bg-[#1f3a36]"></div>
+                </div>
+                <div class="h-2 w-4/5 rounded bg-line"></div>
+              </div>
+            </div>
+            <div>
+              <h3 class="font-display text-[22px] font-semibold text-ink">A build log you can actually watch.</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-muted">
+                A writer agent drafts each page from a structural map of your source. Pages stream into the preview as
+                they finish. The timeline shows exactly where the run is: verified, drafting, or flagged. Nothing
+                happens in a black box.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Review & verify (both automatic) -->
+        <div slot="panel-2" class="grid items-start gap-8 lg:grid-cols-[1fr_0.95fr]">
+          <div class="surface overflow-hidden">
+            <div class="flex items-center justify-between border-b border-line bg-canvas px-5 py-3">
+              <span class="font-mono text-[12px] text-muted">verifying · guides/authentication.mdx</span>
+            </div>
+            <div class="space-y-5 p-6">
+              <div>
+                <p class="eyebrow mb-2.5">AI reviewers · per persona</p>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2.5 rounded-lg border border-line bg-paper px-3 py-2">
+                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                    <span class="text-[13.5px] text-ink-soft">New integrator</span>
+                    <span class="ml-auto font-mono text-[11.5px] text-pass">audience fit 0.92</span>
+                  </div>
+                  <div class="flex items-center gap-2.5 rounded-lg border border-line bg-paper px-3 py-2">
+                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                    <span class="text-[13.5px] text-ink-soft">Platform engineer</span>
+                    <span class="ml-auto font-mono text-[11.5px] text-pass">audience fit 0.88</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p class="eyebrow mb-2.5">Deterministic verifiers</p>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-[12.5px] text-ink-soft">
+                  {
+                    ['tsc', 'pyright', 'imports', 'links', 'D2 render', 'API refs'].map((c) => (
+                      <span class="flex items-center gap-2">
+                        <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass"><svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                        {c}
+                      </span>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2.5 border-t border-line bg-canvas px-5 py-3">
+              <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-pass"><svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+              <span class="text-[13px] font-semibold text-ink">Passed the gate</span>
+              <span class="ml-auto font-mono text-[11.5px] text-muted">quality 0.94 / 1.0</span>
+            </div>
+          </div>
+          <div class="flex flex-col gap-5">
+            <h3 class="font-display text-[22px] font-semibold text-ink">Reviewed and verified, both automatic.</h3>
+            <p class="text-[15px] leading-relaxed text-muted">
+              Every page clears two checks before it ships, with no human in the loop. A reviewer agent per persona
+              judges audience fit, depth, and tone. Then deterministic verifiers run real tools against it: tsc,
+              pyright, import and link resolution, D2 rendering, and API references matched to your compiler.
+            </p>
+            <div class="surface-tint flex items-center gap-4 p-5">
+              <span class="font-display text-[36px] font-bold leading-none gradient-text">⚠</span>
+              <p class="text-[14px] leading-relaxed text-ink-soft">
+                A page that can't clear both arrives
+                <span class="font-semibold text-ink"> flagged, never silently wrong</span>, with the exact finding
+                attached.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Stay in sync -->
+        <div slot="panel-3" class="grid items-start gap-8 lg:grid-cols-[1fr_0.95fr]">
+          <div class="surface overflow-hidden">
+            <div class="flex items-center justify-between border-b border-line bg-canvas px-5 py-3">
+              <span class="font-mono text-[12px] text-muted">docstube refresh · incremental</span>
+              <span class="rounded-full bg-pass/12 px-2 py-0.5 font-mono text-[10.5px] font-semibold text-pass">~96% fewer tokens</span>
+            </div>
+            <div class="space-y-5 p-5">
+              <div>
+                <p class="eyebrow mb-2">Changed symbols detected</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <code class="rounded-md border border-line bg-canvas px-2 py-0.5 font-mono text-[12px] text-ink">getSession()</code>
+                  <code class="rounded-md border border-line bg-canvas px-2 py-0.5 font-mono text-[12px] text-ink">refreshToken()</code>
+                  <code class="rounded-md border border-line bg-canvas px-2 py-0.5 font-mono text-[12px] text-ink">AuthError</code>
+                </div>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="text-center">
+                  <div class="font-display text-[24px] font-bold leading-none text-ink">2</div>
+                  <div class="mt-1 text-[11px] text-muted">pages regenerate</div>
+                </div>
+                <svg width="22" height="14" viewBox="0 0 24 16" fill="none" class="shrink-0 text-line-strong"><path d="M2 8h18M15 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <div class="text-center">
+                  <div class="font-display text-[24px] font-bold leading-none text-muted">47</div>
+                  <div class="mt-1 text-[11px] text-muted">untouched · skipped</div>
+                </div>
+              </div>
+              <div>
+                <div class="mb-1.5 flex items-center justify-between">
+                  <p class="eyebrow">Tokens this refresh</p>
+                  <span class="font-mono text-[11px] text-brand-600">~11k</span>
+                </div>
+                <div class="h-2.5 w-full overflow-hidden rounded-full bg-line">
+                  <div class="h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600" style="width:4%"></div>
+                </div>
+                <p class="mt-1.5 font-mono text-[10.5px] text-muted">vs ~294k to regenerate all 49 pages</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 border-t border-line bg-canvas px-5 py-3 text-[12px] text-muted">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="shrink-0 text-ink-soft" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+              Runs automatically via the GitHub Action.
+            </div>
+          </div>
+          <div class="flex flex-col gap-5">
+            <h3 class="font-display text-[22px] font-semibold text-ink">A diff that thinks in symbols.</h3>
+            <p class="text-[15px] leading-relaxed text-muted">
+              docstube hashes your codebase at the symbol level. Change a function and it knows exactly which pages
+              depend on it, then regenerates only those. Everything else is skipped, so a refresh costs a handful of
+              tokens instead of a full rebuild.
+            </p>
+            <ul class="space-y-2.5 text-[14.5px] text-ink-soft">
+              <li class="flex gap-2.5"><span class="text-brand-500">›</span> Symbol-level diffing with normalized hashes, not a blunt file scan or a full re-run.</li>
+              <li class="flex gap-2.5"><span class="text-brand-500">›</span> Only the affected pages reach the model, so you spend a fraction of the tokens.</li>
+              <li class="flex gap-2.5"><span class="text-brand-500">›</span> Run it locally, or let the GitHub Action keep docs current automatically.</li>
+            </ul>
+          </div>
+        </div>
+      </Tabs>
+    </Section>
+
+    <!-- Verification -->
+    <Section
+      id="verify"
+      eyebrow="Verification"
+      title="Mechanically checked, not vibe-checked."
+      intro="Reviewer agents judge audience fit. But before any page ships, deterministic verifiers run real tools against it: tsc, pyright, link and import resolution, D2 rendering, API references matched to the compiler."
+      tone="paper"
+    >
+      <div class="grid items-start gap-6 lg:grid-cols-2">
+        <div class="flex flex-col gap-6">
+          <VerifierCascade command="npx docstube refresh" caption="api/create-client.mdx" />
+        </div>
+        <div class="flex flex-col gap-6">
+          <DriftReport />
+          <div class="surface flex flex-col gap-3 p-6">
+            <h3 class="font-display text-[18px] font-semibold text-ink">Same gate as your CI</h3>
+            <p class="text-[14px] leading-relaxed text-muted">
+              A page that can't pass doesn't quietly ship. It retries with the verifier's feedback, or it ships flagged
+              for a human, with the exact finding attached, so review takes seconds, not an afternoon.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Comparison - table given full width for readability -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="Active generation. Mechanical verification. Yours."
+      intro="Hosting platforms organize the docs you write by hand. AI tools generate text and hope. docstube generates from your code, verifies the output, and hands you a site you own."
+    >
+      <div class="flex flex-col gap-10">
+        <Quadrant />
+        <CompareTable />
+      </div>
+    </Section>
+
+    <!-- Built for agents -->
+    <Section eyebrow="Built for agents" title="Docs your LLMs can read, too.">
+      <BuiltForAgents />
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Every feature."
+      intro="The open-source tool is the whole product. You pay only for your own AI usage, with caps you set. A hosted Cloud tier is optional, for teams that want everything in one place."
+      tone="paper"
+    >
+      <Pricing />
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
+      <Faq />
+    </Section>
+
+    <FinalCta />
+  </main>
+
+  <Footer showVariants={false} />
+</Base>
+
+<style>
+  .dt-spin {
+    animation: dt-spin 0.9s linear infinite;
+  }
+  @keyframes dt-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+</style>

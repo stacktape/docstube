@@ -1,0 +1,413 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import RunsOn from '../components/RunsOn.astro';
+import Steps from '../components/Steps.astro';
+import Pillars from '../components/Pillars.astro';
+import FeatureGrid from '../components/FeatureGrid.astro';
+import UseCases from '../components/UseCases.astro';
+import Pricing from '../components/Pricing.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site, facts } from '../data/site.ts';
+
+// Faux sidebar nav for the illustrative docs mock. Not real product copy -
+// purely to sell "beautiful generated site". One item is active.
+const mockNav = [
+  { label: 'Quickstart', active: false },
+  { label: 'Authentication', active: true },
+  { label: 'Webhooks', active: false },
+  { label: 'API reference', active: false },
+  { label: 'Changelog', active: false }
+];
+---
+
+<Base
+  title="docstube - docs you'd actually read"
+  description="Beautiful, always-current documentation generated from your codebase - free, open-source, and yours. Point docstube at your repo and watch a self-contained Astro + MDX site appear, on the AI you already pay for."
+  variant="v4 · docs you'd actually read"
+>
+  <Header />
+
+  <main>
+    <!-- Hero: playful copy on the left, illustrative docs mock on the right -->
+    <section class="dot-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto grid max-w-6xl items-center gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:py-24">
+        <div class="relative z-10 flex flex-col items-start gap-6">
+          <span class="eyebrow">
+            <span class="h-1.5 w-1.5 rounded-full bg-pass"></span> open source · MIT · yours
+          </span>
+          <h1 class="text-5xl font-extrabold sm:text-[64px] sm:leading-[0.98]">
+            Docs you'd <span class="gradient-text">actually read</span>.
+          </h1>
+          <p class="max-w-xl text-[18px] leading-relaxed text-muted">
+            Beautiful, always-current documentation generated from your codebase - free, open-source, and yours.
+            Point it at your repo and watch.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.repo} class="btn btn-primary">Try it on your repo</a>
+            <a href={site.repo} class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+              </svg>
+              Star on GitHub
+            </a>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> bring your own AI</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> no token markup</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> a site you own</span>
+          </div>
+        </div>
+
+        <!-- Illustrative mock of a generated docs page (not a real screenshot) -->
+        <div class="relative z-10 float-slow">
+          <div class="absolute -right-3 -top-3 z-20 rounded-full border border-brand-200 bg-paper px-2.5 py-1 font-mono text-[10.5px] font-medium text-brand-700 shadow-soft">
+            illustrative preview
+          </div>
+          <div class="surface overflow-hidden">
+            <!-- Faux browser chrome -->
+            <div class="flex items-center gap-2.5 border-b border-line bg-canvas px-4 py-3">
+              <span class="h-3 w-3 rounded-full" style="background:#f0716b"></span>
+              <span class="h-3 w-3 rounded-full" style="background:#f3c64a"></span>
+              <span class="h-3 w-3 rounded-full" style="background:#54c98b"></span>
+              <div class="ml-2 flex h-7 flex-1 items-center gap-2 rounded-lg border border-line bg-paper px-3 font-mono text-[11.5px] text-muted">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" class="text-brand-500"><path d="M11 7V5a3 3 0 00-6 0v2M4 7h8v6H4z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                docs.yourproject.dev/authentication
+              </div>
+            </div>
+
+            <!-- Faux docs layout: sidebar + content -->
+            <div class="grid grid-cols-[34%_1fr]">
+              <!-- Sidebar -->
+              <aside class="border-r border-line bg-canvas/60 p-3.5">
+                <div class="flex items-center gap-1.5 px-2 pb-3">
+                  <img src="/brand/docstube-icon.svg" alt="" width="16" height="16" />
+                  <span class="font-display text-[12.5px] font-bold text-ink">yourproject</span>
+                </div>
+                <div class="mb-3 flex h-7 items-center gap-2 rounded-md border border-line bg-paper px-2.5 font-mono text-[10.5px] text-muted">
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.4"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                  Search
+                  <span class="ml-auto rounded border border-line px-1 text-[9px]">⌘K</span>
+                </div>
+                <nav class="flex flex-col gap-0.5">
+                  {
+                    mockNav.map((item) =>
+                      item.active ? (
+                        <span class="flex items-center gap-2 rounded-md bg-brand-50 px-2.5 py-1.5 text-[12.5px] font-semibold text-brand-700">
+                          <span class="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                          {item.label}
+                        </span>
+                      ) : (
+                        <span class="rounded-md px-2.5 py-1.5 pl-5 text-[12.5px] text-muted">{item.label}</span>
+                      )
+                    )
+                  }
+                </nav>
+              </aside>
+
+              <!-- Main column -->
+              <div class="p-5 sm:p-6">
+                <p class="font-mono text-[10.5px] uppercase tracking-[0.12em] text-brand-600">Guides</p>
+                <h3 class="mt-1.5 font-display text-[22px] font-bold text-ink">Authentication</h3>
+                <p class="mt-2.5 text-[12.5px] leading-relaxed text-muted">
+                  Create a client with your API key and start a session. Tokens refresh automatically; the example below
+                  type-checks against the current build.
+                </p>
+
+                <!-- Faux code block (the one dark surface) -->
+                <div class="terminal mt-4">
+                  <div class="terminal-bar">
+                    <span class="terminal-dot" style="background:#f0716b"></span>
+                    <span class="terminal-dot" style="background:#f3c64a"></span>
+                    <span class="terminal-dot" style="background:#54c98b"></span>
+                    <span class="ml-2 font-mono text-[10.5px] text-[#6f8e8a]">auth.ts</span>
+                    <span class="ml-auto font-mono text-[9.5px] text-[#4d6b67]">typescript</span>
+                  </div>
+                  <pre class="overflow-x-auto p-3.5 text-[11px] leading-relaxed"><code><span style="color:#7fb0d6">import</span> &#123; createClient &#125; <span style="color:#7fb0d6">from</span> <span style="color:#86d0b6">'yourproject'</span>
+
+<span style="color:#7fb0d6">const</span> client <span style="color:#cfeae6">=</span> <span style="color:#9bd6c4">createClient</span>(&#123; apiKey: process.env.<span style="color:#e8c785">KEY</span> &#125;)
+<span style="color:#7fb0d6">const</span> session <span style="color:#cfeae6">=</span> <span style="color:#7fb0d6">await</span> client.<span style="color:#9bd6c4">login</span>(user)</code></pre>
+                </div>
+
+                <!-- Teal callout / note box -->
+                <div class="mt-4 flex gap-2.5 rounded-lg border border-brand-200 bg-brand-50/70 p-3">
+                  <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-brand-500 text-paper">
+                    <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M8 7v4M8 5h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  </span>
+                  <p class="text-[11.5px] leading-relaxed text-brand-900">
+                    <span class="font-semibold">Note</span> - sessions expire after 24h. Verified against the live
+                    signature, so this page can't drift past your code.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn heading="Bring your own AI - any model, no token markup" />
+    </div>
+
+    <!-- The enemy: ugly, stale docs nobody opens -->
+    <Section
+      eyebrow="The problem"
+      title="Most docs are ugly, stale, and unopened."
+      intro="The wiki rots. The README lies. The “last updated” date is from two refactors ago. Good docs are the most-used thing developers reach for - when they exist and you can stand to look at them."
+    >
+      <div class="grid gap-5 lg:grid-cols-[1.15fr_1fr]">
+        <div class="surface flex flex-col gap-6 p-7 sm:p-8">
+          <div class="grid gap-5 sm:grid-cols-2">
+            <div class="flex flex-col gap-1.5">
+              <span class="font-display text-[30px] font-bold leading-none gradient-text">{facts.docsResource.stat}</span>
+              <span class="text-[13.5px] leading-snug text-ink-soft">{facts.docsResource.claim}</span>
+              <span class="mt-1 font-mono text-[11px] text-muted">{facts.docsResource.source}</span>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <span class="font-display text-[30px] font-bold leading-none gradient-text">{facts.searching.stat}</span>
+              <span class="text-[13.5px] leading-snug text-ink-soft">{facts.searching.claim}</span>
+              <span class="mt-1 font-mono text-[11px] text-muted">{facts.searching.source}</span>
+            </div>
+          </div>
+          <p class="border-t border-line pt-5 text-[14.5px] leading-relaxed text-muted">
+            Docs are how people learn your code. docstube makes the kind people actually open - and keeps them honest,
+            so they stay worth opening.
+          </p>
+        </div>
+
+        <!-- before / after, illustrative -->
+        <div class="grid grid-rows-2 gap-4">
+          <div class="surface flex items-center gap-4 p-5">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger/10 text-danger">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <div>
+              <p class="font-display text-[14.5px] font-semibold text-ink">The wiki nobody opens</p>
+              <p class="text-[13px] leading-snug text-muted">Stale, hand-maintained, last touched two refactors ago.</p>
+            </div>
+          </div>
+          <div class="surface-tint flex items-center gap-4 border-brand-200 p-5">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pass/12 text-pass">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M5 12.5 10 17.5 19 6.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div>
+              <p class="font-display text-[14.5px] font-semibold text-ink">A site you're proud to link</p>
+              <p class="text-[13px] leading-snug text-muted">Generated from source, mechanically checked, regenerated on change.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- How it works -->
+    <Section id="how" eyebrow="How it works" title="Point, watch, ship." tone="paper">
+      <Steps />
+    </Section>
+
+    <!-- Beauty band - the emphasis. What makes the output gorgeous. -->
+    <Section
+      id="verify"
+      eyebrow="Beautiful by default"
+      title="A real site, not a markdown dump."
+      intro="docstube renders a self-contained Astro + React theme into your repo - Mintlify-grade polish, but yours. No platform to pay to keep it online, no lock-in. You git-push it like any other code."
+    >
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          [
+            {
+              title: 'Custom React theme',
+              body: 'A modern Astro + React theme vendored into your repo. Style it, fork it, ship it - no runtime dependency on us.',
+              icon: '<path d="M4 5h16v11H4z" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 9h16M8 16v3m8-3v3M7 20h10" stroke-width="1.6" stroke-linecap="round"/>'
+            },
+            {
+              title: 'Instant Pagefind search',
+              body: 'Fast, fully static, client-side search baked in. ⌘K and go - no search service to wire up or pay for.',
+              icon: '<circle cx="10" cy="10" r="6" stroke-width="1.6"/><path d="M15 15l5 5" stroke-width="1.6" stroke-linecap="round"/>'
+            },
+            {
+              title: 'D2 diagrams',
+              body: 'Architecture diagrams rendered and syntax-checked at build time, in a hand-sketched style by default.',
+              icon: '<rect x="3.5" y="3.5" width="7" height="6" rx="1.2" stroke-width="1.6"/><rect x="13.5" y="14.5" width="7" height="6" rx="1.2" stroke-width="1.6"/><path d="M7 9.5v3.5a2 2 0 002 2h4.5" stroke-width="1.6" stroke-linecap="round"/>'
+            },
+            {
+              title: 'Glossary autolinking',
+              body: 'Define your terms once. Every mention links back automatically, kept consistent at build time.',
+              icon: '<path d="M5 4h11a2 2 0 012 2v14H7a2 2 0 01-2-2V4z" stroke-width="1.6" stroke-linejoin="round"/><path d="M9 8h6M9 12h6" stroke-width="1.6" stroke-linecap="round"/>'
+            },
+            {
+              title: 'SEO + AEO, ready',
+              body: 'Sitemaps, canonical URLs, Open Graph, and structured data - so humans and answer engines both find it.',
+              icon: '<circle cx="12" cy="12" r="8.5" stroke-width="1.6"/><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17" stroke-width="1.6"/>'
+            },
+            {
+              title: 'Owned MDX output',
+              body: 'It is just MDX + Astro in your repo. Edit a page by hand, mix in custom components, deploy anywhere.',
+              icon: '<path d="M9 7l-5 5 5 5M15 7l5 5-5 5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+            }
+          ].map((c) => (
+            <div class="surface hover-lift flex flex-col gap-3 p-6">
+              <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" set:html={c.icon} />
+              </span>
+              <h3 class="font-display text-[16.5px] font-semibold text-ink">{c.title}</h3>
+              <p class="text-[14px] leading-relaxed text-muted">{c.body}</p>
+            </div>
+          ))
+        }
+      </div>
+    </Section>
+
+    <!-- Swap-and-watch: instant gratification -->
+    <Section
+      eyebrow="Swap and watch"
+      title="Change the code. The docs follow."
+      intro="Merge a refactor and only the pages it touches regenerate - tracked at the symbol level, not a whole-site rebuild. Locally, or a GitHub Action that opens a PR with exactly what changed and why."
+      tone="paper"
+    >
+      <div class="mx-auto grid max-w-4xl items-stretch gap-4 md:grid-cols-[1fr_auto_1fr]">
+        <!-- a code diff, illustrative -->
+        <div class="terminal flex flex-col">
+          <div class="terminal-bar">
+            <span class="terminal-dot" style="background:#f0716b"></span>
+            <span class="terminal-dot" style="background:#f3c64a"></span>
+            <span class="terminal-dot" style="background:#54c98b"></span>
+            <span class="ml-2 font-mono text-[11.5px] text-[#6f8e8a]">git diff · auth.ts</span>
+          </div>
+          <pre class="overflow-x-auto p-4 text-[12px] leading-relaxed"><code><span style="color:#6f8e8a">  export function login(</span>
+<span style="color:#d6584f">- user: string</span>
+<span style="color:#15a06b">+ user: User, opts?: LoginOptions</span>
+<span style="color:#6f8e8a">  ) &#123; … &#125;</span></code></pre>
+        </div>
+
+        <!-- arrow -->
+        <div class="flex items-center justify-center">
+          <div class="rotate-90 text-brand-400 md:rotate-0">
+            <svg width="34" height="20" viewBox="0 0 40 24" fill="none"><path d="M2 12h34M28 5l8 7-8 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+
+        <!-- pages regenerated, illustrative -->
+        <div class="surface flex flex-col p-5">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-[11px] uppercase tracking-[0.12em] text-brand-600">regenerated</span>
+            <span class="chip !py-0.5 !text-[11px]"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> PR opened</span>
+          </div>
+          <ul class="mt-4 space-y-2.5">
+            {
+              ['Authentication', 'API reference · login()', 'Quickstart'].map((page) => (
+                <li class="flex items-center gap-2.5 text-[13.5px] text-ink-soft">
+                  <span class="flex h-5 w-5 items-center justify-center rounded-full bg-pass/12 text-pass">
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </span>
+                  {page}
+                </li>
+              ))
+            }
+          </ul>
+          <p class="mt-auto border-t border-line pt-4 text-[12.5px] leading-snug text-muted">
+            The other 40 pages stayed untouched. Only what changed regenerates.
+          </p>
+        </div>
+      </div>
+      <p class="mt-6 text-center font-mono text-[11.5px] text-muted">illustrative - your real diffs and page set will vary</p>
+    </Section>
+
+    <!-- Pillars: the four things that make it different -->
+    <Section eyebrow="What makes it different" title="Four things most doc tools skip.">
+      <Pillars columns={4} />
+    </Section>
+
+    <!-- Honest verification note - keep the promise truthful, lighter touch -->
+    <Section eyebrow="The honest part" title="Pretty, but not making things up." tone="paper">
+      <div class="surface-tint mx-auto flex max-w-3xl flex-col items-center gap-4 border-brand-200 p-8 text-center">
+        <span class="font-display text-[40px] font-bold leading-none gradient-text">⚑</span>
+        <p class="text-[16px] leading-relaxed text-ink-soft">
+          Before a page ships, deterministic verifiers run the same tools you'd run in CI - samples type-check, imports
+          and links resolve, diagrams render, API references match the compiler. Anything that can't be verified ships
+          <span class="font-semibold text-ink"> flagged, never silently wrong</span>.
+        </p>
+        <a href={site.repo} class="btn btn-ghost btn-sm">See how verification works →</a>
+      </div>
+    </Section>
+
+    <!-- Use cases - heavier emphasis -->
+    <Section eyebrow="Use cases" title="One engine, three jobs.">
+      <UseCases />
+    </Section>
+
+    <!-- More to love - feature grid -->
+    <Section eyebrow="More to love" title="The small things, handled." tone="paper">
+      <FeatureGrid />
+    </Section>
+
+    <!-- Open source band - pride, heavier emphasis -->
+    <Section id="compare" eyebrow="Open source" title="Free, MIT, and genuinely yours.">
+      <div class="relative overflow-hidden rounded-3xl border border-brand-200 bg-gradient-to-br from-brand-50 via-paper to-brand-50 p-8 sm:p-12">
+        <div class="grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
+          <div class="flex flex-col gap-5">
+            <h3 class="font-display text-[26px] font-bold leading-tight text-ink sm:text-[30px]">
+              No catch. No metered credits.<br />No platform holding your docs hostage.
+            </h3>
+            <p class="text-[15.5px] leading-relaxed text-ink-soft">
+              The complete CLI, localhost web UI, and GitHub Action are MIT-licensed and free - every feature, forever.
+              Bring your own AI: your API key or subscription, any model, no token markup. Your source never leaves your
+              machine for a docstube server, and the site it generates is plain MDX + Astro you fully own.
+            </p>
+            <div class="flex flex-col gap-3 sm:flex-row">
+              <a href={site.repo} class="btn btn-primary">Try it on your repo</a>
+              <a href={site.repo} class="btn btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                Star on GitHub
+              </a>
+            </div>
+          </div>
+          <div class="grid gap-3.5">
+            {
+              [
+                { label: 'License', value: 'MIT - fork it, ship it' },
+                { label: 'Cost', value: 'Free forever, every feature' },
+                { label: 'Your AI', value: 'Any model · no token markup' },
+                { label: 'Your code', value: "Never leaves your machine for us" },
+                { label: 'Your output', value: 'Self-contained MDX + Astro' }
+              ].map((row) => (
+                <div class="surface flex items-center justify-between gap-4 px-4 py-3.5">
+                  <span class="font-mono text-[11.5px] uppercase tracking-[0.1em] text-muted">{row.label}</span>
+                  <span class="text-right font-display text-[14px] font-semibold text-ink">{row.value}</span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Every feature."
+      intro="The open-source tool is the whole product. A hosted Cloud tier is optional, for teams that want everything in one place."
+      tone="paper"
+    >
+      <Pricing />
+    </Section>
+
+    <!-- FAQ - heavier emphasis -->
+    <Section id="faq" eyebrow="FAQ" title="The questions you're already asking.">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Generate docs you'd actually read."
+      sub="Point docstube at your repo and watch a beautiful, always-current site appear. Free, open-source, and yours."
+    />
+  </main>
+
+  <Footer current={4} />
+</Base>

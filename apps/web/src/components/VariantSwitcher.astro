@@ -1,0 +1,39 @@
+---
+// Review helper: hop between the 10 homepage copy variants.
+type Props = { current?: number };
+const { current } = Astro.props;
+const variants = Array.from({ length: 10 }, (_, i) => i + 1);
+const labels: Record<number, string> = {
+  1: 'Docs that compile',
+  2: 'Your code. Your AI.',
+  3: 'Trust layer',
+  4: 'Docs you’d read',
+  5: 'Docs compiler',
+  6: 'AI-native',
+  7: 'Verified + current',
+  8: 'Point & watch',
+  9: 'Docs are lying',
+  10: 'Keeps up'
+};
+---
+
+<div class="border-t border-line bg-paper/60">
+  <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-5 py-4 sm:px-8">
+    <span class="mr-1 font-mono text-[11px] uppercase tracking-wider text-muted">Copy variants</span>
+    {
+      variants.map((v) => (
+        <a
+          href={`/v${v}`}
+          title={labels[v]}
+          class={`rounded-md px-2.5 py-1 font-mono text-[12px] transition ${
+            v === current
+              ? 'bg-brand-500 text-white'
+              : 'border border-line text-muted hover:border-brand-300 hover:text-ink'
+          }`}
+        >
+          v{v}
+        </a>
+      ))
+    }
+  </div>
+</div>

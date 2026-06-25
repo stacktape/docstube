@@ -1,0 +1,40 @@
+---
+// 2x2 positioning chart. docstube sits alone in active + verified.
+const cells = [
+  { label: 'Code-coupled\ndoc tools', x: 'left', y: 'top', brand: false },
+  { label: 'docstube', x: 'right', y: 'top', brand: true },
+  { label: 'Hosted docs\nplatforms', x: 'left', y: 'bottom', brand: false },
+  { label: 'Generic AI\ndoc tools', x: 'right', y: 'bottom', brand: false }
+];
+---
+
+<div class="surface relative mx-auto max-w-2xl p-6 sm:p-10">
+  <div class="relative aspect-square w-full">
+    <!-- axis labels -->
+    <span class="absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full pb-2 font-mono text-[11px] uppercase tracking-wider text-pass">Verified</span>
+    <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 translate-y-full pt-2 font-mono text-[11px] uppercase tracking-wider text-muted">Unverified</span>
+    <span class="absolute top-1/2 -left-2 -translate-x-full -translate-y-1/2 -rotate-90 whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-muted">Hosts docs you write</span>
+    <span class="absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 rotate-90 whitespace-nowrap font-mono text-[11px] uppercase tracking-wider text-brand-600">Generates from code</span>
+
+    <div class="grid h-full w-full grid-cols-2 grid-rows-2 overflow-hidden rounded-xl border border-line-strong">
+      {
+        cells.map((c) => (
+          <div
+            class={`flex items-center justify-center border border-line p-3 text-center ${
+              c.brand ? 'bg-gradient-to-br from-brand-500 to-brand-700' : 'bg-canvas'
+            }`}
+          >
+            {c.brand ? (
+              <span class="flex flex-col items-center gap-2">
+                <img src="/brand/docstube-icon.svg" alt="" width="34" height="34" />
+                <span class="font-display text-[17px] font-bold text-white">docstube</span>
+              </span>
+            ) : (
+              <span class="whitespace-pre-line font-display text-[14px] font-medium text-muted">{c.label}</span>
+            )}
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</div>

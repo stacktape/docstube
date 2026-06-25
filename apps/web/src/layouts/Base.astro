@@ -1,0 +1,46 @@
+---
+// eslint-disable-next-line import/no-unassigned-import -- global stylesheet, side-effect import
+import '../styles/global.css';
+
+type Props = {
+  title?: string;
+  description?: string;
+  variant?: string;
+};
+
+const {
+  title = 'docstube - verified, always-current documentation generated from your code',
+  description = 'An open-source CLI that reads your codebase and generates verified, always-current, persona-targeted docs - on the AI you already pay for. Your code never leaves your machine.',
+  variant
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://docstube.dev').toString();
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {variant && <meta name="docstube:variant" content={variant} />}
+    <meta name="generator" content="docstube web" />
+
+    {/* Brand fonts are self-hosted (see scripts/fetch-fonts.mjs) - no external
+        font dependency, in keeping with docstube's privacy-first stance. */}
+    <link rel="preload" href="/fonts/outfit-700-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

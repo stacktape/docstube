@@ -1,0 +1,374 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import RunsOn from '../components/RunsOn.astro';
+import StatStrip from '../components/StatStrip.astro';
+import Steps from '../components/Steps.astro';
+import Pillars from '../components/Pillars.astro';
+import DriftReport from '../components/DriftReport.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import UseCases from '../components/UseCases.astro';
+import Pricing from '../components/Pricing.astro';
+import BuiltForAgents from '../components/BuiltForAgents.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site, facts } from '../data/site.ts';
+
+// Hero contrast: the two operating models for AI + docs.
+const assisted = [
+  { label: 'You prompt', note: 'paste context, coax a draft, prompt again' },
+  { label: 'You edit', note: 'fix the tone, the gaps, the half-right parts' },
+  { label: 'You babysit', note: 'check every claim against the source by hand' },
+  { label: 'You maintain the drift', note: 'the code moves; the docs quietly rot' }
+];
+const native = [
+  { label: 'It reads', note: 'maps your codebase from the actual source' },
+  { label: 'It writes', note: 'a writer agent drafts MDX grounded in code' },
+  { label: 'It verifies', note: 'samples type-check, refs match the compiler' },
+  { label: 'It stays in sync', note: 'on a change, only affected pages regenerate' }
+];
+---
+
+<Base
+  title="docstube - AI-native documentation, not AI-assisted"
+  description="High-quality, verified, always-current docs generated from your code with the least supervision required. A localhost wizard asks the minimum it needs; from there docstube is autonomous - it reads, writes, fact-checks every claim against the source, and keeps everything in sync as your code changes."
+  variant="v6 · AI-native, not AI-assisted"
+>
+  <Header />
+
+  <main>
+    <!-- Hero - AI-assisted vs AI-native contrast -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-24">
+        <div class="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-6 text-center">
+          <span class="eyebrow">
+            <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>
+            Autonomous docs · open source
+          </span>
+          <h1 class="text-balance text-5xl font-extrabold sm:text-[66px] sm:leading-[0.98]">
+            <span class="gradient-text">AI-native</span>, not AI-assisted.
+          </h1>
+          <p class="max-w-2xl text-[18px] leading-relaxed text-muted">
+            High-quality, verified, always-current documentation generated from your code - with the least supervision
+            required. The wizard asks the minimum it needs; from there docstube is autonomous: it reads your codebase,
+            writes your docs, fact-checks every claim against the source, and keeps everything in sync as your code
+            changes.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.repo} class="btn btn-primary">Start the wizard</a>
+            <a href={site.repo} class="btn btn-secondary">Read the source</a>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> MIT licensed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> bring your own AI</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-300"></span> set intent once, then it runs</span>
+          </div>
+        </div>
+
+        <!-- Two-column contrast -->
+        <div class="relative z-10 mx-auto mt-14 grid max-w-5xl items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr]">
+          <!-- AI-assisted -->
+          <div class="surface flex flex-col p-6 sm:p-7">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">AI-assisted</span>
+              <span class="rounded-full border border-line bg-canvas px-2.5 py-0.5 font-mono text-[10.5px] text-muted">the babysitting</span>
+            </div>
+            <p class="mt-2 text-[13.5px] leading-snug text-muted">
+              The tool drafts a paragraph, then hands you the editing and the upkeep.
+            </p>
+            <ul class="mt-5 space-y-3.5">
+              {
+                assisted.map((it) => (
+                  <li class="flex items-start gap-3">
+                    <span class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-flag/12 text-flag">
+                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                        <path d="M6 2.2 10.4 9.6H1.6L6 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+                        <path d="M6 5v2.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                        <circle cx="6" cy="8.6" r="0.7" fill="currentColor" />
+                      </svg>
+                    </span>
+                    <span>
+                      <span class="block font-display text-[14.5px] font-semibold text-ink">{it.label}</span>
+                      <span class="block text-[13px] leading-snug text-muted">{it.note}</span>
+                    </span>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+
+          <!-- arrow / divider -->
+          <div class="flex items-center justify-center py-1 lg:flex-col">
+            <span class="flex h-9 w-9 items-center justify-center rounded-full border border-brand-200 bg-paper text-brand-600 shadow-soft">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" class="hidden lg:block">
+                <path d="M4 10h11M11 5l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true" class="lg:hidden">
+                <path d="M10 4v11M5 11l5 5 5-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          </div>
+
+          <!-- AI-native -->
+          <div class="surface relative overflow-hidden border-brand-200 p-6 shadow-lift sm:p-7">
+            <span class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-300 to-transparent"></span>
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-brand-700">AI-native</span>
+              <span class="rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 font-mono text-[10.5px] text-brand-700">docstube</span>
+            </div>
+            <p class="mt-2 text-[13.5px] leading-snug text-ink-soft">
+              You set intent once. It reads, writes, verifies, and stays in sync.
+            </p>
+            <ul class="mt-5 space-y-3.5">
+              {
+                native.map((it) => (
+                  <li class="flex items-start gap-3">
+                    <span class="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                        <path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <span>
+                      <span class="block font-display text-[14.5px] font-semibold text-ink">{it.label}</span>
+                      <span class="block text-[13px] leading-snug text-muted">{it.note}</span>
+                    </span>
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+
+        <!-- Compact terminal: wizard → autonomous run -->
+        <div class="relative z-10 mx-auto mt-6 max-w-5xl">
+          <div class="terminal w-full text-[13px] leading-relaxed">
+            <div class="terminal-bar">
+              <span class="terminal-dot" style="background:#f0716b"></span>
+              <span class="terminal-dot" style="background:#f3c64a"></span>
+              <span class="terminal-dot" style="background:#54c98b"></span>
+              <span class="ml-2 font-mono text-[12px] text-[#6f8e8a]">docstube - autonomous run</span>
+            </div>
+            <div class="p-4 sm:p-5">
+              <div class="flex items-center gap-2">
+                <span class="text-brand-300">❯</span>
+                <span class="text-[#e7f5f2]">{site.install}</span>
+              </div>
+              <div class="mt-2.5 space-y-1 font-mono text-[12.5px] text-[#9fc4be]">
+                <div><span class="text-[#6f8e8a]">wizard</span> · doc type, reader personas, a little context - <span class="text-[#bfe0db]">answered</span></div>
+                <div class="text-[#6f8e8a]">- from here it runs on its own -</div>
+                <div><span class="text-brand-300">↳</span> reads codebase · drafts MDX · verifies every page</div>
+                <div><span class="text-brand-300">↳</span> <span class="text-[#e7f5f2]">37 pages shipped</span> · 2 flagged for review · 0 babysitting</div>
+              </div>
+            </div>
+          </div>
+          <p class="mt-3 text-center font-mono text-[11.5px] text-muted">illustrative run · counts depend on your repo</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn />
+    </div>
+
+    <!-- Why now -->
+    <Section
+      id="why"
+      eyebrow="Why now"
+      title="More code, written faster - and AI-assisted tools just add a second job."
+      intro="Drafting a paragraph was never the hard part. The hard part is keeping it true as the code moves. Tools that hand you back the editing and the upkeep don’t remove the work - they relocate it onto you."
+    >
+      <StatStrip keys={['msftCode', 'googleCode', 'trustFell', 'searching']} />
+    </Section>
+
+    <!-- How it works - EMPHASIS: wizard → autonomous -->
+    <Section
+      id="how"
+      eyebrow="How it works"
+      title="Answer a few questions, then it runs."
+      intro="The localhost wizard asks the minimum it needs - doc type, reader personas, a little context. That’s the whole of your involvement. Everything after the wizard is autonomous."
+      tone="paper"
+    >
+      <Steps />
+      <div class="mt-8 grid gap-4 sm:grid-cols-3">
+        <div class="surface-tint flex flex-col gap-1.5 p-5">
+          <span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-brand-700">You do this</span>
+          <p class="text-[14px] leading-relaxed text-ink-soft">Open the wizard and answer a short set of questions. Set spend caps you control. Done.</p>
+        </div>
+        <div class="surface-tint flex flex-col gap-1.5 p-5">
+          <span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-brand-700">It does the rest</span>
+          <p class="text-[14px] leading-relaxed text-ink-soft">Maps the code, drafts every page, runs persona reviewers and deterministic verifiers, renders a site you own.</p>
+        </div>
+        <div class="surface-tint flex flex-col gap-1.5 p-5">
+          <span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-brand-700">You stay in the loop</span>
+          <p class="text-[14px] leading-relaxed text-ink-soft">Only where it matters. Anything it can’t verify ships clearly flagged for review - never silently wrong.</p>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Pillars -->
+    <Section
+      eyebrow="What makes it autonomous"
+      title="Four things that let it run without you."
+    >
+      <Pillars columns={4} />
+    </Section>
+
+    <!-- Minimal supervision: verification + flagged -->
+    <Section
+      id="verify"
+      eyebrow="Minimal supervision"
+      title="Autonomy you can leave running - because every page clears a gate."
+      intro="Autonomous doesn’t mean unchecked. Before any page ships, deterministic verifiers run the same tools you’d run in CI. If a page can’t pass, it retries with feedback or ships flagged - so the only pages that need you are the ones that genuinely do."
+      tone="paper"
+    >
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div class="surface flex flex-col p-6 sm:p-8">
+          <h3 class="font-display text-[18px] font-semibold text-ink">What runs on every page, automatically</h3>
+          <ul class="mt-5 grid gap-2.5 sm:grid-cols-2">
+            {
+              [
+                'MDX compiles + props valid',
+                'TypeScript samples type-check (tsc)',
+                'Python samples check (pyright)',
+                'Imports + paths resolve',
+                'Internal + external links resolve',
+                'D2 diagrams render',
+                'API refs match the compiler'
+              ].map((label) => (
+                <li class="flex items-center gap-2.5 text-[13.5px]">
+                  <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                  <span class="text-ink-soft">{label}</span>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="mt-6 border-t border-line pt-5 text-[13.5px] text-muted">
+            No claim ships on vibes. Reviewer agents judge audience fit; verifiers judge fact. The result is docs you
+            can trust without re-reading them.
+          </p>
+        </div>
+        <div class="flex flex-col gap-6">
+          <DriftReport />
+          <div class="surface-tint flex items-center gap-4 p-6">
+            <span class="font-display text-[40px] font-bold leading-none gradient-text">⚠</span>
+            <p class="text-[14.5px] leading-relaxed text-ink-soft">
+              The honest promise isn’t “zero hallucinations.” It’s that anything unverifiable is
+              <span class="font-semibold text-ink"> flagged, never silently wrong</span> - so autonomy never means
+              quietly shipping something false.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Incremental regeneration - EMPHASIS: symbol-level -->
+    <Section
+      eyebrow="Stays current on its own"
+      title="Change one function - only the affected pages regenerate."
+      intro="Provenance is tracked at the symbol level, so a code change doesn’t trigger a full rewrite. docstube knows exactly which pages a given symbol touches and regenerates only those - locally, or as a GitHub Action that opens a PR with the changed pages and the reasons why."
+    >
+      <div class="grid items-stretch gap-6 lg:grid-cols-[1fr_1fr]">
+        <div class="terminal w-full text-[13px] leading-relaxed">
+          <div class="terminal-bar">
+            <span class="terminal-dot" style="background:#f0716b"></span>
+            <span class="terminal-dot" style="background:#f3c64a"></span>
+            <span class="terminal-dot" style="background:#54c98b"></span>
+            <span class="ml-2 font-mono text-[12px] text-[#6f8e8a]">docstube - incremental refresh</span>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="flex items-center gap-2">
+              <span class="text-brand-300">❯</span>
+              <span class="text-[#e7f5f2]">git commit · changed</span> <span class="text-[#9fc4be]">getUser(id)</span>
+            </div>
+            <div class="mt-3 space-y-1.5 font-mono text-[12.5px] text-[#9fc4be]">
+              <div><span class="text-[#6f8e8a]">scan</span> 1 changed symbol · maps to 2 pages</div>
+              <div><span class="text-brand-300">↻</span> auth/sessions.mdx - regenerated + verified</div>
+              <div><span class="text-brand-300">↻</span> api/users.mdx - regenerated + verified</div>
+              <div class="text-[#6f8e8a]">198 pages untouched · no full rebuild</div>
+              <div class="flex items-center gap-2 border-t border-[#16302e] pt-2.5 text-[#bfe0db]">
+                <span class="text-brand-300">❯</span> opened PR · 2 pages, with reasons
+                <span class="caret ml-0.5 inline-block h-[14px] w-[7px] bg-brand-300 align-middle"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-col gap-4">
+          <div class="surface flex flex-col gap-2 p-6">
+            <h3 class="font-display text-[16px] font-semibold text-ink">Symbol-level provenance</h3>
+            <p class="text-[14px] leading-relaxed text-muted">
+              Every page records which source symbols it depends on. That mapping is what makes incremental
+              regeneration precise instead of a guess - and what keeps a busy repo cheap to keep current.
+            </p>
+          </div>
+          <div class="surface flex flex-col gap-2 p-6">
+            <h3 class="font-display text-[16px] font-semibold text-ink">Local or a PR-opening Action</h3>
+            <p class="text-[14px] leading-relaxed text-muted">
+              Run <span class="font-mono text-[13px] text-brand-600">docstube refresh</span> on your machine, or let the
+              GitHub Action do it on every change and open a PR with exactly the pages that moved.
+            </p>
+          </div>
+          <div class="surface-tint flex items-center gap-4 p-5">
+            <span class="font-display text-[26px] font-bold leading-none gradient-text">{facts.reposPerMinute.stat}</span>
+            <span>
+              <span class="block text-[13.5px] leading-snug text-ink-soft">{facts.reposPerMinute.claim}</span>
+              <span class="mt-0.5 block font-mono text-[11px] text-muted">{facts.reposPerMinute.source}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Comparison -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="Assisted tools draft. docstube runs."
+      intro="Hosting platforms organize the docs you write by hand. AI add-ons draft text and hand you the babysitting. docstube is the one that runs the whole loop from your code - reads, writes, verifies, stays in sync - and hands you a site you own."
+      tone="paper"
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <Quadrant />
+        <CompareTable />
+      </div>
+    </Section>
+
+    <!-- Use cases -->
+    <Section eyebrow="Use cases" title="One autonomous engine, three jobs.">
+      <UseCases />
+    </Section>
+
+    <!-- Built for agents -->
+    <Section eyebrow="Built for agents" title="Docs your LLMs can read, too." tone="paper">
+      <BuiltForAgents />
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Bring your own AI."
+      intro="The open-source tool is the whole product. You bring your own AI - your API key or subscription, any model, no token markup - and pay only for your own usage, with caps you set. A hosted Cloud tier is optional."
+    >
+      <Pricing />
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Set intent once. Let it run."
+      sub="Start the wizard, answer a few questions, and docstube takes it from there - verified, always-current docs you own. Free and open-source."
+    />
+  </main>
+
+  <Footer current={6} />
+</Base>

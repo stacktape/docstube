@@ -1,0 +1,17 @@
+---
+import { features } from '../data/site.ts';
+---
+
+<div class="grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+  {
+    features.map((f) => (
+      <div class="flex flex-col gap-1.5 bg-paper p-5">
+        <div class="flex items-center gap-2 text-brand-500">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 class="font-display text-[15px] font-semibold leading-tight text-ink">{f.title}</h3>
+        <p class="text-[13px] leading-snug text-muted">{f.note}</p>
+      </div>
+    ))
+  }
+</div>

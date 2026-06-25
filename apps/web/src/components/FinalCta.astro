@@ -1,0 +1,32 @@
+---
+import { site } from '../data/site.ts';
+
+type Props = {
+  title?: string;
+  sub?: string;
+};
+const {
+  title = 'Be first to stop maintaining docs by hand.',
+  sub = 'docstube is launching soon. Join the waitlist and we’ll send you a single email the day it’s ready.'
+} = Astro.props;
+---
+
+<section id="waitlist" class="relative overflow-hidden">
+  <div class="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+    <div class="glow relative overflow-hidden rounded-3xl border border-brand-200 bg-gradient-to-br from-brand-50 via-paper to-brand-50 px-6 py-16 text-center sm:px-12">
+      <div class="relative z-10 mx-auto flex max-w-2xl flex-col items-center gap-5">
+        <img src="/brand/docstube-icon.svg" alt="" width="60" height="60" class="float-slow drop-shadow-sm" />
+        <h2 class="text-balance text-3xl font-bold sm:text-[42px] sm:leading-[1.06]">{title}</h2>
+        <p class="text-[17px] leading-relaxed text-muted">{sub}</p>
+        <a href={site.waitlist} class="btn btn-primary btn-lg mt-1 shadow-brand">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2.5" />
+            <path d="m4 7 8 5.5L20 7" />
+          </svg>
+          Join the waitlist
+        </a>
+        <p class="font-mono text-[12px] text-muted">Early access · no spam, just one launch ping.</p>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,31 @@
+---
+import { pillars } from '../data/site.ts';
+
+type Props = { columns?: 2 | 4 };
+const { columns = 2 } = Astro.props;
+const grid = columns === 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-2';
+
+const icons: Record<string, string> = {
+  verified:
+    '<path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z" stroke-width="1.6"/><path d="M9 12l2 2 4-4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  current:
+    '<path d="M4 12a8 8 0 0113.7-5.6L20 8" stroke-width="1.6" stroke-linecap="round"/><path d="M20 4v4h-4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12a8 8 0 01-13.7 5.6L4 16" stroke-width="1.6" stroke-linecap="round"/><path d="M4 20v-4h4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  personas:
+    '<circle cx="9" cy="8" r="3" stroke-width="1.6"/><path d="M3.5 19a5.5 5.5 0 0111 0" stroke-width="1.6" stroke-linecap="round"/><path d="M16 6.2a3 3 0 010 5.6M19 19a5.5 5.5 0 00-3.2-5" stroke-width="1.6" stroke-linecap="round"/>',
+  byo: '<path d="M14.5 4a5.5 5.5 0 00-5.1 7.5L4 17v3h3l1-1h2v-2h2v-2l1.4-1.4A5.5 5.5 0 1014.5 4z" stroke-width="1.6" stroke-linejoin="round"/><circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none"/>'
+};
+---
+
+<div class={`grid gap-4 ${grid}`}>
+  {
+    pillars.map((p) => (
+      <div class="surface hover-lift flex flex-col gap-4 p-6">
+        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" set:html={icons[p.key]} />
+        </span>
+        <h3 class="font-display text-[19px] font-semibold text-ink">{p.title}</h3>
+        <p class="text-[14.5px] leading-relaxed text-muted">{p.blurb}</p>
+      </div>
+    ))
+  }
+</div>

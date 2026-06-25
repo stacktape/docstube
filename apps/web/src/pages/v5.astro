@@ -1,0 +1,362 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import Steps from '../components/Steps.astro';
+import Pillars from '../components/Pillars.astro';
+import VerifierCascade from '../components/VerifierCascade.astro';
+import DriftReport from '../components/DriftReport.astro';
+import FeatureGrid from '../components/FeatureGrid.astro';
+import UseCases from '../components/UseCases.astro';
+import RunsOn from '../components/RunsOn.astro';
+import Pricing from '../components/Pricing.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site, facts } from '../data/site.ts';
+
+// The dichotomy at the heart of the page: a platform is passive, a compiler is active.
+const platform = [
+  'Hosts the docs you write by hand',
+  'You chase the drift, every release',
+  'Accuracy is on you - no checker',
+  'Rent the hosting to stay online'
+];
+const compiler = [
+  'Reads your code and drafts from source',
+  'Only the affected pages recompile',
+  'Verifies every claim it can mechanically',
+  'Emits a site you own and host anywhere'
+];
+
+// The compiler pipeline, in build-step language.
+const pipeline = [
+  { mono: 'src/**', label: 'your codebase', note: 'stdin - stays on your machine' },
+  { mono: 'map', label: 'structural map', note: 'tree-sitter, symbol-level' },
+  { mono: 'draft', label: 'writer agent', note: 'MDX grounded in source' },
+  { mono: '--verify', label: 'reviewers + verifiers', note: 'tsc · pyright · links · D2' },
+  { mono: 'emit', label: 'a site you own', note: 'Astro + MDX, in your repo' }
+];
+---
+
+<Base
+  title="docstube - not a docs platform, a docs compiler"
+  description="Hosting platforms organize the docs you write by hand. docstube compiles them from your code, verifies every claim against your real compiler, and emits a self-contained Astro site you own. Open source, MIT, bring your own AI."
+  variant="v5 · a docs compiler"
+>
+  <Header />
+
+  <main>
+    <!-- Hero: platform vs compiler dichotomy -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-24">
+        <div class="relative z-10 mx-auto flex max-w-3xl flex-col items-center text-center">
+          <span class="eyebrow">
+            <span class="font-mono lowercase tracking-normal">$ docs --compile</span>
+          </span>
+          <h1 class="mt-5 text-balance text-4xl font-extrabold sm:text-[60px] sm:leading-[0.98]">
+            Not a docs platform.<br class="hidden sm:block" />
+            <span class="sm:hidden"> </span>A docs <span class="gradient-text">compiler</span>.
+          </h1>
+          <p class="mt-6 max-w-2xl text-[18px] leading-relaxed text-muted">
+            Hosting platforms organize the docs you write by hand. docstube compiles them from your code, verifies
+            every claim, and hands you a site you own.
+          </p>
+          <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a href="#compare" class="btn btn-primary">See the difference</a>
+            <a href={site.repo} class="btn btn-secondary">Get started</a>
+          </div>
+          <div class="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> MIT licensed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> bring your own AI</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> source never leaves your machine</span>
+          </div>
+        </div>
+
+        <!-- The dichotomy, side by side -->
+        <div class="relative z-10 mt-14 grid items-stretch gap-4 lg:mt-16 lg:grid-cols-[1fr_auto_1fr]">
+          <!-- A platform -->
+          <div class="surface flex flex-col gap-4 p-6 sm:p-7">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-[12px] uppercase tracking-[0.14em] text-muted">A platform</span>
+              <span class="rounded-full bg-canvas px-2.5 py-0.5 font-mono text-[11px] text-muted">passive</span>
+            </div>
+            <p class="text-[14px] leading-relaxed text-ink-soft">
+              A place to <span class="font-semibold text-ink">put</span> docs. It stores and serves what you already
+              wrote - and waits for you to keep it true.
+            </p>
+            <ul class="mt-1 space-y-2.5 border-t border-line pt-4">
+              {
+                platform.map((p) => (
+                  <li class="flex items-start gap-2.5 text-[13.5px] text-muted">
+                    <svg class="mt-1 shrink-0 text-muted" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M4 4l6 6M10 4l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                    {p}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+
+          <!-- the transform arrow -->
+          <div class="hidden flex-col items-center justify-center px-2 lg:flex">
+            <div class="flex flex-col items-center gap-2 text-brand-500">
+              <span class="font-mono text-[11px] uppercase tracking-[0.18em] text-brand-700">compile</span>
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+                <path d="M8 20h22M24 13l8 7-8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+          </div>
+          <div class="flex items-center justify-center py-1 text-brand-500 lg:hidden">
+            <svg width="34" height="34" viewBox="0 0 40 40" fill="none" aria-hidden="true" class="rotate-90">
+              <path d="M8 20h22M24 13l8 7-8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+
+          <!-- A compiler -->
+          <div class="surface-tint hover-lift flex flex-col gap-4 p-6 ring-1 ring-brand-200 sm:p-7">
+            <div class="flex items-center justify-between">
+              <span class="inline-flex items-center gap-2 font-mono text-[12px] uppercase tracking-[0.14em] text-brand-700">
+                <img src="/brand/docstube-icon.svg" alt="" width="16" height="16" />
+                A compiler
+              </span>
+              <span class="rounded-full bg-brand-50 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-brand-700">active</span>
+            </div>
+            <p class="text-[14px] leading-relaxed text-ink-soft">
+              A program that <span class="font-semibold text-ink">produces</span> docs. Source in, verified site out -
+              and it reruns itself when your code moves.
+            </p>
+            <ul class="mt-1 space-y-2.5 border-t border-line pt-4">
+              {
+                compiler.map((c) => (
+                  <li class="flex items-start gap-2.5 text-[13.5px] text-ink-soft">
+                    <svg class="mt-0.5 shrink-0 text-brand-500" width="15" height="15" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    {c}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- The pipeline: source in -> verified site out -->
+    <section class="border-b border-line bg-paper">
+      <div class="mx-auto max-w-6xl px-5 py-12 sm:px-8">
+        <p class="text-center font-mono text-[12px] uppercase tracking-[0.14em] text-muted">source in → verified site out</p>
+        <ol class="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {
+            pipeline.map((stage, i) => (
+              <li class="relative flex flex-col gap-1.5 rounded-xl border border-line bg-canvas px-4 py-4">
+                <div class="flex items-center justify-between">
+                  <code class="font-mono text-[13px] font-semibold text-brand-600">{stage.mono}</code>
+                  <span class="font-mono text-[11px] text-faint">{String(i).padStart(2, '0')}</span>
+                </div>
+                <span class="font-display text-[14px] font-semibold text-ink">{stage.label}</span>
+                <span class="text-[12px] leading-snug text-muted">{stage.note}</span>
+                {i < pipeline.length - 1 && (
+                  <span class="absolute -right-3 top-1/2 z-10 hidden -translate-y-1/2 text-line-strong lg:block">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                      <path d="M3 9h9M9 5l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                )}
+              </li>
+            ))
+          }
+        </ol>
+        <p class="mt-5 text-center text-[13px] text-muted">
+          The whole compile runs on <span class="font-medium text-ink-soft">your</span> AI - your API key or
+          subscription, any model, no token markup. Your source never leaves your machine.
+        </p>
+      </div>
+    </section>
+
+    <!-- Short "why" beat before the comparison -->
+    <Section
+      id="why"
+      eyebrow="The category"
+      title="The black box is the product they sell."
+      intro="A docs CMS asks you to write the docs, then sells you the box they live in. The drift between your code and your prose is your problem forever. A compiler turns that around: the code is the input, correctness is checked, and the output is just files you keep."
+    >
+      <div class="grid gap-4 sm:grid-cols-3">
+        <div class="surface flex flex-col gap-2 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">the input</span>
+          <h3 class="font-display text-[17px] font-semibold text-ink">Your code, not your patience</h3>
+          <p class="text-[14px] leading-relaxed text-muted">
+            docstube builds a structural map and drafts from the real source - so docs start from ground truth instead
+            of a memory of it.
+          </p>
+        </div>
+        <div class="surface flex flex-col gap-2 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">the check</span>
+          <h3 class="font-display text-[17px] font-semibold text-ink">A build that can fail</h3>
+          <p class="text-[14px] leading-relaxed text-muted">
+            Samples type-check, imports and links resolve, API references match the compiler. A page that can&rsquo;t
+            pass ships flagged - never silently wrong.
+          </p>
+        </div>
+        <div class="surface flex flex-col gap-2 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">the output</span>
+          <h3 class="font-display text-[17px] font-semibold text-ink">Artifacts, not a subscription</h3>
+          <p class="text-[14px] leading-relaxed text-muted">
+            The emit is a self-contained Astro + MDX site committed to your repo. Nothing to keep paying to keep your
+            docs online.
+          </p>
+        </div>
+      </div>
+    </Section>
+
+    <!-- COMPARISON - front and center -->
+    <Section
+      id="compare"
+      eyebrow="Platform vs compiler"
+      title="The only one that's active, verified, and yours."
+      intro="Plot the field on two axes - does it generate from your code, and does it verify the output? Hosting platforms host what you write. AI generators write and hope. docstube is the corner where active generation meets a real checker, and the result is a site you keep."
+      tone="paper"
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <Quadrant />
+        <CompareTable />
+      </div>
+
+      <div class="mt-10 grid gap-4 sm:grid-cols-3">
+        <div class="surface-tint flex flex-col gap-1.5 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">active</span>
+          <p class="text-[14px] leading-relaxed text-ink-soft">
+            It generates from your code on every change - not a CMS waiting for you to type, not a one-shot dump that
+            rots.
+          </p>
+        </div>
+        <div class="surface-tint flex flex-col gap-1.5 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">verified</span>
+          <p class="text-[14px] leading-relaxed text-ink-soft">
+            Deterministic verifiers run the same tools you&rsquo;d run in CI. Most tools in the field ship with no
+            checker at all.
+          </p>
+        </div>
+        <div class="surface-tint flex flex-col gap-1.5 p-6">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-700">yours</span>
+          <p class="text-[14px] leading-relaxed text-ink-soft">
+            The output is MDX + Astro in your repo. Platforms keep the output on their platform; here it&rsquo;s just
+            files.
+          </p>
+        </div>
+      </div>
+
+      <p class="mx-auto mt-8 max-w-2xl text-center text-[14px] leading-relaxed text-muted">
+        To be fair to the incumbents: they lead on polish and maturity, and a hosted CMS is a fine place to
+        hand-author. docstube&rsquo;s bet is narrower and louder &mdash; treat docs as a build, and own the artifact.
+      </p>
+    </Section>
+
+    <!-- How the compile runs -->
+    <Section id="how" eyebrow="The build steps" title="Generate, review, verify, ship." intro="Five passes, one command. It runs autonomously after you point it at the repo.">
+      <Steps />
+    </Section>
+
+    <!-- Verification deep-dive -->
+    <Section
+      id="verify"
+      eyebrow="The verify pass"
+      title="A page either passes the gate or ships flagged."
+      intro="Reviewer agents judge audience fit. But before any page emits, deterministic verifiers run real tools against it - tsc, pyright, link and import resolution, D2 render, compiler-matched API refs. This is the step a hosting platform doesn't have."
+      tone="paper"
+    >
+      <div class="grid items-stretch gap-6 lg:grid-cols-2">
+        <div class="float-slow">
+          <VerifierCascade command="npx docstube generate --verify" caption="auth/session.mdx" />
+        </div>
+        <div class="flex flex-col gap-6">
+          <DriftReport />
+          <div class="surface-tint flex items-center gap-4 p-6">
+            <span class="font-display text-[40px] font-bold leading-none gradient-text">⚠</span>
+            <p class="text-[14.5px] leading-relaxed text-ink-soft">
+              The honest promise isn&rsquo;t &ldquo;zero hallucinations.&rdquo; It&rsquo;s that anything unverifiable is
+              <span class="font-semibold text-ink"> flagged, never silently wrong</span> - like a compiler warning you
+              can&rsquo;t ignore.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Pillars -->
+    <Section eyebrow="What a compiler buys you" title="Four things a hosting platform can't do.">
+      <Pillars columns={4} />
+    </Section>
+
+    <!-- Feature grid -->
+    <Section eyebrow="In the toolchain" title="Everything the emit includes." tone="paper">
+      <FeatureGrid />
+    </Section>
+
+    <!-- Why now / proof, sourced facts -->
+    <Section
+      eyebrow="Why a compiler now"
+      title="More code is machine-written. Trust didn't keep up."
+      intro="As more of the codebase is generated, hand-maintained prose drifts faster than anyone can chase it. The fix isn't another place to store docs - it's a build that regenerates and re-checks them."
+    >
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          [facts.googleCode, facts.cognition, facts.almostRight, facts.reposPerMinute].map((f) => (
+            <div class="surface flex flex-col gap-1.5 p-5">
+              <span class="font-display text-[30px] font-bold leading-none gradient-text">{f.stat}</span>
+              <span class="text-[13.5px] leading-snug text-ink-soft">{f.claim}</span>
+              <span class="mt-1 font-mono text-[11px] text-muted">{f.source}</span>
+            </div>
+          ))
+        }
+      </div>
+    </Section>
+
+    <!-- Use cases -->
+    <Section eyebrow="What you compile" title="One engine, three jobs." tone="paper">
+      <UseCases />
+    </Section>
+
+    <!-- Runs on -->
+    <section class="border-y border-line bg-paper py-12">
+      <RunsOn heading="The compiler backend is your own AI" />
+    </section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="The compiler is free. Forever."
+      intro="The open-source tool is the whole product - no metered docs, no platform rent. A hosted Cloud tier is optional, for teams that want everything in one place."
+    >
+      <Pricing />
+    </Section>
+
+    <!-- Open source band -->
+    <Section eyebrow="Open source" title="MIT, free, and yours." tone="paper">
+      <div class="surface mx-auto flex max-w-3xl flex-col items-center gap-5 p-8 text-center">
+        <p class="text-[16px] leading-relaxed text-muted">
+          A compiler you can read. docstube emits a self-contained Astro + MDX site into your repo - no black box, no
+          platform to pay to keep your docs online, no token markup. Run it locally or wire up the GitHub Action.
+        </p>
+        <a href={site.repo} class="btn btn-secondary">Read the source</a>
+      </div>
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers.">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Stop maintaining a docs platform. Compile them."
+      sub="Point docstube at your repo and get a verified, always-current site you own. Free, open-source, on the AI you already pay for."
+    />
+  </main>
+
+  <Footer current={5} />
+</Base>

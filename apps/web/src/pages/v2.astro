@@ -1,0 +1,354 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import Tabs from '../components/Tabs.astro';
+import CodeWindow from '../components/CodeWindow.astro';
+import RunsOn from '../components/RunsOn.astro';
+import CompareTable from '../components/CompareTable.astro';
+import Pricing from '../components/Pricing.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site } from '../data/site.ts';
+
+// The three things v2 refuses to let a vendor take from you.
+const enemies = [
+  {
+    name: 'Token markup',
+    body: 'Most AI doc tools resell you compute at a margin - metered credits, marked up per token. docstube runs on the key or subscription you already pay for. We never touch the meter.',
+    bad: 'metered credits, per-token margin',
+    good: 'your AI · zero markup'
+  },
+  {
+    name: 'Vendor lock-in',
+    body: 'No proprietary format, no platform you have to keep renting. The output is plain MDX and a standard Astro site, committed straight into your repo. Walk away any time - the docs come with you.',
+    bad: 'proprietary format, rented platform',
+    good: 'MDX + Astro · in your repo'
+  },
+  {
+    name: 'Hosting black boxes',
+    body: 'Your source is only ever sent to the AI provider you choose, through your own credentials. docstube servers never receive your code, prompts, or generated docs. Nothing to trust but the part you control.',
+    bad: 'opaque server, your code uploaded',
+    good: 'stays on your machine'
+  }
+];
+
+// What you actually own once a run finishes.
+const owned = [
+  'A self-contained Astro + MDX site, committed to your repo',
+  'Plain MDX pages you can hand-edit, diff, and review',
+  'No platform subscription to keep the site online',
+  'Run it locally or wire up the PR-opening GitHub Action'
+];
+---
+
+<Base
+  title="docstube - your code, your AI, your docs"
+  description="Open-source docs on the AI you already pay for. Bring your own key or subscription - no token markup, your source never leaves your machine, and the output is MDX + Astro you fully own. No lock-in, no black box."
+  variant="v2 · your code, your AI, your docs"
+>
+  <Header />
+
+  <main>
+    <!-- Hero: the "three yours" triptych -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto max-w-6xl px-5 pt-20 pb-16 text-center sm:px-8 sm:pt-28 sm:pb-20">
+        <div class="relative z-10 flex flex-col items-center gap-7">
+          <span class="eyebrow">
+            <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>
+            Open source · MIT · bring your own AI
+          </span>
+
+          <h1 class="font-display text-[44px] font-extrabold leading-[0.95] tracking-tight sm:text-[78px]">
+            <span class="block text-ink">Your code.</span>
+            <span class="block"><span class="gradient-text">Your AI.</span></span>
+            <span class="block text-ink">Your docs.</span>
+          </h1>
+
+          <p class="max-w-2xl text-[18px] leading-relaxed text-muted">
+            Bring your own AI - your API key or subscription, any model, no token markup. Your source never leaves your
+            machine for a docstube server. And the site that comes out is yours: plain MDX, a standard Astro build, no
+            lock-in.
+          </p>
+
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.repo} class="btn btn-primary">Own your docs</a>
+            <a href={site.repo} target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"
+                ></path>
+              </svg>
+              Star on GitHub
+            </a>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> no token markup</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> source stays local</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span> MDX + Astro you own</span>
+          </div>
+        </div>
+
+        <!-- BYO provider showcase: pick your engine, paste one block -->
+        <div class="relative z-10 mt-16 sm:mt-20">
+          <p class="mb-7 font-mono text-[12px] uppercase tracking-[0.14em] text-muted">
+            One config block. Pick the engine you already pay for.
+          </p>
+          <Tabs tabs={['Claude', 'Codex', 'Gemini', 'Any API']}>
+            <CodeWindow slot="panel-0" file="docstube.yml" lang="claude · subscription or API" class="mx-auto max-w-2xl text-left">
+agent: claude
+model: claude-opus-4-5
+# uses your logged-in Claude CLI session,
+# or set ANTHROPIC_API_KEY - your key, your meter.
+spendCap: $5/run
+            </CodeWindow>
+
+            <CodeWindow slot="panel-1" file="docstube.yml" lang="codex · openai cli" class="mx-auto max-w-2xl text-left">
+agent: codex
+model: gpt-5-codex
+# drives your installed Codex CLI.
+# no docstube credits, no per-token markup.
+spendCap: $5/run
+            </CodeWindow>
+
+            <CodeWindow slot="panel-2" file="docstube.yml" lang="gemini · google cli" class="mx-auto max-w-2xl text-left">
+agent: gemini
+model: gemini-2.5-pro
+# runs through your Gemini CLI.
+# your Google credentials, your quota.
+spendCap: $5/run
+            </CodeWindow>
+
+            <CodeWindow slot="panel-3" file="docstube.yml" lang="any openai/anthropic-compatible" class="mx-auto max-w-2xl text-left">
+agent: openai-compatible
+baseURL: https://your-gateway.example.com/v1
+model: your-model-name
+# any endpoint you can already reach -
+# self-hosted, proxied, or a different provider.
+spendCap: $5/run
+            </CodeWindow>
+          </Tabs>
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn heading="Runs on the AI you already pay for" />
+    </div>
+
+    <!-- Use your existing subscription -->
+    <Section
+      id="byo"
+      eyebrow="Bring your own AI"
+      title="Use the subscription you already have."
+      intro="No new vendor relationship, no credits to top up. Point docstube at the AI you already pay for - or any endpoint you can already reach."
+    >
+      <div class="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+        <div class="surface flex flex-col gap-5 p-7 sm:p-8">
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M14.5 4a5.5 5.5 0 00-5.1 7.5L4 17v3h3l1-1h2v-2h2v-2l1.4-1.4A5.5 5.5 0 1014.5 4z" stroke-width="1.6" stroke-linejoin="round" />
+              <circle cx="16" cy="8" r="1.2" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+          <h3 class="font-display text-[20px] font-semibold text-ink">Your CLI, logged in already</h3>
+          <p class="text-[14.5px] leading-relaxed text-muted">
+            docstube drives your local Claude, Codex, or Gemini CLI - the same session you already use to write code.
+            Subscription or API key, your choice. No token markup, and you set spend caps you control.
+          </p>
+          <ul class="mt-1 space-y-2.5">
+            {
+              ['Subscription or API key - either works', 'Spend caps you set, per run', 'Your normal agent usage, nothing new to trust'].map(
+                (pt) => (
+                  <li class="flex items-start gap-2.5 text-[14px] text-ink-soft">
+                    <svg class="mt-1 shrink-0 text-brand-500" width="15" height="15" viewBox="0 0 16 16" fill="none">
+                      <path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    {pt}
+                  </li>
+                )
+              )
+            }
+          </ul>
+        </div>
+
+        <div class="surface flex flex-col gap-5 p-7 sm:p-8">
+          <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <h3 class="font-display text-[20px] font-semibold text-ink">Any endpoint, via a custom base URL</h3>
+          <p class="text-[14.5px] leading-relaxed text-muted">
+            Any OpenAI-compatible or Anthropic-compatible endpoint works through a custom <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-[12.5px] text-brand-700">baseURL</code> -
+            a self-hosted model, an internal gateway, or a different provider entirely. If you can already reach the
+            model, docstube can use it.
+          </p>
+          <CodeWindow file="docstube.yml" lang="custom base url" class="mt-1">
+agent: openai-compatible
+baseURL: https://gateway.internal/v1
+model: your-model-name
+# proxy, self-host, or swap providers -
+# your infra, your rules.
+          </CodeWindow>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Name the enemies -->
+    <Section
+      eyebrow="What we refuse to do"
+      title="Three things we won’t take from you."
+      intro="Most doc tools quietly tax you on compute, trap your content in a format, or route your code through a server you can’t see. docstube does none of it - on purpose."
+      tone="paper"
+    >
+      <div class="grid gap-4 md:grid-cols-3">
+        {
+          enemies.map((e) => (
+            <div class="surface hover-lift flex flex-col gap-4 p-6">
+              <div class="flex items-center gap-2">
+                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-danger/10 text-danger">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  </svg>
+                </span>
+                <h3 class="font-display text-[18px] font-semibold text-ink">{e.name}</h3>
+              </div>
+              <p class="text-[14.5px] leading-relaxed text-muted">{e.body}</p>
+              <div class="mt-1 flex flex-col gap-2 border-t border-line pt-4 font-mono text-[12px]">
+                <span class="flex items-center gap-2 text-muted line-through decoration-danger/50">
+                  <span class="text-danger">✕</span>
+                  {e.bad}
+                </span>
+                <span class="flex items-center gap-2 text-ink-soft">
+                  <span class="text-pass">✓</span>
+                  {e.good}
+                </span>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </Section>
+
+    <!-- Ownership -->
+    <Section
+      id="own"
+      eyebrow="You own the output"
+      title="A site in your repo, not on someone’s platform."
+      intro="When a run finishes, docstube writes a self-contained Astro + MDX site straight into your repository. There’s nothing to keep paying for to keep your docs online."
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.05fr]">
+        <div class="flex flex-col gap-6">
+          <ul class="grid gap-3 sm:grid-cols-2">
+            {
+              owned.map((pt) => (
+                <li class="surface-tint flex items-start gap-3 p-4 text-[14px] leading-snug text-ink-soft">
+                  <svg class="mt-0.5 shrink-0 text-brand-500" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  {pt}
+                </li>
+              ))
+            }
+          </ul>
+          <div class="surface flex items-center gap-4 p-6">
+            <span class="font-display text-[34px] font-bold leading-none gradient-text">✦</span>
+            <p class="text-[14.5px] leading-relaxed text-ink-soft">
+              The site is generated, but it isn’t locked. It’s
+              <span class="font-semibold text-ink"> your MDX, your Astro, your repo</span> - edit it, fork it, or host it
+              anywhere you already host static sites.
+            </p>
+          </div>
+        </div>
+
+        <CodeWindow file="your-repo/" lang="committed by docstube" class="lg:mt-0">
+docs/
+  src/
+    content/
+      auth.mdx          ← plain MDX, hand-editable
+      quickstart.mdx
+    pages/
+    components/         ← standard Astro
+  astro.config.mjs
+  package.json          ← no @docstube/* runtime dep
+# git add . && git commit -m "docs"
+# it’s yours now.
+        </CodeWindow>
+      </div>
+    </Section>
+
+    <!-- Open source band -->
+    <Section
+      eyebrow="Open source"
+      title="MIT. Free forever. The whole product."
+      tone="paper"
+    >
+      <div class="surface-tint mx-auto flex max-w-3xl flex-col items-center gap-6 p-8 text-center sm:p-10">
+        <p class="text-[16px] leading-relaxed text-muted">
+          The open-source CLI, localhost web UI, and GitHub Action are the entire product - every feature, no asterisk.
+          You bring your own AI and pay only for your own usage. The optional hosted Cloud tier exists for teams that
+          want everything in one place, but it’s never a gate on the docs you generate.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <span class="chip"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> MIT licensed</span>
+          <span class="chip"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> no token markup</span>
+          <span class="chip"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span> source stays local</span>
+        </div>
+        <a href={site.repo} class="btn btn-primary">Own your docs</a>
+      </div>
+    </Section>
+
+    <!-- Pricing - lead with the free tier -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="The free tier is the product."
+      intro="Free forever, every feature, on the AI you already pay for. Cloud and Enterprise add hosted convenience and controls - they don’t unlock anything the open-source tool can’t already do."
+    >
+      <Pricing />
+    </Section>
+
+    <!-- Verification - kept compact and secondary -->
+    <Section
+      id="verify"
+      eyebrow="Still verified"
+      title="Owned doesn’t mean unchecked."
+      tone="paper"
+    >
+      <div class="surface mx-auto flex max-w-3xl flex-col items-center gap-5 p-7 text-center sm:p-8">
+        <p class="text-[15.5px] leading-relaxed text-muted">
+          Before any page lands in your repo, deterministic verifiers run the same tools you’d run in CI: TypeScript
+          samples type-check, Python checks with pyright, imports and links resolve, D2 diagrams render, and API
+          references are matched against your real compiler signatures. Anything that can’t be verified ships
+          <span class="font-semibold text-ink"> flagged, never silently wrong</span>.
+        </p>
+        <a href="#faq" class="btn btn-secondary btn-sm">How verification works</a>
+      </div>
+    </Section>
+
+    <!-- Compare - anti-lock-in framing -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="Owned, on your compute, verified."
+      intro="Hosted platforms rent you a place to keep the docs you write. AI generators sell you marked-up tokens. docstube is the one that runs on your own AI, verifies the output, and hands you a site you keep."
+    >
+      <CompareTable />
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Own your docs."
+      sub="Point docstube at your repo, bring your own AI, and get a verified MDX + Astro site that’s yours to keep. Free and open-source - no token markup, no lock-in."
+    />
+  </main>
+
+  <Footer current={2} />
+</Base>

@@ -1,0 +1,19 @@
+---
+import { facts } from '../data/site.ts';
+
+type Props = { keys?: (keyof typeof facts)[] };
+const { keys = ['msftCode', 'trustFell', 'almostRight', 'searching'] } = Astro.props;
+const items = keys.map((k) => facts[k]);
+---
+
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {
+    items.map((f) => (
+      <div class="surface flex flex-col gap-1.5 p-5">
+        <span class="font-display text-[30px] font-bold leading-none gradient-text">{f.stat}</span>
+        <span class="text-[13.5px] leading-snug text-ink-soft">{f.claim}</span>
+        <span class="mt-1 font-mono text-[11px] text-muted">{f.source}</span>
+      </div>
+    ))
+  }
+</div>

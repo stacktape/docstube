@@ -1,0 +1,32 @@
+---
+type Props = {
+  id?: string;
+  eyebrow?: string;
+  title?: string;
+  intro?: string;
+  align?: 'left' | 'center';
+  tone?: 'canvas' | 'paper' | 'none';
+  class?: string;
+};
+
+const { id, eyebrow, title, intro, align = 'center', tone = 'none', class: className = '' } = Astro.props;
+const toneClass = tone === 'paper' ? 'bg-paper' : tone === 'canvas' ? 'bg-canvas' : '';
+const alignClass = align === 'center' ? 'mx-auto text-center items-center' : 'text-left items-start';
+---
+
+<section id={id} class={`relative ${toneClass} ${className}`}>
+  <div class="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    {
+      (eyebrow || title || intro) && (
+        <div class={`flex max-w-2xl flex-col gap-4 ${align === 'center' ? 'mx-auto' : ''} ${alignClass}`}>
+          {eyebrow && <span class="eyebrow">{eyebrow}</span>}
+          {title && <h2 class="text-balance text-3xl font-bold sm:text-[40px] sm:leading-[1.08]">{title}</h2>}
+          {intro && <p class="text-[17px] leading-relaxed text-muted">{intro}</p>}
+        </div>
+      )
+    }
+    <div class={eyebrow || title || intro ? 'mt-14' : ''}>
+      <slot />
+    </div>
+  </div>
+</section>

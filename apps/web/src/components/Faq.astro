@@ -1,0 +1,25 @@
+---
+import { faqs } from '../data/site.ts';
+---
+
+<div class="mx-auto max-w-3xl divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper">
+  {
+    faqs.map((f) => (
+      <details class="group px-6 py-1 [&_summary::-webkit-details-marker]:hidden">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-left font-display text-[16px] font-semibold text-ink">
+          {f.q}
+          <svg
+            class="shrink-0 text-brand-500 transition-transform duration-300 group-open:rotate-45"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+          >
+            <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </summary>
+        <p class="pb-5 pr-8 text-[14.5px] leading-relaxed text-muted">{f.a}</p>
+      </details>
+    ))
+  }
+</div>

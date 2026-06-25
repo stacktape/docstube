@@ -16,7 +16,8 @@
     "coverage/**",
     ".docstube/**",
     ".docstube-build/**",
-    "packages/*/dist/**"
+    "packages/*/dist/**",
+    "**/.astro/**"
   ],
   "options": {
     "maxWarnings": 0

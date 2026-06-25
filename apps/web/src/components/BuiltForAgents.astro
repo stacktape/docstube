@@ -1,0 +1,42 @@
+---
+const cards = [
+  {
+    title: 'llms.txt + llms-full.txt',
+    body: 'Every site ships a compact and a full machine index, so your own agents read accurate, current context instead of guessing.'
+  },
+  {
+    title: 'Docs-serving MCP server',
+    body: 'Point Claude, Codex, or any MCP client at your docs and let it answer from verified pages - not a stale crawl.'
+  },
+  {
+    title: 'Compiler-extracted API refs',
+    body: 'References are pulled from real signatures via TypeDoc and griffe, so the types agents read match the types you ship.'
+  }
+];
+---
+
+<div class="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
+  <div class="terminal p-5 sm:p-6">
+    <div class="font-mono text-[12px] text-[#6f8e8a]">llms.txt</div>
+    <pre class="mt-3 overflow-x-auto text-[12.5px] leading-relaxed text-[#cfeae6]"><code># docstube docs
+> Verified, always-current documentation.
+
+## Guides
+- [Authentication](/auth): sessions, tokens, refresh
+- [Quickstart](/start): install and first run
+
+## API
+- [createClient()](/api/create-client)
+- [useFlags()](/api/use-flags)</code></pre>
+  </div>
+  <div class="grid gap-4">
+    {
+      cards.map((c) => (
+        <div class="surface hover-lift flex flex-col gap-2 p-5">
+          <h3 class="font-display text-[16px] font-semibold text-ink">{c.title}</h3>
+          <p class="text-[14px] leading-relaxed text-muted">{c.body}</p>
+        </div>
+      ))
+    }
+  </div>
+</div>

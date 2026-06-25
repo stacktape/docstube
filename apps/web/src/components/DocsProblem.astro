@@ -1,0 +1,143 @@
+---
+// "Why this matters" - the problem section that sits right after the hero.
+// Two sourced stats (docs are how devs learn + a top factor in what they adopt),
+// then a 2x2 of content-rich problem tiles: stale, wrong audience, never written,
+// and the AI version. On-brand surface cards, semantic accents kept subtle.
+import Section from './Section.astro';
+
+const SO = 'https://survey.stackoverflow.co/2024/';
+const POSTMAN = 'https://www.postman.com/state-of-api/';
+---
+
+<Section
+  id="why-docs"
+  eyebrow="Why this matters"
+  title="Everyone needs the docs. Every way we make them is broken."
+  tone="canvas"
+>
+  <!-- Two sourced claims -->
+  <div class="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
+    <div class="surface flex items-center gap-4 p-5">
+      <span class="shrink-0 font-display text-[40px] font-extrabold leading-none gradient-text">84%</span>
+      <p class="text-[13.5px] leading-snug text-ink-soft">
+        call technical docs their number-one way to learn.
+        <a href={SO} target="_blank" rel="noopener" class="ml-0.5 font-mono text-[11px] text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-brand-600">source</a>
+      </p>
+    </div>
+    <div class="surface flex items-center gap-4 p-5">
+      <span class="shrink-0 font-display text-[34px] font-extrabold leading-none gradient-text">2 in 3</span>
+      <p class="text-[13.5px] leading-snug text-ink-soft">
+        weigh documentation before they'll adopt an API.
+        <a href={POSTMAN} target="_blank" rel="noopener" class="ml-0.5 font-mono text-[11px] text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-brand-600">source</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- 2x2 problem tiles -->
+  <div class="mt-12 grid gap-5 sm:grid-cols-2">
+    <!-- Stale -->
+    <div class="surface hover-lift flex flex-col gap-4 p-6 sm:p-7">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-danger/10 text-danger">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4.5l3 1.8" /></svg>
+        </span>
+        <h3 class="font-display text-[18px] font-semibold text-ink">It goes stale</h3>
+        <span class="ml-auto rounded-full border border-line bg-canvas px-2.5 py-1 font-mono text-[10.5px] text-muted">every release</span>
+      </div>
+      <p class="text-[14px] leading-relaxed text-muted">
+        Code ships every day; hand-written docs don't move. Examples rot and signatures drift until the page is full
+        of statements that used to be true.
+      </p>
+      <div class="overflow-hidden rounded-lg border border-line font-mono text-[12.5px]">
+        <div class="flex items-center gap-2 bg-danger/8 px-3 py-1.5 text-danger"><span class="font-bold">-</span> getSession()<span class="ml-auto text-[10px] opacity-70">docs</span></div>
+        <div class="flex items-center gap-2 border-t border-line px-3 py-1.5 text-ink-soft"><span class="font-bold text-pass">+</span> getSession(opts)<span class="ml-auto text-[10px] text-muted">code</span></div>
+      </div>
+      <div>
+        <p class="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-muted">How it shows up</p>
+        <ul class="mt-2.5 space-y-1.5 text-[13px] text-ink-soft">
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-danger"></span> A sample that throws the moment you paste it</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-danger"></span> An option renamed three sprints ago</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-danger"></span> A "returns a Session" that now returns a Client</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Wrong audience -->
+    <div class="surface hover-lift flex flex-col gap-4 p-6 sm:p-7">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-flag/12 text-flag">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12" /><path d="M2 12s3.6 6.5 10 6.5S22 12 22 12" /><circle cx="12" cy="12" r="2.5" /><path d="M4 20 20 4" /></svg>
+        </span>
+        <h3 class="font-display text-[18px] font-semibold text-ink">It assumes too much</h3>
+        <span class="ml-auto rounded-full border border-line bg-canvas px-2.5 py-1 font-mono text-[10.5px] text-muted">most pages</span>
+      </div>
+      <p class="text-[14px] leading-relaxed text-muted">
+        Whoever wrote the code can't un-know it. The obvious step gets skipped, internal names leak in, and the
+        context a newcomer needs never gets written down.
+      </p>
+      <div class="space-y-2">
+        <div class="rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-[12.5px] text-ink-soft">init with your <span class="rounded bg-flag/15 px-1 text-flag">workspace token</span></div>
+        <div class="ml-8 w-fit rounded-lg rounded-tl-none border border-flag/25 bg-flag/8 px-3 py-1.5 text-[12px] text-flag">where do I get one of those?</div>
+      </div>
+      <div>
+        <p class="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-muted">How it shows up</p>
+        <ul class="mt-2.5 space-y-1.5 text-[13px] text-ink-soft">
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-flag"></span> A term defined nowhere, used everywhere</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-flag"></span> A prerequisite nobody mentioned</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-flag"></span> Jargon that only makes sense from the inside</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Never written -->
+    <div class="surface hover-lift flex flex-col gap-4 p-6 sm:p-7">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5" /><path d="M7 3h7l5 5v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M8.5 17 15 10.5" /><path d="M15 17 8.5 10.5" /></svg>
+        </span>
+        <h3 class="font-display text-[18px] font-semibold text-ink">It never gets written</h3>
+        <span class="ml-auto rounded-full border border-line bg-canvas px-2.5 py-1 font-mono text-[10.5px] text-muted">the hard parts</span>
+      </div>
+      <p class="text-[14px] leading-relaxed text-muted">
+        Docs are the chore that loses to every deadline. Configuration, edge cases, the gnarly migration - the pages
+        readers need most are the ones that stay empty.
+      </p>
+      <div class="rounded-lg border border-dashed border-line-strong bg-canvas px-4 py-3.5 font-mono text-[12.5px]"><div class="text-ink-soft">## Configuration</div><div class="mt-1 text-muted">// TODO: write this</div></div>
+      <div>
+        <p class="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-muted">How it shows up</p>
+        <ul class="mt-2.5 space-y-1.5 text-[13px] text-ink-soft">
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand-400"></span> A "coming soon" that shipped two years ago</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand-400"></span> A heading with one sentence under it</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-brand-400"></span> The exact error you hit, documented nowhere</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- AI -->
+    <div class="surface hover-lift flex flex-col gap-4 p-6 sm:p-7">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[#6d4ee6]" style="background:#ece6fd">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 4.6L18 9l-4.3 1.4L12 15l-1.7-4.6L6 9l4.3-1.4L12 3z" /><path d="M18.5 13.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9z" /></svg>
+        </span>
+        <h3 class="font-display text-[18px] font-semibold text-ink">And AI doesn't fix it</h3>
+        <span class="ml-auto rounded-full px-2.5 py-1 font-mono text-[10.5px] font-semibold text-[#6d4ee6]" style="background:#ece6fd">30+ / page</span>
+      </div>
+      <p class="text-[14px] leading-relaxed text-muted">
+        Point a model at your repo and the pages read beautifully. Check them against the source and the problems
+        pour out - fluent, confident, and wrong.
+      </p>
+      <div class="overflow-hidden rounded-lg border border-line">
+        <div class="flex items-center gap-2 px-3 py-1.5 font-mono text-[11px]"><span class="text-ink-soft">review · auth.mdx</span><span class="ml-auto font-semibold text-[#6d4ee6]">30+ issues</span></div>
+        <div class="h-1.5 w-full bg-line"><div class="h-full" style="width:80%;background:#7c5cf0"></div></div>
+      </div>
+      <div>
+        <p class="font-mono text-[10.5px] font-semibold uppercase tracking-wider text-muted">How it shows up</p>
+        <ul class="mt-2.5 space-y-1.5 text-[13px] text-ink-soft">
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full" style="background:#7c5cf0"></span> Methods and flags that don't exist</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full" style="background:#7c5cf0"></span> Two samples on one page that contradict</li>
+          <li class="flex items-start gap-2.5"><span class="mt-[7px] h-1 w-1 shrink-0 rounded-full" style="background:#7c5cf0"></span> Claims with nothing in the code behind them</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</Section>

@@ -9,6 +9,7 @@
     "changeset": "changeset",
     "dev": "node scripts/dev.ts",
     "dev:ui": "pnpm --filter @docstube/web-ui dev",
+    "dev:web": "pnpm --filter @docstube/web dev",
     "dogfood:build": "pnpm --filter @docstube/core... build && node scripts/dogfood/build-dogfood.ts",
     "evals": "node scripts/evals/run-evals.ts",
     "evals:live": "node scripts/evals/run-evals.ts --live",

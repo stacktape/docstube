@@ -1,0 +1,186 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import VerifierCascade from '../components/VerifierCascade.astro';
+import RunsOn from '../components/RunsOn.astro';
+import StatStrip from '../components/StatStrip.astro';
+import Steps from '../components/Steps.astro';
+import Pillars from '../components/Pillars.astro';
+import DriftReport from '../components/DriftReport.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import UseCases from '../components/UseCases.astro';
+import Pricing from '../components/Pricing.astro';
+import BuiltForAgents from '../components/BuiltForAgents.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site, verifierChecks } from '../data/site.ts';
+---
+
+<Base
+  title="docstube - docs that compile"
+  description="Open-source docs generated from your code and mechanically checked against it. Every sample type-checks, every API reference matches your compiler, anything unverifiable ships flagged - never silently wrong."
+  variant="v1 · docs that compile"
+>
+  <Header />
+
+  <main>
+    <!-- Hero -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.05fr_1fr] lg:py-28">
+        <div class="relative z-10 flex flex-col items-start gap-6">
+          <span class="eyebrow">Verified docs · open source</span>
+          <h1 class="text-5xl font-extrabold sm:text-[68px] sm:leading-[0.98]">
+            Docs that <span class="gradient-text">compile</span>.
+          </h1>
+          <p class="max-w-xl text-[18px] leading-relaxed text-muted">
+            Open-source docs generated from your code - and mechanically checked against it. Every sample type-checks,
+            every API reference matches your compiler, anything unverifiable ships flagged for review. Never silently
+            wrong.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.repo} class="btn btn-primary">Get started</a>
+            <a href={site.repo} class="btn btn-secondary">Read the source</a>
+          </div>
+          <div class="flex items-center gap-4 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> MIT licensed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> bring your own AI</span>
+          </div>
+        </div>
+        <div class="relative z-10 float-slow">
+          <VerifierCascade />
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn />
+    </div>
+
+    <!-- Problem / why now -->
+    <Section
+      id="why"
+      eyebrow="Why now"
+      title="AI writes more of your code every month. Trust hasn’t kept up."
+      intro="More code, written faster, by more hands and more agents - and the docs fall behind the moment they’re written. The cost shows up as wasted time and quiet, confident wrongness."
+    >
+      <StatStrip />
+    </Section>
+
+    <!-- How it works -->
+    <Section id="how" eyebrow="How it works" title="Generate, review, verify, ship." tone="paper">
+      <Steps />
+    </Section>
+
+    <!-- Pillars -->
+    <Section
+      eyebrow="What makes it different"
+      title="Four things most doc tools skip."
+    >
+      <Pillars columns={4} />
+    </Section>
+
+    <!-- Verification deep-dive (emphasis for v1) -->
+    <Section
+      id="verify"
+      eyebrow="Docs that compile"
+      title="Mechanically checked, not vibe-checked."
+      intro="Reviewer agents judge audience fit. But before any page ships, deterministic verifiers run real tools against it - the same ones you’d run in CI."
+      tone="paper"
+    >
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div class="surface p-6 sm:p-8">
+          <h3 class="font-display text-[18px] font-semibold text-ink">Every page clears the same gate</h3>
+          <ul class="mt-5 space-y-2.5">
+            {
+              verifierChecks.map((c) => (
+                <li class="flex items-center gap-3 text-[14px]">
+                  {c.status === 'pass' ? (
+                    <span class="flex h-5 w-5 items-center justify-center rounded-full bg-pass/12 text-pass">
+                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                  ) : (
+                    <span class="flex h-5 w-5 items-center justify-center rounded-full bg-flag/15 text-flag">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.2 10.4 9.6H1.6L6 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                    </span>
+                  )}
+                  <span class={c.status === 'pass' ? 'text-ink-soft' : 'font-medium text-flag'}>{c.label}</span>
+                </li>
+              ))
+            }
+          </ul>
+          <p class="mt-6 border-t border-line pt-5 text-[13.5px] text-muted">
+            A page that can’t pass doesn’t quietly ship. It retries with feedback, or it ships flagged for a human -
+            with the exact finding attached.
+          </p>
+        </div>
+        <div class="flex flex-col gap-6">
+          <DriftReport />
+          <div class="surface-tint flex items-center gap-4 p-6">
+            <span class="font-display text-[40px] font-bold leading-none gradient-text">⚠</span>
+            <p class="text-[14.5px] leading-relaxed text-ink-soft">
+              The honest promise isn’t “zero hallucinations.” It’s that anything unverifiable is
+              <span class="font-semibold text-ink"> flagged, never silently wrong</span>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </Section>
+
+    <!-- Comparison -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="Active generation. Mechanical verification. Yours."
+      intro="Hosting platforms organize the docs you write by hand. AI tools generate text and hope. docstube is the only one that generates from your code, verifies the output, and hands you a site you own."
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <Quadrant />
+        <CompareTable />
+      </div>
+    </Section>
+
+    <!-- Use cases -->
+    <Section eyebrow="Use cases" title="One engine, three jobs." tone="paper">
+      <UseCases />
+    </Section>
+
+    <!-- Built for agents -->
+    <Section eyebrow="Built for agents" title="Docs your LLMs can read, too.">
+      <BuiltForAgents />
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Every feature."
+      intro="The open-source tool is the whole product. A hosted Cloud tier is optional, for teams that want everything in one place."
+      tone="paper"
+    >
+      <Pricing />
+    </Section>
+
+    <!-- Open source band -->
+    <Section eyebrow="Open source" title="MIT, free, and yours.">
+      <div class="surface mx-auto flex max-w-3xl flex-col items-center gap-5 p-8 text-center">
+        <p class="text-[16px] leading-relaxed text-muted">
+          docstube generates a self-contained Astro + MDX site into your repo. No platform to pay to keep your docs
+          online, no lock-in, no token markup. Run it locally or wire up the GitHub Action.
+        </p>
+        <a href={site.repo} class="btn btn-secondary">Star on GitHub</a>
+      </div>
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
+      <Faq />
+    </Section>
+
+    <FinalCta />
+  </main>
+
+  <Footer current={1} />
+</Base>

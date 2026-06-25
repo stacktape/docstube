@@ -1,0 +1,303 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Section from '../components/Section.astro';
+import VerifierCascade from '../components/VerifierCascade.astro';
+import RunsOn from '../components/RunsOn.astro';
+import StatStrip from '../components/StatStrip.astro';
+import Steps from '../components/Steps.astro';
+import Pillars from '../components/Pillars.astro';
+import Quadrant from '../components/Quadrant.astro';
+import CompareTable from '../components/CompareTable.astro';
+import UseCases from '../components/UseCases.astro';
+import Pricing from '../components/Pricing.astro';
+import BuiltForAgents from '../components/BuiltForAgents.astro';
+import Faq from '../components/Faq.astro';
+import FinalCta from '../components/FinalCta.astro';
+import { site, facts } from '../data/site.ts';
+
+// Conceptual three-node flow beneath the hero statement.
+const flow = [
+  {
+    kicker: 'AI writes',
+    title: 'Agents write the code',
+    body: 'Claude, Codex, Gemini - more of every codebase ships from a model each month.',
+    tone: 'neutral'
+  },
+  {
+    kicker: 'docstube verifies',
+    title: 'docstube verifies the docs',
+    body: 'Samples type-check, imports resolve, API refs match the compiler. Unverifiable pages ship flagged.',
+    tone: 'brand'
+  },
+  {
+    kicker: 'You can trust',
+    title: 'Humans + agents trust them',
+    body: 'A site you own, plus llms.txt and an MCP server, so people and your own agents read the truth.',
+    tone: 'neutral'
+  }
+];
+---
+
+<Base
+  title="docstube - the trust layer for AI-written code"
+  description="AI writes more of your code every month. docstube generates documentation humans and agents can actually trust - verified against your source, always current, and ready for your LLMs. Open source, bring your own AI."
+  variant="v3 · trust layer"
+>
+  <Header />
+
+  <main>
+    <!-- Hero - centered big statement + conceptual three-node flow -->
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto max-w-6xl px-5 py-20 sm:px-8 lg:py-28">
+        <div class="relative z-10 mx-auto flex max-w-3xl flex-col items-center gap-6 text-center">
+          <span class="eyebrow">
+            <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>
+            Docs as AI infrastructure
+          </span>
+          <h1 class="text-balance text-5xl font-extrabold sm:text-[68px] sm:leading-[0.98]">
+            The <span class="gradient-text">trust layer</span> for AI-written code.
+          </h1>
+          <p class="max-w-2xl text-[18px] leading-relaxed text-muted">
+            AI writes more of your code every month. docstube generates the documentation humans and agents can
+            actually trust - verified against the source, always current, ready for your LLMs.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <a href={site.repo} class="btn btn-primary">Get started</a>
+            <a href="#how" class="btn btn-secondary">See how it works</a>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 font-mono text-[12.5px] text-muted">
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-pass"></span> MIT licensed</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> bring your own AI</span>
+            <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-brand-300"></span> source never leaves your machine</span>
+          </div>
+        </div>
+
+        <!-- Conceptual flow: AI writes → docstube verifies → trust -->
+        <div class="relative z-10 mt-16 sm:mt-20">
+          <p class="mb-6 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+            Where docs become infrastructure
+          </p>
+          <ol class="grid items-stretch gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
+            {
+              flow.map((node, i) => (
+                <>
+                  <li
+                    class={`hover-lift relative flex flex-col gap-2.5 rounded-2xl p-6 ${
+                      node.tone === 'brand'
+                        ? 'border border-brand-200 bg-gradient-to-br from-brand-50 via-paper to-brand-50 shadow-brand'
+                        : 'surface'
+                    }`}
+                  >
+                    <span class="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-brand-600">
+                      <span class="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 font-sans text-[11px] font-semibold text-white">
+                        {i + 1}
+                      </span>
+                      {node.kicker}
+                    </span>
+                    <h3 class="font-display text-[17px] font-semibold text-ink">{node.title}</h3>
+                    <p class="text-[13.5px] leading-relaxed text-muted">{node.body}</p>
+                  </li>
+                  {i < flow.length - 1 && (
+                    <li class="flex items-center justify-center" aria-hidden="true">
+                      {/* down chevron on mobile, right chevron on desktop */}
+                      <span class="text-brand-300">
+                        <svg class="lg:hidden" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                          <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <svg class="hidden lg:block" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </span>
+                    </li>
+                  )}
+                </>
+              ))
+            }
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <div class="border-b border-line bg-paper py-12">
+      <RunsOn />
+    </div>
+
+    <!-- Why now - lead strong: AI writes a ton of code, trust is collapsing -->
+    <Section
+      id="why"
+      eyebrow="Why now"
+      title="AI is writing the code. Trust is the thing that broke."
+      intro="Models now ship a large and growing share of production code. The output is fast - and frequently confident-but-wrong. The gap between how much AI writes and how much developers trust it is the problem docstube exists to close."
+    >
+      <StatStrip keys={['msftCode', 'googleCode', 'cognition', 'trustFell']} />
+      <p class="mx-auto mt-6 max-w-2xl text-center text-[14px] text-muted">
+        More code, written faster, by more agents - and the documentation that humans and machines rely on falls
+        behind the moment it’s written.
+      </p>
+    </Section>
+
+    <!-- The enemy → the trust answer: verification mechanism -->
+    <Section
+      id="verify"
+      eyebrow="The trust gap"
+      title="The answer to AI slop is a verifier, not a vibe."
+      intro="“Looks plausible” is how confidently-wrong docs get shipped. docstube treats every page like code: deterministic verifiers run the same tools you’d run in CI, and anything that can’t pass is flagged - never silently wrong."
+      tone="paper"
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr]">
+        <div class="flex flex-col gap-6">
+          <div class="surface flex flex-col gap-3 p-6 sm:p-7">
+            <h3 class="font-display text-[18px] font-semibold text-ink">What “verified” actually means</h3>
+            <ul class="mt-1 space-y-3">
+              <li class="flex items-start gap-3 text-[14.5px] leading-relaxed text-ink-soft">
+                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span>TypeScript samples type-check with <span class="font-mono text-[13px] text-ink">tsc</span>; Python checks with <span class="font-mono text-[13px] text-ink">pyright</span>.</span>
+              </li>
+              <li class="flex items-start gap-3 text-[14.5px] leading-relaxed text-ink-soft">
+                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span>Imports, paths, and internal + external links resolve. D2 diagrams actually render.</span>
+              </li>
+              <li class="flex items-start gap-3 text-[14.5px] leading-relaxed text-ink-soft">
+                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pass/12 text-pass">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <span>API references are matched against your real compiler signatures, not paraphrased.</span>
+              </li>
+              <li class="flex items-start gap-3 text-[14.5px] leading-relaxed text-ink-soft">
+                <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-flag/15 text-flag">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 2.2 10.4 9.6H1.6L6 2.2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+                </span>
+                <span class="font-medium text-flag">Anything unverifiable ships flagged for a human, with the finding attached.</span>
+              </li>
+            </ul>
+          </div>
+          <div class="surface-tint flex items-center gap-4 p-6">
+            <span class="font-display text-[40px] font-bold leading-none gradient-text">⚠</span>
+            <p class="text-[14.5px] leading-relaxed text-ink-soft">
+              The honest promise isn’t “zero hallucinations.” It’s that anything unverifiable is
+              <span class="font-semibold text-ink"> flagged, never silently wrong</span> - so the trust layer never
+              lies to you.
+            </p>
+          </div>
+        </div>
+        <div class="float-slow">
+          <VerifierCascade />
+        </div>
+      </div>
+    </Section>
+
+    <!-- How it works -->
+    <Section
+      id="how"
+      eyebrow="How it works"
+      title="Map the code, draft, review, verify, ship."
+      intro="The trust layer is a loop: a structural map of your repo, a writer agent grounded in source, persona reviewers, and deterministic verifiers - running on the AI you already use."
+    >
+      <Steps />
+    </Section>
+
+    <!-- Pillars -->
+    <Section eyebrow="What makes it a trust layer" title="Four guarantees, each tied to a mechanism." tone="paper">
+      <Pillars columns={4} />
+    </Section>
+
+    <!-- Built for agents - given real prominence -->
+    <Section
+      id="agents"
+      eyebrow="Built for agents"
+      title="The trust layer your LLMs read, too."
+      intro="Docs aren’t just for humans anymore. docstube ships the exact context your agents need to stop guessing - generated from the same verified pages, so people and machines read one source of truth."
+    >
+      <BuiltForAgents />
+      <div class="mt-8 grid gap-4 sm:grid-cols-3">
+        <div class="surface flex flex-col gap-1.5 p-5">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-600">llms.txt + llms-full.txt</span>
+          <p class="text-[13.5px] leading-relaxed text-muted">
+            A compact and a full machine index in every site, so agents load accurate, current context instead of
+            crawling a stale page.
+          </p>
+        </div>
+        <div class="surface flex flex-col gap-1.5 p-5">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-600">docs-serving MCP server</span>
+          <p class="text-[13.5px] leading-relaxed text-muted">
+            Point Claude, Codex, or any MCP client at your docs and let it answer from verified pages - the same
+            trust gate humans get.
+          </p>
+        </div>
+        <div class="surface flex flex-col gap-1.5 p-5">
+          <span class="font-mono text-[12px] uppercase tracking-wider text-brand-600">compiler-extracted API refs</span>
+          <p class="text-[13.5px] leading-relaxed text-muted">
+            Signatures pulled from TypeDoc and griffe, so the types your agents read are the types you actually ship.
+          </p>
+        </div>
+      </div>
+      <div class="surface-tint mt-4 flex flex-col items-start gap-2 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-[14.5px] leading-relaxed text-ink-soft">
+          <span class="font-semibold text-ink">{facts.llmSdks.stat}</span> {facts.llmSdks.claim} - agents need a
+          source they can trust, not another doc they have to second-guess.
+        </p>
+        <span class="shrink-0 font-mono text-[11px] text-muted">{facts.llmSdks.source}</span>
+      </div>
+    </Section>
+
+    <!-- Where it sits -->
+    <Section
+      id="compare"
+      eyebrow="Where it sits"
+      title="A new layer: generated from your code, then verified."
+      intro="Hosting platforms organize docs you write by hand. Generic AI tools generate text and hope. The trust layer is the corner nobody else occupies - generate from the source, mechanically verify the output, and hand you a site you own."
+      tone="paper"
+    >
+      <div class="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
+        <Quadrant />
+        <CompareTable />
+      </div>
+    </Section>
+
+    <!-- Use cases -->
+    <Section eyebrow="Use cases" title="One trust layer, three jobs.">
+      <UseCases />
+    </Section>
+
+    <!-- Pricing -->
+    <Section
+      id="pricing"
+      eyebrow="Pricing"
+      title="Free forever. Every feature."
+      intro="The open-source tool is the whole product - bring your own AI, your API key or subscription, any model, no token markup. A hosted Cloud tier is optional, for teams that want everything in one place."
+      tone="paper"
+    >
+      <Pricing />
+    </Section>
+
+    <!-- Open source band -->
+    <Section eyebrow="Open source" title="Infrastructure you own, not a service you rent.">
+      <div class="surface mx-auto flex max-w-3xl flex-col items-center gap-5 p-8 text-center">
+        <p class="text-[16px] leading-relaxed text-muted">
+          docstube generates a self-contained Astro + MDX site into your repo. No platform to pay to keep your docs
+          online, no lock-in, no token markup. Your source never leaves your machine for a docstube server - run it
+          locally or wire up the GitHub Action that opens a PR with only the affected pages.
+        </p>
+        <a href={site.repo} class="btn btn-secondary">Star on GitHub</a>
+      </div>
+    </Section>
+
+    <!-- FAQ -->
+    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
+      <Faq />
+    </Section>
+
+    <FinalCta
+      title="Build on a trust layer, not a hope."
+      sub="Point docstube at your repo and get verified, always-current docs that humans and agents can rely on. Free, open-source, your own AI."
+    />
+  </main>
+
+  <Footer current={3} />
+</Base>

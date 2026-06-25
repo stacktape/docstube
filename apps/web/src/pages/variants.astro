@@ -1,0 +1,70 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Logo from '../components/Logo.astro';
+
+const variants = [
+  { v: 1, h: 'Docs that compile.', bet: 'Verification-first', tone: 'Precise', sub: 'Mechanically checked against your code. Every sample type-checks, or the page ships flagged.' },
+  { v: 2, h: 'Your code. Your AI. Your docs.', bet: 'Ownership + BYO', tone: 'Bold', sub: 'No token markup. Your source never leaves your machine. The site is yours - MDX, Astro, no lock-in.' },
+  { v: 3, h: 'The trust layer for AI-written code.', bet: 'Docs as AI-infra', tone: 'Visionary', sub: 'AI writes more of your code every month. docstube generates docs humans and agents can trust.' },
+  { v: 4, h: 'Docs you’d actually read.', bet: 'Developer-joy', tone: 'Warm', sub: 'Beautiful, always-current docs generated from your repo - free, open-source, and yours.' },
+  { v: 5, h: 'Not a docs platform. A docs compiler.', bet: 'Anti-platform', tone: 'Contrarian', sub: 'Platforms organize the docs you write. docstube compiles them from your code and verifies every claim.' },
+  { v: 6, h: 'AI-native, not AI-assisted.', bet: 'Autonomy-first', tone: 'Confident', sub: 'Answer a few questions in the wizard. From there it’s autonomous - read, write, verify, keep in sync.' },
+  { v: 7, h: 'Verified, always-current docs - from your code.', bet: 'Benefit-led', tone: 'Credible', sub: 'It reads your codebase, writes your docs, fact-checks every claim, and keeps everything in sync.' },
+  { v: 8, h: 'Point it at your repo. Watch.', bet: 'Instant gratification', tone: 'Demo-driven', sub: 'A local wizard opens. Pick a doc type, define personas, and watch a real site assemble itself.' },
+  { v: 9, h: 'Your docs are lying to you.', bet: 'Problem-first', tone: 'Provocative', sub: 'Stale docs rot the moment they’re written. docstube finds where docs disagree with code - and fixes it.' },
+  { v: 10, h: 'Documentation that keeps up with your code.', bet: 'Always-current', tone: 'Professional', sub: 'Change a function, and only the pages it touches regenerate - locally or via a PR-opening Action.' }
+];
+---
+
+<Base title="docstube - homepage copy variants" description="Ten homepage copy directions for docstube. Pick a positioning bet and tone.">
+  <Header />
+
+  <main>
+    <section class="grid-bg relative overflow-hidden border-b border-line">
+      <div class="glow relative mx-auto max-w-4xl px-5 py-24 text-center sm:px-8">
+        <div class="relative z-10 flex flex-col items-center gap-6">
+          <span class="chip"><span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span> 10 directions · one product</span>
+          <h1 class="text-balance text-4xl font-extrabold sm:text-6xl">
+            Homepage copy, <span class="gradient-text">ten ways</span>.
+          </h1>
+          <p class="max-w-xl text-[18px] leading-relaxed text-muted">
+            Each variant is a different positioning bet and tone for the same product - verified, always-current
+            documentation generated from your code. Open a few, compare, and pick a direction.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <div class="mx-auto max-w-6xl px-5 py-16 sm:px-8">
+      <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {
+          variants.map((item) => (
+            <a href={`/v${item.v}`} class="surface hover-lift group flex flex-col gap-4 p-6">
+              <div class="flex items-center justify-between">
+                <span class="font-mono text-[13px] font-semibold text-brand-500">v{item.v}</span>
+                <span class="font-mono text-[11px] text-muted">{item.tone}</span>
+              </div>
+              <h2 class="font-display text-[22px] font-bold leading-tight text-ink">{item.h}</h2>
+              <p class="flex-1 text-[14px] leading-relaxed text-muted">{item.sub}</p>
+              <div class="flex items-center justify-between border-t border-line pt-4">
+                <span class="rounded-full bg-brand-50 px-2.5 py-1 font-mono text-[11px] font-medium text-brand-700">{item.bet}</span>
+                <span class="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink transition-transform group-hover:translate-x-0.5">
+                  View
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </main>
+
+  <footer class="border-t border-line bg-paper">
+    <div class="mx-auto flex max-w-6xl flex-col items-center gap-3 px-5 py-12 text-center sm:px-8">
+      <Logo size={32} href={null} />
+      <p class="text-[13px] text-muted">Open source · MIT · your code never leaves your machine.</p>
+    </div>
+  </footer>
+</Base>

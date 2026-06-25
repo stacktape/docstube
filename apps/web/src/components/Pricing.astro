@@ -1,0 +1,41 @@
+---
+import { pricing } from '../data/site.ts';
+---
+
+<div class="grid gap-5 lg:grid-cols-3">
+  {
+    pricing.map((tier) => (
+      <div
+        class={`relative flex flex-col gap-5 rounded-2xl p-7 ${
+          tier.hero
+            ? 'border-2 border-brand-400 bg-paper shadow-lift'
+            : 'surface'
+        }`}
+      >
+        {tier.hero && (
+          <span class="absolute -top-3 left-7 rounded-full bg-brand-500 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white">
+            Start here
+          </span>
+        )}
+        <div>
+          <h3 class="font-display text-[20px] font-bold text-ink">{tier.name}</h3>
+          <p class="mt-1 text-[14px] text-muted">{tier.tagline}</p>
+        </div>
+        <div class="font-display text-[26px] font-bold text-ink">{tier.price}</div>
+        <ul class="flex flex-1 flex-col gap-2.5">
+          {tier.points.map((pt) => (
+            <li class="flex items-start gap-2.5 text-[14px] text-ink-soft">
+              <svg class="mt-1 shrink-0 text-brand-500" width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              {pt}
+            </li>
+          ))}
+        </ul>
+        <a href={tier.ctaHref} class={`btn ${tier.hero ? 'btn-primary' : 'btn-secondary'} w-full`}>
+          {tier.cta}
+        </a>
+      </div>
+    ))
+  }
+</div>
