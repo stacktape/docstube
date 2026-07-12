@@ -1,0 +1,106 @@
+---
+// Easy human review - an element-picker infographic (hover to highlight, comment
+// inline) showing how feedback lands and is remembered. Static; CSS hover only.
+---
+
+<section class="border-b border-line bg-paper">
+  <div class="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <div class="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
+      <span class="eyebrow">Human review</span>
+      <h2 class="text-balance text-3xl font-bold sm:text-[42px] sm:leading-[1.06]">Don't like something? Just say so.</h2>
+      <p class="text-[16px] leading-relaxed text-muted">Review the rendered site, point at whatever's off — a word, a paragraph, a whole page — and say what you'd change in plain English. docstube makes the fix, then <span class="font-medium text-ink-soft">remembers the rule</span>, so you never give the same note twice.</p>
+    </div>
+
+    <div class="mt-14 grid items-start gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+      <!-- static infographic: element picked + inline comment -->
+      <div>
+        <div class="surface overflow-hidden">
+          <div class="flex items-center gap-2 border-b border-line bg-canvas px-4 py-2.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span><span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span><span class="h-2.5 w-2.5 rounded-full bg-line-strong"></span>
+            <span class="ml-2 font-mono text-[11px] text-muted">docs.yourproject.dev/auth</span>
+            <span class="ml-auto inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 font-mono text-[10px] font-semibold text-brand-700"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M5.5 3.2 20 11l-6.4 1.4L11 19z" /></svg> select to edit</span>
+          </div>
+          <div class="space-y-3.5 p-6 sm:p-8">
+            <h3 class="dt-pick font-display text-[20px] font-semibold text-ink" data-pick-type="Heading">Authentication</h3>
+            <p class="text-[13.5px] leading-relaxed text-muted">Acme uses short-lived sessions to authorize requests. Each session is a bearer token you attach to every call.</p>
+            <div class="dt-pick is-selected" data-pick-type="Paragraph">
+              <p class="text-[13.5px] leading-relaxed text-ink-soft">Initialise the client with your workspace token to begin.</p>
+            </div>
+            <!-- inline comment, attached to the selected element -->
+            <div class="relative mt-2.5">
+              <span class="absolute -top-1.5 left-7 h-3 w-3 rotate-45 border-l border-t border-brand-300 bg-paper"></span>
+              <div class="flex items-center gap-2.5 rounded-2xl border border-brand-300 bg-paper p-2 pl-2.5 shadow-lift">
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.7 5.8L19.5 10l-5.8 1.7L12 17.5l-1.7-5.8L4.5 10l5.8-1.7z" /></svg></span>
+                <span class="flex-1 text-[12.5px] leading-snug text-ink-soft">Define “workspace token” on first use — say where to find it.</span>
+                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z" /><path d="M22 2 11 13" /></svg></span>
+              </div>
+            </div>
+            <div class="dt-pick overflow-hidden rounded-lg border border-line bg-canvas font-mono text-[11px] leading-relaxed text-ink-soft" data-pick-type="Code block"><span class="text-brand-700">const</span> session = <span class="text-brand-700">await</span> acme.connect(token)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- the three beats (stacked, right) -->
+      <div class="flex flex-col gap-5">
+        <div class="flex gap-4">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg></span>
+          <div><h3 class="font-display text-[18px] font-semibold text-ink">Point at any level</h3><p class="mt-1.5 text-[14px] leading-relaxed text-muted">A word, a paragraph, a code block, a section, or the whole page. Click it on the rendered site and describe the change like you'd tell a teammate — no editor, no MDX, no tickets.</p></div>
+        </div>
+        <div class="flex gap-4">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg></span>
+          <div><h3 class="font-display text-[18px] font-semibold text-ink">It remembers, for good</h3><p class="mt-1.5 text-[14px] leading-relaxed text-muted">Your note becomes a durable writing rule, committed alongside your config. Every regeneration from here on respects it — you never give the same feedback twice.</p></div>
+        </div>
+        <div class="flex gap-4">
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 4.6L18 9l-4.3 1.4L12 15l-1.7-4.6L6 9l4.3-1.4L12 3z" /><path d="M18.5 13.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9z" /></svg></span>
+          <div><h3 class="font-display text-[18px] font-semibold text-ink">Fixed everywhere it repeats</h3><p class="mt-1.5 text-[14px] leading-relaxed text-muted">One note doesn't fix one spot. docstube finds the same issue across the rest of your docs and corrects it too — then re-verifies the lot.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* element picker (static infographic) */
+  .dt-pick {
+    position: relative;
+    border-radius: 10px;
+    /* padding gives the selection ring / tint room to breathe; the negative
+       inline margin keeps content left-edges aligned with non-picked text */
+    padding: 8px 11px;
+    margin-inline: -11px;
+    transition: box-shadow 0.15s ease, background-color 0.15s ease;
+  }
+  .dt-pick:hover {
+    box-shadow: 0 0 0 2px var(--color-brand-300);
+  }
+  .dt-pick.is-selected {
+    box-shadow: 0 0 0 2px var(--color-brand-500);
+    background: color-mix(in srgb, var(--color-brand-500) 5%, transparent);
+  }
+  .dt-pick::before {
+    content: attr(data-pick-type);
+    position: absolute;
+    top: -3px;
+    left: 10px;
+    transform: translateY(-100%);
+    background: var(--color-brand-500);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    padding: 3px 7px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(10, 129, 139, 0.35);
+    z-index: 5;
+  }
+  .dt-pick:hover::before,
+  .dt-pick.is-selected::before {
+    opacity: 1;
+  }
+</style>

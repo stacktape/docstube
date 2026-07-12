@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css"></head>
+<body>
+<div class="slide bg-grid">
+  <div class="hz">
+    <h1 class="head">Any AI can write your docs. That's the easy 10%.<br><span class="accent">Making sure they're right is the hard 90%.</span></h1>
+  </div>
+
+  <div class="body">
+    <div class="card flush lift" style="display:flex;flex-direction:column;flex:1">
+      <!-- report header -->
+      <div class="win-bar" style="padding:13px 18px">
+        <span class="win-dots"><i></i><i></i><i></i></span>
+        <span class="win-title" style="font-size:13px"><span class="ink" style="font-weight:600">docstube verify</span> · your-project / docs</span>
+        <span class="pill danger" style="margin-left:auto;font-size:12.5px;padding:5px 13px"><span class="dot"></span> 77 problems found</span>
+      </div>
+
+      <!-- three columns -->
+      <div class="row" style="flex:1">
+        <!-- A: deterministic -->
+        <div class="col" style="flex:1;padding:20px 22px">
+          <div class="row items-c gap-2" style="margin-bottom:15px">
+            <span style="font-family:var(--display);font-weight:800;font-size:19px;color:var(--danger);background:rgba(214,88,79,.10);border:1px solid rgba(214,88,79,.22);border-radius:9px;padding:2px 11px">41</span>
+            <span style="font-weight:600;font-size:14px;color:var(--ink)">Deterministic failures</span>
+          </div>
+          <div class="col gap-3">
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--danger);width:22px;text-align:right">12</b> code samples don't type-check</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--danger);width:22px;text-align:right">9</b> imports don't resolve</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--danger);width:22px;text-align:right">14</b> dead links</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--danger);width:22px;text-align:right">3</b> diagrams fail to render</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--danger);width:22px;text-align:right">3</b> API refs mismatched</div>
+          </div>
+        </div>
+
+        <!-- B: audience -->
+        <div class="col" style="flex:1;padding:20px 22px;border-left:1px solid var(--line)">
+          <div class="row items-c gap-2" style="margin-bottom:15px">
+            <span style="font-family:var(--display);font-weight:800;font-size:19px;color:var(--flag);background:rgba(194,121,11,.10);border:1px solid rgba(194,121,11,.24);border-radius:9px;padding:2px 11px">19</span>
+            <span style="font-weight:600;font-size:14px;color:var(--ink)">Audience-review flags</span>
+          </div>
+          <div class="col gap-3">
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--flag);width:22px;text-align:right">8</b> sections too advanced for newcomers</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--flag);width:22px;text-align:right">7</b> steps a beginner can't follow</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--flag);width:22px;text-align:right">4</b> places missing the "why"</div>
+          </div>
+        </div>
+
+        <!-- C: ai -->
+        <div class="col" style="flex:1;padding:20px 22px;border-left:1px solid var(--line)">
+          <div class="row items-c gap-2" style="margin-bottom:15px">
+            <span style="font-family:var(--display);font-weight:800;font-size:19px;color:var(--brand-600);background:var(--brand-50);border:1px solid var(--brand-200);border-radius:9px;padding:2px 11px">17</span>
+            <span style="font-weight:600;font-size:14px;color:var(--ink)">AI-review flags</span>
+          </div>
+          <div class="col gap-3">
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--brand-600);width:22px;text-align:right">6</b> claims with no source</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--brand-600);width:22px;text-align:right">7</b> internal contradictions</div>
+            <div class="row items-c gap-3" style="font-size:13px;color:var(--ink-soft)"><b class="mono" style="color:var(--brand-600);width:22px;text-align:right">4</b> examples that don't match the prose</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- resolution band -->
+      <div class="row items-c gap-3" style="padding:15px 20px;border-top:1px solid var(--line);background:var(--canvas)">
+        <span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span style="font-size:13.5px;color:var(--ink)"><b>docstube corrected 68 and re-verified</b></span>
+        <span style="font-size:13.5px;color:var(--flag)">· 9 flagged for human review</span>
+        <span style="margin-left:auto;font-style:italic;font-size:13px;color:var(--muted)">every other tool ships all 77.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="fl">docs<b>tube</b></span>
+    <span class="fc">Verified, not guessed</span>
+    <span class="fr">03 / 16</span>
+  </div>
+</div>
+</body>
+</html>

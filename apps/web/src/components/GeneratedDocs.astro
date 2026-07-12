@@ -1,0 +1,438 @@
+---
+// Generated docs vs world-class platforms: an interactive, light-default sample
+// site (theme switch, animated code tabs, collapsible nested nav, bent in-page
+// TOC, a clean D2 diagram) plus a feature gallery. One consistent "Acme" auth doc.
+---
+
+<section class="dot-bg border-b border-line">
+  <div class="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <div class="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
+      <span class="eyebrow">Beautiful &amp; feature-rich</span>
+      <h2 class="text-balance text-3xl font-bold sm:text-[42px] sm:leading-[1.06]">As polished as the best docs platforms</h2>
+      <p class="text-[16px] leading-relaxed text-muted">Instant search, rendered diagrams, type-checked samples, API references, light and dark — every component a great docs site needs, and you wrote none of it.</p>
+    </div>
+
+    <!-- the live sample site (one consistent "Acme" auth doc) -->
+    <div class="relative mx-auto mt-14 max-w-5xl">
+      <div class="pointer-events-none absolute inset-x-0 -top-10 h-48" aria-hidden="true" style="background:radial-gradient(55% 100% at 50% 0%, rgba(54,177,176,0.18), transparent 70%)"></div>
+      <div data-doc-preview class="relative overflow-hidden rounded-2xl border shadow-lift" style="background:var(--dp-bg); border-color:var(--dp-border)">
+        <!-- chrome: centered search + Ask AI, theme switch on the right -->
+        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 py-2.5" style="border-bottom:1px solid var(--dp-border)">
+          <div class="flex items-center gap-2">
+            <span class="h-2.5 w-2.5 rounded-full" style="background:var(--dp-border)"></span><span class="h-2.5 w-2.5 rounded-full" style="background:var(--dp-border)"></span><span class="h-2.5 w-2.5 rounded-full" style="background:var(--dp-border)"></span>
+          </div>
+          <div class="hidden items-center gap-2 sm:flex">
+            <div class="flex w-[210px] items-center gap-2 rounded-lg px-2.5 py-[7px]" style="background:var(--dp-card); border:1px solid var(--dp-border); cursor:text">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color:var(--dp-muted)"><circle cx="11" cy="11" r="7" /><path d="m21 21-4-4" /></svg>
+              <span class="text-[11px]" style="color:var(--dp-muted)">Search documentation…</span>
+              <span class="ml-auto rounded px-1.5 py-0.5 font-mono text-[8.5px]" style="background:color-mix(in srgb, var(--dp-text) 9%, transparent); color:var(--dp-muted)">⌘K</span>
+            </div>
+            <button type="button" class="flex items-center gap-1.5 rounded-lg px-2.5 py-[7px] text-[11px] font-semibold" style="background:color-mix(in srgb, var(--dp-accent) 13%, transparent); color:var(--dp-accent); cursor:pointer">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.5 5L19 9.5 13.5 11 12 16l-1.5-5L5 9.5 10.5 8z" /></svg>
+              Ask AI
+            </button>
+          </div>
+          <div class="flex justify-end">
+            <div data-theme-rail class="relative inline-flex items-center gap-0.5 rounded-[9px] p-[3px]" style="background:color-mix(in srgb, var(--dp-text) 8%, transparent)">
+              <span data-rail-pill style="background:var(--dp-bg); box-shadow:var(--shadow-soft); border-radius:7px"></span>
+              <button type="button" data-theme-mode="light" class="dp-themebtn dp-on relative z-10 flex items-center gap-1 rounded-[7px] px-2 py-1 font-mono text-[10px] font-semibold"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4" /><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M18.4 5.6l-.7.7M6.3 17.7l-.7.7" stroke-linecap="round" /></svg>Light</button>
+              <button type="button" data-theme-mode="dark" class="dp-themebtn relative z-10 flex items-center gap-1 rounded-[7px] px-2 py-1 font-mono text-[10px] font-semibold"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" stroke-linecap="round" stroke-linejoin="round" /></svg>Dark</button>
+            </div>
+          </div>
+        </div>
+        <!-- 3-pane body -->
+        <div class="grid lg:grid-cols-[222px_1fr_188px]">
+          <!-- LEFT NAV (fuller, icons on sections, nested gutter, pretty active) -->
+          <nav class="hidden p-3 text-[12.5px] lg:block" style="border-right:1px solid var(--dp-border)">
+            <p class="flex items-center gap-1.5 px-2.5 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]" style="color:var(--dp-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z" /><path d="M4 22v-7" /></svg>Getting started</p>
+            <div class="space-y-0.5">
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Installation</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Quickstart</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Project setup</a>
+            </div>
+            <p class="mt-3 flex items-center gap-1.5 px-2.5 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]" style="color:var(--dp-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>Guides</p>
+            <div class="space-y-0.5">
+              <div data-doc-acc class="open">
+                <button type="button" data-doc-acc-btn class="dp-navitem relative flex w-full items-center gap-1.5 rounded-[7px] py-1.5 pl-3.5 pr-2.5 font-medium" style="background:var(--dp-active); color:var(--dp-text)">
+                  <span class="absolute left-1 top-1/2 h-3.5 w-[3px] -translate-y-1/2 rounded-full" style="background:var(--dp-accent)"></span>
+                  <svg data-doc-acc-chevron width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  Authentication
+                </button>
+                <div data-doc-acc-panel><div class="overflow-hidden">
+                  <div class="ml-[15px] mt-0.5 space-y-0.5 pl-2.5" style="border-left:1px solid var(--dp-border)">
+                    <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Sessions</a>
+                    <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">API keys</a>
+                    <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">OAuth</a>
+                  </div>
+                </div></div>
+              </div>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Webhooks</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Rate limits</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Pagination</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Errors</a>
+            </div>
+            <p class="mt-3 flex items-center gap-1.5 px-2.5 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]" style="color:var(--dp-muted)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6" /><path d="m16 6 6 6-6 6" /></svg>API reference</p>
+            <div class="space-y-0.5">
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Client</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Session</a>
+              <a class="dp-navitem block rounded-[7px] px-2.5 py-1.5" style="color:var(--dp-muted)">Webhook</a>
+            </div>
+          </nav>
+
+          <!-- CONTENT -->
+          <article class="space-y-5 p-6 sm:p-7" style="color:var(--dp-text)">
+            <div>
+              <p class="font-mono text-[11px]" style="color:var(--dp-muted)">Guides › Authentication</p>
+              <h3 class="mt-1.5 font-display text-[26px] font-semibold" style="color:var(--dp-text)">Authentication</h3>
+              <p class="mt-2.5 text-[13.5px] leading-relaxed" style="color:var(--dp-muted)">Acme uses short-lived <span class="rounded px-1 font-mono text-[11.5px]" style="background:var(--dp-inline); color:var(--dp-accent)">sessions</span>. Create one with <span class="rounded px-1 font-mono text-[11.5px]" style="background:var(--dp-inline); color:var(--dp-accent)">connect()</span>, then attach the returned <span class="rounded px-1 font-mono text-[11.5px]" style="background:var(--dp-inline); color:var(--dp-accent)">Session</span> to every request.</p>
+            </div>
+            <!-- theme-aware tabbed code block -->
+            <div class="dp-code overflow-hidden rounded-xl" style="box-shadow:0 1px 3px rgba(13,50,48,.08), 0 0 0 1px color-mix(in srgb, var(--dp-text) 7%, transparent)">
+              <div class="flex items-center gap-2 px-3 pt-3">
+                <div data-cb-rail class="relative inline-flex items-center gap-0.5 rounded-lg p-[3px]" style="background:color-mix(in srgb, var(--dp-text) 7%, transparent)">
+                  <span data-rail-pill style="background:var(--dp-bg); box-shadow:var(--shadow-soft); border-radius:6px"></span>
+                  <button type="button" data-cb-tab class="dp-cbtab dp-on relative z-10 rounded-md px-2.5 py-1 font-mono text-[11.5px] font-semibold">client.ts</button>
+                  <button type="button" data-cb-tab class="dp-cbtab relative z-10 rounded-md px-2.5 py-1 font-mono text-[11.5px] font-semibold">client.py</button>
+                </div>
+                <svg class="ml-auto" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--dp-muted)"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+              </div>
+              <div data-cb-panel class="px-4 pb-4 pt-3 font-mono text-[12px] leading-[1.85]">
+                <div><span class="k">import</span> <span class="v">Acme</span> <span class="k">from</span> <span class="s">'acme'</span></div>
+                <div><span class="k">const</span> <span class="v">acme</span> = <span class="k">new</span> <span class="f">Acme</span>(apiKey)</div>
+                <div><span class="k">const</span> <span class="v">session</span> = <span class="k">await</span> <span class="f">acme.connect</span>()</div>
+              </div>
+              <div data-cb-panel hidden class="px-4 pb-4 pt-3 font-mono text-[12px] leading-[1.85]">
+                <div><span class="k">from</span> <span class="v">acme</span> <span class="k">import</span> <span class="v">Acme</span></div>
+                <div><span class="v">acme</span> = <span class="f">Acme</span>(api_key)</div>
+                <div><span class="v">session</span> = <span class="f">acme.connect</span>()</div>
+              </div>
+            </div>
+            <!-- clean D2 diagram -->
+            <figure class="overflow-hidden rounded-xl" style="border:1px solid var(--dp-border)">
+              <div class="dp-dotgrid flex items-center justify-center px-5 py-7">
+                <div class="relative z-10 flex w-[104px] shrink-0 flex-col items-center gap-2 rounded-xl px-3 py-3" style="background:var(--dp-card); border:1px solid var(--dp-border); box-shadow:0 1px 3px rgba(0,0,0,.08)">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-lg" style="background:var(--dp-inline); color:var(--dp-accent)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg></span>
+                  <span class="font-mono text-[11px] font-medium" style="color:var(--dp-text)">Client</span>
+                </div>
+                <div class="relative z-0 flex flex-1 flex-col items-center justify-center px-1">
+                  <span class="mb-1 font-mono text-[8.5px]" style="color:var(--dp-muted)">connect</span>
+                  <div class="flex w-full items-center" style="color:var(--dp-accent)"><div class="h-[1.5px] flex-1 rounded-full" style="background:var(--dp-accent)"></div><svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="margin-left:-1px"><path d="M4 2l5 4-5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+                </div>
+                <div class="relative z-10 flex w-[104px] shrink-0 flex-col items-center gap-2 rounded-xl px-3 py-3" style="background:color-mix(in srgb, var(--dp-accent) 9%, var(--dp-card)); border:1.5px solid var(--dp-accent); box-shadow:0 1px 3px rgba(0,0,0,.08)">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-lg text-white" style="background:var(--dp-accent)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="1.5" /><rect x="4" y="13" width="16" height="7" rx="1.5" /><path d="M8 7.5h.01M8 16.5h.01" /></svg></span>
+                  <span class="font-mono text-[11px] font-medium" style="color:var(--dp-text)">Acme API</span>
+                </div>
+                <div class="relative z-0 flex flex-1 flex-col items-center justify-center px-1">
+                  <span class="mb-1 font-mono text-[8.5px]" style="color:var(--dp-muted)">query</span>
+                  <div class="flex w-full items-center" style="color:var(--dp-accent)"><div class="h-[1.5px] flex-1 rounded-full" style="background:var(--dp-accent)"></div><svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="margin-left:-1px"><path d="M4 2l5 4-5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+                </div>
+                <div class="relative z-10 flex w-[104px] shrink-0 flex-col items-center gap-2 rounded-xl px-3 py-3" style="background:var(--dp-card); border:1px solid var(--dp-border); box-shadow:0 1px 3px rgba(0,0,0,.08)">
+                  <span class="flex h-8 w-8 items-center justify-center rounded-lg" style="background:var(--dp-inline); color:var(--dp-accent)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.6" /><path d="M5 6v12c0 1.5 3.1 2.6 7 2.6s7-1.1 7-2.6V6" /><path d="M5 12c0 1.5 3.1 2.6 7 2.6s7-1.1 7-2.6" /></svg></span>
+                  <span class="font-mono text-[11px] font-medium" style="color:var(--dp-text)">Postgres</span>
+                </div>
+              </div>
+              <figcaption class="px-3.5 py-2 font-mono text-[9.5px]" style="border-top:1px solid var(--dp-border); color:var(--dp-muted)">architecture.d2 · rendered &amp; syntax-checked</figcaption>
+            </figure>
+          </article>
+
+          <!-- RIGHT TOC (bent gutter rail, active highlight sits on the bend) -->
+          <aside class="hidden p-4 text-[12px] lg:block" style="border-left:1px solid var(--dp-border)">
+            <p class="pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]" style="color:var(--dp-muted)">On this page</p>
+            <div class="relative" style="height:150px">
+              <svg class="pointer-events-none absolute left-0 top-0" width="24" height="150" viewBox="0 0 24 150" fill="none" aria-hidden="true">
+                <path d="M2 8 L2 52 C2 58 14 58 14 64 L14 108 C14 114 2 114 2 120 L2 142" style="stroke:var(--dp-border)" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M14 66 L14 84" style="stroke:var(--dp-accent)" stroke-width="2.5" stroke-linecap="round" />
+              </svg>
+              <a class="dp-tocitem flex h-[30px] items-center pl-[18px]" style="color:var(--dp-muted)">Overview</a>
+              <a class="dp-tocitem flex h-[30px] items-center pl-[18px]" style="color:var(--dp-muted)">Sessions</a>
+              <a class="dp-tocitem flex h-[30px] items-center pl-[30px] font-medium" style="color:var(--dp-text)">Create a session</a>
+              <a class="dp-tocitem flex h-[30px] items-center pl-[30px]" style="color:var(--dp-muted)">Refresh tokens</a>
+              <a class="dp-tocitem flex h-[30px] items-center pl-[18px]" style="color:var(--dp-muted)">Errors</a>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- feature-rich: each card shows a simplified render, equal-height infographic -->
+    <div class="mt-16">
+      <div class="mx-auto flex max-w-2xl flex-col items-center gap-2 text-center">
+        <h3 class="font-display text-[24px] font-semibold text-ink">Everything a great docs site needs, already built in.</h3>
+        <p class="text-[14.5px] leading-relaxed text-muted">No plugins to wire up, no theme to fork. The components come with it.</p>
+      </div>
+      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <!-- instant search -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="w-full rounded-xl border border-line bg-canvas p-3 shadow-soft">
+              <div class="flex items-center gap-2 rounded-lg border border-line bg-paper px-2.5 py-2"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="text-muted"><circle cx="11" cy="11" r="7" /><path d="m21 21-4-4" /></svg><span class="text-[11px] text-ink-soft">auth</span><span class="ml-0.5 inline-block h-3 w-px bg-brand-500"></span><span class="ml-auto rounded border border-line bg-canvas px-1 font-mono text-[8px] text-muted">⌘K</span></div>
+              <div class="mt-2 space-y-1">
+                <div class="flex items-center gap-2 rounded-md bg-brand-50 px-2 py-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-brand-600"><path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /></svg><span class="text-[10px] font-medium text-brand-700">Authentication</span><span class="ml-auto font-mono text-[8.5px] text-brand-600">guide ›</span></div>
+                <div class="flex items-center gap-2 px-2 py-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-muted"><path d="m9 8-4 4 4 4M15 8l4 4-4 4" /></svg><span class="text-[10px] text-ink-soft">getSession()</span><span class="ml-auto font-mono text-[8.5px] text-muted">api ›</span></div>
+                <div class="flex items-center gap-2 px-2 py-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="text-muted"><path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /></svg><span class="text-[10px] text-ink-soft">Refresh tokens</span><span class="ml-auto font-mono text-[8.5px] text-muted">guide ›</span></div>
+              </div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Instant search</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Full-text search across every page in milliseconds, powered by Pagefind.</p></div>
+        </div>
+        <!-- D2 diagrams -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-canvas px-3 py-5 shadow-soft">
+              <div class="flex flex-col items-center gap-1.5"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg></span><span class="font-mono text-[8.5px] text-muted">Client</span></div>
+              <div class="flex flex-1 flex-col items-center gap-0.5"><span class="font-mono text-[7.5px] text-muted">request</span><div class="flex w-full items-center text-brand-400"><div class="h-[1.5px] flex-1 rounded-full bg-brand-400"></div><svg width="8" height="8" viewBox="0 0 12 12" fill="none" style="margin-left:-1px"><path d="M4 2l5 4-5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></div></div>
+              <div class="flex flex-col items-center gap-1.5"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 text-white shadow-soft"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="1.5" /><rect x="4" y="13" width="16" height="7" rx="1.5" /><path d="M8 7.5h.01M8 16.5h.01" /></svg></span><span class="font-mono text-[8.5px] text-muted">Gateway</span></div>
+              <div class="flex flex-1 flex-col items-center gap-0.5"><span class="font-mono text-[7.5px] text-muted">query</span><div class="flex w-full items-center text-brand-400"><div class="h-[1.5px] flex-1 rounded-full bg-brand-400"></div><svg width="8" height="8" viewBox="0 0 12 12" fill="none" style="margin-left:-1px"><path d="M4 2l5 4-5 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></div></div>
+              <div class="flex flex-col items-center gap-1.5"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="2.6" /><path d="M5 6v12c0 1.5 3.1 2.6 7 2.6s7-1.1 7-2.6V6" /><path d="M5 12c0 1.5 3.1 2.6 7 2.6s7-1.1 7-2.6" /></svg></span><span class="font-mono text-[8.5px] text-muted">Postgres</span></div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">D2 diagrams</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Architecture and flow diagrams, rendered and syntax-checked. Sketch mode by default.</p></div>
+        </div>
+        <!-- type-checked code (light) -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="w-full overflow-hidden rounded-xl border border-line bg-paper shadow-soft">
+              <div class="flex items-center justify-between border-b border-line bg-canvas px-3 py-2"><span class="font-mono text-[9px] text-muted">example.ts</span><span class="inline-flex items-center gap-1 rounded bg-pass/12 px-1.5 py-0.5 font-mono text-[8.5px] font-semibold text-pass"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg> tsc passed</span></div>
+              <div class="space-y-0.5 px-3 py-2.5 font-mono text-[10px] leading-relaxed"><div><span class="text-brand-700">import</span> <span class="text-ink">Acme</span> <span class="text-brand-700">from</span> <span class="text-flag">'acme'</span></div><div><span class="text-brand-700">const</span> c = <span class="text-brand-700">new</span> <span class="text-ink">Acme</span>(key)</div><div><span class="text-brand-700">await</span> c.connect()</div></div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Type-checked code blocks</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Every sample runs through tsc or pyright, so the code on the page actually compiles.</p></div>
+        </div>
+        <!-- autolinked glossary -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="relative w-full rounded-xl border border-line bg-canvas p-3.5 shadow-soft">
+              <p class="text-[11.5px] leading-relaxed text-ink-soft">Create a <span class="rounded bg-brand-50 px-1 text-brand-700 underline decoration-dotted decoration-brand-400 underline-offset-2">session</span>, then attach it to every request you make.</p>
+              <div class="mt-2.5 w-fit rounded-lg border border-line bg-night px-2.5 py-1.5 text-[9.5px] text-paper shadow-lift"><span class="font-semibold text-brand-300">session</span> · a short-lived auth token</div>
+              <svg class="absolute left-[15%] top-[30%]" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.6 2.3 9.9 18.2l2.4-6.5 6.6-2.2L4.6 2.3Z" fill="#0e2b2d" stroke="#fff" stroke-width="1.3" stroke-linejoin="round" /></svg>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Autolinked glossary</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Define a term once; it links consistently everywhere it appears.</p></div>
+        </div>
+        <!-- API reference -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="w-full overflow-hidden rounded-xl border border-line bg-canvas shadow-soft">
+              <p class="border-b border-line bg-paper px-3 py-2 font-mono text-[9.5px] text-ink-soft"><span class="text-brand-700">getSession</span>(opts)</p>
+              <div class="grid grid-cols-[1fr_auto] gap-2 px-3 py-1.5 font-mono text-[9.5px]"><span class="text-muted">opts.token</span><span class="text-brand-600">string</span></div>
+              <div class="grid grid-cols-[1fr_auto] gap-2 border-t border-line px-3 py-1.5 font-mono text-[9.5px]"><span class="text-muted">opts.expiresIn</span><span class="text-brand-600">number?</span></div>
+              <div class="grid grid-cols-[1fr_auto] gap-2 border-t border-line px-3 py-1.5 font-mono text-[9.5px]"><span class="text-muted">returns</span><span class="text-brand-600">Promise&lt;Session&gt;</span></div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">API reference</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Signatures extracted straight from your compiler with TypeDoc and griffe.</p></div>
+        </div>
+        <!-- screenshots: a simplified SaaS console UI -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="w-full overflow-hidden rounded-xl border border-line bg-paper shadow-soft">
+              <div class="flex items-center gap-1.5 border-b border-line bg-canvas px-2.5 py-1.5"><span class="h-2 w-2 rounded-full bg-brand-500"></span><span class="h-1.5 w-9 rounded bg-line"></span><span class="ml-auto h-1.5 w-5 rounded bg-line"></span><span class="h-4 w-4 rounded-full bg-brand-100"></span></div>
+              <div class="flex">
+                <div class="w-9 shrink-0 space-y-1.5 border-r border-line p-2"><span class="block h-1.5 rounded bg-brand-200"></span><span class="block h-1.5 w-3/4 rounded bg-line"></span><span class="block h-1.5 rounded bg-line"></span><span class="block h-1.5 w-2/3 rounded bg-line"></span></div>
+                <div class="flex-1 space-y-1.5 p-2">
+                  <div class="grid grid-cols-3 gap-1.5">
+                    <div class="rounded border border-line p-1.5"><span class="block h-2 w-5 rounded bg-brand-400"></span><span class="mt-1 block h-1 w-7 rounded bg-line"></span></div>
+                    <div class="rounded border border-line p-1.5"><span class="block h-2 w-4 rounded bg-pass/60"></span><span class="mt-1 block h-1 w-7 rounded bg-line"></span></div>
+                    <div class="rounded border border-line p-1.5"><span class="block h-2 w-6 rounded bg-brand-300"></span><span class="mt-1 block h-1 w-6 rounded bg-line"></span></div>
+                  </div>
+                  <div class="flex items-end gap-1 rounded border border-line p-1.5" style="height:36px"><span class="w-full rounded-sm bg-brand-200" style="height:40%"></span><span class="w-full rounded-sm bg-brand-300" style="height:65%"></span><span class="w-full rounded-sm bg-brand-200" style="height:50%"></span><span class="w-full rounded-sm bg-brand-400" style="height:85%"></span><span class="w-full rounded-sm bg-brand-300" style="height:70%"></span><span class="w-full rounded-sm bg-brand-200" style="height:55%"></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Screenshots</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Drop real product screenshots — like a console dashboard — into a page with one component.</p></div>
+        </div>
+        <!-- callouts, tabs & steps -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="w-full space-y-2 rounded-xl border border-line bg-canvas p-3 shadow-soft">
+              <div class="flex gap-1 border-b border-line pb-1.5 text-[8.5px]"><span class="rounded bg-paper px-1.5 py-0.5 font-semibold text-brand-700 shadow-soft">npm</span><span class="px-1.5 py-0.5 text-muted">pnpm</span><span class="px-1.5 py-0.5 text-muted">yarn</span></div>
+              <div class="flex items-start gap-1.5 rounded-md border border-brand-200 bg-brand-50/70 px-2 py-1.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" class="mt-px shrink-0 text-brand-600"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round" /></svg><span class="text-[9px] leading-snug text-ink-soft">Sessions expire after 60 minutes.</span></div>
+              <div class="flex items-center gap-1 px-0.5">
+                <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand-500 font-mono text-[7px] font-bold text-white">1</span><span class="h-px flex-1 bg-line"></span>
+                <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand-100 font-mono text-[7px] font-bold text-brand-700">2</span><span class="h-px flex-1 bg-line"></span>
+                <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand-100 font-mono text-[7px] font-bold text-brand-700">3</span>
+              </div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Callouts, tabs &amp; steps</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">The rich MDX building blocks a great guide is actually made of.</p></div>
+        </div>
+        <!-- light & dark -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="grid w-full grid-cols-2 overflow-hidden rounded-xl border border-line shadow-soft">
+              <div class="space-y-2 bg-paper p-3"><div class="flex items-center justify-between"><span class="font-display text-[10px] font-bold text-ink">Aa</span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-flag"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5.6 5.6l.7.7M17.7 17.7l.7.7" /></svg></div><div class="h-1.5 w-full rounded bg-line"></div><div class="h-1.5 w-2/3 rounded bg-line"></div><div class="rounded bg-canvas px-1.5 py-1 font-mono text-[7px] text-brand-700">const c</div></div>
+              <div class="space-y-2 bg-night p-3"><div class="flex items-center justify-between"><span class="font-display text-[10px] font-bold text-paper">Aa</span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-brand-300"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" /></svg></div><div class="h-1.5 w-full rounded bg-[#1f3a36]"></div><div class="h-1.5 w-2/3 rounded bg-[#1f3a36]"></div><div class="rounded bg-[#06201f] px-1.5 py-1 font-mono text-[7px] text-brand-300">const c</div></div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Light &amp; dark</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">Both themes ship together; every reader picks the one they prefer.</p></div>
+        </div>
+        <!-- built for agents -->
+        <div class="surface hover-lift flex flex-col gap-4 p-5">
+          <div class="flex h-[150px] items-center">
+            <div class="w-full overflow-hidden rounded-xl border border-line bg-canvas shadow-soft">
+              <div class="flex items-center justify-between border-b border-line bg-paper px-3 py-2"><span class="font-mono text-[9px] text-ink-soft">llms.txt</span><span class="rounded px-1.5 py-0.5 font-mono text-[8px] font-semibold text-[#6d4ee6]" style="background:#ece6fd">+ MCP server</span></div>
+              <div class="space-y-0.5 px-3 py-2 font-mono text-[9px] leading-relaxed"><div class="text-muted"># Acme — verified API surface</div><div class="text-ink-soft">/auth · /billing · /webhooks</div><div class="text-ink-soft">/reference/client</div><div style="color:#6d4ee6">→ agents cite getSession(opts) ✓</div></div>
+            </div>
+          </div>
+          <div><h4 class="font-display text-[15px] font-semibold text-ink">Built for agents</h4><p class="mt-1 text-[12.5px] leading-relaxed text-muted">llms.txt, llms-full.txt, and a docs-serving MCP server, included by default.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* doc-preview theming (light by default) */
+  [data-doc-preview] {
+    --dp-bg: #ffffff;
+    --dp-card: #f5faf9;
+    --dp-text: #0e2b2d;
+    --dp-muted: #5d7173;
+    --dp-border: #e0ece9;
+    --dp-accent: #0a818b;
+    --dp-active: #ecfbf9;
+    --dp-inline: rgba(10, 129, 139, 0.1);
+    --dp-codebg: #f1f5f4;
+    --dp-codetext: #33484a;
+    --dp-kw: #0a7b85;
+    --dp-str: #b5610b;
+    --dp-fn: #7a5cf0;
+    --dp-var: #0e2b2d;
+  }
+  [data-doc-preview].is-dark {
+    --dp-bg: #161c1c;
+    --dp-card: #222828;
+    --dp-text: rgba(255, 255, 255, 0.9);
+    --dp-muted: #8c9594;
+    --dp-border: #2f3434;
+    --dp-accent: #36bebe;
+    --dp-active: #2b3231;
+    --dp-inline: rgba(54, 190, 190, 0.14);
+    --dp-codebg: #1b2221;
+    --dp-codetext: #cfeae6;
+    --dp-kw: #569cd6;
+    --dp-str: #ce9178;
+    --dp-fn: #dcdcaa;
+    --dp-var: #9cdcfe;
+  }
+  .dp-code {
+    background: var(--dp-codebg);
+    color: var(--dp-codetext);
+  }
+  .dp-code .k {
+    color: var(--dp-kw);
+  }
+  .dp-code .s {
+    color: var(--dp-str);
+  }
+  .dp-code .f {
+    color: var(--dp-fn);
+  }
+  .dp-code .v {
+    color: var(--dp-var);
+  }
+  [data-rail-pill] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transition:
+      left 0.28s var(--ease-spring),
+      width 0.28s var(--ease-spring),
+      top 0.25s ease,
+      height 0.25s ease;
+  }
+  .dp-themebtn,
+  .dp-cbtab {
+    color: var(--dp-muted);
+    cursor: pointer;
+  }
+  .dp-themebtn.dp-on,
+  .dp-cbtab.dp-on {
+    color: var(--dp-text);
+  }
+  .dp-navitem {
+    transition: background-color 0.15s ease;
+    cursor: pointer;
+  }
+  .dp-navitem:hover {
+    background: color-mix(in srgb, var(--dp-text) 7%, transparent);
+    color: var(--dp-text);
+  }
+  .dp-tocitem {
+    cursor: pointer;
+  }
+  .dp-tocitem:hover {
+    color: var(--dp-text);
+  }
+  [data-doc-acc-panel] {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s ease;
+  }
+  [data-doc-acc].open [data-doc-acc-panel] {
+    grid-template-rows: 1fr;
+  }
+  [data-doc-acc-chevron] {
+    transition: transform 0.22s ease;
+  }
+  [data-doc-acc].open [data-doc-acc-chevron] {
+    transform: rotate(90deg);
+  }
+  .dp-dotgrid {
+    background-image: radial-gradient(var(--dp-border) 1px, transparent 1px);
+    background-size: 14px 14px;
+  }
+</style>
+
+<script>
+  // doc preview: Tabs-style theme switch + animated code tabs + collapsible nav.
+  const setupDocPreview = () => {
+    const movePill = (rail: HTMLElement) => {
+      const pill = rail.querySelector<HTMLElement>('[data-rail-pill]');
+      const on = rail.querySelector<HTMLElement>('.dp-on') || rail.querySelector<HTMLButtonElement>('button');
+      if (!pill || !on) return;
+      pill.style.left = `${on.offsetLeft}px`;
+      pill.style.top = `${on.offsetTop}px`;
+      pill.style.width = `${on.offsetWidth}px`;
+      pill.style.height = `${on.offsetHeight}px`;
+    };
+    const rails: HTMLElement[] = [];
+    document.querySelectorAll<HTMLElement>('[data-doc-preview]').forEach((root) => {
+      const themeRail = root.querySelector<HTMLElement>('[data-theme-rail]');
+      if (themeRail) {
+        rails.push(themeRail);
+        const btns = Array.from(themeRail.querySelectorAll<HTMLButtonElement>('[data-theme-mode]'));
+        btns.forEach((b) =>
+          b.addEventListener('click', () => {
+            root.classList.toggle('is-dark', b.dataset.themeMode === 'dark');
+            btns.forEach((x) => x.classList.toggle('dp-on', x === b));
+            movePill(themeRail);
+          })
+        );
+      }
+      const cbRail = root.querySelector<HTMLElement>('[data-cb-rail]');
+      if (cbRail) {
+        rails.push(cbRail);
+        const btns = Array.from(cbRail.querySelectorAll<HTMLButtonElement>('[data-cb-tab]'));
+        const panels = Array.from(root.querySelectorAll<HTMLElement>('[data-cb-panel]'));
+        btns.forEach((b, i) =>
+          b.addEventListener('click', () => {
+            btns.forEach((x, idx) => x.classList.toggle('dp-on', idx === i));
+            panels.forEach((p, idx) => (p.hidden = idx !== i));
+            movePill(cbRail);
+          })
+        );
+      }
+      root.querySelectorAll<HTMLButtonElement>('[data-doc-acc-btn]').forEach((btn) =>
+        btn.addEventListener('click', () => btn.closest<HTMLElement>('[data-doc-acc]')?.classList.toggle('open'))
+      );
+    });
+    const place = () => rails.forEach(movePill);
+    requestAnimationFrame(place);
+    window.addEventListener('load', place);
+    window.addEventListener('resize', place);
+  };
+
+  if (document.readyState !== 'loading') setupDocPreview();
+  else document.addEventListener('DOMContentLoaded', setupDocPreview);
+</script>

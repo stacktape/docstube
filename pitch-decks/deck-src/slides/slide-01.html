@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css"></head>
+<body>
+<div class="slide bg-grid bg-glow" style="padding:0">
+  <div class="row" style="flex:1; align-items:center; gap:60px; padding:0 72px">
+
+    <!-- LEFT: message -->
+    <div class="col" style="width:600px; flex:none">
+      <div class="row items-c gap-3" style="margin-bottom:30px">
+        <img src="../img/docstube-icon.svg" alt="" style="height:40px;width:40px">
+        <span style="font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em;color:var(--ink)">docs<span style="color:var(--brand-500)">tube</span></span>
+      </div>
+
+      <span class="eyebrow">Verified docs, generated from your code</span>
+
+      <h1 class="head xl" style="margin-top:20px">Most technical<br>documentation is trash.<br><span class="grad">Yours won't be.</span></h1>
+
+      <p class="subhead" style="margin-top:22px;max-width:56ch;font-size:17.5px">
+        docstube generates it from your codebase, fact-checks every claim against the
+        source, writes it for the people actually reading it, and keeps it in sync as your
+        code changes. <span class="em">Nothing to write. Nothing to maintain.</span>
+      </p>
+
+      <div class="row gap-3 wrap" style="margin-top:30px">
+        <span class="chip"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ok"/></svg> MIT licensed</span>
+        <span class="chip"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ok"/></svg> Bring your own AI</span>
+        <span class="chip"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ok"/></svg> Source stays local</span>
+      </div>
+    </div>
+
+    <!-- RIGHT: the run UI, "all passed" state -->
+    <div class="grow" style="display:flex;justify-content:center">
+    <div class="card lift flush" style="width:492px">
+      <div class="win-bar">
+        <span class="win-dots"><i></i><i></i><i></i></span>
+        <span class="win-title">docstube</span>
+        <span class="pill pass" style="margin-left:auto"><span class="dot"></span> all passed</span>
+      </div>
+
+      <!-- narration band -->
+      <div class="row items-c gap-3" style="padding:14px 18px;border-bottom:1px solid var(--line);background:var(--paper)">
+        <span class="num" style="background:var(--pass)">
+          <svg width="15" height="15" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <div>
+          <div class="mono" style="font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-700)">Step 3 of 3</div>
+          <div style="font-family:var(--display);font-weight:600;font-size:15.5px;color:var(--ink);line-height:1.2">It checks every page, and fixes what's wrong</div>
+        </div>
+      </div>
+
+      <!-- body -->
+      <div style="padding:18px 18px 16px">
+        <div class="row items-c gap-2" style="margin-bottom:13px">
+          <span class="tile" style="width:28px;height:28px;border-radius:8px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 11.5l2 2 4-4.5"/></svg>
+          </span>
+          <span style="font-weight:600;font-size:13.5px;color:var(--ink)">Verifier</span>
+          <span class="muted" style="font-size:12.5px">· runs real checks</span>
+        </div>
+
+        <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Code samples run</div>
+        <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Links work</div>
+        <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Examples match your code</div>
+
+        <p style="margin:11px 0 0 31px;font-size:12px;color:var(--pass);line-height:1.4">
+          fixed <span class="mono">getSession()</span> example, now matches your code
+        </p>
+
+        <div class="row between items-c" style="margin-top:16px">
+          <span class="mono" style="font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-700)">Quality score</span>
+          <span class="mono" style="font-size:12.5px;color:var(--ink-soft)"><b style="color:var(--ink)">0.79</b> <span class="muted">/ 1.0</span></span>
+        </div>
+        <div class="score" style="margin-top:8px">
+          <div class="fill" style="width:79%"></div>
+          <span class="score-gate" style="left:70%"></span>
+        </div>
+      </div>
+
+      <!-- step rail -->
+      <div class="row items-c center-x gap-3" style="padding:11px 16px;border-top:1px solid var(--line);background:var(--canvas)">
+        <span class="mono" style="font-size:11px;font-weight:600;color:var(--muted)">1 · Configure</span>
+        <span style="color:var(--line-strong)">›</span>
+        <span class="mono" style="font-size:11px;font-weight:600;color:var(--muted)">2 · Generate</span>
+        <span style="color:var(--line-strong)">›</span>
+        <span class="mono" style="font-size:11px;font-weight:600;color:var(--brand-600)">3 · Verify &amp; fix</span>
+      </div>
+    </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

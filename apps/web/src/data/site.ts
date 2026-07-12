@@ -8,14 +8,13 @@ export const site = {
   tagline: 'Verified, always-current documentation, generated from your code.',
   repo: 'https://github.com/stacktape/docstube',
   install: 'npx docstube wizard',
-  waitlist: '#'
+  waitlist: '#waitlist'
 } as const;
 
 export type NavLink = { label: string; href: string };
 
 export const nav: NavLink[] = [
   { label: 'How it works', href: '#how' },
-  { label: 'Verification', href: '#verify' },
   { label: 'Compare', href: '#compare' },
   { label: 'Pricing', href: '#pricing' },
   { label: 'Docs', href: '#faq' }

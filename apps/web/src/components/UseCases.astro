@@ -1,17 +1,89 @@
 ---
-import { useCases } from '../data/site.ts';
+// Use cases - public docs vs internal wiki, each with a meaningful illustration.
+const useCases = [
+  {
+    title: 'Public docs',
+    audience: 'OSS maintainers · API companies',
+    lead: 'A site that markets your project while it teaches it — and that every channel can find.',
+    points: [
+      { h: 'Adoption follows good docs', b: 'Developers commit to the tool they can learn fastest. A clear, searchable site is how you become that tool.' },
+      { h: 'Found by people and their AI', b: 'SEO, AEO, and an llms.txt out of the box — so search engines, answer engines, and coding agents all cite your real API.' },
+      { h: 'Correct, not just fluent', b: 'Every sample is type-checked and every reference matches your compiler, so the code a reader copies actually runs.' }
+    ]
+  },
+  {
+    title: 'Internal wiki',
+    audience: 'engineering teams',
+    lead: 'The private reference for a codebase that changes faster than anyone can document by hand.',
+    points: [
+      { h: 'Onboarding that keeps up', b: 'New hires ramp on docs that match main — not a wiki that went stale three sprints ago.' },
+      { h: 'Answers without the interruption', b: 'Instant search over always-current pages, so nobody pings the one engineer who still remembers how it works.' },
+      { h: 'Context your agents can trust', b: 'Ships an llms.txt and an MCP server, so the coding agents on your team read accurate internals instead of guessing.' }
+    ]
+  }
+];
 ---
 
-<div class="grid gap-5 md:grid-cols-3">
-  {
-    useCases.map((uc) => (
-      <div class="surface hover-lift flex flex-col gap-3 p-6">
-        <span class="w-fit rounded-full bg-brand-50 px-2.5 py-1 font-mono text-[11px] font-medium text-brand-700">
-          {uc.audience}
-        </span>
-        <h3 class="font-display text-[18px] font-semibold text-ink">{uc.title}</h3>
-        <p class="text-[14px] leading-relaxed text-muted">{uc.body}</p>
+<section class="border-b border-line bg-paper">
+  <div class="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
+    <div class="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
+      <span class="eyebrow">Use cases</span>
+      <h2 class="text-balance text-3xl font-bold sm:text-[40px] sm:leading-[1.08]">Win adoption. Unblock your team.</h2>
+    </div>
+    <div class="mt-14 grid gap-6 lg:grid-cols-2">
+      <!-- PUBLIC -->
+      <div class="surface hover-lift flex flex-col overflow-hidden">
+        <div class="relative h-[252px] overflow-hidden border-b border-line bg-gradient-to-b from-canvas to-paper">
+          <div class="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true"><span class="h-[340px] w-[340px] rounded-full border border-dashed border-line-strong/55"></span></div>
+          <div class="absolute left-6 top-7 w-[260px] -rotate-2 rounded-xl border border-line bg-paper p-3.5 shadow-soft">
+            <div class="flex items-center gap-2 rounded-full border border-line bg-canvas px-2.5 py-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="text-muted"><circle cx="11" cy="11" r="7" /><path d="m21 21-4-4" /></svg><span class="font-mono text-[10px] text-muted">acme authentication</span></div>
+            <div class="mt-2.5">
+              <p class="font-mono text-[9px] text-pass">yourproject.dev › docs › auth</p>
+              <p class="text-[12.5px] font-medium text-brand-700">Authentication — Acme docs</p>
+              <p class="text-[10px] leading-snug text-muted">Create a session and attach it to every request. Sessions expire after 60 minutes…</p>
+            </div>
+          </div>
+          <div class="absolute bottom-6 right-5 w-[244px] rotate-2 rounded-xl border border-line bg-paper p-3.5 shadow-lift">
+            <div class="flex items-center gap-1.5"><span class="flex h-5 w-5 items-center justify-center rounded-full text-[#6d4ee6]" style="background:#ece6fd"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6z" /></svg></span><span class="font-mono text-[9.5px] font-semibold text-ink-soft">AI answer</span></div>
+            <p class="mt-2 text-[11px] leading-relaxed text-ink-soft">Call <span class="font-mono text-ink">acme.connect()</span> to authenticate, then reuse the session.</p>
+            <div class="mt-2.5 inline-flex items-center gap-1 rounded-md border border-line bg-canvas px-2 py-0.5"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="text-brand-500"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg><span class="font-mono text-[9px] text-muted">yourproject.dev/auth</span></div>
+          </div>
+        </div>
+        <div class="flex flex-1 flex-col gap-5 p-7 sm:p-8">
+          <div><h3 class="font-display text-[22px] font-semibold text-ink">{useCases[0].title}</h3><p class="mt-1 font-mono text-[12px] text-muted">{useCases[0].audience}</p><p class="mt-3 text-[14.5px] leading-relaxed text-ink-soft">{useCases[0].lead}</p></div>
+          <ul class="flex flex-col gap-3 border-t border-line pt-5">
+            {useCases[0].points.map((p) => (
+              <li class="flex gap-3"><span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span><p class="text-[13.5px] leading-relaxed text-muted"><span class="font-semibold text-ink">{p.h}.</span> {p.b}</p></li>
+            ))}
+          </ul>
+        </div>
       </div>
-    ))
-  }
-</div>
+      <!-- INTERNAL -->
+      <div class="surface hover-lift flex flex-col overflow-hidden">
+        <div class="relative h-[252px] overflow-hidden border-b border-line bg-gradient-to-b from-canvas to-paper">
+          <div class="pointer-events-none absolute inset-0 grid place-items-center" aria-hidden="true"><span class="h-[340px] w-[340px] rounded-full border border-dashed border-line-strong/55"></span></div>
+          <div class="absolute left-6 top-8 flex w-[250px] items-center gap-2 rounded-full border border-line bg-paper px-3.5 py-2 shadow-soft">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="text-brand-500"><circle cx="11" cy="11" r="7" /><path d="m21 21-4-4" /></svg>
+            <span class="text-[12px] text-ink-soft">How does auth work?</span>
+          </div>
+          <div class="absolute bottom-7 right-5 w-[262px] rounded-xl border border-line bg-paper p-3.5 shadow-lift">
+            <div class="flex items-center justify-between"><p class="font-display text-[13px] font-semibold text-ink">Auth service</p><span class="inline-flex items-center gap-1 rounded-full bg-pass/12 px-1.5 py-0.5 font-mono text-[8.5px] font-semibold text-pass"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg> matches main</span></div>
+            <p class="mt-2 text-[11px] leading-relaxed text-ink-soft">Sessions are minted in <span class="font-mono text-ink">auth.ts</span> and refreshed by the gateway.</p>
+            <div class="mt-2.5 flex items-center gap-2 border-t border-line pt-2">
+              <div class="flex -space-x-1.5"><span class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-paper bg-brand-100 text-[8px] font-bold text-brand-700">M</span><span class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-paper bg-brand-100 text-[8px] font-bold text-brand-700">J</span><span class="flex h-5 w-5 items-center justify-center rounded-full border-2 border-paper text-[#6d4ee6]" style="background:#ece6fd"><svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6z" /></svg></span></div>
+              <span class="font-mono text-[8.5px] text-muted">synced from main · 2m ago</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-1 flex-col gap-5 p-7 sm:p-8">
+          <div><h3 class="font-display text-[22px] font-semibold text-ink">{useCases[1].title}</h3><p class="mt-1 font-mono text-[12px] text-muted">{useCases[1].audience}</p><p class="mt-3 text-[14.5px] leading-relaxed text-ink-soft">{useCases[1].lead}</p></div>
+          <ul class="flex flex-col gap-3 border-t border-line pt-5">
+            {useCases[1].points.map((p) => (
+              <li class="flex gap-3"><span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></span><p class="text-[13.5px] leading-relaxed text-muted"><span class="font-semibold text-ink">{p.h}.</span> {p.b}</p></li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

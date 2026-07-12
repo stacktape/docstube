@@ -1,6 +1,7 @@
 ---
 // eslint-disable-next-line import/no-unassigned-import -- global stylesheet, side-effect import
 import '../styles/global.css';
+import Waitlist from '../components/Waitlist.astro';
 
 type Props = {
   title?: string;
@@ -42,5 +43,6 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://docstube.de
   </head>
   <body>
     <slot />
+    <Waitlist />
   </body>
 </html>

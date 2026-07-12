@@ -1,0 +1,142 @@
+---
+// Site-wide waitlist modal. Opens from any link to `#waitlist` (every "Join the
+// waitlist" CTA uses href={site.waitlist} = '#waitlist') or any `[data-waitlist]`
+// element. Submits to the shared waitlist collector with a docstube tag.
+---
+
+<div data-waitlist-modal hidden class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  <div data-waitlist-backdrop class="absolute inset-0 bg-ink/50 backdrop-blur-sm"></div>
+  <div class="wl-card relative z-10 w-full max-w-md rounded-2xl border border-line bg-paper p-7 shadow-lift sm:p-8">
+    <button
+      type="button"
+      data-waitlist-close
+      aria-label="Close"
+      class="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted transition hover:bg-canvas hover:text-ink"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+    </button>
+
+    <div data-waitlist-form-wrap>
+      <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 5.5L20 7" /></svg>
+      </span>
+      <h2 class="mt-4 font-display text-[24px] font-bold text-ink">Join the waitlist</h2>
+      <p class="mt-2 text-[14.5px] leading-relaxed text-muted">docstube is launching soon. Drop your email and we'll send you a single message the day it's ready.</p>
+      <form data-waitlist-form class="mt-5 flex flex-col gap-3" novalidate>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-[12.5px] font-medium text-ink-soft">Name <span class="font-normal text-muted">(optional)</span></span>
+          <input name="fullName" type="text" autocomplete="name" placeholder="Ada Lovelace" class="w-full rounded-lg border border-line bg-canvas px-3.5 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/25" />
+        </label>
+        <label class="flex flex-col gap-1.5">
+          <span class="text-[12.5px] font-medium text-ink-soft">Work email</span>
+          <input name="workEmail" type="email" required autocomplete="email" placeholder="you@company.com" class="w-full rounded-lg border border-line bg-canvas px-3.5 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/25" />
+        </label>
+        <p data-waitlist-error class="min-h-[16px] text-[12.5px] text-danger" role="alert"></p>
+        <button type="submit" data-waitlist-submit class="btn btn-primary w-full">Join the waitlist</button>
+        <p class="text-center text-[11.5px] text-muted">No spam. One email at launch, nothing else.</p>
+      </form>
+    </div>
+
+    <div data-waitlist-success hidden class="py-6 text-center">
+      <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-pass/12 text-pass">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+      </span>
+      <h2 class="mt-4 font-display text-[22px] font-bold text-ink">You're on the list.</h2>
+      <p class="mt-2 text-[14.5px] leading-relaxed text-muted">Thanks for signing up — we'll email you the day docstube is ready.</p>
+      <button type="button" data-waitlist-close class="btn btn-secondary btn-sm mt-5">Close</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .wl-card {
+    animation: wlIn 0.2s ease;
+  }
+  @keyframes wlIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>
+
+<script>
+  const WAITLIST_ENDPOINT = 'https://7r5nt7amwzqosdsbepoqakhvha0hbimc.lambda-url.eu-west-1.on.aws';
+
+  const setup = () => {
+    const modal = document.querySelector<HTMLElement>('[data-waitlist-modal]');
+    if (!modal) return;
+    const form = modal.querySelector<HTMLFormElement>('[data-waitlist-form]');
+    const formWrap = modal.querySelector<HTMLElement>('[data-waitlist-form-wrap]');
+    const success = modal.querySelector<HTMLElement>('[data-waitlist-success]');
+    const errorEl = modal.querySelector<HTMLElement>('[data-waitlist-error]');
+    const emailInput = modal.querySelector<HTMLInputElement>('input[name="workEmail"]');
+    const nameInput = modal.querySelector<HTMLInputElement>('input[name="fullName"]');
+    const submitBtn = modal.querySelector<HTMLButtonElement>('[data-waitlist-submit]');
+    if (!form || !formWrap || !success || !errorEl || !emailInput || !submitBtn) return;
+
+    const open = () => {
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+      window.setTimeout(() => emailInput.focus(), 60);
+    };
+    const close = () => {
+      modal.hidden = true;
+      document.body.style.overflow = '';
+    };
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('a[href="#waitlist"], [data-waitlist]')) {
+        e.preventDefault();
+        open();
+        return;
+      }
+      if (target.closest('[data-waitlist-close], [data-waitlist-backdrop]')) close();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !modal.hidden) close();
+    });
+
+    const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const workEmail = emailInput.value.trim();
+      const fullName = (nameInput?.value || '').trim();
+      if (!emailOk(workEmail)) {
+        errorEl.textContent = 'Please enter a valid email address.';
+        emailInput.focus();
+        return;
+      }
+      errorEl.textContent = '';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Joining…';
+      fetch(WAITLIST_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companySize: '<docstube-waitlist>', fullName, workEmail, needs: '<docstube-waitlist>' })
+      })
+        .then((r) => {
+          if (!r.ok) throw new Error(`status ${r.status}`);
+          formWrap.hidden = true;
+          success.hidden = false;
+        })
+        .catch((err) => {
+          console.error('waitlist submit failed', err);
+          errorEl.textContent = 'Something went wrong. Please try again.';
+        })
+        .finally(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Join the waitlist';
+        });
+    });
+  };
+
+  if (document.readyState !== 'loading') setup();
+  else document.addEventListener('DOMContentLoaded', setup);
+</script>

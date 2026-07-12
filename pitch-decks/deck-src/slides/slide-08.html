@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
+<style>
+  .pt { display:flex; flex-direction:column; gap:2px; }
+  .pt .row1 { display:flex; align-items:center; gap:10px; }
+  .pt .ic2 { width:34px;height:34px;border-radius:10px;background:var(--brand-50);border:1px solid var(--brand-100);color:var(--brand-600);display:flex;align-items:center;justify-content:center;flex:none }
+  .pt h3 { font-family:var(--display); font-weight:600; font-size:16.5px; color:var(--ink); }
+  .pt p { font-size:13px; color:var(--muted); line-height:1.45; margin-left:44px; }
+  .openbadge { display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:999px; background:#1a7f4b; color:#fff; font-size:12px; font-weight:600; }
+  .avatar { width:20px;height:20px;border-radius:6px;background:var(--ink);display:flex;align-items:center;justify-content:center;flex:none }
+  .diffbox { border:1px solid var(--line); border-radius:10px; overflow:hidden; font-family:var(--mono); font-size:12.5px; }
+  .diffbox .fn { padding:7px 12px; background:var(--canvas); border-bottom:1px solid var(--line); font-size:11px; color:var(--muted); }
+  .diffbox .dl { padding:5px 12px; }
+  .diffbox .del { background:rgba(214,88,79,.09); color:var(--danger); }
+  .diffbox .add { background:rgba(21,160,107,.10); color:#0f7a52; }
+  .mergebox { border:1px solid rgba(21,160,107,.32); border-radius:10px; overflow:hidden; margin-top:13px; }
+  .mergebox .mh { padding:9px 13px; background:rgba(21,160,107,.08); display:flex; align-items:center; gap:9px; }
+  .chk { display:flex; align-items:center; gap:9px; font-size:12.5px; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="slide bg-grid">
+  <div class="hz">
+    <h1 class="head">The most efficient <span class="accent">regeneration.</span></h1>
+  </div>
+
+  <div class="body center">
+    <div class="row gap-8" style="align-items:center">
+
+      <!-- left: intro + 3 points -->
+      <div class="col" style="width:430px;flex:none;gap:20px">
+        <p style="font-size:15px;color:var(--ink-soft);line-height:1.55">docstube hashes your code at the <span class="ink sb">symbol level</span>. When something changes, only the pages that depend on it regenerate.</p>
+        <div class="pt">
+          <div class="row1"><span class="ic2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 6H15M6 8.5v7a2.5 2.5 0 0 0 2.5 2.5H15"/></svg></span><h3>Symbol-level provenance</h3></div>
+          <p>A map of which pages each symbol feeds, not just a file scan.</p>
+        </div>
+        <div class="pt">
+          <div class="row1"><span class="ic2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><h3>A fraction of the tokens</h3></div>
+          <p>Only the pages a change touches ever reach the model.</p>
+        </div>
+        <div class="pt">
+          <div class="row1"><span class="ic2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M3 12h6M15 12h6"/></svg></span><h3>On every commit</h3></div>
+          <p>The GitHub Action regenerates and opens a PR, with the reasons.</p>
+        </div>
+      </div>
+
+      <!-- right: docstube[bot] pull request -->
+      <div class="card lift flush grow">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--line);background:var(--canvas)">
+          <div class="row items-c gap-2">
+            <span class="openbadge"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M6 8.6v6.8"/><circle cx="18" cy="18" r="2.6"/><path d="M18 15.4V10a3 3 0 0 0-3-3h-3"/><path d="M13 4l-3 3 3 3"/></svg> Open</span>
+            <span class="mono" style="font-size:11.5px;color:var(--muted);margin-left:auto">#128</span>
+          </div>
+          <div style="font-family:var(--display);font-weight:600;font-size:15px;color:var(--ink);margin-top:9px;line-height:1.3">docs: getSession() example, signature changed in a3f9c41</div>
+          <div class="row items-c gap-2" style="margin-top:8px">
+            <span class="avatar"><img src="../img/docstube-icon.svg" style="width:14px;height:14px"></span>
+            <span class="mono" style="font-size:11px;color:var(--muted)"><b style="color:var(--ink-soft)">docstube[bot]</b> wants to merge 2 commits into <b style="color:var(--ink-soft)">main</b></span>
+          </div>
+        </div>
+
+        <div style="padding:16px">
+          <div class="diffbox">
+            <div class="fn">guides/authentication.mdx</div>
+            <div class="dl del">- getSession()</div>
+            <div class="dl add">+ getSession(opts)</div>
+          </div>
+
+          <div class="mergebox">
+            <div class="mh">
+              <span class="ic pass" style="width:19px;height:19px"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span style="font-weight:600;color:#0f7a52;font-size:12.5px">All checks have passed</span>
+            </div>
+            <div class="col gap-3" style="padding:11px 13px">
+              <div class="chk"><span class="ic pass" style="width:16px;height:16px"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> code samples type-check</div>
+              <div class="chk"><span class="ic pass" style="width:16px;height:16px"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> links resolve</div>
+              <div class="chk"><span class="ic pass" style="width:16px;height:16px"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> examples match code</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:11px 16px;border-top:1px solid var(--line);background:var(--canvas);font-family:var(--mono);font-size:11px;color:var(--muted)">2 pages regenerated · 47 skipped · ~11k tokens vs ~294k full rebuild</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="fl">docs<b>tube</b></span>
+    <span class="fc">Verified, not guessed</span>
+    <span class="fr">08 / 16</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
+<style>
+  .crow { display:flex; gap:24px; align-items:baseline; padding:17px 0; }
+  .crow + .crow { border-top:1px solid var(--line); }
+  .cyear { font-family:var(--mono); font-size:17px; font-weight:700; color:var(--muted); width:54px; flex:none; }
+  .ctext { font-size:14.5px; color:var(--ink-soft); line-height:1.5; }
+  .crow.now { margin:0 -18px; padding:18px; background:linear-gradient(90deg,var(--brand-50),#f4fbfa); border-radius:11px; border-top:none; }
+  .crow.now .cyear { color:var(--brand-600); }
+  .crow.now .ctext { color:var(--ink); }
+  .statchip { flex:1; border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:var(--paper); box-shadow:var(--shadow-soft); }
+  .sc-stat { font-size:13.5px; color:var(--ink-soft); line-height:1.35; }
+  .sc-stat b { font-family:var(--display); font-size:21px; color:var(--brand-600); margin-right:5px; letter-spacing:-.01em; }
+  .sc-src { font-family:var(--mono); font-size:10.5px; color:var(--faint); margin-top:7px; }
+</style>
+</head>
+<body>
+<div class="slide bg-grid">
+  <div class="hz">
+    <h1 class="head">This became buildable <span class="accent">a year ago.</span></h1>
+  </div>
+
+  <div class="body center">
+    <!-- changelog: the capability, year by year -->
+    <div class="card" style="padding:6px 24px">
+      <div class="crow">
+        <div class="cyear">2024</div>
+        <div class="ctext">AI could write fluent text about code it barely understood. That's where confident, wrong docs come from.</div>
+      </div>
+      <div class="crow">
+        <div class="cyear">2025</div>
+        <div class="ctext">Agents learned to read an entire codebase and write about it coherently. Generating docs from code stopped being a demo.</div>
+      </div>
+      <div class="crow now">
+        <div class="cyear">2026</div>
+        <div class="ctext"><b style="color:var(--ink)">Docs found a second reader: AI agents.</b> A person skims a wrong page and gets annoyed. An agent follows it and breaks things.</div>
+      </div>
+    </div>
+
+    <!-- stat chips -->
+    <div class="row gap-4" style="margin-top:22px">
+      <div class="statchip">
+        <div class="sc-stat"><b>45.3%</b> of docs traffic is now AI agents, not people.</div>
+        <div class="sc-src">Mintlify · State of agent traffic, Mar 2026</div>
+      </div>
+      <div class="statchip">
+        <div class="sc-stat"><b>96%</b> of developers don't fully trust AI-written code.</div>
+        <div class="sc-src">Sonar · State of Code survey, 2026</div>
+      </div>
+    </div>
+
+    <!-- origin -->
+    <p style="font-size:14px;color:var(--muted);margin-top:20px;line-height:1.5">We learned this the hard way. Five weeks documenting Stacktape, and a pipeline built to survive it. <span style="color:var(--ink);font-weight:600">That pipeline is where docstube comes from.</span></p>
+  </div>
+
+  <div class="foot">
+    <span class="fl">docs<b>tube</b></span>
+    <span class="fc">Verified, not guessed</span>
+    <span class="fr">04 / 16</span>
+  </div>
+</div>
+</body>
+</html>

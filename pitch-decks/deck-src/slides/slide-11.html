@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
+<style>
+  .obj { flex:1; display:flex; flex-direction:column; }
+  .worry { display:flex; gap:10px; align-items:flex-start; }
+  .qm { width:26px;height:26px;flex:none;border-radius:8px;background:var(--canvas);border:1px solid var(--line-strong);color:var(--muted);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:15px }
+  .worry p { font-style:italic; font-size:14px; color:var(--muted); line-height:1.45; }
+  .flipbar { display:flex; align-items:center; gap:9px; margin:16px 0 12px; }
+  .flipbar .ar { color:var(--brand-500); flex:none; }
+  .flipbar .lb { font-family:var(--display); font-weight:700; font-size:17px; color:var(--brand-600); }
+  .obj .sup { font-size:13.5px; color:var(--ink-soft); line-height:1.55; }
+  .obj .sup .em { color:var(--ink); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="slide bg-grid">
+  <div class="hz">
+    <h1 class="head">Common <span class="accent">objections.</span></h1>
+  </div>
+
+  <div class="body">
+    <div class="grow" style="display:flex;align-items:center">
+      <div class="row gap-5" style="align-items:stretch;width:100%">
+
+        <div class="card obj" style="padding:24px 24px">
+          <div class="worry"><span class="qm">?</span><p>"Won't models get so good they won't need verification?"</p></div>
+          <div class="flipbar"><svg class="ar" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="lb">The opposite.</span></div>
+          <p class="sup">Better models write more code and more docs, so there are <span class="em">more unverified claims, not fewer</span>. And a wrong API signature is wrong no matter how good the model is. Better models make verification matter more.</p>
+        </div>
+
+        <div class="card obj" style="padding:24px 24px">
+          <div class="worry"><span class="qm">?</span><p>"Won't an incumbent like Mintlify just add verification?"</p></div>
+          <div class="flipbar"><svg class="ar" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="lb">They can't change what they are.</span></div>
+          <p class="sup">Their products are built for the era where humans write the docs. AI is bolted on. Going AI-native means <span class="em">cannibalizing the paid, hosted business they sell</span>. They can add a feature.</p>
+        </div>
+
+        <div class="card obj" style="padding:24px 24px">
+          <div class="worry"><span class="qm">?</span><p>"Doesn't bring-your-own-compute depend on the AI vendors' terms?"</p></div>
+          <div class="flipbar"><svg class="ar" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span class="lb">The risk works in our favor.</span></div>
+          <p class="sup">Worst case, the first generation costs a bit more. But <span class="em">saving tokens is already one of our advantages</span>, so anything that makes tokens pricier makes that advantage bigger.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="row items-c center-x gap-3" style="margin-top:18px;background:linear-gradient(90deg,#f1fbf8,#ecfbf9);border:1px solid var(--brand-200);border-radius:13px;padding:15px 22px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-600)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5M21 7h-5"/></svg>
+      <span style="font-size:15px;color:var(--ink)">As AI spreads, <span class="sb">verification gets more valuable, not less.</span></span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="fl">docs<b>tube</b></span>
+    <span class="fc">Verified, not guessed</span>
+    <span class="fr">14 / 16</span>
+  </div>
+</div>
+</body>
+</html>

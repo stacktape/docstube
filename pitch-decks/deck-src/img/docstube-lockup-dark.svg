@@ -1,0 +1,21 @@
+<svg viewBox="0 0 206 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;max-width:320px;">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&amp;display=swap');</style>
+    <radialGradient id="bring" cx="38%" cy="34%" r="72%"><stop offset="0%" stop-color="#7ED0BE"/><stop offset="55%" stop-color="#36A6A4"/><stop offset="100%" stop-color="#0A7B85"/></radialGradient>
+    <linearGradient id="bpg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C2CFD1"/><stop offset="32%" stop-color="#ffffff"/><stop offset="100%" stop-color="#ffffff"/></linearGradient>
+    <filter id="bsf" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="2.4"/></filter>
+  </defs>
+  <g transform="translate(-7.17,-1.71)">
+    <clipPath id="brc"><path d="M 41 8 A 25 25 0 1 1 40.9 8 Z M 41 18.5 A 14.5 14.5 0 1 0 41 47.5 A 14.5 14.5 0 1 0 41 18.5 Z" clip-rule="evenodd"/></clipPath>
+    <circle cx="41" cy="33" r="25" fill="url(#bring)"/>
+    <g clip-path="url(#brc)">
+      <circle cx="33" cy="25" r="22" fill="#CDEDE6" opacity="0.4" filter="url(#bsf)"/>
+      <circle cx="50" cy="44" r="22" fill="#0A4A4F" opacity="0.36" filter="url(#bsf)"/>
+    </g>
+    <circle cx="41" cy="33" r="25" fill="none" stroke="#004B52" stroke-width="1.6"/>
+    <circle cx="41" cy="33" r="14.5" fill="#151616" stroke="#004B52" stroke-width="1.6"/>
+    <clipPath id="bhc"><circle cx="41" cy="33" r="14.5"/></clipPath>
+    <g clip-path="url(#bhc)"><circle cx="41" cy="33" r="14.5" fill="none" stroke="#000" stroke-width="3" opacity="0.45" filter="url(#bsf)"/></g><path d="M 32.35 28.00 L 43.65 28.00 L 51.05 33.83 L 57.20 59.50 L 24.80 59.50 Z" fill="url(#bpg)" stroke="#004B52" stroke-width="1.6" stroke-linejoin="round"/><path d="M 43.65 28.00 L 43.65 33.83 L 51.05 33.83 Z" fill="#CBD8DA" stroke="#004B52" stroke-width="1.4" stroke-linejoin="round"/><line x1="34.28" y1="40.25" x2="47.72" y2="40.25" stroke="#334155" stroke-width="2.2" stroke-linecap="round"/><line x1="33.39" y1="46.67" x2="48.61" y2="46.67" stroke="#334155" stroke-width="2.2" stroke-linecap="round"/><line x1="32.50" y1="53.08" x2="49.50" y2="53.08" stroke="#334155" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+  <text x="65" y="43.5" font-family="Outfit, sans-serif" font-weight="700" font-size="33" letter-spacing="-0.7" fill="#CBD5E1">docs<tspan fill="#5EEAD4">tube</tspan></text>
+</svg>
