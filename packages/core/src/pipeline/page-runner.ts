@@ -13,7 +13,7 @@ import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
 import { attachExtractedClaims } from './claims-stage.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
-import type { KnowledgeEntry } from './tribal-knowledge.ts';
+import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
 import type { RunCostTracker } from './run-cost.ts';
 
 // The per-page generation loop: write ⇄ (review ∥ verify) → gate, bounded retries, flag instead
@@ -50,7 +50,7 @@ export type PageRunContext = {
   instructions: string[];
   // Answered tribal knowledge, injected into every writer prompt; keys drive ask-once dedup.
   knowledge: KnowledgeEntry[];
-  openQuestionKeys: ReadonlySet<string>;
+  openQuestions: OpenQuestions;
   // Accumulates every task's reported cost; callers check shouldFreeze() between pages.
   costTracker: RunCostTracker;
   commit: string;
@@ -221,7 +221,7 @@ export const generatePage = async (
     questions: questionCollector.questions(),
     codemap: ctx.codemap,
     knowledgeKeys: new Set(ctx.knowledge.map((entry) => entry.key)),
-    openQuestionKeys: ctx.openQuestionKeys,
+    openQuestions: ctx.openQuestions,
     shard: { locale: ctx.locale, version: ctx.version },
     pageId: lastArtifact.page.id,
     runId: ctx.journal.runId

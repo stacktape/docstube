@@ -14,7 +14,7 @@ import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
 import { loadContextFiles } from './context-files.ts';
-import { applyFlagAnswers, collectOpenQuestionKeys, loadKnowledge } from './tribal-knowledge.ts';
+import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageOutcome, PageRunContext, TaskRunner } from './page-runner.ts';
 import { translateArtifact } from './translate-page.ts';
@@ -102,7 +102,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
   const allLocales = [locale, ...config.locales.targets];
   await applyFlagAnswers({ repoRoot, store, locales: allLocales, pageIds: previousPageIds });
   const knowledge = await loadKnowledge(repoRoot);
-  const openQuestionKeys = await collectOpenQuestionKeys({ store, locales: allLocales, pageIds: previousPageIds });
+  const openQuestions = await collectOpenQuestions({ store, locales: allLocales, pageIds: previousPageIds });
 
   const maxRunUsd = config.agents.budgets.maxRunUsd;
   const costTracker = createRunCostTracker(maxRunUsd);
@@ -122,7 +122,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     criteria: contextFiles.criteria,
     instructions: contextFiles.instructions,
     knowledge,
-    openQuestionKeys,
+    openQuestions,
     costTracker,
     commit,
     locale,

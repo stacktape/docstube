@@ -53,7 +53,7 @@ export { loadContextFiles } from './pipeline/context-files.ts';
 export type { ContextFiles } from './pipeline/context-files.ts';
 export {
   applyFlagAnswers,
-  collectOpenQuestionKeys,
+  collectOpenQuestions,
   flagQuestionDescriptor,
   loadKnowledge,
   questionKey,

@@ -10,7 +10,7 @@ import { loadConfiguredPlugins, registerBuiltinPlugins } from '../plugins/load-p
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { loadContextFiles } from './context-files.ts';
-import { applyFlagAnswers, collectOpenQuestionKeys, loadKnowledge } from './tribal-knowledge.ts';
+import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
 import { resolveCommit } from './generate.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
@@ -116,7 +116,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   const locales = [locale, ...config.locales.targets];
   await applyFlagAnswers({ repoRoot, store, locales, pageIds });
   const knowledge = await loadKnowledge(repoRoot);
-  const openQuestionKeys = await collectOpenQuestionKeys({ store, locales, pageIds });
+  const openQuestions = await collectOpenQuestions({ store, locales, pageIds });
 
   // Rank every indexed page from committed state.
   const ranked: RankedPage[] = [];
@@ -172,7 +172,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     criteria: contextFiles.criteria,
     instructions: contextFiles.instructions,
     knowledge,
-    openQuestionKeys,
+    openQuestions,
     costTracker,
     commit,
     locale,

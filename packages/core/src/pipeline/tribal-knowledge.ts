@@ -17,6 +17,36 @@ const knowledgeDir = (repoRoot: string): string => join(repoRoot, '.docstube', '
 export const questionKey = (question: string): string =>
   sha256Hex(question.trim().toLowerCase().replace(/\s+/gu, ' ')).slice(0, 16);
 
+// Retry attempts reword the same question ("no main/exports — what's the import path?" came back
+// three ways in one live run), so exact-hash dedup alone triples the maintainer's queue.
+// Containment (shared content words / smaller question) is robust to one phrasing being much
+// longer than the other; measured on the live trio it scores 0.56-0.75 vs 0.0-0.13 for genuinely
+// different questions. A false merge only costs the writer one extra ask next run.
+const QUESTION_STOPWORDS = new Set(
+  'the a an is are was were be been it its this that there no not or and of in on for to with what which who how why should would could can has have had do does did e.g i.e from at by as if but so into than then using used use'.split(
+    ' '
+  )
+);
+
+export const questionTokens = (question: string): Set<string> =>
+  new Set((question.toLowerCase().match(/[a-z0-9_./-]+/gu) ?? []).filter((token) => !QUESTION_STOPWORDS.has(token)));
+
+export const questionsSimilar = (a: string, b: string): boolean => {
+  const tokensA = questionTokens(a);
+  const tokensB = questionTokens(b);
+  const smaller = Math.min(tokensA.size, tokensB.size);
+  if (smaller === 0) {
+    return false;
+  }
+  let intersection = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) {
+      intersection += 1;
+    }
+  }
+  return intersection / smaller >= 0.5;
+};
+
 export type KnowledgeEntry = {
   key: string;
   question: string;
@@ -121,23 +151,29 @@ export const applyFlagAnswers = async (input: {
   return applied;
 };
 
-export const collectOpenQuestionKeys = async (input: {
+export type OpenQuestions = { keys: Set<string>; texts: string[] };
+
+export const collectOpenQuestions = async (input: {
   store: ManifestStore;
   locales: string[];
   pageIds: string[];
-}): Promise<Set<string>> => {
+}): Promise<OpenQuestions> => {
   const keys = new Set<string>();
+  const texts: string[] = [];
   for (const locale of input.locales) {
     for (const pageId of input.pageIds) {
       const shard = await input.store.readPageShard({ locale, pageId });
       for (const flag of shard?.flags ?? []) {
         if (flag.kind === 'tribal-knowledge' && flag.status === 'open' && flag.question) {
+          if (!keys.has(questionKey(flag.question))) {
+            texts.push(flag.question);
+          }
           keys.add(questionKey(flag.question));
         }
       }
     }
   }
-  return keys;
+  return { keys, texts };
 };
 
 export type CapturedQuestion = {
@@ -206,24 +242,31 @@ export const resolveSubjectSymbol = (codemap: Codemap, subject: string | undefin
 };
 
 // Merge captured questions into a page shard's flags, ask-once: skip anything already answered
-// (knowledge) or already open anywhere (openQuestionKeys covers every shard, not just this page).
+// (knowledge) or already open anywhere (openQuestions covers every shard, not just this page),
+// exactly or as a paraphrase.
 export const questionsToFlags = (input: {
   questions: CapturedQuestion[];
   codemap: Codemap;
   knowledgeKeys: ReadonlySet<string>;
-  openQuestionKeys: ReadonlySet<string>;
+  openQuestions: OpenQuestions;
   shard: Pick<PageShard, 'locale' | 'version'>;
   pageId: string;
   runId: string;
 }): Flag[] => {
   const flags: Flag[] = [];
   const seenThisPage = new Set<string>();
+  const seenTexts = [...input.openQuestions.texts];
   for (const question of input.questions) {
     const key = questionKey(question.question);
-    if (input.knowledgeKeys.has(key) || input.openQuestionKeys.has(key) || seenThisPage.has(key)) {
+    if (input.knowledgeKeys.has(key) || input.openQuestions.keys.has(key) || seenThisPage.has(key)) {
+      continue;
+    }
+    // Paraphrase dedup: retry attempts reword the same fact gap; keep only the first phrasing.
+    if (seenTexts.some((text) => questionsSimilar(text, question.question))) {
       continue;
     }
     seenThisPage.add(key);
+    seenTexts.push(question.question);
     const subjectSymbol = resolveSubjectSymbol(input.codemap, question.subject);
     flags.push({
       id: mintId(idPrefixes.flag),

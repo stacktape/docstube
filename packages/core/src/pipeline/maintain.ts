@@ -24,7 +24,7 @@ import { errorFindings, runVerifiers } from './verify-page.ts';
 import { loadContextFiles } from './context-files.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
-import { applyFlagAnswers, collectOpenQuestionKeys, loadKnowledge } from './tribal-knowledge.ts';
+import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
 import { resolveCommit } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
@@ -181,7 +181,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   const refreshLocales = [locale, ...config.locales.targets];
   await applyFlagAnswers({ repoRoot, store, locales: refreshLocales, pageIds: refreshPageIds });
   const knowledge = await loadKnowledge(repoRoot);
-  const openQuestionKeys = await collectOpenQuestionKeys({
+  const openQuestions = await collectOpenQuestions({
     store,
     locales: refreshLocales,
     pageIds: refreshPageIds
@@ -212,7 +212,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     criteria: contextFiles.criteria,
     instructions: contextFiles.instructions,
     knowledge,
-    openQuestionKeys,
+    openQuestions,
     costTracker,
     commit,
     locale,

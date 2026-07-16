@@ -90,7 +90,10 @@ export const unwrapMdxResponse = (finalText: string): string => {
   if (trimmed.startsWith('---')) {
     return trimmed;
   }
-  const fence = /```(?:mdx|markdown|md)\r?\n([\s\S]*?)\r?\n```/u.exec(trimmed);
+  // Greedy body match: pages contain their own inner ```ts fences, so the wrapper closes at the
+  // LAST ``` — a lazy match truncates the page at its first code example (live-hit, caught by the
+  // brief-conformance reviewer).
+  const fence = /```(?:mdx|markdown|md)\r?\n([\s\S]*)\r?\n```/u.exec(trimmed);
   const body = fence?.[1]?.trim();
   if (body !== undefined && body.startsWith('---')) {
     return body;

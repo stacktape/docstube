@@ -330,6 +330,14 @@ describe('unwrapMdxResponse', () => {
     expect(unwrapMdxResponse(wrapped)).toBe(page);
   });
 
+  it('keeps the whole page when it contains inner code fences (live truncation regression)', () => {
+    // A lazy match closes the wrapper at the page's FIRST inner fence, chopping everything after
+    // the intro sentence — this exact shape shipped truncated and the reviewer caught it.
+    const pageWithCode = `---\ntitle: "X"\n---\n\n# X\n\nIntro:\n\n\`\`\`ts\nconst x = greet({ name: 'a' });\n\`\`\`\n\nAfter the example.`;
+    const wrapped = `Here is the page.\n\n\`\`\`mdx\n${pageWithCode}\n\`\`\``;
+    expect(unwrapMdxResponse(wrapped)).toBe(pageWithCode);
+  });
+
   it('leaves a page that already starts with frontmatter untouched, even with inner fences', () => {
     const withExample = `${page}\n\n\`\`\`mdx\n---\ntitle: "Example"\n---\n\`\`\`\n`;
     expect(unwrapMdxResponse(withExample)).toBe(withExample.trim());

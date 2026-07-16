@@ -6,7 +6,7 @@ import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { runGenerate } from './generate.ts';
 import type { TaskToolImplementation } from './page-runner.ts';
-import { questionKey } from './tribal-knowledge.ts';
+import { questionKey, questionsSimilar } from './tribal-knowledge.ts';
 
 // The full tribal-knowledge lifecycle (PRODUCT §4.1): the writer asks through the harness tool
 // (non-blocking), the question becomes exactly one open flag (ask-once), a human answer becomes
@@ -93,6 +93,28 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
+});
+
+describe('questionsSimilar', () => {
+  // The three phrasings a live claude run produced for ONE fact gap (missing package entry
+  // point) — retry attempts reword the question, and exact-hash dedup tripled the queue.
+  const q1 =
+    'There\'s no "main"/"exports" field in package.json and no index.ts — what is the intended public import path for consumers (e.g. `greeter-smoke`, `greeter-smoke/src/greeter`, or a relative path)?';
+  const q2 =
+    'package.json for greeter-smoke defines no "main", "exports", or "types" field and there is no index file re-exporting src/greeter.ts. What is the intended public entry point / import path for consumers who install this package?';
+  const q3 =
+    'The package.json has no "main", "module", or "exports" field, and greeter-smoke is not published to the npm registry. What is the intended import path/package name for consumers using this library?';
+
+  it('collapses live paraphrases of the same fact gap', () => {
+    expect(questionsSimilar(q1, q2)).toBe(true);
+    expect(questionsSimilar(q1, q3)).toBe(true);
+  });
+
+  it('keeps genuinely different questions distinct', () => {
+    const other = 'Why was the loud option deprecated in favor of the volume enum in the greeting renderer?';
+    expect(questionsSimilar(q1, other)).toBe(false);
+    expect(questionsSimilar(q2, other)).toBe(false);
+  });
 });
 
 describe('tribal-knowledge lifecycle', () => {
