@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Dashboard } from './dashboard.tsx';
 import { FlagQueue } from './flag-queue.tsx';
+import { Review } from './review.tsx';
 import { TrpcProvider, createControlPlaneClient, readSessionFromUrl } from './trpc-client.ts';
+import { Wizard } from './wizard.tsx';
 
-// The local control plane shell (PRODUCT §3.9). This wave ships the generation dashboard and the
-// flag queue; the setup wizard and review UI are later waves and stay visibly disabled — never
-// faked.
+// The local control plane shell (PRODUCT §3.9): all four surfaces — setup wizard, generation
+// dashboard, review UI, and the flag queue.
 
 type TabId = 'dashboard' | 'flags' | 'wizard' | 'review';
 
-const tabs: Array<{ id: TabId; label: string; disabled?: boolean }> = [
+const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'flags', label: 'Flag queue' },
-  { id: 'wizard', label: 'Wizard', disabled: true },
-  { id: 'review', label: 'Review', disabled: true }
+  { id: 'wizard', label: 'Wizard' },
+  { id: 'review', label: 'Review' }
 ];
 
 export function App() {
@@ -30,19 +31,15 @@ export function App() {
             <button
               key={tab.id}
               type="button"
-              disabled={tab.disabled}
               aria-current={activeTab === tab.id ? 'page' : undefined}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-3 text-sm ${
+              className={`border-b-2 px-3 py-3 text-sm ${
                 activeTab === tab.id
                   ? 'border-neutral-100 text-neutral-100'
                   : 'border-transparent text-neutral-400 hover:text-neutral-200'
-              } disabled:cursor-not-allowed disabled:text-neutral-600 disabled:hover:text-neutral-600`}
+              }`}
             >
               {tab.label}
-              {tab.disabled && (
-                <span className="rounded bg-neutral-900 px-1.5 py-0.5 text-[10px] text-neutral-500">next wave</span>
-              )}
             </button>
           ))}
         </nav>
@@ -62,6 +59,8 @@ export function App() {
           <TrpcProvider value={client}>
             {activeTab === 'dashboard' && <Dashboard />}
             {activeTab === 'flags' && <FlagQueue />}
+            {activeTab === 'wizard' && <Wizard onComplete={() => setActiveTab('dashboard')} />}
+            {activeTab === 'review' && <Review />}
           </TrpcProvider>
         )}
       </main>

@@ -29,7 +29,7 @@ describe('buildCodexCliArgs', () => {
     });
     expect(args).toEqual([
       'exec',
-      'Write the retry page.',
+      '-',
       '--json',
       '--skip-git-repo-check',
       '--ignore-user-config',
@@ -208,7 +208,9 @@ describe('createCodexCliTransport runSession', () => {
     const request = requests[0];
     expect(request?.command).toBe('codex');
     expect(request?.args[0]).toBe('exec');
-    expect(request?.args[1]).toContain('=== TASK PROMPT ===');
+    // The prompt travels via stdin ('-' argv), never argv — long prompts crash codex on Windows.
+    expect(request?.args[1]).toBe('-');
+    expect(request?.input).toContain('=== TASK PROMPT ===');
     // cwd is a throwaway scratch dir, never the repo: stray apply_patch output is discarded.
     expect(request?.cwd).toContain(tmpdir());
     expect(request?.cwd).not.toBe('C:\\repo');

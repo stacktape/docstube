@@ -1,7 +1,7 @@
 import { computeTaskCacheKey, transcriptSchema } from '@docstube/contracts';
 import type { AgentTaskSpec, TaskResult, Transcript } from '@docstube/contracts';
 import type { TranscriptCache } from './cache.ts';
-import { BudgetExceededError, ToolPolicyError } from './errors.ts';
+import { BudgetExceededError, ToolPolicyError, TransportError } from './errors.ts';
 import { checkJsonSchema } from './json-schema-check.ts';
 import { estimateCostUsd } from './model-pricing.ts';
 import { createObservedReadsCollector, createStandardTools } from './tools.ts';
@@ -28,6 +28,8 @@ export type RunAgentTaskOptions = {
   contextHashes?: Record<string, string>;
   // Task-specific tools beyond the standard read-only surface; matched to spec.tools by name.
   extraTools?: ToolImplementation[];
+  // Backoff schedule for retryable transport errors (rate limits wait 3x); tests inject [1, 1].
+  retryDelaysMs?: number[];
 };
 
 type TaskStopReason = Transcript['stopReason'];
@@ -272,10 +274,28 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
   const observedReads = createObservedReadsCollector();
   const tools = resolveToolImplementations(spec, options, observedReads);
 
-  const state =
-    options.transport.mode === 'loop'
-      ? await runLoopSession(spec, options.transport, options.model, tools)
-      : await runVendorSession(spec, options.transport, options.model, tools, observedReads, options.repoRoot);
+  // Live-calibrated: subscriptions rate-limit mid-run; a retryable transport error (timeout,
+  // 429/529) gets a bounded backoff instead of killing the whole run. Non-retryable errors and
+  // exhausted retries still throw — the orchestrator surfaces them honestly.
+  const loopTransport = options.transport.mode === 'loop' ? options.transport : undefined;
+  const sessionTransport = options.transport.mode === 'session' ? options.transport : undefined;
+  const runOnce = () =>
+    loopTransport !== undefined
+      ? runLoopSession(spec, loopTransport, options.model, tools)
+      : runVendorSession(spec, sessionTransport!, options.model, tools, observedReads, options.repoRoot);
+  const delays = options.retryDelaysMs ?? [20_000, 60_000];
+  let state: Awaited<ReturnType<typeof runOnce>> | undefined;
+  for (let attempt = 0; state === undefined; attempt += 1) {
+    try {
+      state = await runOnce();
+    } catch (error) {
+      if (!(error instanceof TransportError) || !error.retryable || attempt >= delays.length) {
+        throw error;
+      }
+      const waitMs = error.rateLimited ? delays[attempt]! * 3 : delays[attempt]!;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+  }
 
   // Cost seam: transports stay pure — they surface a vendor-authoritative cost when one exists
   // (claude CLI's total_cost_usd) and nothing else. The harness is the single point every

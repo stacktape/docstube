@@ -1,0 +1,25 @@
+# docstube documenting docstube — the dogfood config (PRODUCT: credibility play).
+schemaVersion: 1
+docType: external-product
+projectContext: >-
+  docstube is an open-source CLI, localhost web UI, and GitHub Action that reads a codebase and
+  generates verified, persona-targeted, always-current documentation using the user's own coding
+  agents or API keys. Every claim is proven by deterministic checks or visibly flagged.
+personas:
+  - id: oss-maintainer
+    description: Maintains an open-source or internal repo and wants trustworthy docs generated and kept current without babysitting them.
+  - id: plugin-author
+    description: Extends docstube with custom verifiers, language packs, or deploy targets through @docstube/plugin-sdk.
+agents:
+  transport: codex-cli
+  model: gpt-5.5
+site:
+  title: docstube
+  description: Verified docs, generated from your code.
+  layout: single-tree
+components:
+  - Callout
+  - CodeBlock
+  - Steps
+  - Card
+  - CardGrid

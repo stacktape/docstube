@@ -36,3 +36,11 @@ gated retry). The emitted site gains multi-locale routing with hreflang + locale
 version dropdown for frozen labels, Pagefind search, a self-contained docs MCP server
 (read_wiki_structure / read_wiki_contents / ask_question), and visible provenance: a Sources
 footer (linkified via the git remote) plus per-section guarantee chips.
+
+Wave 5: `docstube answer` closes the tribal-knowledge loop from the terminal; Python ships as the
+second language pack (AST-based, API-shape hashing); runs freeze with margin at
+`agents.budgets.maxRunUsd` and report spend; the local control plane gains the full write surface
+(answer/dismiss flags, categorized feedback intake, comment-preserving config/IA editing,
+first-run scaffolding, AI IA proposals, theme-token extraction, run launching); refine gets
+`--max-pages`/`--max-rounds-per-page`/`--total-rounds`. The codex transport is live-verified
+end-to-end on a ChatGPT subscription.

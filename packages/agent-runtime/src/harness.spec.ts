@@ -6,6 +6,7 @@ import { agentTaskSpecSchema, contentHash, idPrefixes, mintId } from '@docstube/
 import type { AgentTaskSpec } from '@docstube/contracts';
 import { ToolPolicyError } from './errors.ts';
 import { runAgentTask } from './harness.ts';
+import type { Transport } from './transport.ts';
 import { standardToolDescriptors } from './tools.ts';
 import type { AssistantTurn, CompleteInput, LoopTransport, SessionTransport } from './transport.ts';
 import { createCodexCliTransport } from './transports/codex-cli.ts';
@@ -268,5 +269,55 @@ describe('cli session transports', () => {
       expect(transport.mode).toBe('session');
       expect(transport.capabilities).toEqual({ toolInjection: 'mcp', structuredOutput: false });
     }
+  });
+});
+
+describe('transport retry with backoff', () => {
+  it('retries a retryable transport error and succeeds, but rethrows non-retryable ones', async () => {
+    const { TransportError } = await import('./errors.ts');
+    let calls = 0;
+    const flaky: Transport = {
+      mode: 'loop',
+      id: 'flaky',
+      capabilities: { toolInjection: 'native', structuredOutput: false },
+      complete: async () => {
+        calls += 1;
+        if (calls === 1) {
+          throw new TransportError({ transport: 'flaky', message: 'rate limited', retryable: true, rateLimited: true });
+        }
+        return {
+          blocks: [{ type: 'text', text: 'done' }],
+          usage: { inputTokens: 1, outputTokens: 1 },
+          stopReason: 'end'
+        };
+      }
+    };
+    const spec = agentTaskSpecSchema.parse({
+      id: mintId(idPrefixes.task),
+      kind: 'write-page',
+      systemPrompt: 'x',
+      userPrompt: 'y',
+      tools: [],
+      workspace: { readRoots: ['.'], writableRoots: [] },
+      budget: { maxTurns: 2, maxToolCalls: 2 },
+      output: { type: 'text' }
+    });
+    const transcript = await runAgentTask(spec, { transport: flaky, model: 'm', repoRoot: '.', retryDelaysMs: [1, 1] });
+    expect(calls).toBe(2);
+    expect(transcript.stopReason).toBe('complete');
+
+    const fatal: Transport = {
+      ...flaky,
+      id: 'fatal',
+      complete: async () => {
+        throw new TransportError({ transport: 'fatal', message: 'bad auth', retryable: false });
+      }
+    };
+    await expect(
+      runAgentTask(
+        { ...spec, id: mintId(idPrefixes.task) },
+        { transport: fatal, model: 'm', repoRoot: '.', retryDelaysMs: [1] }
+      )
+    ).rejects.toThrow(/bad auth/u);
   });
 });

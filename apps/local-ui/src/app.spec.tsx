@@ -15,15 +15,13 @@ const renderApp = () =>
   );
 
 describe('control plane shell', () => {
-  it('renders live tabs plus visibly disabled wizard/review tabs', () => {
+  it('renders all four surfaces as live tabs', () => {
     renderApp();
-    expect(screen.getByRole('button', { name: /Dashboard/ })).toBeDefined();
-    expect(screen.getByRole('button', { name: /Flag queue/ })).toBeDefined();
-    const wizard = screen.getByRole('button', { name: /Wizard/ }) as HTMLButtonElement;
-    const review = screen.getByRole('button', { name: /Review/ }) as HTMLButtonElement;
-    expect(wizard.disabled).toBe(true);
-    expect(review.disabled).toBe(true);
-    expect(screen.getAllByText('next wave')).toHaveLength(2);
+    for (const label of ['Dashboard', 'Flag queue', 'Wizard', 'Review']) {
+      const tab = screen.getByRole('button', { name: label }) as HTMLButtonElement;
+      expect(tab.disabled).toBe(false);
+    }
+    expect(screen.queryByText('next wave')).toBeNull();
   });
 
   it('asks for the tokened URL when the session param is missing', () => {

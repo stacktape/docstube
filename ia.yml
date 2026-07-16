@@ -1,0 +1,47 @@
+# Information architecture for docstube's own docs.
+schemaVersion: 1
+tree:
+  - title: Getting started
+    slug: getting-started
+    brief: >-
+      Install docstube (npm package or standalone binary via installs.docstube.dev), run the setup
+      wizard, and generate the first docs site. Show the three-command happy path and what the
+      user sees after the first run (docs-site/, .docstube/manifest/). Audience: first contact.
+    depth: standard
+  - title: How verification works
+    slug: how-verification-works
+    brief: >-
+      The core promise: every entity carries a guarantee level (proven / scored / out-of-domain).
+      Explain the pipeline stages (codemap, write, per-persona review, deterministic verifiers,
+      claim grounding, gate with bounded retries), what each built-in verifier checks, and why
+      flagged-but-visible beats silently wrong. Ground everything in the verifier ids that exist.
+    depth: deep
+  - title: Configuration
+    slug: configuration
+    brief: >-
+      The config family: docstube.yml (intent only), ia.yml (information architecture with page
+      briefs), glossary.yaml. Cover the agents block (transports and models, budgets incl.
+      maxRunUsd cap-freeze), locales and versions, components, plugins list. Note that programmatic
+      edits preserve comments.
+    depth: deep
+  - title: CLI reference
+    slug: cli-reference
+    brief: >-
+      Every command with its purpose and key flags: wizard, generate, refresh, refine (budget
+      flags), audit, answer, check (kinds derive from registered verifier plugins), status, doctor,
+      plugin scaffold, validate, upgrade. One short usage example each.
+    depth: deep
+  - title: Writing plugins
+    slug: writing-plugins
+    brief: >-
+      The @docstube/plugin-sdk surface: definePlugin, the seven hook kinds with a worked verifier
+      example, permissions (network / exec / writableRoots), loading from npm packages or local
+      paths, and the plugin-authoring skill that scaffolds all of it.
+    depth: standard
+  - title: CI and the GitHub Action
+    slug: github-action
+    brief: >-
+      Running docstube in CI: the committed manifest as the lockfile of the docs, refresh on code
+      change, auto-merging PRs gated on the hardcoded flag rules, flag PR comments, and the
+      tribal-knowledge digest issue.
+    depth: standard

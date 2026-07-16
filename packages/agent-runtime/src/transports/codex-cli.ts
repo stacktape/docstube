@@ -61,7 +61,9 @@ export type CodexCliArgsInput = {
 
 export const buildCodexCliArgs = (input: CodexCliArgsInput): string[] => [
   'exec',
-  input.prompt,
+  // '-' = read the prompt from stdin. Live-verified necessity: long prompts (symbol summaries)
+  // passed as a single argv crash codex on Windows (0xC0000005) and risk the 32K arg limit.
+  '-',
   '--json',
   '--skip-git-repo-check',
   '--ignore-user-config',
@@ -239,8 +241,9 @@ export const createCodexCliTransport = (options: CodexCliTransportOptions = {}):
       // apply_patch cannot be disabled: cwd is a throwaway scratch dir so stray patches are discarded.
       const scratchDir = await mkdtemp(join(tmpdir(), 'docstube-codex-'));
       try {
+        const prompt = combineCodexPrompt(input.spec.systemPrompt, input.spec.userPrompt);
         const args = buildCodexCliArgs({
-          prompt: combineCodexPrompt(input.spec.systemPrompt, input.spec.userPrompt),
+          prompt,
           model: input.model,
           mcpServer: {
             command: options.nodeCommand ?? 'node',
@@ -254,7 +257,14 @@ export const createCodexCliTransport = (options: CodexCliTransportOptions = {}):
             }
           }
         });
-        const result = await runner({ command: executable, args, cwd: scratchDir, timeoutMs, env: options.env });
+        const result = await runner({
+          command: executable,
+          args,
+          cwd: scratchDir,
+          timeoutMs,
+          env: options.env,
+          input: prompt
+        });
         if (result.timedOut) {
           throw new TransportError({ transport: 'codex-cli', message: 'codex CLI timed out', retryable: true });
         }

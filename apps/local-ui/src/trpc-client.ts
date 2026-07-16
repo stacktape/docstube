@@ -39,6 +39,15 @@ export const createControlPlaneClient = (session: SessionInfo) =>
 
 export type ControlPlaneClient = ReturnType<typeof createControlPlaneClient>;
 
+// Agent-dependent mutations fail with PRECONDITION_FAILED('agent runner not configured …') when
+// the control plane host injected no task runner. The UI shows that message verbatim plus a hint.
+export const describeMutationError = (error: unknown): { message: string; needsAgent: boolean } => {
+  const message = error instanceof Error ? error.message : String(error);
+  return { message, needsAgent: message.includes('agent runner not configured') };
+};
+
+export const agentRunnerHint = 'Start the UI with `docstube wizard` so the control plane has an agent runner.';
+
 const TrpcContext = createContext<ControlPlaneClient | undefined>(undefined);
 
 export const TrpcProvider = TrpcContext.Provider;
