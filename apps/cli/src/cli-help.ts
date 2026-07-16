@@ -4,40 +4,41 @@ export const commandHelp = [
   'Commands:',
   '  wizard                 Open the local setup wizard and control plane.',
   '  generate               Generate docs from existing config.',
-  '  refresh                Refresh stale pages and vendored theme assets.',
+  '  refresh                Regenerate entities affected by code changes.',
   '  refine                 Improve the lowest-quality generated pages first.',
+  '  audit                  Measure verified defects in any existing docs site.',
   '  validate               Validate the docstube config family.',
-  '  check                  Run deterministic checks.',
-  '  status                 Show config, manifest, and page status.',
+  '  check [kind]           Run deterministic checks (kinds come from registered verifier plugins).',
+  '  status                 Show manifest, guarantee levels, and open flags.',
   '  doctor                 Check local runtime and project setup.',
+  '  plugin                 Scaffold and manage docstube plugins.',
   '  upgrade                Upgrade the docstube tool itself.',
   '  version                Print the docstube version.',
   '  help [command]         Print command help.'
 ].join('\n');
 
-export const commandHelpByCommand = {
+export const commandHelpByCommand: Record<string, string> = {
   wizard: 'Usage: docstube wizard [--fresh]\n\nOpen the local setup wizard and control plane.',
-  generate: 'Usage: docstube generate [--fresh] [--config <path>]\n\nGenerate docs from existing config.',
-  refresh: 'Usage: docstube refresh [--config <path>]\n\nRefresh all stale pages and vendored theme assets.',
+  generate: 'Usage: docstube generate [--max-attempts <n>]\n\nGenerate docs from existing config.',
+  refresh:
+    'Usage: docstube refresh\n\nRegenerate only the entities affected by code changes since the committed manifest.',
   refine:
-    'Usage: docstube refine [page] [--failed] [--max-rounds <n>] [--config <path>]\n\nImprove the lowest-quality generated pages first.',
-  validate: 'Usage: docstube validate [--config <path>]\n\nValidate the docstube config family.',
+    'Usage: docstube refine [page] [--failed] [--max-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
+  audit:
+    'Usage: docstube audit <path-or-url>\n\nExtract claims from an existing docs site and verify them against the codebase.',
+  validate: 'Usage: docstube validate\n\nValidate the docstube config family.',
   check:
-    'Usage: docstube check --all [--config <path>]\n       docstube check <d2|mdx|snippet|config> <file>\n\nRun deterministic checks.',
-  status: 'Usage: docstube status [--config <path>]\n\nShow config, manifest, and page status.',
-  doctor: 'Usage: docstube doctor [--config <path>]\n\nCheck local runtime and project setup.',
+    'Usage: docstube check [kind]\n       docstube check --list\n\nRun deterministic checks over the generated docs. Kinds derive from registered verifier plugins.',
+  status: 'Usage: docstube status\n\nShow manifest, guarantee levels, and open flags.',
+  doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
+  plugin: 'Usage: docstube plugin scaffold <name>\n\nScaffold a docstube plugin (uses the plugin-authoring skill).',
   upgrade: 'Usage: docstube upgrade [--check] [--to <version>]\n\nUpgrade the docstube tool itself.',
   version: 'Usage: docstube version\n\nPrint the docstube version.'
 };
 
-export type HelpTopic = keyof typeof commandHelpByCommand;
-
 export const getCommandHelp = (command?: string): string => {
-  if (!command) {
+  if (command === undefined) {
     return commandHelp;
   }
-
-  return command in commandHelpByCommand
-    ? commandHelpByCommand[command as HelpTopic]
-    : `Unknown help topic: ${command}`;
+  return commandHelpByCommand[command] ?? `Unknown command: ${command}\n\n${commandHelp}`;
 };

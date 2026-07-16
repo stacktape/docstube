@@ -1,42 +1,44 @@
 import { execFile } from 'node:child_process';
-import { appendFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import {
+  buildDigestIssueBody,
+  buildFlagCommentBody,
+  buildJobSummary,
+  buildPullRequestBody,
+  digestIssueTitle,
+  flagCommentMarker,
+  planCommentUpsert,
+  selectCommitPaths
+} from './delta-report.ts';
+import type { IssueComment } from './delta-report.ts';
+import { decideAutoMerge } from './merge-decision.ts';
+import type { AutoMergeDecision } from './merge-decision.ts';
+import { loadVerifiedDelta } from './verified-delta.ts';
+import type { VerifiedDelta, WorkspaceFileReader } from './verified-delta.ts';
 
-export type GitHubActionCommand = {
-  configPath?: string;
-  cwd: string;
-  mode: 'generate' | 'refresh' | 'validate';
-};
+// The action is an orchestrator, not the pipeline: it runs the docstube CLI as a subprocess in
+// the workspace, reads the committed manifest for the verified delta, and handles git + GitHub
+// (branch, atomic commit, PR, auto-merge gate, flag delivery). Honest L4 posture per PRODUCT §3.3.
 
-export type GitHubActionMode = 'refresh' | 'validate';
-
-export type GitHubActionChangedPage = {
-  path: string;
-  reasons: readonly string[];
-};
+export type GitHubActionMode = 'generate' | 'refresh';
 
 export type GitHubActionInputs = {
   baseBranch?: string;
   branchPrefix?: string;
   commitMessage?: string;
-  configPath?: string;
   docstubePackage?: string;
-  dryRun?: boolean;
   githubToken?: string;
   mode?: GitHubActionMode;
   refName?: string;
-  workspaceDir: string;
+  repository?: string;
   workflowName?: string;
-};
-
-export type DocstubeActionCommandInput = {
-  configPath?: string;
   workspaceDir: string;
 };
 
-export type DocstubeActionCommandResult = {
-  changedPages?: readonly GitHubActionChangedPage[];
+export type DocstubeCliRunResult = {
   exitCode: number;
   output?: string;
 };
@@ -58,6 +60,7 @@ export type GitBranchInput = {
 
 export type GitCommitInput = {
   message: string;
+  paths: readonly string[];
   workspaceDir: string;
 };
 
@@ -72,7 +75,7 @@ export type PullRequestInput = {
 export type GitHubActionGitClient = {
   changedFiles: (input: { workspaceDir: string }) => Promise<readonly string[]>;
   checkoutBase: (input: GitCheckoutInput) => Promise<void>;
-  commitAll: (input: GitCommitInput) => Promise<void>;
+  commitPaths: (input: GitCommitInput) => Promise<void>;
   createBranch: (input: GitBranchInput) => Promise<void>;
   pushBranch: (input: GitBranchInput) => Promise<void>;
 };
@@ -81,6 +84,21 @@ export type GitHubActionPullRequestClient = {
   createPullRequest: (input: PullRequestInput) => Promise<GitHubPullRequest>;
   findOpenPullRequest: (input: { baseBranch: string; branchName: string }) => Promise<GitHubPullRequest | undefined>;
   updatePullRequest: (input: PullRequestInput & { pullRequest: GitHubPullRequest }) => Promise<GitHubPullRequest>;
+};
+
+export type GitHubActionIssueClient = {
+  listPullRequestComments: (input: { pullRequestNumber: number }) => Promise<readonly IssueComment[]>;
+  createPullRequestComment: (input: { pullRequestNumber: number; body: string }) => Promise<void>;
+  updateComment: (input: { commentId: number; body: string }) => Promise<void>;
+  findOpenIssueByTitle: (input: { title: string }) => Promise<{ number: number } | undefined>;
+  createIssue: (input: { title: string; body: string }) => Promise<void>;
+  updateIssue: (input: { issueNumber: number; body: string }) => Promise<void>;
+};
+
+export type GitHubActionMergeControl = {
+  // Enables GitHub native auto-merge (squash) on the PR. Throws when the repository does not
+  // allow auto-merge; the orchestrator degrades gracefully (logs, leaves the PR open).
+  enableAutoMerge: (input: { pullRequest: GitHubPullRequest }) => Promise<void>;
 };
 
 export type GitHubActionReporter = {
@@ -93,19 +111,26 @@ export type GitHubActionReporter = {
 
 export type GitHubActionDeps = {
   git: GitHubActionGitClient;
+  issues: GitHubActionIssueClient;
+  mergeControl: GitHubActionMergeControl;
   pullRequest: GitHubActionPullRequestClient;
+  readWorkspaceFile: WorkspaceFileReader;
   reporter: GitHubActionReporter;
-  runDocstubeRefresh: (input: DocstubeActionCommandInput) => Promise<DocstubeActionCommandResult>;
-  runDocstubeValidate: (input: DocstubeActionCommandInput) => Promise<DocstubeActionCommandResult>;
+  runDocstube: (input: { mode: GitHubActionMode; workspaceDir: string }) => Promise<DocstubeCliRunResult>;
 };
 
+export type GitHubActionAutoMergeState = 'enabled' | 'blocked' | 'unavailable' | 'skipped';
+
 export type GitHubActionResult = {
+  autoMerge: GitHubActionAutoMergeState;
   branchName: string;
   changed: boolean;
   changedFiles: readonly string[];
-  changedPages: readonly GitHubActionChangedPage[];
+  committedPaths: readonly string[];
   concurrencyGroup: string;
   exitCode: number;
+  openFlagCount: number;
+  pullRequestNumber?: number;
   pullRequestUrl?: string;
   summary: string;
 };
@@ -116,7 +141,7 @@ type ProcessRunResult = {
   stdout: string;
 };
 
-type GitHubActionProcessRunner = (
+export type GitHubActionProcessRunner = (
   command: string,
   args: readonly string[],
   options: { cwd: string; env?: Record<string, string | undefined> }
@@ -125,11 +150,8 @@ type GitHubActionProcessRunner = (
 export const actionPackageName = '@docstube/action';
 
 const execFileAsync = promisify(execFile);
-const defaultBranchPrefix = 'docstube/refresh';
-const defaultCommitMessage = 'docs: refresh docstube output';
+const defaultBranchPrefix = 'docstube/docs';
 const defaultDocstubePackage = 'docstube@latest';
-
-const compact = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
 const stripRefPrefix = (value: string): string => value.replace(/^refs\/heads\//, '');
 
@@ -154,102 +176,25 @@ const redactSecrets = (value: string, secrets: readonly string[]): string => {
   return redacted;
 };
 
-const pageFromChangedFile = (path: string): GitHubActionChangedPage | undefined => {
-  if (!path.endsWith('.mdx') && !path.endsWith('.md') && !path.endsWith('.astro')) {
-    return undefined;
-  }
-
-  return { path, reasons: ['changed by docstube refresh'] };
+export const createDocstubeActionBranchName = (input: { baseBranch?: string; branchPrefix?: string }): string => {
+  const prefix = slugify(input.branchPrefix ?? defaultBranchPrefix, defaultBranchPrefix).replace(/\/+$/g, '');
+  const base = slugify(input.baseBranch ?? 'main', 'main').replace(/\//g, '-');
+  return `${prefix}/${base}`;
 };
 
-const changedPagesFromFiles = (files: readonly string[]): readonly GitHubActionChangedPage[] =>
-  files.flatMap((file) => pageFromChangedFile(file) ?? []);
-
-const normalizeChangedPages = (
-  commandPages: readonly GitHubActionChangedPage[] | undefined,
-  changedFiles: readonly string[]
-): readonly GitHubActionChangedPage[] =>
-  commandPages && commandPages.length > 0 ? commandPages : changedPagesFromFiles(changedFiles);
-
-const bulletList = (items: readonly string[]): string =>
-  items.length === 0 ? '- None' : items.map((item) => `- ${item}`).join('\n');
-
-const formatChangedPage = (page: GitHubActionChangedPage): string =>
-  `- \`${page.path}\` - ${page.reasons.length > 0 ? page.reasons.join(', ') : 'changed by docstube refresh'}`;
-
-const formatPullRequestBody = (input: {
-  changedFiles: readonly string[];
-  changedPages: readonly GitHubActionChangedPage[];
-  concurrencyGroup: string;
-}): string =>
-  [
-    '## docstube refresh',
-    '',
-    'This PR was created by the docstube GitHub Action. It contains generated documentation changes only.',
-    '',
-    '### Changed pages',
-    input.changedPages.length === 0
-      ? '- No page-level reasons were reported.'
-      : input.changedPages.map(formatChangedPage).join('\n'),
-    '',
-    '### Changed files',
-    bulletList(input.changedFiles.map((file) => `\`${file}\``)),
-    '',
-    '### Concurrency',
-    `Recommended workflow concurrency group: \`${input.concurrencyGroup}\`.`
-  ].join('\n');
-
-const formatSummary = (input: {
-  changedFiles: readonly string[];
-  changedPages: readonly GitHubActionChangedPage[];
-  dryRun: boolean;
-  mode: GitHubActionMode;
-  pullRequestUrl?: string;
-  status: 'failed' | 'no-changes' | 'pull-request' | 'validated' | 'would-open-pr';
-}): string => {
-  const lines = [`## docstube ${input.mode}`, ''];
-
-  if (input.status === 'validated') {
-    lines.push('Validation completed without creating documentation changes.');
-  } else if (input.status === 'failed') {
-    lines.push('docstube did not complete successfully. No branch was pushed and no PR was opened.');
-  } else if (input.status === 'no-changes') {
-    lines.push('docstube completed and did not leave generated documentation changes.');
-  } else if (input.status === 'would-open-pr') {
-    lines.push('docstube completed in dry-run mode. A PR would have been opened for these changes.');
-  } else {
-    lines.push(`docstube opened or updated a PR: ${input.pullRequestUrl ?? 'unknown URL'}`);
-  }
-
-  if (input.dryRun) {
-    lines.push('', 'Dry-run mode was enabled, so no branch was pushed.');
-  }
-
-  lines.push('', '### Changed pages');
-  lines.push(input.changedPages.length === 0 ? '- None' : input.changedPages.map(formatChangedPage).join('\n'));
-  lines.push('', '### Changed files');
-  lines.push(bulletList(input.changedFiles.map((file) => `\`${file}\``)));
-
-  return lines.join('\n');
+export const createDocstubeActionConcurrencyGroup = (input: { refName?: string; workflowName?: string }): string => {
+  const workflow = slugify(input.workflowName ?? 'docstube', 'docstube').replace(/\//g, '-');
+  const ref = slugify(input.refName ?? 'main', 'main').replace(/\//g, '-');
+  return `docstube-${workflow}-${ref}`;
 };
-
-const refreshOutputPagePattern = /^regenerated:\s+(?<path>.+?)\s+\((?<reason>.+)\)$/gmu;
-
-export const parseChangedPagesFromDocstubeOutput = (output: string): readonly GitHubActionChangedPage[] =>
-  [...output.matchAll(refreshOutputPagePattern)].map((match) => ({
-    path: match.groups?.path ?? 'unknown',
-    reasons: (match.groups?.reason ?? 'changed by docstube refresh')
-      .split(',')
-      .map((reason) => reason.trim())
-      .filter(Boolean)
-  }));
 
 const setActionOutputs = async (reporter: GitHubActionReporter, result: GitHubActionResult): Promise<void> => {
   await reporter.setOutput('changed', String(result.changed));
   await reporter.setOutput('branch-name', result.branchName);
   await reporter.setOutput('concurrency-group', result.concurrencyGroup);
-  await reporter.setOutput('changed-files', JSON.stringify(result.changedFiles));
-  await reporter.setOutput('changed-pages', JSON.stringify(result.changedPages));
+  await reporter.setOutput('auto-merge', result.autoMerge);
+  await reporter.setOutput('open-flag-count', String(result.openFlagCount));
+  await reporter.setOutput('committed-paths', JSON.stringify(result.committedPaths));
   if (result.pullRequestUrl) {
     await reporter.setOutput('pull-request-url', result.pullRequestUrl);
   }
@@ -267,141 +212,131 @@ const completeAction = async (
   return sanitized;
 };
 
-export const createDocstubeActionBranchName = (input: { baseBranch?: string; branchPrefix?: string }): string => {
-  const prefix = slugify(input.branchPrefix ?? defaultBranchPrefix, defaultBranchPrefix).replace(/\/+$/g, '');
-  const base = slugify(input.baseBranch ?? 'main', 'main').replace(/\//g, '-');
-  return `${prefix}/${base}`;
+const deliverFlags = async (input: {
+  decision: AutoMergeDecision;
+  deps: GitHubActionDeps;
+  pullRequestNumber: number;
+}): Promise<void> => {
+  // PR comment always (PRODUCT decision log): one marker-tagged comment, find-and-update.
+  const body = buildFlagCommentBody(input.decision.openFlags);
+  const comments = await input.deps.issues.listPullRequestComments({ pullRequestNumber: input.pullRequestNumber });
+  const plan = planCommentUpsert(comments, flagCommentMarker);
+  if (plan.action === 'update') {
+    await input.deps.issues.updateComment({ commentId: plan.commentId, body });
+  } else {
+    await input.deps.issues.createPullRequestComment({ pullRequestNumber: input.pullRequestNumber, body });
+  }
 };
 
-export const createDocstubeActionConcurrencyGroup = (input: { refName?: string; workflowName?: string }): string => {
-  const workflow = slugify(input.workflowName ?? 'docstube', 'docstube').replace(/\//g, '-');
-  const ref = slugify(input.refName ?? 'main', 'main').replace(/\//g, '-');
-  return `docstube-${workflow}-${ref}`;
+const upsertTribalDigestIssue = async (input: {
+  decision: AutoMergeDecision;
+  deps: GitHubActionDeps;
+}): Promise<void> => {
+  const tribalFlags = input.decision.openFlags.filter((flag) => flag.kind === 'tribal-knowledge');
+  const existing = await input.deps.issues.findOpenIssueByTitle({ title: digestIssueTitle });
+  if (!existing && tribalFlags.length === 0) {
+    return;
+  }
+  const body = buildDigestIssueBody(tribalFlags);
+  if (existing) {
+    await input.deps.issues.updateIssue({ issueNumber: existing.number, body });
+  } else {
+    await input.deps.issues.createIssue({ title: digestIssueTitle, body });
+  }
 };
 
 export const runGitHubAction = async (
   inputs: GitHubActionInputs,
   deps: GitHubActionDeps
 ): Promise<GitHubActionResult> => {
-  const mode = inputs.mode ?? 'refresh';
+  const mode: GitHubActionMode = inputs.mode ?? 'refresh';
   const baseBranch = inputs.baseBranch ?? 'main';
-  const branchName = createDocstubeActionBranchName({
-    baseBranch,
-    branchPrefix: inputs.branchPrefix
-  });
+  const branchName = createDocstubeActionBranchName({ baseBranch, branchPrefix: inputs.branchPrefix });
   const concurrencyGroup = createDocstubeActionConcurrencyGroup({
     refName: inputs.refName ?? baseBranch,
     workflowName: inputs.workflowName
   });
-  const dryRun = inputs.dryRun === true;
   const secrets = [inputs.githubToken].filter(
     (secret): secret is string => typeof secret === 'string' && secret.length > 0
   );
 
-  deps.reporter.info(`Starting docstube ${mode}.`);
+  const emptyResult = (overrides: Partial<GitHubActionResult>): GitHubActionResult => ({
+    autoMerge: 'skipped',
+    branchName,
+    changed: false,
+    changedFiles: [],
+    committedPaths: [],
+    concurrencyGroup,
+    exitCode: 0,
+    openFlagCount: 0,
+    summary: '',
+    ...overrides
+  });
 
-  if (mode === 'validate') {
-    const validateResult = await deps.runDocstubeValidate({
-      configPath: inputs.configPath,
-      workspaceDir: inputs.workspaceDir
-    });
-    const result: GitHubActionResult = {
-      branchName,
-      changed: false,
-      changedFiles: [],
-      changedPages: [],
-      concurrencyGroup,
-      exitCode: validateResult.exitCode,
-      summary: formatSummary({
-        changedFiles: [],
-        changedPages: [],
-        dryRun,
-        mode,
-        status: validateResult.exitCode === 0 ? 'validated' : 'failed'
-      })
-    };
-    return completeAction(result, deps.reporter, secrets);
-  }
+  deps.reporter.info(`Starting docstube ${mode}.`);
 
   await deps.git.checkoutBase({ baseBranch, workspaceDir: inputs.workspaceDir });
   await deps.git.createBranch({ branchName, workspaceDir: inputs.workspaceDir });
 
-  const refreshResult = await deps.runDocstubeRefresh({
-    configPath: inputs.configPath,
-    workspaceDir: inputs.workspaceDir
-  });
-
-  if (refreshResult.exitCode !== 0) {
-    const output = refreshResult.output ? `\n\n${compact(refreshResult.output)}` : '';
-    const result: GitHubActionResult = {
-      branchName,
-      changed: false,
-      changedFiles: [],
-      changedPages: [],
-      concurrencyGroup,
-      exitCode: refreshResult.exitCode,
-      summary:
-        formatSummary({
-          changedFiles: [],
-          changedPages: [],
-          dryRun,
+  const cliResult = await deps.runDocstube({ mode, workspaceDir: inputs.workspaceDir });
+  if (cliResult.exitCode !== 0) {
+    return completeAction(
+      emptyResult({
+        exitCode: cliResult.exitCode,
+        summary: buildJobSummary({
+          autoMerge: 'skipped',
+          committedPaths: [],
+          decision: undefined,
+          delta: undefined,
+          failureOutput: cliResult.output,
           mode,
           status: 'failed'
-        }) + output
-    };
-    return completeAction(result, deps.reporter, secrets);
+        })
+      }),
+      deps.reporter,
+      secrets
+    );
   }
 
   const changedFiles = (await deps.git.changedFiles({ workspaceDir: inputs.workspaceDir })).toSorted();
-  const changedPages = normalizeChangedPages(refreshResult.changedPages, changedFiles);
+  const committedPaths = selectCommitPaths(changedFiles);
 
-  if (changedFiles.length === 0) {
-    const result: GitHubActionResult = {
-      branchName,
-      changed: false,
-      changedFiles,
-      changedPages,
-      concurrencyGroup,
-      exitCode: 0,
-      summary: formatSummary({
+  if (committedPaths.length === 0) {
+    return completeAction(
+      emptyResult({
         changedFiles,
-        changedPages,
-        dryRun,
-        mode,
-        status: 'no-changes'
-      })
-    };
-    return completeAction(result, deps.reporter, secrets);
+        summary: buildJobSummary({
+          autoMerge: 'skipped',
+          committedPaths,
+          decision: undefined,
+          delta: undefined,
+          mode,
+          status: 'no-changes'
+        })
+      }),
+      deps.reporter,
+      secrets
+    );
   }
 
-  const title = 'docs: refresh docstube output';
-  const body = formatPullRequestBody({ changedFiles, changedPages, concurrencyGroup });
-
-  if (dryRun) {
-    const result: GitHubActionResult = {
-      branchName,
-      changed: true,
-      changedFiles,
-      changedPages,
-      concurrencyGroup,
-      exitCode: 0,
-      summary: formatSummary({
-        changedFiles,
-        changedPages,
-        dryRun,
-        mode,
-        status: 'would-open-pr'
-      })
-    };
-    return completeAction(result, deps.reporter, secrets);
+  let delta: VerifiedDelta | undefined;
+  try {
+    delta = await loadVerifiedDelta({ changedFiles: committedPaths, readWorkspaceFile: deps.readWorkspaceFile });
+  } catch (error) {
+    deps.reporter.warn(`Could not compute the verified delta: ${(error as Error).message}`);
   }
+  const decision = delta ? decideAutoMerge(delta.openFlags) : undefined;
 
-  await deps.git.commitAll({
-    message: inputs.commitMessage ?? defaultCommitMessage,
+  // Docs + manifest shards + criteria/instructions ship atomically in one commit (ARCHITECTURE §5.3).
+  await deps.git.commitPaths({
+    message: inputs.commitMessage ?? `docs: docstube ${mode}`,
+    paths: committedPaths,
     workspaceDir: inputs.workspaceDir
   });
   await deps.git.pushBranch({ branchName, workspaceDir: inputs.workspaceDir });
 
+  const title = `docs: docstube ${mode}`;
+  const body = buildPullRequestBody({ committedPaths, decision, delta, mode });
   const existing = await deps.pullRequest.findOpenPullRequest({ baseBranch, branchName });
   const pullRequest = existing
     ? await deps.pullRequest.updatePullRequest({
@@ -420,31 +355,59 @@ export const runGitHubAction = async (
         workspaceDir: inputs.workspaceDir
       });
 
-  const result: GitHubActionResult = {
-    branchName,
-    changed: true,
-    changedFiles,
-    changedPages,
-    concurrencyGroup,
-    exitCode: 0,
-    pullRequestUrl: pullRequest.url,
-    summary: formatSummary({
+  let autoMerge: GitHubActionAutoMergeState = 'unavailable';
+  if (decision && pullRequest.number !== undefined) {
+    if (decision.openFlags.length > 0) {
+      await deliverFlags({ decision, deps, pullRequestNumber: pullRequest.number });
+    }
+    await upsertTribalDigestIssue({ decision, deps });
+    if (decision.autoMerge) {
+      try {
+        await deps.mergeControl.enableAutoMerge({ pullRequest });
+        autoMerge = 'enabled';
+      } catch (error) {
+        deps.reporter.warn(
+          `Could not enable auto-merge (is it allowed in the repository settings?): ${(error as Error).message}`
+        );
+        autoMerge = 'unavailable';
+      }
+    } else {
+      autoMerge = 'blocked';
+      deps.reporter.info(
+        `Auto-merge blocked by ${decision.blockingFlags.length} open flag(s); flags were posted on the PR.`
+      );
+    }
+  } else if (!decision) {
+    deps.reporter.warn('No verified delta available; leaving the PR open without auto-merge.');
+  } else {
+    deps.reporter.warn('PR number unknown; cannot post flags or enable auto-merge.');
+  }
+
+  return completeAction(
+    emptyResult({
+      autoMerge,
+      changed: true,
       changedFiles,
-      changedPages,
-      dryRun,
-      mode,
+      committedPaths,
+      openFlagCount: decision?.openFlags.length ?? 0,
+      pullRequestNumber: pullRequest.number,
       pullRequestUrl: pullRequest.url,
-      status: 'pull-request'
-    })
-  };
-  return completeAction(result, deps.reporter, secrets);
+      summary: buildJobSummary({
+        autoMerge,
+        committedPaths,
+        decision,
+        delta,
+        mode,
+        pullRequestUrl: pullRequest.url,
+        status: 'pull-request'
+      })
+    }),
+    deps.reporter,
+    secrets
+  );
 };
 
-const runProcess = async (
-  command: string,
-  args: readonly string[],
-  options: { cwd: string; env?: Record<string, string | undefined> }
-): Promise<ProcessRunResult> => {
+const runProcess: GitHubActionProcessRunner = async (command, args, options) => {
   try {
     const result = await execFileAsync(command, [...args], {
       cwd: options.cwd,
@@ -500,12 +463,12 @@ const createGitClient = (): GitHubActionGitClient => ({
     }
     return parsePorcelainStatus(result.stdout);
   },
-  commitAll: async (input) => {
+  commitPaths: async (input) => {
     await runProcess('git', ['config', 'user.name', 'github-actions[bot]'], { cwd: input.workspaceDir });
     await runProcess('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], {
       cwd: input.workspaceDir
     });
-    const add = await runProcess('git', ['add', '.'], { cwd: input.workspaceDir });
+    const add = await runProcess('git', ['add', '--', ...input.paths], { cwd: input.workspaceDir });
     if (add.exitCode !== 0) {
       throw new Error(add.stderr || 'Failed to stage docstube changes.');
     }
@@ -518,15 +481,18 @@ const createGitClient = (): GitHubActionGitClient => ({
     const result = await runProcess(
       'git',
       ['push', '--force-with-lease', 'origin', `HEAD:refs/heads/${input.branchName}`],
-      {
-        cwd: input.workspaceDir
-      }
+      { cwd: input.workspaceDir }
     );
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || `Failed to push ${input.branchName}.`);
     }
   }
 });
+
+const pullRequestNumberFromUrl = (url: string): number | undefined => {
+  const match = url.match(/\/pull\/(\d+)\s*$/);
+  return match?.[1] ? Number(match[1]) : undefined;
+};
 
 const parsePullRequest = (stdout: string): GitHubPullRequest | undefined => {
   const trimmed = stdout.trim();
@@ -537,26 +503,29 @@ const parsePullRequest = (stdout: string): GitHubPullRequest | undefined => {
   const parsed = JSON.parse(trimmed) as { number?: unknown; url?: unknown };
   return typeof parsed.url === 'string'
     ? {
-        number: typeof parsed.number === 'number' ? parsed.number : undefined,
+        number: typeof parsed.number === 'number' ? parsed.number : pullRequestNumberFromUrl(parsed.url),
         url: parsed.url
       }
     : undefined;
 };
 
-const createPullRequestClient = (token?: string): GitHubActionPullRequestClient => {
-  const ghEnv = token ? { GH_TOKEN: token, GITHUB_TOKEN: token } : undefined;
+const ghEnvFor = (token?: string): Record<string, string> | undefined =>
+  token ? { GH_TOKEN: token, GITHUB_TOKEN: token } : undefined;
+
+const createPullRequestClient = (input: { token?: string | undefined }): GitHubActionPullRequestClient => {
+  const ghEnv = ghEnvFor(input.token);
 
   return {
-    findOpenPullRequest: async (input) => {
+    findOpenPullRequest: async (query) => {
       const result = await runProcess(
         'gh',
         [
           'pr',
           'list',
           '--base',
-          input.baseBranch,
+          query.baseBranch,
           '--head',
-          input.branchName,
+          query.branchName,
           '--state',
           'open',
           '--json',
@@ -571,61 +540,148 @@ const createPullRequestClient = (token?: string): GitHubActionPullRequestClient 
       }
       return parsePullRequest(result.stdout);
     },
-    createPullRequest: async (input) => {
+    createPullRequest: async (create) => {
       const result = await runProcess(
         'gh',
         [
           'pr',
           'create',
           '--base',
-          input.baseBranch,
+          create.baseBranch,
           '--head',
-          input.branchName,
+          create.branchName,
           '--title',
-          input.title,
+          create.title,
           '--body',
-          input.body
+          create.body
         ],
-        { cwd: input.workspaceDir, env: ghEnv }
+        { cwd: create.workspaceDir, env: ghEnv }
       );
       if (result.exitCode !== 0) {
         throw new Error(result.stderr || 'Failed to create docstube PR.');
       }
-      return { url: result.stdout.trim() };
+      const url = result.stdout.trim();
+      return { number: pullRequestNumberFromUrl(url), url };
     },
-    updatePullRequest: async (input) => {
-      const selector = input.pullRequest.number ? String(input.pullRequest.number) : input.pullRequest.url;
-      const result = await runProcess('gh', ['pr', 'edit', selector, '--title', input.title, '--body', input.body], {
-        cwd: input.workspaceDir,
+    updatePullRequest: async (update) => {
+      const selector = update.pullRequest.number ? String(update.pullRequest.number) : update.pullRequest.url;
+      const result = await runProcess('gh', ['pr', 'edit', selector, '--title', update.title, '--body', update.body], {
+        cwd: update.workspaceDir,
         env: ghEnv
       });
       if (result.exitCode !== 0) {
         throw new Error(result.stderr || 'Failed to update existing docstube PR.');
       }
-      return input.pullRequest;
+      return update.pullRequest;
     }
   };
 };
 
-export const createDocstubeCommandArgs = (input: {
-  configPath?: string;
-  docstubePackage: string;
-  mode: GitHubActionMode;
-}): string[] => [
+const createIssueClient = (input: {
+  repository?: string | undefined;
+  token?: string | undefined;
+  workspaceDir: string;
+}): GitHubActionIssueClient => {
+  const ghEnv = ghEnvFor(input.token);
+  const repoArgs = input.repository ? ['-R', input.repository] : [];
+  const apiRepo = input.repository ?? '{owner}/{repo}';
+
+  const runGh = async (args: readonly string[], failureMessage: string): Promise<string> => {
+    const result = await runProcess('gh', args, { cwd: input.workspaceDir, env: ghEnv });
+    if (result.exitCode !== 0) {
+      throw new Error(result.stderr || failureMessage);
+    }
+    return result.stdout;
+  };
+
+  return {
+    listPullRequestComments: async ({ pullRequestNumber }) => {
+      const stdout = await runGh(
+        ['api', `repos/${apiRepo}/issues/${pullRequestNumber}/comments?per_page=100`],
+        'Failed to list PR comments.'
+      );
+      const parsed = JSON.parse(stdout.trim() || '[]') as { id?: unknown; body?: unknown }[];
+      return parsed
+        .filter((comment) => typeof comment.id === 'number' && typeof comment.body === 'string')
+        .map((comment) => ({ body: comment.body as string, id: comment.id as number }));
+    },
+    createPullRequestComment: async ({ pullRequestNumber, body }) => {
+      await runGh(
+        ['api', '-X', 'POST', `repos/${apiRepo}/issues/${pullRequestNumber}/comments`, '-f', `body=${body}`],
+        'Failed to create the docstube flag comment.'
+      );
+    },
+    updateComment: async ({ commentId, body }) => {
+      await runGh(
+        ['api', '-X', 'PATCH', `repos/${apiRepo}/issues/comments/${commentId}`, '-f', `body=${body}`],
+        'Failed to update the docstube flag comment.'
+      );
+    },
+    findOpenIssueByTitle: async ({ title }) => {
+      const stdout = await runGh(
+        ['issue', 'list', ...repoArgs, '--state', 'open', '--search', `"${title}" in:title`, '--json', 'number,title'],
+        'Failed to search for the docstube digest issue.'
+      );
+      const parsed = JSON.parse(stdout.trim() || '[]') as { number?: unknown; title?: unknown }[];
+      const match = parsed.find((issue) => issue.title === title && typeof issue.number === 'number');
+      return match ? { number: match.number as number } : undefined;
+    },
+    createIssue: async ({ title, body }) => {
+      await runGh(
+        ['issue', 'create', ...repoArgs, '--title', title, '--body', body],
+        'Failed to create the docstube digest issue.'
+      );
+    },
+    updateIssue: async ({ issueNumber, body }) => {
+      await runGh(
+        ['issue', 'edit', String(issueNumber), ...repoArgs, '--body', body],
+        'Failed to update the docstube digest issue.'
+      );
+    }
+  };
+};
+
+const enableAutoMergeMutation =
+  'mutation($pullRequestId: ID!) { enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) { clientMutationId } }';
+
+const createMergeControl = (input: { token?: string | undefined; workspaceDir: string }): GitHubActionMergeControl => {
+  const ghEnv = ghEnvFor(input.token);
+
+  return {
+    enableAutoMerge: async ({ pullRequest }) => {
+      const selector = pullRequest.number ? String(pullRequest.number) : pullRequest.url;
+      const view = await runProcess('gh', ['pr', 'view', selector, '--json', 'id', '--jq', '.id'], {
+        cwd: input.workspaceDir,
+        env: ghEnv
+      });
+      if (view.exitCode !== 0 || view.stdout.trim().length === 0) {
+        throw new Error(view.stderr || 'Failed to resolve the PR node id for auto-merge.');
+      }
+      const result = await runProcess(
+        'gh',
+        ['api', 'graphql', '-f', `query=${enableAutoMergeMutation}`, '-f', `pullRequestId=${view.stdout.trim()}`],
+        { cwd: input.workspaceDir, env: ghEnv }
+      );
+      if (result.exitCode !== 0) {
+        throw new Error(result.stderr || 'GitHub rejected enablePullRequestAutoMerge.');
+      }
+    }
+  };
+};
+
+export const createDocstubeCliArgs = (input: { docstubePackage: string; mode: GitHubActionMode }): string[] => [
   '--yes',
   input.docstubePackage,
-  input.mode,
-  ...(input.configPath ? ['--config', input.configPath] : [])
+  input.mode
 ];
 
-export const createDocstubeCommandRunner =
-  (mode: GitHubActionMode, docstubePackage: string, processRunner: GitHubActionProcessRunner = runProcess) =>
-  async (input: DocstubeActionCommandInput): Promise<DocstubeActionCommandResult> => {
-    const args = createDocstubeCommandArgs({ configPath: input.configPath, docstubePackage, mode });
+export const createDocstubeCliRunner =
+  (docstubePackage: string, processRunner: GitHubActionProcessRunner = runProcess) =>
+  async (input: { mode: GitHubActionMode; workspaceDir: string }): Promise<DocstubeCliRunResult> => {
+    const args = createDocstubeCliArgs({ docstubePackage, mode: input.mode });
     const result = await processRunner('npx', args, { cwd: input.workspaceDir });
     return {
       exitCode: result.exitCode,
-      changedPages: parseChangedPagesFromDocstubeOutput([result.stdout, result.stderr].filter(Boolean).join('\n')),
       output: [result.stdout, result.stderr].filter(Boolean).join('\n')
     };
   };
@@ -650,19 +706,37 @@ const createReporter = (env: NodeJS.ProcessEnv = process.env): GitHubActionRepor
   warn: (message) => console.warn(message)
 });
 
+const createWorkspaceFileReader =
+  (workspaceDir: string): WorkspaceFileReader =>
+  async (relativePath) => {
+    try {
+      return await readFile(join(workspaceDir, relativePath), 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
 export const createDefaultGitHubActionDeps = (input: {
   docstubePackage?: string;
   githubToken?: string;
-}): GitHubActionDeps => {
-  const docstubePackage = input.docstubePackage ?? defaultDocstubePackage;
-  return {
-    git: createGitClient(),
-    pullRequest: createPullRequestClient(input.githubToken),
-    reporter: createReporter(),
-    runDocstubeRefresh: createDocstubeCommandRunner('refresh', docstubePackage),
-    runDocstubeValidate: createDocstubeCommandRunner('validate', docstubePackage)
-  };
-};
+  repository?: string;
+  workspaceDir: string;
+}): GitHubActionDeps => ({
+  git: createGitClient(),
+  issues: createIssueClient({
+    repository: input.repository,
+    token: input.githubToken,
+    workspaceDir: input.workspaceDir
+  }),
+  mergeControl: createMergeControl({ token: input.githubToken, workspaceDir: input.workspaceDir }),
+  pullRequest: createPullRequestClient({ token: input.githubToken }),
+  readWorkspaceFile: createWorkspaceFileReader(input.workspaceDir),
+  reporter: createReporter(),
+  runDocstube: createDocstubeCliRunner(input.docstubePackage ?? defaultDocstubePackage)
+});
 
 const actionInputNames = (name: string): readonly string[] => [
   `INPUT_${name.toUpperCase().replace(/ /g, '_')}`,
@@ -679,44 +753,39 @@ const readActionInput = (env: NodeJS.ProcessEnv, name: string): string | undefin
   return undefined;
 };
 
-const readBooleanActionInput = (env: NodeJS.ProcessEnv, name: string): boolean | undefined => {
-  const value = readActionInput(env, name);
-  if (!value) {
-    return undefined;
-  }
-  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
-};
-
 const readActionMode = (env: NodeJS.ProcessEnv): GitHubActionMode => {
   const raw = readActionInput(env, 'mode') ?? 'refresh';
-  if (raw === 'refresh') {
-    return 'refresh';
-  }
-  if (raw === 'validate') {
+  if (raw === 'generate' || raw === 'refresh') {
     return raw;
   }
-  throw new Error(`Unsupported docstube Action mode: ${raw}.`);
+  throw new Error(`Unsupported docstube Action mode: ${raw}. Supported modes: generate, refresh.`);
 };
 
-export const readGitHubActionInputsFromEnv = (env: NodeJS.ProcessEnv = process.env): GitHubActionInputs => ({
-  baseBranch: readActionInput(env, 'base-branch') ?? env.GITHUB_BASE_REF ?? env.GITHUB_REF_NAME ?? 'main',
-  branchPrefix: readActionInput(env, 'branch-prefix'),
-  commitMessage: readActionInput(env, 'commit-message'),
-  configPath: readActionInput(env, 'config-path'),
-  docstubePackage: readActionInput(env, 'docstube-package'),
-  dryRun: readBooleanActionInput(env, 'dry-run'),
-  githubToken: readActionInput(env, 'github-token') ?? env.GITHUB_TOKEN,
-  mode: readActionMode(env),
-  refName: env.GITHUB_REF_NAME,
-  workspaceDir: readActionInput(env, 'workspace') ?? env.GITHUB_WORKSPACE ?? process.cwd(),
-  workflowName: env.GITHUB_WORKFLOW
-});
+export const readGitHubActionInputsFromEnv = (env: NodeJS.ProcessEnv = process.env): GitHubActionInputs => {
+  if (readActionInput(env, 'dry-run') !== undefined) {
+    throw new Error('The dry-run input was removed; the docstube Action always opens a real PR.');
+  }
+  return {
+    baseBranch: readActionInput(env, 'base-branch') ?? env.GITHUB_BASE_REF ?? env.GITHUB_REF_NAME ?? 'main',
+    branchPrefix: readActionInput(env, 'branch-prefix'),
+    commitMessage: readActionInput(env, 'commit-message'),
+    docstubePackage: readActionInput(env, 'docstube-package'),
+    githubToken: readActionInput(env, 'github-token') ?? env.GITHUB_TOKEN,
+    mode: readActionMode(env),
+    refName: env.GITHUB_REF_NAME,
+    repository: env.GITHUB_REPOSITORY,
+    workflowName: env.GITHUB_WORKFLOW,
+    workspaceDir: readActionInput(env, 'workspace') ?? env.GITHUB_WORKSPACE ?? process.cwd()
+  };
+};
 
 export const runGitHubActionFromEnv = async (env: NodeJS.ProcessEnv = process.env): Promise<GitHubActionResult> => {
   const inputs = readGitHubActionInputsFromEnv(env);
   const deps = createDefaultGitHubActionDeps({
     docstubePackage: inputs.docstubePackage,
-    githubToken: inputs.githubToken
+    githubToken: inputs.githubToken,
+    repository: inputs.repository,
+    workspaceDir: inputs.workspaceDir
   });
   return runGitHubAction(inputs, deps);
 };

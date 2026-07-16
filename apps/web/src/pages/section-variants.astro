@@ -629,16 +629,17 @@ const useCases = [
 
 <script>
   // Section 3 - doc preview: Tabs-style theme switch + animated code tabs + collapsible nav.
+  const movePill = (rail: HTMLElement) => {
+    const pill = rail.querySelector<HTMLElement>('[data-rail-pill]');
+    const on = rail.querySelector<HTMLElement>('.dp-on') || rail.querySelector<HTMLButtonElement>('button');
+    if (!pill || !on) return;
+    pill.style.left = `${on.offsetLeft}px`;
+    pill.style.top = `${on.offsetTop}px`;
+    pill.style.width = `${on.offsetWidth}px`;
+    pill.style.height = `${on.offsetHeight}px`;
+  };
+
   const setupDocPreview = () => {
-    const movePill = (rail: HTMLElement) => {
-      const pill = rail.querySelector<HTMLElement>('[data-rail-pill]');
-      const on = rail.querySelector<HTMLElement>('.dp-on') || rail.querySelector<HTMLButtonElement>('button');
-      if (!pill || !on) return;
-      pill.style.left = `${on.offsetLeft}px`;
-      pill.style.top = `${on.offsetTop}px`;
-      pill.style.width = `${on.offsetWidth}px`;
-      pill.style.height = `${on.offsetHeight}px`;
-    };
     const rails: HTMLElement[] = [];
     document.querySelectorAll<HTMLElement>('[data-doc-preview]').forEach((root) => {
       const themeRail = root.querySelector<HTMLElement>('[data-theme-rail]');

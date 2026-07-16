@@ -8,13 +8,14 @@ export default defineConfig({
   resolve: {
     alias: {
       '@docstube/action': resolve(rootDir, 'apps/github-action/src/github-action.ts'),
-      '@docstube/agent': resolve(rootDir, 'packages/agent/src/agent.ts'),
+      '@docstube/agent-runtime': resolve(rootDir, 'packages/agent-runtime/src/agent-runtime.ts'),
       '@docstube/cli': resolve(rootDir, 'apps/cli/src/cli.ts'),
       '@docstube/codemap': resolve(rootDir, 'packages/codemap/src/codemap.ts'),
       '@docstube/contracts': resolve(rootDir, 'packages/contracts/src/contracts.ts'),
       '@docstube/core': resolve(rootDir, 'packages/core/src/core.ts'),
-      '@docstube/extractors': resolve(rootDir, 'packages/extractors/src/extractors.ts'),
       '@docstube/install-events': resolve(rootDir, 'apps/install-events/src/install-events.ts'),
+      '@docstube/lang-typescript': resolve(rootDir, 'packages/lang-typescript/src/lang-typescript.ts'),
+      '@docstube/plugin-sdk': resolve(rootDir, 'packages/plugin-sdk/src/plugin-sdk.ts'),
       '@docstube/skills': resolve(rootDir, 'packages/skills/src/skills.ts'),
       '@docstube/theme': resolve(rootDir, 'packages/theme/src/theme.ts'),
       '@docstube/verifiers': resolve(rootDir, 'packages/verifiers/src/verifiers.ts'),

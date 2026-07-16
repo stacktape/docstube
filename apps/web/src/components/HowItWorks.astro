@@ -26,9 +26,8 @@ const genTimeline = [
 <Section
   id="how"
   eyebrow="How it works"
-  title="Five steps. You drive the first one, it does the rest."
-  intro="From a single command to a site you own — and back in sync on every commit. Here's the whole loop, start to finish."
-  tone="paper"
+  title="You set the intent once. It does everything else."
+  intro="Five minutes of your time, then the loop is the machine's: write, review, verify, ship, stay in sync — on every commit, forever."
 >
   <ol class="mx-auto max-w-5xl">
     <!-- Step 1: Configure (you) -->
@@ -44,10 +43,9 @@ const genTimeline = [
             <h3 class="font-display text-[22px] font-semibold leading-tight text-ink sm:text-[24px]">You set it up once, then step away.</h3>
             <p class="text-[15px] leading-relaxed text-muted">
               Run <code class="rounded bg-canvas px-1.5 py-0.5 font-mono text-[13px] text-ink-soft">npx docstube wizard</code>
-              and a localhost control plane opens in your browser. Pick a doc type, name the personas who'll actually
-              read the docs, and paste any context that lives in your head instead of your code. docstube reads the repo
-              and proposes a full information architecture — you edit it like a list until the shape is right. That's the
-              entire job; hit generate and everything after this runs on its own.
+              and a localhost UI opens. Pick a doc type, name your readers, add any context that lives only in your
+              head. docstube proposes the full page plan — edit it like a list, hit generate, and you're done. That's
+              the entire job.
             </p>
             <ul class="space-y-2 text-[14px] text-ink-soft">
               <li class="flex gap-2.5"><span class="text-brand-500">›</span> Each persona becomes a dedicated reviewer agent later in the run.</li>
@@ -121,11 +119,9 @@ const genTimeline = [
             <span class="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-brand-700">AI · autonomous</span>
             <h3 class="font-display text-[22px] font-semibold leading-tight text-ink sm:text-[24px]">A writer agent drafts every page from your real source.</h3>
             <p class="text-[15px] leading-relaxed text-muted">
-              First docstube builds a structural map of your codebase with tree-sitter — every module, export, type, and
-              call site. A writer agent then works through your approved plan depth-first, so the first finished pages
-              land in the live preview within seconds, not at the very end. Each page is grounded in the actual symbols
-              it documents, not a vague impression of them, and you watch the run advance page by page — drafting,
-              verified, or flagged — with nothing hidden in a black box.
+              docstube builds a structural map of your codebase first — every module, export, type, and call site. A
+              writer agent then drafts each page grounded in the actual symbols it documents, not a vague impression of
+              them. Finished pages stream into a live preview as the run advances; nothing hides in a black box.
             </p>
           </div>
           <div class="flex flex-col gap-4">
@@ -200,11 +196,10 @@ const genTimeline = [
             <span class="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-brand-700">AI · per persona</span>
             <h3 class="font-display text-[22px] font-semibold leading-tight text-ink sm:text-[24px]">A reviewer agent reads it as each of your readers.</h3>
             <p class="text-[15px] leading-relaxed text-muted">
-              Remember the personas you named in step one? docstube gives each one its own reviewer agent. The
-              new-integrator reviewer checks there's a clean five-minute path and that nothing assumes knowledge they
-              don't have; the platform-engineer reviewer pushes for depth, edge cases, and configuration. Every reviewer
-              scores the page for audience fit, depth, and tone and sends back specific notes — so the next writer pass
-              is aimed at the people who'll actually read it, not a blurred-together average.
+              Every persona you named gets its own reviewer agent. The new-integrator reviewer demands a clean
+              five-minute path that assumes nothing; the platform-engineer reviewer pushes for depth, edge cases, and
+              configuration. Their notes go straight back to the writer — so pages are aimed at your actual readers,
+              not a blurred-together average.
             </p>
           </div>
           <div class="surface overflow-hidden">
@@ -252,13 +247,12 @@ const genTimeline = [
             <span class="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-brand-700">AI · two layers</span>
             <h3 class="font-display text-[22px] font-semibold leading-tight text-ink sm:text-[24px]">Then verifiers prove it's actually true.</h3>
             <p class="text-[15px] leading-relaxed text-muted">
-              Reading well isn't the same as being right, so every page goes through two layers of verification.
-              Deterministic verifiers run real tooling — <code class="rounded bg-canvas px-1 py-0.5 font-mono text-[13px] text-ink-soft">tsc</code>
-              and <code class="rounded bg-canvas px-1 py-0.5 font-mono text-[13px] text-ink-soft">pyright</code> type-check
-              every sample, imports and links must resolve, D2 diagrams must render, and each API reference is matched to
-              your compiler's real signatures. Then AI verifiers catch what no tool can: a confident claim with nothing
-              behind it, two sections that quietly contradict each other, an example that doesn't do what the prose says.
-              Every issue becomes a structured finding feeding one explainable quality score.
+              Reading well isn't the same as being right. Deterministic verifiers run real tooling —
+              <code class="rounded bg-canvas px-1 py-0.5 font-mono text-[13px] text-ink-soft">tsc</code> and
+              <code class="rounded bg-canvas px-1 py-0.5 font-mono text-[13px] text-ink-soft">pyright</code> type-check
+              every sample; imports, links, and diagrams must resolve; every API reference must match your compiler.
+              Then AI verifiers catch what no tool can: unbacked claims, quiet contradictions, examples that don't do
+              what the prose says.
             </p>
             <div class="surface-tint flex items-center gap-3.5 p-4">
               <span class="font-display text-[30px] font-bold leading-none gradient-text">⚠</span>
@@ -316,12 +310,11 @@ const genTimeline = [
             <span class="inline-flex items-center rounded-full bg-brand-100 px-2.5 py-0.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-brand-700">AI · on every commit</span>
             <h3 class="font-display text-[22px] font-semibold leading-tight text-ink sm:text-[24px]">Ship code, and the docs follow.</h3>
             <p class="text-[15px] leading-relaxed text-muted">
-              docstube hashes your codebase at the symbol level and remembers which pages each symbol feeds. Change one
+              docstube hashes your code at the symbol level and remembers which pages each symbol feeds. Change one
               function and <code class="rounded bg-canvas px-1.5 py-0.5 font-mono text-[13px] text-ink-soft">docstube refresh</code>
-              regenerates only the handful of pages that actually depend on it — the rest are skipped, so an update costs
-              a sliver of the tokens a full rebuild would. Run it locally whenever you like, or let the GitHub Action do
-              it on every push: it refreshes the affected pages and opens a PR with the changes and the reasons behind
-              them.
+              regenerates only the pages that depend on it — a sliver of the cost of a full rebuild. The GitHub Action
+              opens a PR on every push, annotated with what changed and what proves it — and when every check is green,
+              it merges itself. You're pulled in only when something can't be proven.
             </p>
             <ul class="space-y-2 text-[14px] text-ink-soft">
               <li class="flex gap-2.5"><span class="text-brand-500">›</span> Symbol-level provenance, not a blunt file-hash scan or a full re-run.</li>
@@ -367,7 +360,7 @@ const genTimeline = [
             </div>
             <div class="flex items-center gap-2 border-t border-line bg-canvas px-5 py-3 text-[12px] text-muted">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="shrink-0 text-ink-soft" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-              Runs automatically via the GitHub Action.
+              GitHub Action · auto-merges when every check is green.
             </div>
           </div>
         </div>

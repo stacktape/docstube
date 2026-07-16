@@ -1,41 +1,71 @@
 ---
 import { pricing } from '../data/site.ts';
+
+const { free, later } = pricing;
 ---
 
-<div class="grid gap-5 lg:grid-cols-3">
-  {
-    pricing.map((tier) => (
-      <div
-        class={`relative flex flex-col gap-5 rounded-2xl p-7 ${
-          tier.hero
-            ? 'border-2 border-brand-400 bg-paper shadow-lift'
-            : 'surface'
-        }`}
-      >
-        {tier.hero && (
-          <span class="absolute -top-3 left-7 rounded-full bg-brand-500 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white">
-            Start here
-          </span>
-        )}
-        <div>
-          <h3 class="font-display text-[20px] font-bold text-ink">{tier.name}</h3>
-          <p class="mt-1 text-[14px] text-muted">{tier.tagline}</p>
+<!-- The one real tier: the whole product, free. -->
+<div class="relative overflow-hidden rounded-2xl border-2 border-brand-400 bg-paper shadow-lift">
+  <div class="grid gap-8 p-7 sm:p-9 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
+    <div class="flex flex-col items-start gap-4">
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider text-white shadow-brand">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+        The whole product
+      </span>
+      <div>
+        <h3 class="font-display text-[22px] font-bold text-ink">{free.name}</h3>
+        <div class="mt-2 font-display text-[40px] font-extrabold leading-none text-ink">
+          Free <span class="gradient-text">forever</span>
         </div>
-        <div class="font-display text-[26px] font-bold text-ink">{tier.price}</div>
-        <ul class="flex flex-1 flex-col gap-2.5">
-          {tier.points.map((pt) => (
-            <li class="flex items-start gap-2.5 text-[14px] text-ink-soft">
-              <svg class="mt-1 shrink-0 text-brand-500" width="15" height="15" viewBox="0 0 16 16" fill="none">
-                <path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              {pt}
-            </li>
-          ))}
-        </ul>
-        <a href={tier.ctaHref} class={`btn ${tier.hero ? 'btn-primary' : 'btn-secondary'} w-full`}>
-          {tier.cta}
-        </a>
       </div>
-    ))
-  }
+      <p class="text-[15px] leading-relaxed text-muted">{free.tagline}</p>
+      <a href={free.ctaHref} class="btn btn-primary mt-1">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 5.5L20 7" /></svg>
+        {free.cta}
+      </a>
+    </div>
+    <ul class="grid content-center gap-x-8 gap-y-3.5 border-t border-line pt-6 sm:grid-cols-2 lg:border-l lg:border-t-0 lg:pl-12 lg:pt-0">
+      {
+        free.points.map((pt) => (
+          <li class="flex items-start gap-2.5 text-[14px] leading-snug text-ink-soft">
+            <svg class="mt-0.5 shrink-0 text-brand-500" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8.2 6.2 11.4 13 4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            {pt}
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</div>
+
+<!-- Future paid tiers: deliberately small, honestly labeled, no buy buttons. -->
+<div class="mt-8">
+  <p class="mb-3 text-center font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+    Later, for teams — on the roadmap, not for sale yet
+  </p>
+  <div class="grid gap-4 sm:grid-cols-2">
+    {
+      later.map((tier) => (
+        <div class="flex flex-col gap-2 rounded-2xl border border-line bg-canvas p-6">
+          <div class="flex items-baseline justify-between gap-3">
+            <h3 class="font-display text-[17px] font-bold text-ink">{tier.name}</h3>
+            <span class="font-mono text-[12px] text-muted">{tier.price}</span>
+          </div>
+          <p class="text-[13.5px] leading-relaxed text-muted">{tier.tagline}</p>
+        </div>
+      ))
+    }
+  </div>
+</div>
+
+<div class="mt-8 flex items-center justify-center gap-2.5 text-center">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-brand-500">
+    <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+  <p class="text-[13.5px] text-muted">
+    <span class="font-semibold text-ink-soft">We never mark up tokens.</span> You bring your own Claude, Codex, Gemini, or
+    any API key — and pay that provider directly, exactly like your normal usage.
+  </p>
 </div>

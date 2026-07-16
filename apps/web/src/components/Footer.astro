@@ -10,8 +10,8 @@ const columns = [
   {
     title: 'Product',
     links: [
+      { label: 'The autonomy ladder', href: '#ladder' },
       { label: 'How it works', href: '#how' },
-      { label: 'Compare', href: '#compare' },
       { label: 'Pricing', href: '#pricing' }
     ]
   },
@@ -19,18 +19,8 @@ const columns = [
     title: 'Open source',
     links: [
       { label: 'GitHub', href: site.repo },
-      { label: 'MIT license', href: site.repo },
-      { label: 'Changelog', href: '#' },
+      { label: 'MIT license', href: `${site.repo}/blob/main/LICENSE` },
       { label: 'Contributing', href: site.repo }
-    ]
-  },
-  {
-    title: 'For agents',
-    links: [
-      { label: 'llms.txt', href: '#' },
-      { label: 'MCP server', href: '#' },
-      { label: 'API references', href: '#' },
-      { label: 'FAQ', href: '#faq' }
     ]
   }
 ];
@@ -38,7 +28,7 @@ const columns = [
 
 <footer class="relative mt-24 border-t border-line bg-canvas">
   <div class="mx-auto max-w-6xl px-5 py-14 sm:px-8">
-    <div class="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+    <div class="grid gap-10 md:grid-cols-[1.8fr_1fr_1fr]">
       <div>
         <Logo size={36} />
         <p class="mt-4 max-w-xs text-[14px] text-muted">{site.tagline}</p>

@@ -17,9 +17,15 @@ const expectMissing = async (path: string): Promise<void> => {
 };
 
 describe('repository product docs', () => {
-  it('uses PRODUCT.md as the single product spec', async () => {
-    await expectFile('PRODUCT.md');
-    await Promise.all([expectMissing('PLAN.md'), expectMissing('ACCEPTANCE.md'), expectMissing('tasks.md')]);
+  it('uses PRODUCT.md + ARCHITECTURE.md as the spec pair', async () => {
+    await Promise.all([expectFile('PRODUCT.md'), expectFile('ARCHITECTURE.md')]);
+    // The planning-era artifacts must stay gone (HANDOFF.md was deleted after the architecture step).
+    await Promise.all([
+      expectMissing('PLAN.md'),
+      expectMissing('ACCEPTANCE.md'),
+      expectMissing('tasks.md'),
+      expectMissing('HANDOFF.md')
+    ]);
 
     const docs = await Promise.all([
       readRepoFile('PRODUCT.md'),
@@ -34,9 +40,11 @@ describe('repository product docs', () => {
       expect(doc).not.toContain('tasks.md');
     }
 
-    expect(docs[0]).toContain('# docstube product');
-    expect(docs[0]).toContain('## What docstube is');
-    expect(docs[0]).toContain('## Hard boundaries');
+    expect(docs[0]).toContain('# docstube — PRODUCT.md');
+    expect(docs[0]).toContain('## 3 · Core architecture contracts');
+    const architecture = await readRepoFile('ARCHITECTURE.md');
+    expect(architecture).toContain('## 3 · Entity model');
+    expect(docs[1]).toContain('ARCHITECTURE.md');
   });
 
   it('keeps validation guidance executable instead of checklist based', async () => {

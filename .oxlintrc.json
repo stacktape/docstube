@@ -37,6 +37,8 @@
   ],
   "plugins": ["import", "typescript", "unicorn"],
   "rules": {
-    "no-console": ["warn", { "allow": ["warn", "error", "info", "time", "clear"] }]
+    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }],
+    "no-console": ["warn", { "allow": ["warn", "error", "info", "time", "clear"] }],
+    "no-await-in-loop": "off"
   }
 }

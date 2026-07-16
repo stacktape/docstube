@@ -1,63 +1,53 @@
-import { join } from 'node:path';
-import { defaultOutput } from '../cli-output.ts';
+import {
+  CoreError,
+  createManifestStore,
+  createTaskRunnerFromConfig,
+  loadConfigFamily,
+  runRefine
+} from '@docstube/core';
+import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
-import { manifestPath, pathExists } from '../workspace-paths.ts';
 
-export type RefineCommandOptions = {
-  configPath?: string;
-  failed?: boolean;
-  maxRounds?: number;
-  refine?: (input: {
-    configPath?: string;
-    failedOnly?: boolean;
-    maxRounds?: number;
-    target?: string;
-    workspaceDir: string;
-  }) => Promise<{
-    candidates: readonly unknown[];
-    manifest: { pages: readonly unknown[] };
-    plannedPages: readonly unknown[];
-    refinedPages: readonly { id: string; path: string; status: string }[];
-  }>;
-  target?: string;
-  workspaceDir?: string;
+export type RefineCommandInput = {
+  workspaceDir: string;
+  target?: string | undefined;
+  failedOnly?: boolean | undefined;
+  maxRounds?: number | undefined;
 };
 
-export const runRefineCommand = async (
-  options: RefineCommandOptions = {},
-  output: CliOutput = defaultOutput
-): Promise<CliCommandResult> => {
-  const workspaceDir = options.workspaceDir ?? process.cwd();
-  const configPath = options.configPath ?? 'docstube.yml';
-  if (!(await pathExists(join(workspaceDir, configPath)))) {
-    output.error(`No ${configPath} found. Run docstube wizard first.`);
-    return { exitCode: 1 };
-  }
+export const runRefineCommand = async (input: RefineCommandInput, output: CliOutput): Promise<CliCommandResult> => {
+  try {
+    const family = await loadConfigFamily(input.workspaceDir);
+    const runner = createTaskRunnerFromConfig(family.config, input.workspaceDir);
+    output.info(`refining with ${runner.transportId} (${runner.model})…`);
 
-  const path = manifestPath(workspaceDir);
-  if (!(await pathExists(path))) {
-    output.error('No .docstube/manifest.yml found. Run docstube generate first.');
-    return { exitCode: 1 };
-  }
+    const summary = await runRefine({
+      repoRoot: input.workspaceDir,
+      runTask: runner.runTask,
+      toolDescriptors: runner.toolDescriptors,
+      target: input.target,
+      failedOnly: input.failedOnly,
+      maxRounds: input.maxRounds
+    });
+    if (summary.refined.length === 0) {
+      output.info(`nothing to refine (${summary.consideredCount} page(s) considered)`);
+      return { exitCode: 0 };
+    }
+    for (const page of summary.refined) {
+      output.info(
+        `  ${page.status === 'passed' ? 'ok  ' : 'FLAG'}  ${page.slug} — proven blocks ${page.provenBlocksBefore} → ${page.provenBlocksAfter} (${page.attempts} attempt(s))`
+      );
+    }
 
-  const refine = options.refine ?? (await import('@docstube/core')).refineProjectDocumentation;
-  const result = await refine({
-    configPath,
-    failedOnly: options.failed,
-    maxRounds: options.maxRounds,
-    target: options.target,
-    workspaceDir
-  });
-  output.info(`Loaded manifest with ${result.manifest.pages.length} pages.`);
-  output.info(`Ranked ${result.candidates.length} refinement candidates.`);
-
-  if (result.plannedPages.length === 0) {
-    output.info('No pages require refinement.');
+    const store = createManifestStore(input.workspaceDir, family.config.versions.current);
+    await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    output.info(`run ${summary.runId}: ${summary.outcome}`);
     return { exitCode: 0 };
+  } catch (error) {
+    if (error instanceof CoreError) {
+      output.error(error.message);
+      return { exitCode: 1 };
+    }
+    throw error;
   }
-
-  for (const page of result.refinedPages) {
-    output.info(`refined: ${page.id} status=${page.status} path=${page.path}`);
-  }
-  return { exitCode: 0 };
 };

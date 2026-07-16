@@ -4,6 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineCommand, runMain } from 'citty';
 import { getCommandHelp } from './cli-help.ts';
+import { defaultOutput } from './cli-output.ts';
 
 const docstubeVersion = '0.0.2';
 
@@ -11,16 +12,12 @@ const enableNodeCompileCache = () => {
   if (process.env.NODE_COMPILE_CACHE) {
     return;
   }
-
   const cacheDir = join(process.cwd(), 'node_modules', '.cache', 'docstube-node-compile-cache');
   mkdirSync(cacheDir, { recursive: true });
   process.env.NODE_COMPILE_CACHE = cacheDir;
 };
 
-const output = {
-  info: (message: string) => console.info(message),
-  error: (message: string) => console.error(message)
-};
+const output = defaultOutput;
 
 const printHelp = (command?: string): void => {
   output.info(getCommandHelp(command));
@@ -40,46 +37,62 @@ const runCliCommand = async (
   process.exitCode = result.exitCode;
 };
 
-const wizard = defineCommand({
-  meta: {
-    description: 'Start the local setup wizard and generation control plane.',
-    name: 'wizard'
-  },
+const generate = defineCommand({
+  meta: { description: 'Generate docs from existing config.', name: 'generate' },
   args: {
-    fresh: { type: 'boolean', description: 'Discard local wizard state before starting.' }
+    'max-attempts': { type: 'string', description: 'Max write attempts per page (default 3).' }
+  },
+  async run({ args }) {
+    await runCliCommand('generate', async () => {
+      enableNodeCompileCache();
+      const maxAttempts = typeof args['max-attempts'] === 'string' ? Number(args['max-attempts']) : undefined;
+      if (maxAttempts !== undefined && (!Number.isInteger(maxAttempts) || maxAttempts < 1)) {
+        output.error(`Invalid --max-attempts value: ${args['max-attempts']}`);
+        return { exitCode: 1 };
+      }
+      const { runGenerateCommand } = await import('./commands/generate-command.ts');
+      return runGenerateCommand({ workspaceDir: process.cwd(), maxAttempts }, output);
+    });
+  }
+});
+
+const wizard = defineCommand({
+  meta: { description: 'Open the local setup wizard and control plane.', name: 'wizard' },
+  args: {
+    port: { type: 'string', description: 'Port for the local control plane (default: random).' }
   },
   async run({ args }) {
     await runCliCommand('wizard', async () => {
       enableNodeCompileCache();
+      const port = typeof args.port === 'string' ? Number(args.port) : undefined;
+      if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
+        output.error(`Invalid --port value: ${args.port}`);
+        return { exitCode: 1 };
+      }
       const { runWizardCommand } = await import('./commands/wizard-command.ts');
       return runWizardCommand(
-        {
-          fresh: args.fresh === true,
-          uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL
-        },
+        { workspaceDir: process.cwd(), uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL, port },
         output
       );
     });
   }
 });
 
-const generate = defineCommand({
-  meta: {
-    description: 'Generate docs from existing config.',
-    name: 'generate'
-  },
+const plugin = defineCommand({
+  meta: { description: 'Scaffold and manage docstube plugins.', name: 'plugin' },
   args: {
-    fresh: { type: 'boolean', description: 'Discard local generation state before starting.' },
-    config: { type: 'string', description: 'Path to docstube.yml.' }
+    action: { type: 'positional', required: true, description: 'scaffold' },
+    name: { type: 'positional', required: false, description: 'Plugin name (e.g. wordcount).' }
   },
   async run({ args }) {
-    await runCliCommand('generate', async () => {
+    await runCliCommand('plugin', async () => {
       enableNodeCompileCache();
-      const { runGenerateCommand } = await import('./commands/generate-command.ts');
-      return runGenerateCommand(
+      const { runPluginCommand } = await import('./commands/plugin-command.ts');
+      return runPluginCommand(
         {
-          configPath: typeof args.config === 'string' ? args.config : undefined,
-          fresh: args.fresh === true
+          workspaceDir: process.cwd(),
+          action: String(args.action),
+          name: typeof args.name === 'string' ? args.name : undefined
         },
         output
       );
@@ -88,37 +101,30 @@ const generate = defineCommand({
 });
 
 const refresh = defineCommand({
-  meta: {
-    description: 'Refresh stale pages and vendored theme assets.',
-    name: 'refresh'
-  },
+  meta: { description: 'Regenerate only the entities affected by code changes.', name: 'refresh' },
   args: {
-    config: { type: 'string', description: 'Path to docstube.yml.' }
+    'max-attempts': { type: 'string', description: 'Max write attempts per page (default 3).' }
   },
   async run({ args }) {
     await runCliCommand('refresh', async () => {
       enableNodeCompileCache();
+      const maxAttempts = typeof args['max-attempts'] === 'string' ? Number(args['max-attempts']) : undefined;
+      if (maxAttempts !== undefined && (!Number.isInteger(maxAttempts) || maxAttempts < 1)) {
+        output.error(`Invalid --max-attempts value: ${args['max-attempts']}`);
+        return { exitCode: 1 };
+      }
       const { runRefreshCommand } = await import('./commands/refresh-command.ts');
-      return runRefreshCommand(
-        {
-          configPath: typeof args.config === 'string' ? args.config : undefined
-        },
-        output
-      );
+      return runRefreshCommand({ workspaceDir: process.cwd(), maxAttempts }, output);
     });
   }
 });
 
 const refine = defineCommand({
-  meta: {
-    description: 'Improve the lowest-quality generated pages first.',
-    name: 'refine'
-  },
+  meta: { description: 'Improve the lowest-quality generated pages first.', name: 'refine' },
   args: {
-    target: { type: 'positional', required: false, description: 'Optional page path or page id to refine.' },
-    config: { type: 'string', description: 'Path to docstube.yml.' },
-    failed: { type: 'boolean', description: 'Consider only pages with failing checks.' },
-    'max-rounds': { type: 'string', description: 'Maximum refinement rounds.' }
+    target: { type: 'positional', required: false, description: 'Page slug to refine.' },
+    failed: { type: 'boolean', description: 'Consider only pages with open flags.' },
+    'max-rounds': { type: 'string', description: 'Max pages refined this run (default 3).' }
   },
   async run({ args }) {
     await runCliCommand('refine', async () => {
@@ -128,15 +134,32 @@ const refine = defineCommand({
         output.error(`Invalid --max-rounds value: ${args['max-rounds']}`);
         return { exitCode: 1 };
       }
-
       const { runRefineCommand } = await import('./commands/refine-command.ts');
       return runRefineCommand(
         {
-          configPath: typeof args.config === 'string' ? args.config : undefined,
-          failed: args.failed === true,
-          maxRounds,
-          target: typeof args.target === 'string' ? args.target : undefined
+          workspaceDir: process.cwd(),
+          target: typeof args.target === 'string' ? args.target : undefined,
+          failedOnly: args.failed === true,
+          maxRounds
         },
+        output
+      );
+    });
+  }
+});
+
+const audit = defineCommand({
+  meta: { description: 'Measure verified defects in any existing docs site.', name: 'audit' },
+  args: {
+    'docs-dir': { type: 'positional', required: true, description: 'Directory containing the docs to audit (md/mdx).' },
+    json: { type: 'boolean', description: 'Emit the report as JSON.' }
+  },
+  async run({ args }) {
+    await runCliCommand('audit', async () => {
+      enableNodeCompileCache();
+      const { runAuditCommand } = await import('./commands/audit-command.ts');
+      return runAuditCommand(
+        { workspaceDir: process.cwd(), docsDir: String(args['docs-dir']), json: args.json === true },
         output
       );
     });
@@ -144,117 +167,62 @@ const refine = defineCommand({
 });
 
 const validate = defineCommand({
-  meta: {
-    description: 'Validate the docstube config family.',
-    name: 'validate'
-  },
-  args: {
-    config: { type: 'string', description: 'Path to docstube.yml.' }
-  },
-  async run({ args }) {
+  meta: { description: 'Validate the docstube config family.', name: 'validate' },
+  async run() {
     await runCliCommand('validate', async () => {
       enableNodeCompileCache();
       const { runValidateCommand } = await import('./commands/validate-command.ts');
-      return runValidateCommand(
-        {
-          configPath: typeof args.config === 'string' ? args.config : undefined
-        },
-        output
-      );
+      return runValidateCommand({ workspaceDir: process.cwd() }, output);
     });
   }
 });
 
 const check = defineCommand({
-  meta: {
-    description: 'Run one deterministic check.',
-    name: 'check'
-  },
+  meta: { description: 'Run deterministic checks; kinds derive from registered verifier plugins.', name: 'check' },
   args: {
-    kind: { type: 'positional', required: false, description: 'd2, mdx, snippet, or config' },
-    file: { type: 'positional', required: false, description: 'File to check' },
-    all: { type: 'boolean', description: 'Run all deterministic checks for the project.' },
-    config: { type: 'string', description: 'Path to docstube.yml for --all.' }
+    kind: { type: 'positional', required: false, description: 'Verifier id (see `docstube check --list`).' },
+    list: { type: 'boolean', description: 'List the checks registered in this project.' }
   },
   async run({ args }) {
     await runCliCommand('check', async () => {
       enableNodeCompileCache();
-      if (args.all === true) {
-        const { runCheckAllCommand } = await import('./commands/check-command.ts');
-        return runCheckAllCommand(
-          {
-            configPath: typeof args.config === 'string' ? args.config : undefined
-          },
-          output
-        );
-      }
-
-      const kind = args.kind;
-      if (kind !== 'd2' && kind !== 'mdx' && kind !== 'snippet' && kind !== 'config') {
-        output.error('Expected `docstube check --all` or `docstube check <d2|mdx|snippet|config> <file>`.');
-        return { exitCode: 1 };
-      }
-
-      if (typeof args.file !== 'string') {
-        output.error(`Missing file for check kind: ${kind}`);
-        return { exitCode: 1 };
-      }
-
       const { runCheckCommand } = await import('./commands/check-command.ts');
-      return runCheckCommand({ kind, file: args.file }, output);
+      return runCheckCommand(
+        {
+          workspaceDir: process.cwd(),
+          kind: typeof args.kind === 'string' ? args.kind : undefined,
+          list: args.list === true
+        },
+        output
+      );
     });
   }
 });
 
 const status = defineCommand({
-  meta: {
-    description: 'Show config, manifest, and page status.',
-    name: 'status'
-  },
-  args: {
-    config: { type: 'string', description: 'Path to docstube.yml.' }
-  },
-  async run({ args }) {
+  meta: { description: 'Show manifest, guarantee levels, and open flags.', name: 'status' },
+  async run() {
     await runCliCommand('status', async () => {
       enableNodeCompileCache();
       const { runStatusCommand } = await import('./commands/status-command.ts');
-      return runStatusCommand(
-        {
-          configPath: typeof args.config === 'string' ? args.config : undefined
-        },
-        output
-      );
+      return runStatusCommand({ workspaceDir: process.cwd() }, output);
     });
   }
 });
 
 const doctor = defineCommand({
-  meta: {
-    description: 'Check local runtime and project setup.',
-    name: 'doctor'
-  },
-  args: {
-    config: { type: 'string', description: 'Path to docstube.yml.' }
-  },
-  async run({ args }) {
+  meta: { description: 'Check local runtime and project setup.', name: 'doctor' },
+  async run() {
     await runCliCommand('doctor', async () => {
       enableNodeCompileCache();
       const { runDoctorCommand } = await import('./commands/doctor-command.ts');
-      return runDoctorCommand(
-        {
-          configPath: typeof args.config === 'string' ? args.config : undefined
-        },
-        output
-      );
+      return runDoctorCommand({ workspaceDir: process.cwd() }, output);
     });
   }
 });
 
 const upgrade = defineCommand({
-  meta: {
-    description: 'Upgrade the docstube tool itself.',
-    name: 'upgrade'
-  },
+  meta: { description: 'Upgrade the docstube tool itself.', name: 'upgrade' },
   args: {
     check: { type: 'boolean', description: 'Only check the current version.' },
     to: { type: 'string', description: 'Target version. Defaults to latest.' }
@@ -264,10 +232,7 @@ const upgrade = defineCommand({
       enableNodeCompileCache();
       const { runUpgradeCommand } = await import('./commands/upgrade-command.ts');
       return runUpgradeCommand(
-        {
-          check: args.check === true,
-          targetVersion: typeof args.to === 'string' ? args.to : undefined
-        },
+        { check: args.check === true, targetVersion: typeof args.to === 'string' ? args.to : undefined },
         output
       );
     });
@@ -275,10 +240,7 @@ const upgrade = defineCommand({
 });
 
 const version = defineCommand({
-  meta: {
-    description: 'Print the docstube version.',
-    name: 'version'
-  },
+  meta: { description: 'Print the docstube version.', name: 'version' },
   async run() {
     await runCliCommand('version', () => {
       output.info(docstubeVersion);
@@ -288,10 +250,7 @@ const version = defineCommand({
 });
 
 const help = defineCommand({
-  meta: {
-    description: 'Print command help.',
-    name: 'help'
-  },
+  meta: { description: 'Print command help.', name: 'help' },
   args: {
     command: { type: 'positional', required: false, description: 'Command to describe.' }
   },
@@ -305,7 +264,7 @@ const help = defineCommand({
 
 const main = defineCommand({
   meta: {
-    description: 'Generate verified, always-current documentation from source code.',
+    description: 'Verified docs, generated from your code.',
     name: 'docstube',
     version: docstubeVersion
   },
@@ -314,6 +273,8 @@ const main = defineCommand({
     generate,
     refresh,
     refine,
+    audit,
+    plugin,
     validate,
     check,
     status,

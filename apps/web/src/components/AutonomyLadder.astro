@@ -1,0 +1,176 @@
+---
+// The autonomy ladder - docstube's positioning centerpiece, replacing the old
+// capability-matrix comparison. Five levels of documentation autonomy; every
+// tool sits somewhere on the ladder. L4 splits in two: unverified (fluent,
+// distrusted) vs verified (docstube). Below it, the mechanism that earns the
+// top rung: every claim ships as proven / scored / flagged.
+import Section from './Section.astro';
+
+const rungs = [
+  {
+    level: 'L0',
+    name: 'Hand-written',
+    meta: 'humans write · humans maintain',
+    tools: 'Docusaurus · MkDocs · Starlight',
+    note: 'Great at hosting the docs you never quite find the time to write.'
+  },
+  {
+    level: 'L1',
+    name: 'AI-assisted',
+    meta: 'humans write with AI help · humans maintain',
+    tools: 'GitBook AI · a Copilot in the repo',
+    note: 'The typing gets faster. The job is still entirely yours.'
+  },
+  {
+    level: 'L2',
+    name: 'AI-suggested',
+    meta: 'humans wrote the base · AI drafts PRs, humans approve',
+    tools: 'Mintlify Autopilot · GitBook Agent · Swimm',
+    note: 'Every change waits on a review queue. The human is the bottleneck.'
+  },
+  {
+    level: 'L3',
+    name: 'AI-generated',
+    meta: 'AI writes from the code · humans re-review everything',
+    tools: 'one-shot AI doc generators',
+    note: 'Generation got cheap. Trust didn’t — you still proofread all of it.'
+  }
+];
+
+const guarantees = [
+  {
+    key: 'proven',
+    title: 'Proven',
+    body: 'Checked by deterministic tools — compilers, type-checkers, link resolvers, sandboxed execution. True no matter how smart the model is.'
+  },
+  {
+    key: 'scored',
+    title: 'Scored',
+    body: 'Reviewed by AI against explainable criteria — audience fit, grounding in the source, consistency. Never an opaque judge number.'
+  },
+  {
+    key: 'flagged',
+    title: 'Flagged',
+    body: 'Declared unprovable — tribal knowledge, intent, the “why”. Pulled to a human instead of shipped wrong.'
+  }
+];
+---
+
+<Section
+  id="ladder"
+  eyebrow="The autonomy ladder"
+  title="There are five levels of documentation autonomy."
+  intro="Every docs tool answers the same question: how much human time do the docs still cost? That's the ladder. Climbing it was never the hard part — earning trust at the top is."
+  tone="paper"
+>
+  <div class="mx-auto max-w-3xl">
+    <ol class="relative flex flex-col gap-3">
+      <span class="absolute bottom-6 left-[22px] top-6 w-px bg-line-strong" aria-hidden="true"></span>
+
+      {
+        rungs.map((r) => (
+          <li class="relative grid grid-cols-[44px_1fr] items-start gap-x-4 sm:gap-x-5">
+            <span class="z-10 flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-canvas font-mono text-[13px] font-bold text-muted shadow-soft">
+              {r.level}
+            </span>
+            <div class="rounded-xl border border-line bg-canvas/70 px-4 py-3.5 sm:px-5">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <h3 class="font-display text-[16.5px] font-semibold text-ink">{r.name}</h3>
+                <span class="font-mono text-[11px] text-muted">{r.meta}</span>
+              </div>
+              <p class="mt-1 text-[13.5px] leading-relaxed text-muted">{r.note}</p>
+              <p class="mt-1.5 font-mono text-[11px] text-faint">{r.tools}</p>
+            </div>
+          </li>
+        ))
+      }
+
+      <!-- L4: the top rung, split in two -->
+      <li class="relative grid grid-cols-[44px_1fr] items-start gap-x-4 sm:gap-x-5">
+        <span class="z-10 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 font-mono text-[13px] font-bold text-white shadow-brand">
+          L4
+        </span>
+        <div class="overflow-hidden rounded-2xl border-2 border-brand-400 bg-paper shadow-lift">
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line px-4 py-3.5 sm:px-5">
+            <h3 class="font-display text-[17px] font-bold text-ink">Autonomous</h3>
+            <span class="font-mono text-[11px] text-muted">AI writes · AI maintains · no human gate</span>
+          </div>
+          <div class="grid sm:grid-cols-2">
+            <div class="border-b border-line bg-danger/[0.04] px-4 py-4 sm:border-b-0 sm:border-r sm:px-5">
+              <p class="flex items-center gap-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-danger">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z" /><path d="M12 10v4M12 17.5h.01" /></svg>
+                without verification
+              </p>
+              <p class="mt-2 text-[13.5px] leading-relaxed text-ink-soft">
+                Fluent, confident, and publicly distrusted — invented architecture, wrong build systems.
+                <span class="font-semibold text-ink">Hallucination at scale.</span>
+              </p>
+              <p class="mt-2 font-mono text-[11px] text-faint">DeepWiki-style</p>
+            </div>
+            <div class="bg-brand-50/50 px-4 py-4 sm:px-5">
+              <p class="flex items-center gap-1.5 font-mono text-[10.5px] font-semibold uppercase tracking-wider text-brand-700">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3z" /><path d="m9 12 2 2 4-4" /></svg>
+                with verification
+              </p>
+              <p class="mt-2 text-[13.5px] leading-relaxed text-ink-soft">
+                Every claim proven against your source by real tools — or flagged for a human.
+                <span class="font-semibold text-ink">Never silently wrong.</span>
+              </p>
+              <p class="mt-2 inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-brand-700">
+                <img src="/brand/docstube-icon.svg" alt="" width="14" height="14" />
+                docstube
+              </p>
+            </div>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <p class="mx-auto mt-10 max-w-xl text-center text-[16px] leading-relaxed text-ink-soft">
+      <span class="font-semibold text-ink">Verification is what replaces the human gate.</span> That's the whole
+      product — and why nobody honestly held the top rung until now.
+    </p>
+  </div>
+
+  <!-- The mechanism: three guarantee levels -->
+  <div class="mx-auto mt-14 max-w-5xl">
+    <p class="text-center font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+      How the top rung is earned — every claim ships with a guarantee
+    </p>
+    <div class="mt-5 grid gap-4 sm:grid-cols-3">
+      {
+        guarantees.map((g) => (
+          <div class="surface flex flex-col gap-2.5 p-5">
+            <span
+              class={`inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10.5px] font-bold uppercase tracking-wider ${
+                g.key === 'proven'
+                  ? 'bg-pass/12 text-pass'
+                  : g.key === 'scored'
+                    ? 'bg-brand-50 text-brand-700'
+                    : 'bg-flag/12 text-flag'
+              }`}
+            >
+              {g.key === 'proven' && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+              )}
+              {g.key === 'scored' && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.7 4.6L18 9l-4.3 1.4L12 15l-1.7-4.6L6 9l4.3-1.4L12 3z" /></svg>
+              )}
+              {g.key === 'flagged' && (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4" /><path d="M5 4h13l-2.5 4L18 12H5" /></svg>
+              )}
+              {g.title}
+            </span>
+            <p class="text-[13.5px] leading-relaxed text-muted">{g.body}</p>
+          </div>
+        ))
+      }
+    </div>
+    <p class="mx-auto mt-6 max-w-2xl text-center text-[13.5px] leading-relaxed text-muted">
+      We'll never claim zero hallucinations — we claim something you can check:
+      <span class="font-medium text-ink-soft">verified defects per 100 claims</span>, measured by
+      <code class="rounded bg-canvas px-1.5 py-0.5 font-mono text-[12px] text-ink-soft">docstube audit</code>
+      on any docs site. Ours included.
+    </p>
+  </div>
+</Section>

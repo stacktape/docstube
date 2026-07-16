@@ -4,11 +4,9 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import Section from '../components/Section.astro';
 import RunsOn from '../components/RunsOn.astro';
-import Quadrant from '../components/Quadrant.astro';
-import CompareTable from '../components/CompareTable.astro';
+import AutonomyLadder from '../components/AutonomyLadder.astro';
 import BuiltForAgents from '../components/BuiltForAgents.astro';
 import Pricing from '../components/Pricing.astro';
-import Faq from '../components/Faq.astro';
 import FinalCta from '../components/FinalCta.astro';
 import HeroDemo from '../components/HeroDemo.astro';
 import DocsProblem from '../components/DocsProblem.astro';
@@ -20,8 +18,8 @@ import { site } from '../data/site.ts';
 ---
 
 <Base
-  title="docstube - verified, always-current docs generated from your code"
-  description="docstube reads your codebase, writes your docs, fact-checks every claim against the source, and keeps everything in sync as your code changes. Open-source, MIT, and runs on the AI you already pay for."
+  title="docstube — verified docs, generated from your code"
+  description="docstube is the first L4 documentation system: it generates docs from your codebase, proves every claim against the source, and maintains them autonomously — flagged when unprovable, never silently wrong. Open-source, MIT, runs on your own AI."
 >
   <Header />
 
@@ -31,6 +29,14 @@ import { site } from '../data/site.ts';
       <div class="glow relative mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:gap-14 lg:py-24">
         <!-- Left: copy -->
         <div class="relative z-10 flex flex-col items-start gap-6">
+          <a
+            href="#ladder"
+            class="group inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50/80 py-1.5 pl-1.5 pr-3.5 text-[13px] font-medium text-brand-800 shadow-soft transition hover:border-brand-300 hover:shadow-lift"
+          >
+            <span class="rounded-full bg-brand-500 px-2 py-0.5 font-mono text-[10.5px] font-bold text-white">L4</span>
+            The first fully-autonomous docs system
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-600 transition-transform group-hover:translate-y-0.5" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+          </a>
           <h1 class="text-[40px] font-extrabold leading-[1.05] sm:text-[52px] sm:leading-[1.03]">
             Most technical documentation is trash. <span class="gradient-text">Yours won't be.</span>
           </h1>
@@ -62,6 +68,10 @@ import { site } from '../data/site.ts';
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 5.5L20 7" /></svg>
               Join the waitlist
             </a>
+            <a href="#how" class="btn btn-secondary">
+              See how it works
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+            </a>
           </div>
         </div>
 
@@ -78,7 +88,10 @@ import { site } from '../data/site.ts';
     <!-- Why this matters - the problem -->
     <DocsProblem />
 
-    <!-- How it works - four-step walkthrough -->
+    <!-- The autonomy ladder - the category claim and where everyone sits -->
+    <AutonomyLadder />
+
+    <!-- How it works - five-step walkthrough -->
     <HowItWorks />
 
     <!-- Use cases - public docs / internal wiki -->
@@ -90,19 +103,6 @@ import { site } from '../data/site.ts';
     <!-- Easy human review -->
     <HumanReview />
 
-    <!-- Comparison - table given full width for readability -->
-    <Section
-      id="compare"
-      eyebrow="Where it sits"
-      title="Active generation. Mechanical verification. Yours."
-      intro="Hosting platforms organize the docs you write by hand. AI tools generate text and hope. docstube generates from your code, verifies the output, and hands you a site you own."
-    >
-      <div class="flex flex-col gap-10">
-        <Quadrant />
-        <CompareTable />
-      </div>
-    </Section>
-
     <!-- Built for agents -->
     <Section eyebrow="Built for agents" title="Your agents read it too — and get it right.">
       <BuiltForAgents />
@@ -112,16 +112,11 @@ import { site } from '../data/site.ts';
     <Section
       id="pricing"
       eyebrow="Pricing"
-      title="Free forever. Every feature."
-      intro="The open-source tool is the whole product. You pay only for your own AI usage, with caps you set. A hosted Cloud tier is optional, for teams that want everything in one place."
+      title="The whole product is free."
+      intro="Every feature, MIT-licensed, forever. You pay only your own AI provider, at their prices, with spend caps you set. Paid tiers come later — and they'll sell what a single repo can't have, never the product itself."
       tone="paper"
     >
       <Pricing />
-    </Section>
-
-    <!-- FAQ -->
-    <Section id="faq" eyebrow="FAQ" title="The honest answers." tone="paper">
-      <Faq />
     </Section>
 
     <FinalCta />

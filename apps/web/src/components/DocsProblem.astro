@@ -15,25 +15,41 @@ const SO = 'https://survey.stackoverflow.co/2024/';
   title="Everyone needs the docs. Every way we make them is broken."
   tone="canvas"
 >
-  <!-- Single sourced claim -->
-  <div class="mx-auto flex max-w-md items-center gap-4 rounded-2xl border border-line bg-paper p-5 shadow-soft">
-    <span class="shrink-0 font-display text-[46px] font-extrabold leading-none gradient-text">84%</span>
-    <p class="text-[14px] leading-snug text-ink-soft">
-      of developers call technical documentation their number-one way to learn a new tool.
+  <!-- Sourced claims: docs matter, and the human baseline is measurably bad -->
+  <div class="mx-auto grid max-w-4xl gap-4 sm:grid-cols-3">
+    <div class="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-5 shadow-soft">
+      <span class="font-display text-[40px] font-extrabold leading-none gradient-text">84%</span>
+      <p class="text-[13.5px] leading-snug text-ink-soft">
+        of developers call documentation their number-one way to learn a new tool.
+      </p>
       <a
         href={SO}
         target="_blank"
         rel="noopener"
-        class="ml-0.5 inline-flex items-center gap-0.5 align-baseline font-mono text-[11px] text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-brand-600"
-        >source<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg></a>
-    </p>
+        class="mt-auto inline-flex items-center gap-1 font-mono text-[10.5px] text-muted underline decoration-line-strong underline-offset-2 transition-colors hover:text-brand-600"
+        >Stack Overflow survey, 2024<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8" /></svg></a>
+    </div>
+    <div class="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-5 shadow-soft">
+      <span class="font-display text-[40px] font-extrabold leading-none text-ink">28.9%</span>
+      <p class="text-[13.5px] leading-snug text-ink-soft">
+        of popular repos document code symbols that <span class="font-semibold text-ink">no longer exist</span>.
+      </p>
+      <span class="mt-auto font-mono text-[10.5px] text-muted">Tan, Wagner &amp; Treude · Empirical Software Eng.</span>
+    </div>
+    <div class="flex flex-col gap-2 rounded-2xl border border-line bg-paper p-5 shadow-soft">
+      <span class="font-display text-[40px] font-extrabold leading-none text-ink">4.7 <span class="text-[24px]">yrs</span></span>
+      <p class="text-[13.5px] leading-snug text-ink-soft">
+        how long the average outdated doc reference has been wrong.
+      </p>
+      <span class="mt-auto font-mono text-[10.5px] text-muted">Tan, Wagner &amp; Treude · Empirical Software Eng.</span>
+    </div>
   </div>
 
   <!-- Framing: everything below is the current, broken state -->
   <div class="mt-11 flex justify-center">
     <span class="inline-flex items-center gap-2 rounded-full border border-danger/20 bg-danger/[0.06] px-3.5 py-1.5 text-[12.5px] font-medium text-danger">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
-      How it goes today, without docstube
+      How docs get made today
     </span>
   </div>
 

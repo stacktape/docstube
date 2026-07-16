@@ -7,9 +7,9 @@
 <section class="dot-bg border-b border-line">
   <div class="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
     <div class="mx-auto flex max-w-2xl flex-col items-center gap-4 text-center">
-      <span class="eyebrow">Beautiful &amp; feature-rich</span>
-      <h2 class="text-balance text-3xl font-bold sm:text-[42px] sm:leading-[1.06]">As polished as the best docs platforms</h2>
-      <p class="text-[16px] leading-relaxed text-muted">Instant search, rendered diagrams, type-checked samples, API references, light and dark — every component a great docs site needs, and you wrote none of it.</p>
+      <span class="eyebrow">The output</span>
+      <h2 class="text-balance text-3xl font-bold sm:text-[42px] sm:leading-[1.06]">Not a markdown dump. A real docs site.</h2>
+      <p class="text-[16px] leading-relaxed text-muted">Instant search, rendered diagrams, type-checked samples, API references, light and dark — everything a great docs site needs, and you wrote none of it.</p>
     </div>
 
     <!-- the live sample site (one consistent "Acme" auth doc) -->
@@ -386,16 +386,17 @@
 
 <script>
   // doc preview: Tabs-style theme switch + animated code tabs + collapsible nav.
+  const movePill = (rail: HTMLElement) => {
+    const pill = rail.querySelector<HTMLElement>('[data-rail-pill]');
+    const on = rail.querySelector<HTMLElement>('.dp-on') || rail.querySelector<HTMLButtonElement>('button');
+    if (!pill || !on) return;
+    pill.style.left = `${on.offsetLeft}px`;
+    pill.style.top = `${on.offsetTop}px`;
+    pill.style.width = `${on.offsetWidth}px`;
+    pill.style.height = `${on.offsetHeight}px`;
+  };
+
   const setupDocPreview = () => {
-    const movePill = (rail: HTMLElement) => {
-      const pill = rail.querySelector<HTMLElement>('[data-rail-pill]');
-      const on = rail.querySelector<HTMLElement>('.dp-on') || rail.querySelector<HTMLButtonElement>('button');
-      if (!pill || !on) return;
-      pill.style.left = `${on.offsetLeft}px`;
-      pill.style.top = `${on.offsetTop}px`;
-      pill.style.width = `${on.offsetWidth}px`;
-      pill.style.height = `${on.offsetHeight}px`;
-    };
     const rails: HTMLElement[] = [];
     document.querySelectorAll<HTMLElement>('[data-doc-preview]').forEach((root) => {
       const themeRail = root.querySelector<HTMLElement>('[data-theme-rail]');

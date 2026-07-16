@@ -1,45 +1,49 @@
-import { defaultOutput } from '../cli-output.ts';
+import { createManifestStore, loadConfigFamily, CoreError } from '@docstube/core';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 
-export type StatusCommandOptions = {
-  configPath?: string;
-  workspaceDir?: string;
+export type StatusCommandInput = {
+  workspaceDir: string;
 };
 
-export const runStatusCommand = async (
-  options: StatusCommandOptions = {},
-  output: CliOutput = defaultOutput
-): Promise<CliCommandResult> => {
-  const workspaceDir = options.workspaceDir ?? process.cwd();
-  const configPath = options.configPath ?? 'docstube.yml';
-  const { getProjectStatus } = await import('@docstube/core');
-  const status = await getProjectStatus({ configPath, workspaceDir });
-
-  output.info(
-    `Config: ${status.config.found ? (status.config.valid ? 'valid' : 'invalid') : 'missing'} (${configPath})`
-  );
-  if (status.config.error) {
-    output.error(status.config.error);
+export const runStatusCommand = async (input: StatusCommandInput, output: CliOutput): Promise<CliCommandResult> => {
+  let currentVersion = 'latest';
+  let sourceLocale = 'en';
+  try {
+    const family = await loadConfigFamily(input.workspaceDir);
+    currentVersion = family.config.versions.current;
+    sourceLocale = family.config.locales.source;
+  } catch (error) {
+    if (!(error instanceof CoreError)) {
+      throw error;
+    }
+    output.error(error.message);
+    return { exitCode: 1 };
   }
 
-  if (!status.manifest) {
-    output.info('Manifest: missing');
-  } else {
-    const summary =
-      Object.keys(status.manifest.statusCounts).length === 0
-        ? '0 pages'
-        : Object.entries(status.manifest.statusCounts)
-            .map(([pageStatus, count]) => `${pageStatus}:${count}`)
-            .join(', ');
-    output.info(`Manifest: found (${status.manifest.generatedWith})`);
-    output.info(`Pages: ${summary}`);
+  const store = createManifestStore(input.workspaceDir, currentVersion);
+  const index = await store.readIndex();
+  if (index === undefined) {
+    output.info('No manifest yet — run `docstube generate` first.');
+    return { exitCode: 0 };
   }
 
-  output.info(`State: ${status.pageState.found ? `${status.pageState.pageCount} pages` : 'missing'}`);
-  output.info(`Source files considered: ${status.sourceFilesCount}`);
-  output.info(`Stale pages: ${status.staleDecisions.length}`);
+  output.info(`docs version ${currentVersion} · locales: ${index.locales.join(', ')} · ${index.pages.length} page(s)`);
+  let openFlags = index.systemFlags.filter((flag) => flag.status === 'open').length;
+  const guaranteeCounts = { proven: 0, scored: 0, 'out-of-domain': 0 };
+  for (const entry of index.pages) {
+    const shard = await store.readPageShard({ locale: sourceLocale, pageId: entry.id });
+    if (shard === undefined) {
+      output.info(`  ${entry.slug} — shard missing (state corrupt? run generate)`);
+      continue;
+    }
+    openFlags += shard.flags.filter((flag) => flag.status === 'open').length;
+    guaranteeCounts[shard.page.guarantee] += 1;
+    output.info(
+      `  ${entry.slug} — ${shard.page.guarantee}${shard.flags.length > 0 ? ` · ${shard.flags.length} flag(s)` : ''}`
+    );
+  }
   output.info(
-    `Refinement candidates: ${status.refinementCandidates.filter((candidate) => candidate.score < 100).length}`
+    `guarantees: ${guaranteeCounts.proven} proven · ${guaranteeCounts.scored} scored · ${guaranteeCounts['out-of-domain']} out-of-domain · open flags: ${openFlags}`
   );
   return { exitCode: 0 };
 };

@@ -6,26 +6,46 @@ type Props = {
   sub?: string;
 };
 const {
-  title = 'Be first to stop maintaining docs by hand.',
-  sub = 'docstube is launching soon. Join the waitlist and we’ll send you a single email the day it’s ready.'
+  title = 'Stop maintaining docs by hand.',
+  sub = 'docstube is launching soon. Join the waitlist and we’ll send you a single email the day it’s ready — nothing else.'
 } = Astro.props;
+
+const trust = ['MIT licensed', 'Bring your own AI', 'Source stays local'];
 ---
 
 <section id="waitlist" class="relative overflow-hidden">
   <div class="mx-auto max-w-6xl px-5 py-16 sm:px-8">
     <div class="glow relative overflow-hidden rounded-3xl border border-brand-200 bg-gradient-to-br from-brand-50 via-paper to-brand-50 px-6 py-16 text-center sm:px-12">
       <div class="relative z-10 mx-auto flex max-w-2xl flex-col items-center gap-5">
-        <img src="/brand/docstube-icon.svg" alt="" width="60" height="60" class="float-slow drop-shadow-sm" />
+        <img src="/brand/docstube-icon.svg" alt="" width="56" height="56" class="float-slow drop-shadow-sm" />
+        <span class="eyebrow">The first L4 documentation system</span>
         <h2 class="text-balance text-3xl font-bold sm:text-[42px] sm:leading-[1.06]">{title}</h2>
-        <p class="text-[17px] leading-relaxed text-muted">{sub}</p>
-        <a href={site.waitlist} class="btn btn-primary btn-lg mt-1 shadow-brand">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="3" y="5" width="18" height="14" rx="2.5" />
-            <path d="m4 7 8 5.5L20 7" />
-          </svg>
-          Join the waitlist
-        </a>
-        <p class="font-mono text-[12px] text-muted">Early access · no spam, just one launch ping.</p>
+        <p class="max-w-xl text-[17px] leading-relaxed text-muted">{sub}</p>
+
+        <div class="mt-2 flex flex-col items-center gap-3 sm:flex-row">
+          <a href={site.waitlist} class="btn btn-primary btn-lg shadow-brand">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2.5" />
+              <path d="m4 7 8 5.5L20 7" />
+            </svg>
+            Join the waitlist
+          </a>
+          <a href={site.repo} target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-lg">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" /></svg>
+            Star it on GitHub
+          </a>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-muted">
+          {
+            trust.map((t) => (
+              <span class="inline-flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brand-500"><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 5-5" /></svg>
+                {t}
+              </span>
+            ))
+          }
+        </div>
       </div>
     </div>
   </div>

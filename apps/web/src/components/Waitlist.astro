@@ -24,10 +24,6 @@
       <p class="mt-2 text-[14.5px] leading-relaxed text-muted">docstube is launching soon. Drop your email and we'll send you a single message the day it's ready.</p>
       <form data-waitlist-form class="mt-5 flex flex-col gap-3" novalidate>
         <label class="flex flex-col gap-1.5">
-          <span class="text-[12.5px] font-medium text-ink-soft">Name <span class="font-normal text-muted">(optional)</span></span>
-          <input name="fullName" type="text" autocomplete="name" placeholder="Ada Lovelace" class="w-full rounded-lg border border-line bg-canvas px-3.5 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/25" />
-        </label>
-        <label class="flex flex-col gap-1.5">
           <span class="text-[12.5px] font-medium text-ink-soft">Work email</span>
           <input name="workEmail" type="email" required autocomplete="email" placeholder="you@company.com" class="w-full rounded-lg border border-line bg-canvas px-3.5 py-2.5 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand-400 focus:ring-2 focus:ring-brand-400/25" />
         </label>
@@ -67,6 +63,8 @@
 <script>
   const WAITLIST_ENDPOINT = 'https://7r5nt7amwzqosdsbepoqakhvha0hbimc.lambda-url.eu-west-1.on.aws';
 
+  const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
   const setup = () => {
     const modal = document.querySelector<HTMLElement>('[data-waitlist-modal]');
     if (!modal) return;
@@ -75,7 +73,6 @@
     const success = modal.querySelector<HTMLElement>('[data-waitlist-success]');
     const errorEl = modal.querySelector<HTMLElement>('[data-waitlist-error]');
     const emailInput = modal.querySelector<HTMLInputElement>('input[name="workEmail"]');
-    const nameInput = modal.querySelector<HTMLInputElement>('input[name="fullName"]');
     const submitBtn = modal.querySelector<HTMLButtonElement>('[data-waitlist-submit]');
     if (!form || !formWrap || !success || !errorEl || !emailInput || !submitBtn) return;
 
@@ -102,12 +99,10 @@
       if (e.key === 'Escape' && !modal.hidden) close();
     });
 
-    const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const workEmail = emailInput.value.trim();
-      const fullName = (nameInput?.value || '').trim();
       if (!emailOk(workEmail)) {
         errorEl.textContent = 'Please enter a valid email address.';
         emailInput.focus();
@@ -119,7 +114,7 @@
       fetch(WAITLIST_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companySize: '<docstube-waitlist>', fullName, workEmail, needs: '<docstube-waitlist>' })
+        body: JSON.stringify({ companySize: '<docstube-waitlist>', fullName: '', workEmail, needs: '<docstube-waitlist>' })
       })
         .then((r) => {
           if (!r.ok) throw new Error(`status ${r.status}`);

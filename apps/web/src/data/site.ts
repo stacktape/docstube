@@ -14,10 +14,9 @@ export const site = {
 export type NavLink = { label: string; href: string };
 
 export const nav: NavLink[] = [
+  { label: 'The ladder', href: '#ladder' },
   { label: 'How it works', href: '#how' },
-  { label: 'Compare', href: '#compare' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'Docs', href: '#faq' }
+  { label: 'Pricing', href: '#pricing' }
 ];
 
 // "Runs on the AI you already use" - the AI tools docstube drives, not customer
@@ -111,54 +110,6 @@ export const verifierChecks = [
   { label: 'Migration guide - needs a human', status: 'flag' }
 ] as const;
 
-// Capability comparison. Deliberately about capabilities, not funding or star
-// counts (which are unverifiable to assert publicly). docstube's wedge =
-// active + verified + bring-your-own-compute + you own the output.
-export const compareColumns = [
-  'Open source',
-  'Reads your actual code',
-  'Runs on your AI subscription',
-  'Mechanically verifies output',
-  'Incremental updates',
-  'You own the output'
-] as const;
-
-export const compareRows = [
-  {
-    tool: 'docstube',
-    self: true,
-    values: ['MIT', 'Yes', 'Yes', 'Yes', 'Symbol-level', 'MDX / Astro']
-  },
-  {
-    tool: 'Hosted docs platforms',
-    self: false,
-    values: ['No', 'Via AI add-on', 'No - metered credits', 'No verifier', 'File-hash scan', 'Their platform']
-  },
-  {
-    tool: 'AI doc generators',
-    self: false,
-    values: ['Mostly no', 'Yes', 'No - own models', 'No verifier', 'Re-generates', 'Varies']
-  },
-  {
-    tool: 'Claude + you',
-    self: false,
-    values: ['n/a', 'Yes', 'Yes', 'No verifier', 'Manual', 'Markdown in repo']
-  }
-] as const;
-
-// 2x2 positioning quadrant.
-export const quadrant = {
-  xLabels: ['Hosts docs you write', 'Generates from your code'],
-  yLabels: ['Verified', 'Unverified'],
-  cells: {
-    // [y][x]
-    topLeft: { label: 'Code-coupled tools', tone: 'neutral' },
-    topRight: { label: 'docstube', tone: 'brand' },
-    bottomLeft: { label: 'Hosted docs platforms', tone: 'neutral' },
-    bottomRight: { label: 'Generic AI doc tools', tone: 'neutral' }
-  }
-} as const;
-
 export const useCases = [
   {
     title: 'Public docs sites',
@@ -177,72 +128,38 @@ export const useCases = [
   }
 ] as const;
 
-export const pricing = [
-  {
+// Pricing: one hero tier (the whole product, free) + two compact future tiers.
+// The future tiers deliberately get no CTA buttons — they don't exist yet.
+export const pricing = {
+  free: {
     name: 'Open source',
     price: 'Free forever',
-    tagline: 'Every feature. Bring your own AI.',
-    hero: true,
+    tagline: 'Not a free tier of something bigger. The entire product, MIT-licensed.',
     points: [
-      'The complete CLI, web UI, and GitHub Action',
-      'Verified, persona-targeted docs',
-      'MDX + Astro output you own',
-      'MIT-licensed · community support'
+      'The full pipeline: generate, review, verify, refresh',
+      'CLI, local web UI, and the GitHub Action',
+      'Every verifier and every feature — nothing gated',
+      'A self-contained MDX + Astro site you own, hosted anywhere',
+      'Runs on your Claude, Codex, or Gemini — or any API key',
+      'Your source never leaves your machine'
     ],
     cta: 'Join the waitlist',
     ctaHref: site.waitlist
   },
-  {
-    name: 'Cloud',
-    price: 'Usage-based',
-    tagline: 'Everything in open source, hosted.',
-    hero: false,
-    points: [
-      'All your projects’ docs in one place',
-      'Cross-project “Ask agent” + MCP',
-      'Governance, audit log, analytics',
-      'Collaboration + company-wide defaults'
-    ],
-    cta: 'Join the waitlist',
-    ctaHref: site.waitlist
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    tagline: 'Everything in Cloud, plus control.',
-    hero: false,
-    points: ['Self-hosting', 'SLA + onboarding', 'Enterprise support', 'Security review'],
-    cta: 'Talk to us',
-    ctaHref: site.waitlist
-  }
-] as const;
-
-export const faqs = [
-  {
-    q: 'Does my code leave my machine?',
-    a: 'No. docstube servers never receive your source, prompts, or generated docs. Your code is only ever sent to the AI provider you choose, through your own credentials - exactly like your normal agent usage.'
-  },
-  {
-    q: 'Which AI providers can I use?',
-    a: 'Your own Claude, Codex, or Gemini CLI - subscription or API key - or any OpenAI-compatible or Anthropic-compatible endpoint via a custom base URL. Any model you can already reach.'
-  },
-  {
-    q: 'Do I own the output?',
-    a: 'Yes. docstube generates a self-contained MDX + Astro site into your repo. No platform lock-in, nothing to keep paying for to keep your docs online.'
-  },
-  {
-    q: 'Is it really free?',
-    a: 'Yes - every feature, MIT-licensed. You pay only for your own AI usage, with spend caps you set. A hosted Cloud tier is optional and adds cross-project features.'
-  },
-  {
-    q: 'How can it claim docs are correct?',
-    a: 'It doesn’t claim perfection. Deterministic verifiers mechanically check what is checkable - samples type-check, imports resolve, links work, API references match your compiler. Anything that can’t be verified ships flagged for review, never silently wrong.'
-  },
-  {
-    q: 'What languages does it support?',
-    a: 'TypeScript and Python today, with compiler-extracted API references via TypeDoc and griffe. The structural map is tree-sitter-based, so more languages can follow.'
-  }
-] as const;
+  later: [
+    {
+      name: 'Cloud',
+      price: 'Usage-based',
+      tagline:
+        'For teams with many repos: a cross-repo Ask agent, docs-health across your fleet, SSO and audit. Sells what a single repo can’t have — never the core product.'
+    },
+    {
+      name: 'Enterprise',
+      price: 'Custom',
+      tagline: 'Everything in Cloud, self-hosted on your infrastructure, with an SLA and hands-on support.'
+    }
+  ]
+} as const;
 
 // Approved fact bank. tone = how confident the source is. Attribute inline.
 export const facts = {
@@ -285,6 +202,16 @@ export const facts = {
     stat: '84%',
     claim: 'name technical documentation their most-used learning resource',
     source: 'Stack Overflow 2024 survey'
+  },
+  staleSymbols: {
+    stat: '28.9%',
+    claim: 'of popular repos document code symbols that no longer exist',
+    source: 'Tan, Wagner & Treude · Empirical Software Engineering'
+  },
+  staleYears: {
+    stat: '4.7 years',
+    claim: 'how long the average outdated doc reference has been wrong',
+    source: 'Tan, Wagner & Treude · Empirical Software Engineering'
   },
   reposPerMinute: {
     stat: '~1 / minute',

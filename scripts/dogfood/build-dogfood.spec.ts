@@ -1,52 +1,18 @@
-import { copyFile, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import * as core from '@docstube/core';
-import { describe, expect, it } from 'vitest';
-import { buildDogfoodDocs } from './build-dogfood.ts';
+import { rm } from 'node:fs/promises';
+import { afterAll, describe, expect, it } from 'vitest';
+import { buildDogfood } from './build-dogfood.ts';
 
-const repoFile = (name: string): string => fileURLToPath(new URL(`../../${name}`, import.meta.url));
+const outputDir = 'dist-dogfood-test';
 
-describe('dogfood docs builder', () => {
-  it('creates a reviewable static artifact without live agents', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'docstube-dogfood-'));
-    try {
-      await Promise.all([
-        copyFile(repoFile('PRODUCT.md'), join(dir, 'PRODUCT.md')),
-        copyFile(repoFile('package.json'), join(dir, 'package.json'))
-      ]);
+afterAll(async () => {
+  await rm(outputDir, { recursive: true, force: true });
+});
 
-      const result = await buildDogfoodDocs({ core, outputDir: 'dogfood-out', workspaceDir: dir });
-      const html = await readFile(join(result.siteDistDir!, 'index.html'), 'utf8');
-      const mdx = await readFile(join(result.siteDir, 'src', 'pages', 'index.mdx'), 'utf8');
-      const manifest = JSON.parse(await readFile(join(result.outputDir, 'manifest.json'), 'utf8')) as {
-        generatedPages?: unknown;
-        liveAgents?: unknown;
-        productSectionCount?: unknown;
-        reviewRequired?: unknown;
-        siteBuilt?: unknown;
-      };
-
-      expect(result.generatedPages).toEqual([
-        { id: 'overview', path: 'docs/src/pages/index.mdx', status: 'passed' },
-        { id: 'product', path: 'docs/src/pages/product.mdx', status: 'passed' }
-      ]);
-      expect(result.files).toContain('workspace/docs/dist/index.html');
-      expect(result.files).toContain('workspace/docs/dist/llms.txt');
-      expect(result.files).toContain('workspace/docs/dist/pagefind/pagefind.js');
-      expect(result.files).toContain('workspace/docs/dist/sitemap.xml');
-      expect(html).toContain('docstube dogfood');
-      expect(mdx).toContain('Source facts:');
-      expect(mdx).toContain('src/PRODUCT.md');
-      expect(html).not.toContain('sk-');
-      expect(manifest.generatedPages).toHaveLength(2);
-      expect(manifest.liveAgents).toBe(false);
-      expect(manifest.reviewRequired).toBe(true);
-      expect(manifest.siteBuilt).toBe(true);
-      expect(typeof manifest.productSectionCount).toBe('number');
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
+describe('dogfood build', () => {
+  it('generates verified docs for the contracts package through the real pipeline', async () => {
+    const { summary } = await buildDogfood({ outputDir });
+    expect(summary.outcome).toBe('passed');
+    expect(summary.pages).toHaveLength(2);
+    expect(summary.pages.every((page) => page.status === 'passed')).toBe(true);
+  }, 120_000);
 });

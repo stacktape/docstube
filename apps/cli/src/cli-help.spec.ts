@@ -1,34 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { commandHelp, commandHelpByCommand, getCommandHelp } from './cli-help.ts';
+import { getCommandHelp } from './cli-help.ts';
 
-describe('CLI help surface', () => {
-  it('pins the public command names and command-specific usage', () => {
-    expect(Object.keys(commandHelpByCommand)).toEqual([
+describe('cli help', () => {
+  it('lists the full v1 command surface', () => {
+    const help = getCommandHelp();
+    for (const command of [
       'wizard',
       'generate',
       'refresh',
       'refine',
+      'audit',
       'validate',
       'check',
       'status',
       'doctor',
-      'upgrade',
-      'version'
-    ]);
-    expect(commandHelp).toContain('wizard');
-    expect(getCommandHelp('wizard')).toContain('docstube wizard [--fresh]');
-    expect(getCommandHelp('refine')).toContain('[--config <path>]');
-    expect(getCommandHelp('check')).toContain('docstube check --all [--config <path>]');
-    expect(getCommandHelp('status')).toContain('docstube status [--config <path>]');
-    expect(getCommandHelp('doctor')).toContain('docstube doctor [--config <path>]');
+      'plugin',
+      'upgrade'
+    ]) {
+      expect(help).toContain(`  ${command}`);
+    }
   });
 
-  it('does not advertise removed command concepts', () => {
-    const help = [commandHelp, ...Object.values(commandHelpByCommand)].join('\n');
+  it('documents check kinds as plugin-derived, not a hardcoded list', () => {
+    expect(getCommandHelp('check')).toContain('registered verifier plugins');
+    expect(getCommandHelp('check')).not.toMatch(/d2\|mdx\|snippet\|config/);
+  });
 
-    expect(help).not.toContain('--no-open');
-    expect(help).not.toContain('upgrade --project');
-    expect(help).not.toContain('docstube update');
-    expect(help).not.toContain('refine [page] [--all]');
+  it('falls back to the overview for unknown commands', () => {
+    expect(getCommandHelp('nope')).toContain('Unknown command: nope');
   });
 });
