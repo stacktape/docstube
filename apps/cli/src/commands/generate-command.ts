@@ -49,6 +49,14 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
     if (summary.outcome === 'flagged') {
       output.info('run finished with open flags — review them with `docstube status`');
     }
+    if (summary.outcome === 'frozen') {
+      output.info(
+        'run FROZE at the configured budget cap (agents.budgets.maxRunUsd) — rerun to continue; finished pages are cached'
+      );
+    }
+    if (summary.spentUsd !== undefined) {
+      output.info(`agent spend this run: ~$${summary.spentUsd.toFixed(4)}`);
+    }
     output.info(`run ${summary.runId}: ${summary.outcome}`);
     return { exitCode: summary.outcome === 'failed' ? 1 : 0 };
   } catch (error) {

@@ -14,9 +14,15 @@ import { reviewPage } from './review-page.ts';
 import { attachExtractedClaims } from './claims-stage.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
 import type { KnowledgeEntry } from './tribal-knowledge.ts';
+import type { RunCostTracker } from './run-cost.ts';
 
 // The per-page generation loop: write ⇄ (review ∥ verify) → gate, bounded retries, flag instead
 // of silent shipping. Reused by generate (all pages) and maintain/refresh (affected pages only).
+//
+// Cost accounting: every task-completed usage feeds ctx.costTracker, but the cap-freeze check
+// deliberately does NOT happen inside this loop — only the callers check, between pages. Freezing
+// mid-loop would abandon a half-verified draft: the shard and MDX would ship in a state the gate
+// never approved, which is state corruption, not savings.
 
 // Structurally compatible with agent-runtime's ToolImplementation; core stays contracts-typed.
 export type TaskToolImplementation = {
@@ -45,6 +51,8 @@ export type PageRunContext = {
   // Answered tribal knowledge, injected into every writer prompt; keys drive ask-once dedup.
   knowledge: KnowledgeEntry[];
   openQuestionKeys: ReadonlySet<string>;
+  // Accumulates every task's reported cost; callers check shouldFreeze() between pages.
+  costTracker: RunCostTracker;
   commit: string;
   locale: string;
   version: string;
@@ -95,6 +103,7 @@ export const generatePage = async (
     await ctx.journal.append({ type: 'task-started', taskId: task.id });
     const transcript = await ctx.options.runTask(task, [questionCollector.tool]);
     await ctx.journal.append({ type: 'task-completed', taskId: task.id, usage: transcript.usage });
+    ctx.costTracker.add(transcript.usage);
     lastTranscript = transcript;
     if (transcript.result?.type !== 'mdx') {
       throw new CoreError(
@@ -152,7 +161,8 @@ export const generatePage = async (
       criteria: ctx.criteria,
       artifact,
       runTask: ctx.options.runTask,
-      journal: ctx.journal
+      journal: ctx.journal,
+      costTracker: ctx.costTracker
     });
     findings = [
       ...errorFindings(results),
@@ -171,7 +181,8 @@ export const generatePage = async (
         artifact: { ...artifact, page: verifiedPage },
         codemap: ctx.codemap,
         runTask: ctx.options.runTask,
-        journal: ctx.journal
+        journal: ctx.journal,
+        costTracker: ctx.costTracker
       });
       findings = claimsResult.findings;
       if (claimsResult.warning !== undefined) {

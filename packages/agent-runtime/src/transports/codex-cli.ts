@@ -23,7 +23,7 @@ import { prepareForwardedTools } from './forwarded-tools.ts';
 //   needs one live smoke test. Chosen over a temp CODEX_HOME config.toml because
 //   `--ignore-user-config` + `-c` is fully flag-driven (no file lifecycle) and keeps ChatGPT
 //   subscription auth working (`--ignore-user-config` skips only $CODEX_HOME/config.toml).
-// - Built-in tool reduction: `features.shell_tool=false`, `tools.web_search="disabled"`,
+// - Built-in tool reduction: `features.shell_tool=false`, `tools.web_search=false` (live-verified on codex 0.139: the string enum form fails config parsing; boolean works),
 //   `tools.view_image=false`, plus `--sandbox read-only`. `apply_patch` CANNOT be disabled, so the
 //   process runs with cwd = a fresh scratch directory: stray patches land in a directory that is
 //   deleted afterwards and never touch the repo.
@@ -72,7 +72,7 @@ export const buildCodexCliArgs = (input: CodexCliArgsInput): string[] => [
   '-c',
   'features.shell_tool=false',
   '-c',
-  'tools.web_search="disabled"',
+  'tools.web_search=false',
   '-c',
   'tools.view_image=false',
   '-c',
@@ -81,6 +81,12 @@ export const buildCodexCliArgs = (input: CodexCliArgsInput): string[] => [
   `mcp_servers.${MCP_SERVER_NAME}.args=${tomlStringArray(input.mcpServer.args)}`,
   '-c',
   `mcp_servers.${MCP_SERVER_NAME}.required=true`,
+  // Live-verified on codex 0.139: MCP tool calls need per-server approval mode `approve`
+  // (always-approve) or exec mode cancels every call ("user cancelled MCP tool call"). The other
+  // enum values fail non-interactively: `prompt` has nowhere to ask, `auto` still cancels, and
+  // approval_policy="never" means never-ask-and-DENY.
+  '-c',
+  `mcp_servers.${MCP_SERVER_NAME}.default_tools_approval_mode="approve"`,
   ...Object.entries(input.mcpServer.env).flatMap(([key, value]) => [
     '-c',
     `mcp_servers.${MCP_SERVER_NAME}.env.${key}=${tomlString(value)}`
@@ -135,6 +141,8 @@ export const parseCodexJsonEvents = (lines: readonly string[]): CodexJsonParseRe
       continue;
     }
 
+    // turn.completed usage carries token counts only — codex never reports a USD cost
+    // (exec_events.rs); the harness estimates one from model-pricing.ts when the model is known.
     if (event.type === 'turn.completed') {
       sawTurnCompleted = true;
       if (isRecord(event.usage)) {

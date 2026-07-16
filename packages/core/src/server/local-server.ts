@@ -5,6 +5,7 @@ import { serve } from '@hono/node-server';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import type { ControlPlaneInjection } from './trpc-router.ts';
 import { controlPlaneRouter } from './trpc-router.ts';
 
 // Session-guarded localhost control plane (PRODUCT §3.9): binds 127.0.0.1 only, and every /api
@@ -48,6 +49,11 @@ export type LocalAppOptions = {
   sessionToken: string;
   // When provided, the built UI is static-served from this directory (SPA fallback to index.html).
   uiDistDir?: string;
+  // Agent/pipeline capabilities injected by the host (the CLI wizard command): task runner,
+  // codemap provider, run launcher, read-tool descriptors. Absent fields make the corresponding
+  // mutations fail with a clean "agent runner not configured" error — the session guard and every
+  // read procedure keep working regardless.
+  controlPlane?: ControlPlaneInjection;
 };
 
 export const createLocalApp = (options: LocalAppOptions): Hono => {
@@ -77,7 +83,7 @@ export const createLocalApp = (options: LocalAppOptions): Hono => {
       endpoint: '/api/trpc',
       req: c.req.raw,
       router: controlPlaneRouter,
-      createContext: () => ({ repoRoot: options.repoRoot })
+      createContext: () => ({ repoRoot: options.repoRoot, ...options.controlPlane })
     })
   );
 
@@ -117,6 +123,7 @@ export type LocalServerOptions = {
   uiDevServerUrl?: string;
   // Override for tests; production always mints a fresh random token.
   sessionToken?: string;
+  controlPlane?: ControlPlaneInjection;
 };
 
 export type LocalServer = {
@@ -134,7 +141,8 @@ export const startLocalServer = async (options: LocalServerOptions): Promise<Loc
   const app = createLocalApp({
     repoRoot: options.repoRoot,
     sessionToken,
-    ...(options.uiDistDir !== undefined ? { uiDistDir: options.uiDistDir } : {})
+    ...(options.uiDistDir !== undefined ? { uiDistDir: options.uiDistDir } : {}),
+    ...(options.controlPlane !== undefined ? { controlPlane: options.controlPlane } : {})
   });
 
   const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>(

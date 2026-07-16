@@ -10,12 +10,14 @@ import type { PluginHost } from './plugin-host.ts';
 // API honest, PRODUCT §3.4). Dynamic import keeps heavy deps (typescript, @mdx-js/mdx) off the
 // CLI startup path.
 export const registerBuiltinPlugins = async (host: PluginHost): Promise<void> => {
-  const [verifiers, langTypescript] = await Promise.all([
+  const [verifiers, langTypescript, langPython] = await Promise.all([
     import('@docstube/verifiers'),
-    import('@docstube/lang-typescript')
+    import('@docstube/lang-typescript'),
+    import('@docstube/lang-python')
   ]);
   await host.registerPlugin(verifiers.default, 'builtin', '@docstube/verifiers');
   await host.registerPlugin(langTypescript.default, 'builtin', '@docstube/lang-typescript');
+  await host.registerPlugin(langPython.default, 'builtin', '@docstube/lang-python');
 };
 
 const importPluginModule = async (specifier: string, repoRoot: string): Promise<unknown> => {

@@ -14,6 +14,7 @@ export default defineConfig({
       '@docstube/contracts': resolve(rootDir, 'packages/contracts/src/contracts.ts'),
       '@docstube/core': resolve(rootDir, 'packages/core/src/core.ts'),
       '@docstube/install-events': resolve(rootDir, 'apps/install-events/src/install-events.ts'),
+      '@docstube/lang-python': resolve(rootDir, 'packages/lang-python/src/lang-python.ts'),
       '@docstube/lang-typescript': resolve(rootDir, 'packages/lang-typescript/src/lang-typescript.ts'),
       '@docstube/plugin-sdk': resolve(rootDir, 'packages/plugin-sdk/src/plugin-sdk.ts'),
       '@docstube/skills': resolve(rootDir, 'packages/skills/src/skills.ts'),

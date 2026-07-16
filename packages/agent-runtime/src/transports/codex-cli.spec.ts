@@ -40,7 +40,7 @@ describe('buildCodexCliArgs', () => {
       '-c',
       'features.shell_tool=false',
       '-c',
-      'tools.web_search="disabled"',
+      'tools.web_search=false',
       '-c',
       'tools.view_image=false',
       '-c',
@@ -49,6 +49,8 @@ describe('buildCodexCliArgs', () => {
       'mcp_servers.docstube.args=["--conditions=docstube-source","C:\\\\repo\\\\mcp-stdio-server-bin.ts"]',
       '-c',
       'mcp_servers.docstube.required=true',
+      '-c',
+      'mcp_servers.docstube.default_tools_approval_mode="approve"',
       '-c',
       'mcp_servers.docstube.env.DOCSTUBE_MCP_REPO_ROOT="C:\\\\repo"'
     ]);

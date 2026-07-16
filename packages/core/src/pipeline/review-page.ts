@@ -3,6 +3,7 @@ import type { PageArtifact } from '@docstube/plugin-sdk';
 import type { AgentTaskSpec, DocstubeConfig, Persona, ReviewResult, Transcript } from '@docstube/contracts';
 import { agentTaskSpecSchema, idPrefixes, mintId, reviewResultSchema } from '@docstube/contracts';
 import type { RunJournal } from '../state/run-journal.ts';
+import type { RunCostTracker } from './run-cost.ts';
 
 // The review stage (PRODUCT §3.5 stage 4): one reviewer per persona, audience-fit and
 // correctness-risk findings, scores derived from explainable criteria only — never an opaque
@@ -67,6 +68,8 @@ export type ReviewPageInput = {
   brief?: string | undefined;
   runTask: (spec: AgentTaskSpec) => Promise<Transcript>;
   journal: RunJournal;
+  // Run-cost accounting (optional so direct callers/tests without a run budget stay simple).
+  costTracker?: RunCostTracker | undefined;
 };
 
 const reviewFromTranscript = (persona: Persona, transcript: Transcript): ReviewResult => {
@@ -104,6 +107,7 @@ export const reviewPage = async (input: ReviewPageInput): Promise<ReviewResult[]
       pageId: input.artifact.page.id,
       usage: transcript.usage
     });
+    input.costTracker?.add(transcript.usage);
     reviews.push(reviewFromTranscript(persona, transcript));
   }
   return reviews;

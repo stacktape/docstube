@@ -26,6 +26,7 @@ import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { applyFlagAnswers, collectOpenQuestionKeys, loadKnowledge } from './tribal-knowledge.ts';
 import { resolveCommit } from './generate.ts';
+import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
 // The maintain/refresh stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
 // affected pages regenerate. Bias rule: uncertain provenance ⇒ regenerate, never assume. A
@@ -45,12 +46,14 @@ export type RefreshOptions = {
 
 export type RefreshSummary = {
   runId: string;
-  outcome: 'passed' | 'flagged';
+  outcome: 'passed' | 'flagged' | 'frozen';
   // Slugs of the pages that were regenerated this run.
   regenerated: string[];
   unchangedCount: number;
   siteFindings: Finding[];
   warnings: string[];
+  // Total task cost reported this run; present whenever any task carried a costUsd.
+  spentUsd?: number;
 };
 
 const readOptionalFile = async (path: string): Promise<string | undefined> => {
@@ -191,6 +194,9 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
       .map((node) => [node.slug, node])
   );
 
+  const maxRunUsd = config.agents.budgets.maxRunUsd;
+  const costTracker = createRunCostTracker(maxRunUsd);
+
   const ctx: PageRunContext = {
     repoRoot,
     host,
@@ -207,6 +213,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     instructions: contextFiles.instructions,
     knowledge,
     openQuestionKeys,
+    costTracker,
     commit,
     locale,
     version
@@ -220,6 +227,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   const newSystemFlags: Flag[] = [];
   let unchangedCount = 0;
   let anyPageFlagged = false;
+  let frozen = false;
 
   for (const entry of previousIndex.pages) {
     const shard = await store.readPageShard({ locale, pageId: entry.id });
@@ -257,6 +265,18 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
       continue;
     }
 
+    // Cap-freeze (PRODUCT §3.5): checked only before starting an affected page's regeneration —
+    // never mid-page. Frozen pages keep their existing shipped state untouched (stale but whole);
+    // reconstructing unaffected pages costs nothing, so it is never gated.
+    if (frozen || costTracker.shouldFreeze()) {
+      frozen = true;
+      if (shard !== undefined && mdx !== undefined) {
+        artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
+      }
+      indexEntries.push(entry);
+      continue;
+    }
+
     const { outcome, artifact, shard: newShard } = await generatePage(ctx, node, shard);
     regenerated.push(node.slug);
     artifacts.push(artifact);
@@ -283,6 +303,9 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     inputHash: hashValue({ commit, regenerated }),
     durationMs: Date.now() - maintainStarted
   });
+  if (frozen && maxRunUsd !== undefined) {
+    await journal.append({ type: 'run-frozen', reason: freezeReason(maxRunUsd), spentUsd: costTracker.spentUsd() });
+  }
 
   // IA nodes without a generated page are not refresh's job (generate owns new pages) — surface
   // them instead of silently skipping.
@@ -361,13 +384,15 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   await store.writeIndex(index);
 
   const flagged = anyPageFlagged || siteFindings.length > 0 || newSystemFlags.length > 0;
-  await journal.append({ type: 'run-completed', outcome: flagged ? 'flagged' : 'passed' });
+  const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
+  await journal.append({ type: 'run-completed', outcome });
   return {
     runId: journal.runId,
-    outcome: flagged ? 'flagged' : 'passed',
+    outcome,
     regenerated,
     unchangedCount,
     siteFindings,
-    warnings: [...host.warnings(), ...newNodeWarnings]
+    warnings: [...host.warnings(), ...newNodeWarnings],
+    ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {})
   };
 };

@@ -93,6 +93,26 @@ describe('runAgentTask with a loop transport', () => {
     expect(transport.calls[1]?.messages.at(-1)?.role).toBe('tool');
   });
 
+  it('estimates costUsd from the pricing table for known models and leaves it unset otherwise', async () => {
+    const spec = buildSpec();
+    const turns = [toolCallTurn('read_file', { path: 'src/retry.ts' }), textTurn('# Retry')];
+
+    const known = await runAgentTask(spec, {
+      transport: scriptedTransport(turns),
+      model: 'claude-sonnet-5-20260401',
+      repoRoot
+    });
+    // Two completions at 10 in / 5 out each: (20 * 3 + 10 * 15) / 1e6.
+    expect(known.usage.costUsd).toBeCloseTo(0.00021, 10);
+
+    const unknown = await runAgentTask(spec, {
+      transport: scriptedTransport(turns),
+      model: 'test-model',
+      repoRoot
+    });
+    expect(unknown.usage.costUsd).toBeUndefined();
+  });
+
   it('stops with max-turns when the model never emits a final answer', async () => {
     const spec = buildSpec({ budget: { maxTurns: 2, maxToolCalls: 32 } });
     const transport = scriptedTransport([toolCallTurn('read_file', { path: 'src/retry.ts' })]);

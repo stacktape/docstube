@@ -74,7 +74,8 @@ describe('parseClaudeStreamEvents', () => {
     const parsed = parseClaudeStreamEvents(successLines);
     expect(parsed.stopReason).toBe('complete');
     expect(parsed.finalText).toBe('# Retry');
-    expect(parsed.usage).toEqual({ inputTokens: 120, outputTokens: 45 });
+    // total_cost_usd from the result event is captured as the vendor-authoritative cost.
+    expect(parsed.usage).toEqual({ inputTokens: 120, outputTokens: 45, costUsd: 0.01 });
     expect(parsed.turns.map((turn) => turn.role)).toEqual(['assistant', 'tool', 'assistant']);
     expect(parsed.turns[0]?.blocks[0]).toEqual({
       type: 'tool-call',

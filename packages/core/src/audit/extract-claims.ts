@@ -33,7 +33,7 @@ const extractClaimsSystemPrompt = [
   '- text: the claim restated as one checkable sentence.',
   '- anchor: { quote, prefix?, suffix? } — quote is an EXACT substring of the page copied verbatim; prefix/suffix are short surrounding snippets that disambiguate it.',
   '- claimClass: one of factual | api-shape | behavioral | code-sample | structural | configuration (lowercase, hyphenated).',
-  '- identifiers: the code identifiers the claim depends on — backtick-quoted names or names obviously referenced by the text (function, class, method, type, config key). Use dotted paths like Class.method when the page qualifies them. Leave [] when the claim references no code identifier.',
+  '- identifiers: ONLY exported/public API symbol names the claim depends on — functions, classes, types, methods as Class.method, CLI commands, config keys. NEVER parameter names, object property names, local variables, or literal values. Leave [] when the claim references no public symbol.',
   '',
   `Cap the output at ${maxClaimsPerPage} claims; when a page has more, keep the most load-bearing ones (API existence and shape first).`,
   'Respond with the structured output only.'

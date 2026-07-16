@@ -43,6 +43,43 @@ describe('session guard', () => {
   });
 });
 
+describe('control plane context injection', () => {
+  it('threads injected capabilities into tRPC procedures', async () => {
+    const launched: string[] = [];
+    const app = createLocalApp({
+      repoRoot: await makeRepoRoot(),
+      sessionToken: token,
+      controlPlane: {
+        launchRun: async (mode) => {
+          launched.push(mode);
+          return { runId: 'run_00000000000000000000' };
+        }
+      }
+    });
+    const response = await app.request('/api/trpc/runs.start', {
+      method: 'POST',
+      headers: { 'x-docstube-session': token, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'generate' })
+    });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { result: { data: { runId: string } } };
+    expect(body.result.data.runId).toBe('run_00000000000000000000');
+    expect(launched).toEqual(['generate']);
+  });
+
+  it('returns a clean precondition error when a capability is not injected', async () => {
+    const app = createLocalApp({ repoRoot: await makeRepoRoot(), sessionToken: token });
+    const response = await app.request('/api/trpc/runs.start', {
+      method: 'POST',
+      headers: { 'x-docstube-session': token, 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'generate' })
+    });
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    const body = (await response.json()) as { error: { message: string } };
+    expect(body.error.message).toMatch(/agent runner not configured/);
+  });
+});
+
 describe('static UI serving', () => {
   it('serves the built UI with SPA fallback and blocks traversal', async () => {
     const repoRoot = await makeRepoRoot();

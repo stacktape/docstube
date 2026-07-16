@@ -10,6 +10,7 @@
       "@docstube/contracts": ["./packages/contracts/src/contracts.ts"],
       "@docstube/core": ["./packages/core/src/core.ts"],
       "@docstube/install-events": ["./apps/install-events/src/install-events.ts"],
+      "@docstube/lang-python": ["./packages/lang-python/src/lang-python.ts"],
       "@docstube/lang-typescript": ["./packages/lang-typescript/src/lang-typescript.ts"],
       "@docstube/plugin-sdk": ["./packages/plugin-sdk/src/plugin-sdk.ts"],
       "@docstube/skills": ["./packages/skills/src/skills.ts"],

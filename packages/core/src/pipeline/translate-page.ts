@@ -147,6 +147,7 @@ export const translateArtifact = async (
         pageId: sourceArtifact.page.id,
         usage: transcript.usage
       });
+      ctx.costTracker.add(transcript.usage);
       if (transcript.result?.type !== 'mdx') {
         throw new CoreError(
           'pipeline-failed',

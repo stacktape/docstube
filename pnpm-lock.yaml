@@ -71,6 +71,9 @@ importers:
       '@docstube/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@docstube/lang-python':
+        specifier: workspace:*
+        version: link:../../packages/lang-python
       '@docstube/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
@@ -201,6 +204,9 @@ importers:
       '@docstube/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@docstube/lang-python':
+        specifier: workspace:*
+        version: link:../lang-python
       '@docstube/lang-typescript':
         specifier: workspace:*
         version: link:../lang-typescript
@@ -250,6 +256,21 @@ importers:
       '@types/unist':
         specifier: ^3.0.3
         version: 3.0.3
+
+  packages/lang-python:
+    dependencies:
+      '@docstube/codemap':
+        specifier: workspace:*
+        version: link:../codemap
+      '@docstube/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@docstube/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
 
   packages/lang-typescript:
     dependencies:

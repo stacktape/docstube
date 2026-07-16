@@ -7,6 +7,7 @@ export const commandHelp = [
   '  refresh                Regenerate entities affected by code changes.',
   '  refine                 Improve the lowest-quality generated pages first.',
   '  audit                  Measure verified defects in any existing docs site.',
+  '  answer                 List and answer open maintainer questions.',
   '  validate               Validate the docstube config family.',
   '  check [kind]           Run deterministic checks (kinds come from registered verifier plugins).',
   '  status                 Show manifest, guarantee levels, and open flags.',
@@ -31,6 +32,8 @@ export const commandHelpByCommand: Record<string, string> = {
     'Usage: docstube check [kind]\n       docstube check --list\n\nRun deterministic checks over the generated docs. Kinds derive from registered verifier plugins.',
   status: 'Usage: docstube status\n\nShow manifest, guarantee levels, and open flags.',
   doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
+  answer:
+    'Usage: docstube answer\n       docstube answer <id> "your answer"\n\nList open maintainer questions (tribal knowledge) and answer them.',
   plugin: 'Usage: docstube plugin scaffold <name>\n\nScaffold a docstube plugin (uses the plugin-authoring skill).',
   upgrade: 'Usage: docstube upgrade [--check] [--to <version>]\n\nUpgrade the docstube tool itself.',
   version: 'Usage: docstube version\n\nPrint the docstube version.'

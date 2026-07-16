@@ -19,6 +19,7 @@ import { generatePage } from './page-runner.ts';
 import type { PageOutcome, PageRunContext, TaskRunner } from './page-runner.ts';
 import { translateArtifact } from './translate-page.ts';
 import type { TranslationOutcome } from './translate-page.ts';
+import { createRunCostTracker, freezeReason } from './run-cost.ts';
 import type { ToolDescriptor } from '@docstube/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -41,11 +42,13 @@ export type GenerateOptions = {
 
 export type GenerateSummary = {
   runId: string;
-  outcome: 'passed' | 'flagged' | 'failed';
+  outcome: 'passed' | 'flagged' | 'frozen' | 'failed';
   pages: PageOutcome[];
   translations: TranslationOutcome[];
   siteFindings: Finding[];
   warnings: string[];
+  // Total task cost reported this run; present whenever any task carried a costUsd.
+  spentUsd?: number;
 };
 
 export const resolveCommit = async (repoRoot: string): Promise<string> => {
@@ -101,6 +104,9 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
   const knowledge = await loadKnowledge(repoRoot);
   const openQuestionKeys = await collectOpenQuestionKeys({ store, locales: allLocales, pageIds: previousPageIds });
 
+  const maxRunUsd = config.agents.budgets.maxRunUsd;
+  const costTracker = createRunCostTracker(maxRunUsd);
+
   const ctx: PageRunContext = {
     repoRoot,
     host,
@@ -117,6 +123,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     instructions: contextFiles.instructions,
     knowledge,
     openQuestionKeys,
+    costTracker,
     commit,
     locale,
     version
@@ -139,7 +146,15 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     }
   };
 
+  // Cap-freeze (PRODUCT §3.5): checked only BETWEEN pages (and before translations) — never
+  // mid-page, because a half-verified page would ship state the gate never approved. Pages that
+  // already landed stay shipped; remaining pages are simply not generated.
+  let frozen = false;
   for (const node of pageNodes(ia.tree)) {
+    if (costTracker.shouldFreeze()) {
+      frozen = true;
+      break;
+    }
     const previousPageId = slugToPageId.get(node.slug);
     const previousShard =
       previousPageId === undefined ? undefined : await store.readPageShard({ locale, pageId: previousPageId });
@@ -153,11 +168,18 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
 
     // Verified translations stream out right behind their source page (PRODUCT §4.1 i18n).
     if (config.locales.targets.length > 0 && outcome.status === 'passed') {
+      if (costTracker.shouldFreeze()) {
+        frozen = true;
+        break;
+      }
       for (const translation of await translateArtifact(ctx, artifact)) {
         translations.push(translation.outcome);
         await persistArtifact(translation.artifact, translation.shard);
       }
     }
+  }
+  if (frozen && maxRunUsd !== undefined) {
+    await journal.append({ type: 'run-frozen', reason: freezeReason(maxRunUsd), spentUsd: costTracker.spentUsd() });
   }
 
   // Topology / site-scope verification across all pages (cross-page links, orphans).
@@ -208,13 +230,15 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     translations.some((translation) => translation.status === 'flagged') ||
     openFlagsRaised > 0 ||
     siteFindings.length > 0;
-  await journal.append({ type: 'run-completed', outcome: flagged ? 'flagged' : 'passed' });
+  const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
+  await journal.append({ type: 'run-completed', outcome });
   return {
     runId: journal.runId,
-    outcome: flagged ? 'flagged' : 'passed',
+    outcome,
     pages: outcomes,
     translations,
     siteFindings,
-    warnings: host.warnings()
+    warnings: host.warnings(),
+    ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {})
   };
 };

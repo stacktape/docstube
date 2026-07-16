@@ -14,6 +14,7 @@ import { applyFlagAnswers, collectOpenQuestionKeys, loadKnowledge } from './trib
 import { resolveCommit } from './generate.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
+import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
 // `docstube refine`: improve the lowest-quality pages first. Quality is read from the committed
 // state, never an opaque score: pages with open (non-tribal) flags rank worst, then pages with
@@ -47,9 +48,11 @@ export type RefinedPage = {
 
 export type RefineSummary = {
   runId: string;
-  outcome: 'passed' | 'flagged';
+  outcome: 'passed' | 'flagged' | 'frozen';
   refined: RefinedPage[];
   consideredCount: number;
+  // Total task cost reported this run; present whenever any task carried a costUsd.
+  spentUsd?: number;
 };
 
 const countBlocks = (shard: PageShard): { total: number; proven: number } => {
@@ -152,6 +155,9 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       .map((node) => [node.slug, node])
   );
 
+  const maxRunUsd = config.agents.budgets.maxRunUsd;
+  const costTracker = createRunCostTracker(maxRunUsd);
+
   const ctx: PageRunContext = {
     repoRoot,
     host,
@@ -167,6 +173,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     instructions: contextFiles.instructions,
     knowledge,
     openQuestionKeys,
+    costTracker,
     commit,
     locale,
     version
@@ -174,11 +181,19 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
 
   const refined: RefinedPage[] = [];
   let roundsSpent = 0;
+  let frozen = false;
   for (const candidate of selected) {
     const node = nodesBySlug.get(candidate.slug);
     if (node === undefined) {
       // Structure changes are refresh's job; refine never invents pages.
       continue;
+    }
+    // Cap-freeze (PRODUCT §3.5): checked only before starting a candidate — never mid-page, so a
+    // half-refined page can never ship. Sits next to the totalRounds budget: both stop refining
+    // between candidates, but only the cost cap marks the run frozen.
+    if (costTracker.shouldFreeze()) {
+      frozen = true;
+      break;
     }
     // The global budget caps how many write rounds this invocation may spend in total.
     const remainingRounds = options.totalRounds === undefined ? undefined : options.totalRounds - roundsSpent;
@@ -213,7 +228,17 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   // The index survives (same pages, same ids); only its input hashes may drift.
   await store.writeIndex({ ...index, configHash: hashValue(family.raw.config), iaHash: hashValue(family.raw.ia) });
 
+  if (frozen && maxRunUsd !== undefined) {
+    await journal.append({ type: 'run-frozen', reason: freezeReason(maxRunUsd), spentUsd: costTracker.spentUsd() });
+  }
   const flagged = refined.some((page) => page.status === 'flagged');
-  await journal.append({ type: 'run-completed', outcome: flagged ? 'flagged' : 'passed' });
-  return { runId: journal.runId, outcome: flagged ? 'flagged' : 'passed', refined, consideredCount: ranked.length };
+  const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
+  await journal.append({ type: 'run-completed', outcome });
+  return {
+    runId: journal.runId,
+    outcome,
+    refined,
+    consideredCount: ranked.length,
+    ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {})
+  };
 };

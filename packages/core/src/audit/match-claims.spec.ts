@@ -82,8 +82,14 @@ describe('matchClaim', () => {
     });
   });
 
-  it('emits one defect per missing identifier and none for grounded ones', () => {
-    const match = matchClaim(claim(['greet', 'removedFn', 'alsoGone']), index);
+  it('grounds a claim when ANY checkable identifier grounds (stragglers are not staleness)', () => {
+    // Live-calibrated: claims name their anchor symbol plus incidental tokens; one grounded
+    // identifier anchors the claim to real API.
+    expect(matchClaim(claim(['greet', 'options.loud', 'name']), index).status).toBe('grounded');
+  });
+
+  it('emits defects only when EVERY checkable identifier fails to ground', () => {
+    const match = matchClaim(claim(['removedFn', 'alsoGone']), index);
     expect(match).toMatchObject({
       status: 'defect',
       defects: [{ identifier: 'removedFn' }, { identifier: 'alsoGone' }]

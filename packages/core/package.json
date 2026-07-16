@@ -22,6 +22,7 @@
     "@docstube/agent-runtime": "workspace:*",
     "@docstube/codemap": "workspace:*",
     "@docstube/contracts": "workspace:*",
+    "@docstube/lang-python": "workspace:*",
     "@docstube/lang-typescript": "workspace:*",
     "@docstube/plugin-sdk": "workspace:*",
     "@docstube/verifiers": "workspace:*",

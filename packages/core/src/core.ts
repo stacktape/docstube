@@ -70,10 +70,42 @@ export { runRefine, rankPagesForRefinement } from './pipeline/refine.ts';
 export type { RefineOptions, RefineSummary, RefinedPage } from './pipeline/refine.ts';
 export { runAudit, auditFallbackConfig } from './audit/run-audit.ts';
 export type { AuditReport, AuditDefect, RunAuditOptions } from './audit/run-audit.ts';
+export { createRunCostTracker, FREEZE_MARGIN_RATIO } from './pipeline/run-cost.ts';
+export type { RunCostTracker } from './pipeline/run-cost.ts';
+export {
+  buildProposeIaTask,
+  proposalsFromTranscript,
+  iaProposalsResultSchema,
+  iaProposalIds
+} from './pipeline/propose-ia.ts';
+export type { IaProposal, IaProposalsResult, ProposeIaInput } from './pipeline/propose-ia.ts';
+export {
+  buildExtractThemeTokensTask,
+  tokensFromTranscript,
+  themeTokenNames,
+  themeTokenExtractionSchema
+} from './pipeline/extract-theme-tokens.ts';
+export type { ThemeTokenName, ThemeTokensResult } from './pipeline/extract-theme-tokens.ts';
+export { updateConfigValues, writeIaFile, scaffoldConfigFamily } from './config/write-config.ts';
+export type { ConfigValueUpdate, ConfigFamilySeed, ScaffoldResult } from './config/write-config.ts';
+export {
+  appendFeedbackEntry,
+  buildCategorizeFeedbackTask,
+  categorizationFromTranscript,
+  feedbackCategories
+} from './server/feedback.ts';
+export type { FeedbackCategory } from './server/feedback.ts';
 export { createTransportFromConfig, createTaskRunnerFromConfig } from './pipeline/task-runner.ts';
 export type { ConfiguredTaskRunner } from './pipeline/task-runner.ts';
 
 export { createLocalApp, startLocalServer } from './server/local-server.ts';
 export type { LocalAppOptions, LocalServer, LocalServerOptions } from './server/local-server.ts';
 export { controlPlaneRouter, createControlPlaneCaller } from './server/trpc-router.ts';
-export type { ControlPlaneContext, ControlPlaneRouter, FlagQueueEntry, RunListEntry } from './server/trpc-router.ts';
+export type {
+  ControlPlaneContext,
+  ControlPlaneRouter,
+  FlagQueueEntry,
+  RunListEntry,
+  ControlPlaneInjection,
+  RunMode
+} from './server/trpc-router.ts';

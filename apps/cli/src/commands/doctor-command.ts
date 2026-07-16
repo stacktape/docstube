@@ -38,6 +38,16 @@ export const runDoctorCommand = async (input: DoctorCommandInput, output: CliOut
   });
 
   const detection = await detectProject(input.workspaceDir);
+  if (detection.languages.includes('python')) {
+    const { resolvePythonInterpreter } = await import('@docstube/lang-python');
+    const interpreter = await resolvePythonInterpreter();
+    checks.push({
+      name: 'python',
+      ok: interpreter !== undefined,
+      detail: interpreter ?? 'documenting a Python repo requires a python interpreter (3.9+) on PATH',
+      critical: true
+    });
+  }
   checks.push({
     name: 'project detection',
     ok: detection.languages.length > 0,

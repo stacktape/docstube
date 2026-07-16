@@ -183,6 +183,28 @@ const audit = defineCommand({
   }
 });
 
+const answer = defineCommand({
+  meta: { description: 'List and answer open maintainer questions (tribal knowledge).', name: 'answer' },
+  args: {
+    id: { type: 'positional', required: false, description: 'Question id from `docstube answer`.' },
+    text: { type: 'positional', required: false, description: 'The answer text (quote it).' }
+  },
+  async run({ args }) {
+    await runCliCommand('answer', async () => {
+      enableNodeCompileCache();
+      const { runAnswerCommand } = await import('./commands/answer-command.ts');
+      return runAnswerCommand(
+        {
+          workspaceDir: process.cwd(),
+          flagId: typeof args.id === 'string' ? args.id : undefined,
+          text: typeof args.text === 'string' ? args.text : undefined
+        },
+        output
+      );
+    });
+  }
+});
+
 const validate = defineCommand({
   meta: { description: 'Validate the docstube config family.', name: 'validate' },
   async run() {
@@ -291,6 +313,7 @@ const main = defineCommand({
     refresh,
     refine,
     audit,
+    answer,
     plugin,
     validate,
     check,

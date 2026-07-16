@@ -180,6 +180,9 @@ export const parseGeminiStreamEvents = (lines: readonly string[]): GeminiStreamP
       continue;
     }
 
+    // result.stats carries token counts only — gemini-cli never reports a USD cost; the harness
+    // estimates one from model-pricing.ts when the model is known (Gemini models are not in the
+    // table today, so their costUsd stays undefined rather than guessed).
     if (event.type === 'result') {
       sawResult = true;
       if (isRecord(event.stats)) {

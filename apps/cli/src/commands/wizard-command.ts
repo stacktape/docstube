@@ -1,6 +1,21 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { startLocalServer } from '@docstube/core';
+import { standardToolDescriptors } from '@docstube/agent-runtime';
+import { buildCodemap } from '@docstube/codemap';
+import {
+  createPluginHost,
+  createTaskRunnerFromConfig,
+  loadConfigFamily,
+  loadConfiguredPlugins,
+  registerBuiltinPlugins,
+  resolveCommit,
+  runGenerate,
+  runRefine,
+  runRefresh,
+  startLocalServer
+} from '@docstube/core';
+import type { ControlPlaneInjection } from '@docstube/core';
+import { idPrefixes, mintId } from '@docstube/contracts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { pathExists } from '../workspace-paths.ts';
 
@@ -34,8 +49,46 @@ export const runWizardCommand = async (input: WizardCommandInput, output: CliOut
     );
     return { exitCode: 1 };
   }
+  // Agent-backed mutations resolve config lazily: the wizard can start pre-scaffold and the
+  // runner only materializes when the UI first needs it.
+  const lazyRunner = async () => {
+    const family = await loadConfigFamily(input.workspaceDir);
+    return createTaskRunnerFromConfig(family.config, input.workspaceDir);
+  };
+  const controlPlane: ControlPlaneInjection = {
+    runTask: async (spec) => (await lazyRunner()).runTask(spec),
+    toolDescriptors: standardToolDescriptors(),
+    codemapProvider: async () => {
+      const family = await loadConfigFamily(input.workspaceDir);
+      const host = createPluginHost();
+      await registerBuiltinPlugins(host);
+      await loadConfiguredPlugins(host, family.config, input.workspaceDir);
+      return buildCodemap({
+        repoRoot: input.workspaceDir,
+        commit: await resolveCommit(input.workspaceDir),
+        packs: host.languagePacks().map((entry) => entry.definition)
+      });
+    },
+    launchRun: async (mode) => {
+      const runner = await lazyRunner();
+      const runId = mintId(idPrefixes.run);
+      const common = {
+        repoRoot: input.workspaceDir,
+        runTask: runner.runTask,
+        toolDescriptors: runner.toolDescriptors,
+        runId
+      };
+      const run =
+        mode === 'generate' ? runGenerate(common) : mode === 'refresh' ? runRefresh(common) : runRefine(common);
+      // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
+      void run.catch((error: unknown) => output.error(`background ${mode} run failed: ${(error as Error).message}`));
+      return { runId };
+    }
+  };
+
   const server = await startLocalServer({
     repoRoot: input.workspaceDir,
+    controlPlane,
     ...(input.port === undefined ? {} : { port: input.port }),
     ...(uiDistDir === undefined ? {} : { uiDistDir }),
     ...(input.uiDevServerUrl === undefined ? {} : { uiDevServerUrl: input.uiDevServerUrl })

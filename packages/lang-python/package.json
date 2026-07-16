@@ -1,0 +1,28 @@
+{
+  "name": "@docstube/lang-python",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist",
+    "src/python-inspector.py"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "docstube-source": "./src/lang-python.ts",
+      "types": "./dist/lang-python.d.mts",
+      "import": "./dist/lang-python.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/lang-python.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@docstube/codemap": "workspace:*",
+    "@docstube/contracts": "workspace:*",
+    "@docstube/plugin-sdk": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

@@ -12,7 +12,9 @@ export type TransportCapabilities = {
 export type ToolCallBlock = Extract<TranscriptBlock, { type: 'tool-call' }>;
 export type ToolResultBlock = Extract<TranscriptBlock, { type: 'tool-result' }>;
 
-export type TokenUsage = { inputTokens: number; outputTokens: number };
+// costUsd is set only when the vendor reports an authoritative cost (claude CLI's
+// total_cost_usd); otherwise the harness estimates it from model-pricing.ts.
+export type TokenUsage = { inputTokens: number; outputTokens: number; costUsd?: number };
 
 export type LoopMessage =
   | { role: 'user'; text: string }

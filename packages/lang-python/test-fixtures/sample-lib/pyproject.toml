@@ -1,0 +1,4 @@
+[project]
+name = "sample-lib"
+version = "0.1.0"
+description = "Committed fixture for @docstube/lang-python specs."

@@ -145,12 +145,18 @@ export const matchClaim = (claim: ExtractedClaim, index: CodemapIndex): ClaimMat
       reason: 'no identifier is checkable against the codemap (ambient or non-identifier tokens only)'
     };
   }
-  const defects: ClaimDefect[] = checkable
-    .filter((identifier) => !identifierExists(identifier, index))
-    .map((identifier) => ({
-      kind: 'stale-reference' as const,
-      identifier,
-      reason: `identifier "${identifier}" does not exist in the codemap (no matching symbol name, container, or dotted path)`
-    }));
-  return defects.length > 0 ? { status: 'defect', defects } : { status: 'grounded' };
+  const missing = checkable.filter((identifier) => !identifierExists(identifier, index));
+  // Live-calibrated policy (never overclaim): a claim usually names its anchor symbol PLUS
+  // incidental parameter/property tokens ("greet", "options.loud") — if ANY checkable identifier
+  // grounds, the claim is anchored to real API and the stragglers are not evidence of staleness.
+  // Only a claim where EVERY checkable identifier fails to ground is a stale-reference defect.
+  if (missing.length < checkable.length) {
+    return { status: 'grounded' };
+  }
+  const defects: ClaimDefect[] = missing.map((identifier) => ({
+    kind: 'stale-reference' as const,
+    identifier,
+    reason: `identifier "${identifier}" does not exist in the codemap (no matching symbol name, container, or dotted path)`
+  }));
+  return { status: 'defect', defects };
 };

@@ -13,7 +13,8 @@ const ignoredDiagnosticCodes = new Set([2307, 2792]);
 // TypeScript package, the snippet itself served from a virtual file, no filesystem writes.
 export const typecheckSnippet = async (code: string, ctx: { repoRoot: string }): Promise<Finding[]> => {
   const options: ts.CompilerOptions = {
-    lib: ['lib.es2022.d.ts'],
+    // dom included for console/fetch/timers — ubiquitous in docs snippets (live-verified gap).
+    lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'],
     target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,

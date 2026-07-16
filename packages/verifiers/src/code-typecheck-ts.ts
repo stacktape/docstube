@@ -65,7 +65,8 @@ const typecheckSnippet = (code: string, useTsx: boolean): ts.Diagnostic[] => {
   const fileName = useTsx ? 'snippet.tsx' : 'snippet.ts';
   const compilerOptions: ts.CompilerOptions = {
     target: ts.ScriptTarget.ES2022,
-    lib: ['lib.es2022.d.ts'],
+    // dom included for console/fetch/timers — ubiquitous in docs snippets (live-verified gap).
+    lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'],
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     jsx: ts.JsxEmit.Preserve,

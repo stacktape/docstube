@@ -3,6 +3,7 @@ import type { AgentTaskSpec, TaskResult, Transcript } from '@docstube/contracts'
 import type { TranscriptCache } from './cache.ts';
 import { BudgetExceededError, ToolPolicyError } from './errors.ts';
 import { checkJsonSchema } from './json-schema-check.ts';
+import { estimateCostUsd } from './model-pricing.ts';
 import { createObservedReadsCollector, createStandardTools } from './tools.ts';
 import type { ObservedReadsCollector, ToolImplementation } from './tools.ts';
 import type {
@@ -164,6 +165,9 @@ const runLoopSession = async (
     });
     usage.inputTokens += assistant.usage.inputTokens;
     usage.outputTokens += assistant.usage.outputTokens;
+    if (assistant.usage.costUsd !== undefined) {
+      usage.costUsd = (usage.costUsd ?? 0) + assistant.usage.costUsd;
+    }
     turns.push({ role: 'assistant', blocks: assistant.blocks });
     messages.push({ role: 'assistant', blocks: assistant.blocks });
 
@@ -273,6 +277,12 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
       ? await runLoopSession(spec, options.transport, options.model, tools)
       : await runVendorSession(spec, options.transport, options.model, tools, observedReads, options.repoRoot);
 
+  // Cost seam: transports stay pure — they surface a vendor-authoritative cost when one exists
+  // (claude CLI's total_cost_usd) and nothing else. The harness is the single point every
+  // transport funnels through, so pricing-table estimation happens here, once, and only when the
+  // vendor reported no cost. Unknown models keep costUsd undefined — never guessed.
+  const costUsd = state.usage.costUsd ?? estimateCostUsd(options.model, state.usage);
+
   const transcript = transcriptSchema.parse({
     schemaVersion: 1,
     taskId: spec.id,
@@ -281,7 +291,12 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
     model: options.model,
     turns: state.turns,
     observedReads: observedReads.list(),
-    usage: { inputTokens: state.usage.inputTokens, outputTokens: state.usage.outputTokens, cacheHit: false },
+    usage: {
+      inputTokens: state.usage.inputTokens,
+      outputTokens: state.usage.outputTokens,
+      ...(costUsd !== undefined ? { costUsd } : {}),
+      cacheHit: false
+    },
     stopReason: state.stopReason,
     result: state.result,
     error: state.error

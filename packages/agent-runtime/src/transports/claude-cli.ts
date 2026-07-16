@@ -156,11 +156,16 @@ export const parseClaudeStreamEvents = (lines: readonly string[]): ClaudeStreamP
     }
 
     if (event.type === 'result') {
+      // total_cost_usd sits on the result event root and is the vendor-authoritative run cost.
+      const costUsd = typeof event.total_cost_usd === 'number' ? event.total_cost_usd : undefined;
       if (isRecord(event.usage)) {
         usage = {
           inputTokens: typeof event.usage.input_tokens === 'number' ? event.usage.input_tokens : 0,
-          outputTokens: typeof event.usage.output_tokens === 'number' ? event.usage.output_tokens : 0
+          outputTokens: typeof event.usage.output_tokens === 'number' ? event.usage.output_tokens : 0,
+          ...(costUsd !== undefined ? { costUsd } : {})
         };
+      } else if (costUsd !== undefined) {
+        usage = { ...usage, costUsd };
       }
       if (typeof event.result === 'string') {
         finalText = event.result;

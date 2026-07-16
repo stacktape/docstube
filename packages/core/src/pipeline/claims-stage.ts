@@ -7,6 +7,7 @@ import { buildCodemapIndex, matchClaim } from '../audit/match-claims.ts';
 import { blockSourceRanges } from '../entities/extract-entities.ts';
 import type { RunJournal } from '../state/run-journal.ts';
 import type { TaskRunner } from './page-runner.ts';
+import type { RunCostTracker } from './run-cost.ts';
 
 // Claim extraction for OUR generated docs (the finest entity grain, PRODUCT §3.1) — the same
 // extractor and deterministic matcher `docstube audit` points at foreign docs. Runs on the
@@ -44,6 +45,8 @@ export const attachExtractedClaims = async (input: {
   codemap: Codemap;
   runTask: TaskRunner;
   journal: RunJournal;
+  // Run-cost accounting (optional so direct callers/tests without a run budget stay simple).
+  costTracker?: RunCostTracker | undefined;
 }): Promise<ClaimsStageResult> => {
   const { artifact } = input;
   const task = buildExtractClaimsTask({ file: artifact.mdxPath, markdown: artifact.mdx });
@@ -55,6 +58,7 @@ export const attachExtractedClaims = async (input: {
     pageId: artifact.page.id,
     usage: transcript.usage
   });
+  input.costTracker?.add(transcript.usage);
   const { claims, warning } = claimsFromTranscript(artifact.mdxPath, transcript);
 
   const blocks = flattenBlocks(artifact.page);
