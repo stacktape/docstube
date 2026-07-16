@@ -1,0 +1,40 @@
+{
+  "name": "@docstube/plugin-sdk",
+  "version": "0.0.2",
+  "description": "Plugin API for docstube — write verifiers, language packs, content sources, importers, deploy targets, search providers, and components. Experimental until docstube 1.0.",
+  "keywords": [
+    "docstube",
+    "docstube-plugin",
+    "documentation"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stacktape/docstube.git",
+    "directory": "packages/plugin-sdk"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "docstube-source": "./src/plugin-sdk.ts",
+      "types": "./dist/plugin-sdk.d.mts",
+      "import": "./dist/plugin-sdk.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@docstube/contracts": "workspace:*"
+  }
+}
