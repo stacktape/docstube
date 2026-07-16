@@ -84,24 +84,24 @@ describe('diagram-d2 verifier', () => {
     expect(result.coveredEntityIds).toEqual([block.id, claim.id]);
   }, 30_000);
 
-  it('fails an ungrounded node with an error finding, downgraded to warning by `loose`', async () => {
+  it('warns on an ungrounded node by default, gates only with `strict` fence meta', async () => {
     const code = 'greet -> Database: writes';
     const { page } = pageWithDiagram(code);
 
-    const strict = await diagramD2Verifier.verify(ctxWithCodemap(), [makeArtifact(page, mdxWithFence('d2', code))]);
-    expect(strict.status).toBe('fail');
-    expect(strict.findings[0]?.severity).toBe('error');
-    expect(strict.findings[0]?.message).toContain('Database');
-    expect(strict.coveredEntityIds).toEqual([]);
-
-    const loosePage = pageWithDiagram(code);
-    const loose = await diagramD2Verifier.verify(ctxWithCodemap(), [
-      makeArtifact(loosePage.page, mdxWithFence('d2 loose', code))
-    ]);
+    const loose = await diagramD2Verifier.verify(ctxWithCodemap(), [makeArtifact(page, mdxWithFence('d2', code))]);
     expect(loose.status).toBe('pass');
     expect(loose.findings[0]?.severity).toBe('warning');
+    expect(loose.findings[0]?.message).toContain('Database');
     // Visible but not proven: the block stays uncovered.
     expect(loose.coveredEntityIds).toEqual([]);
+
+    const strictPage = pageWithDiagram(code);
+    const strict = await diagramD2Verifier.verify(ctxWithCodemap(), [
+      makeArtifact(strictPage.page, mdxWithFence('d2 strict', code))
+    ]);
+    expect(strict.status).toBe('fail');
+    expect(strict.findings[0]?.severity).toBe('error');
+    expect(strict.coveredEntityIds).toEqual([]);
   }, 30_000);
 
   it('fails a diagram that does not compile', async () => {

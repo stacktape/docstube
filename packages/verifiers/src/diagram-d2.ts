@@ -6,10 +6,10 @@ import type { MdxCodeBlock } from './code-typecheck-ts.ts';
 import { matchingCodeBlocks, missingFenceFinding, runVerifier } from './run-support.ts';
 
 // Verified diagrams (PRODUCT §4.1, "very important"): D2 only. Compile proves the diagram is
-// well-formed; GROUNDING proves it is true — every node must map to a codemap symbol. Ungrounded
-// nodes are error findings by default (the writer must ground or remove them); a fence marked
-// `loose` downgrades grounding failures to warnings for conceptual diagrams with external actors
-// (User, Browser, …) — visible, never silent.
+// well-formed; GROUNDING proves it is true — every node must map to a codemap symbol. Founder
+// call (2026-07): ungrounded nodes WARN by default (visible, never silent, block stays unproven —
+// conceptual actors like User/Browser are legitimate), and a fence marked `strict` upgrades
+// grounding failures to gating errors for diagrams that must be fully code-grounded.
 
 const verifierId = 'diagram-d2';
 
@@ -152,19 +152,19 @@ export const groundD2Node = (node: D2Node, codemap: Codemap): boolean => {
   return false;
 };
 
-const hasLooseMeta = (fence: MdxCodeBlock): boolean => /(^|\s)loose(\s|$)/u.test(fence.meta);
+const hasStrictMeta = (fence: MdxCodeBlock): boolean => /(^|\s)strict(\s|$)/u.test(fence.meta);
 
 const groundingFinding = (
   artifact: PageArtifact,
   blockId: string,
   fence: MdxCodeBlock,
   node: D2Node,
-  loose: boolean
+  strict: boolean
 ): Finding => ({
   source: 'verifier',
   check: verifierId,
-  severity: loose ? 'warning' : 'error',
-  message: `diagram node "${node.path}"${node.label ? ` (“${node.label}”)` : ''} does not map to any codemap symbol — ground it, remove it, or mark the fence \`loose\` for conceptual diagrams`,
+  severity: strict ? 'error' : 'warning',
+  message: `diagram node "${node.path}"${node.label ? ` (“${node.label}”)` : ''} does not map to any codemap symbol — it stays unproven; ground it or mark the fence \`strict\` to gate on grounding`,
   entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id, entityId: blockId },
   file: artifact.mdxPath,
   span: [fence.line + node.line, fence.line + node.line]
@@ -174,7 +174,7 @@ export const diagramD2Verifier: VerifierDefinition = {
   id: verifierId,
   title: 'D2 diagrams compile and every node is grounded',
   description:
-    'D2-only diagrams (PRODUCT: no Mermaid). Compile catches malformed diagrams; grounding requires every node to map to a codemap symbol so diagrams cannot depict invented architecture. `loose` fences downgrade grounding failures to warnings.',
+    'D2-only diagrams (PRODUCT: no Mermaid). Compile catches malformed diagrams; grounding maps every node to a codemap symbol — ungrounded nodes warn (block unproven) and `strict` fences gate on grounding.',
   scope: 'block',
   appliesTo: { blockTypes: ['code-example'], languages: ['d2'] },
   localeScope: 'source-only',
@@ -214,15 +214,14 @@ export const diagramD2Verifier: VerifierDefinition = {
             continue;
           }
 
-          const loose = hasLooseMeta(fence);
+          const strict = hasStrictMeta(fence);
           const ungrounded = extractD2Nodes(fence.code).filter((node) => !groundD2Node(node, ctx.codemap));
           for (const node of ungrounded) {
-            findings.push(groundingFinding(artifact, block.id, fence, node, loose));
+            findings.push(groundingFinding(artifact, block.id, fence, node, strict));
           }
-          if (ungrounded.length === 0 || loose) {
-            if (ungrounded.length === 0) {
-              coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
-            }
+          // Fully grounded diagrams are proven; anything ungrounded stays visible and unproven.
+          if (ungrounded.length === 0) {
+            coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
           }
         }
       }

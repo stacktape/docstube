@@ -124,14 +124,29 @@ const refine = defineCommand({
   args: {
     target: { type: 'positional', required: false, description: 'Page slug to refine.' },
     failed: { type: 'boolean', description: 'Consider only pages with open flags.' },
-    'max-rounds': { type: 'string', description: 'Max pages refined this run (default 3).' }
+    'max-pages': { type: 'string', description: 'Max pages refined this run (default 3).' },
+    'max-rounds-per-page': { type: 'string', description: 'Max rewrite rounds per page (default 3).' },
+    'total-rounds': { type: 'string', description: 'Global rewrite-round budget for the whole run.' }
   },
   async run({ args }) {
     await runCliCommand('refine', async () => {
       enableNodeCompileCache();
-      const maxRounds = typeof args['max-rounds'] === 'string' ? Number(args['max-rounds']) : undefined;
-      if (maxRounds !== undefined && (!Number.isInteger(maxRounds) || maxRounds < 1)) {
-        output.error(`Invalid --max-rounds value: ${args['max-rounds']}`);
+      const parsePositive = (name: string): number | undefined | null => {
+        const raw = args[name as keyof typeof args];
+        if (typeof raw !== 'string') {
+          return undefined;
+        }
+        const value = Number(raw);
+        if (!Number.isInteger(value) || value < 1) {
+          output.error(`Invalid --${name} value: ${raw}`);
+          return null;
+        }
+        return value;
+      };
+      const maxPages = parsePositive('max-pages');
+      const maxRoundsPerPage = parsePositive('max-rounds-per-page');
+      const totalRounds = parsePositive('total-rounds');
+      if (maxPages === null || maxRoundsPerPage === null || totalRounds === null) {
         return { exitCode: 1 };
       }
       const { runRefineCommand } = await import('./commands/refine-command.ts');
@@ -140,7 +155,9 @@ const refine = defineCommand({
           workspaceDir: process.cwd(),
           target: typeof args.target === 'string' ? args.target : undefined,
           failedOnly: args.failed === true,
-          maxRounds
+          maxPages,
+          maxRoundsPerPage,
+          totalRounds
         },
         output
       );

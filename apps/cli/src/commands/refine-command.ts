@@ -12,7 +12,9 @@ export type RefineCommandInput = {
   workspaceDir: string;
   target?: string | undefined;
   failedOnly?: boolean | undefined;
-  maxRounds?: number | undefined;
+  maxPages?: number | undefined;
+  maxRoundsPerPage?: number | undefined;
+  totalRounds?: number | undefined;
 };
 
 export const runRefineCommand = async (input: RefineCommandInput, output: CliOutput): Promise<CliCommandResult> => {
@@ -27,7 +29,9 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
       toolDescriptors: runner.toolDescriptors,
       target: input.target,
       failedOnly: input.failedOnly,
-      maxRounds: input.maxRounds
+      maxPages: input.maxPages,
+      maxRoundsPerPage: input.maxRoundsPerPage,
+      totalRounds: input.totalRounds
     });
     if (summary.refined.length === 0) {
       output.info(`nothing to refine (${summary.consideredCount} page(s) considered)`);

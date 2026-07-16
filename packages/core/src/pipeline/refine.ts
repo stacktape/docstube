@@ -28,9 +28,12 @@ export type RefineOptions = {
   target?: string | undefined;
   // Consider only pages with open flags.
   failedOnly?: boolean | undefined;
-  // Max pages refined in one invocation.
-  maxRounds?: number | undefined;
-  maxAttemptsPerPage?: number | undefined;
+  // Max pages refined in one invocation (default 3).
+  maxPages?: number | undefined;
+  // Max write⇄review∥verify rounds spent on a single page (default 3).
+  maxRoundsPerPage?: number | undefined;
+  // Global round budget across the whole invocation; refining stops when it is spent.
+  totalRounds?: number | undefined;
   runId?: string | undefined;
 };
 
@@ -141,7 +144,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   if (options.failedOnly === true) {
     candidates = candidates.filter((candidate) => candidate.openFlags > 0);
   }
-  const selected = candidates.slice(0, options.maxRounds ?? 3);
+  const selected = candidates.slice(0, options.maxPages ?? 3);
 
   const nodesBySlug = new Map(
     walkIaNodes(ia.tree)
@@ -156,8 +159,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     journal,
     options: {
       runTask: options.runTask,
-      toolDescriptors: options.toolDescriptors,
-      maxAttemptsPerPage: options.maxAttemptsPerPage
+      toolDescriptors: options.toolDescriptors
     },
     config,
     glossary,
@@ -171,14 +173,26 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   };
 
   const refined: RefinedPage[] = [];
+  let roundsSpent = 0;
   for (const candidate of selected) {
     const node = nodesBySlug.get(candidate.slug);
     if (node === undefined) {
       // Structure changes are refresh's job; refine never invents pages.
       continue;
     }
+    // The global budget caps how many write rounds this invocation may spend in total.
+    const remainingRounds = options.totalRounds === undefined ? undefined : options.totalRounds - roundsSpent;
+    if (remainingRounds !== undefined && remainingRounds <= 0) {
+      break;
+    }
+    const perPageCap = Math.min(options.maxRoundsPerPage ?? 3, remainingRounds ?? Number.MAX_SAFE_INTEGER);
     const before = countBlocks(candidate.shard);
-    const { outcome, artifact, shard } = await generatePage(ctx, node, candidate.shard);
+    const { outcome, artifact, shard } = await generatePage(
+      { ...ctx, options: { ...ctx.options, maxAttemptsPerPage: perPageCap } },
+      node,
+      candidate.shard
+    );
+    roundsSpent += outcome.attempts;
     const mdxTarget = join(repoRoot, config.outDir, artifact.mdxPath);
     await mkdir(dirname(mdxTarget), { recursive: true });
     await writeFile(mdxTarget, artifact.mdx, 'utf8');
