@@ -65,6 +65,23 @@ describe('snippet-exec', () => {
     expect(result.coveredEntityIds).toEqual([]);
   });
 
+  it('leaves a bash block uncovered (not failed) when the invoked binary is not installed', async () => {
+    // Live regression from the self-dogfood: getting-started runs `docstube generate`, which is
+    // not installed in the sandbox — exit 127 means "unprovable here", never "wrong".
+    const code = 'docstube generate';
+    const { block, page } = pageWithBlock(code, 'bash');
+    const exec: PluginExec = async (_command, args) =>
+      args[0] === '--version'
+        ? { exitCode: 0, stdout: 'GNU bash', stderr: '' }
+        : { exitCode: 127, stdout: '', stderr: `bash: line 1: ${code.split(' ')[0]}: command not found\n` };
+
+    const result = await snippetExecVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('bash', code))]);
+
+    expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
+    expect(result.coveredEntityIds).not.toContain(block.id);
+  });
+
   it('caps the stderr tail at 10 lines', async () => {
     const code = 'exit 3';
     const { page } = pageWithBlock(code, 'sh');

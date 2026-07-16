@@ -26,6 +26,20 @@ describe('manifest store', () => {
     expect(await store.listShardPageIds('en')).toEqual([shard.page.id]);
     expect(await store.readPageShard({ locale: 'en', pageId: 'pg_00000000000000000000' })).toBeUndefined();
   });
+
+  it('prunes orphaned shards left behind by crashed runs, keeping indexed pages', async () => {
+    const store = createManifestStore(repoRoot, 'latest');
+    const kept = buildFixturePageShard(buildFixturePage());
+    const orphan = buildFixturePageShard(buildFixturePage());
+    await store.writePageShard(kept);
+    await store.writePageShard(orphan);
+
+    const pruned = await store.pruneOrphanShards({ keepPageIds: [kept.page.id], locales: ['en', 'de'] });
+
+    expect(pruned).toEqual([`en/${orphan.page.id}`]);
+    expect(await store.listShardPageIds('en')).toEqual([kept.page.id]);
+    expect(await store.readPageShard({ locale: 'en', pageId: kept.page.id })).toBeDefined();
+  });
 });
 
 describe('run journal', () => {

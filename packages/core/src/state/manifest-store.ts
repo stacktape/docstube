@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import type { ManifestIndex, PageShard } from '@docstube/contracts';
@@ -36,6 +36,7 @@ export type ManifestStore = {
   readPageShard: (input: { locale: string; pageId: string; version?: string }) => Promise<PageShard | undefined>;
   writePageShard: (shard: PageShard) => Promise<void>;
   listShardPageIds: (locale: string) => Promise<string[]>;
+  pruneOrphanShards: (input: { keepPageIds: string[]; locales: string[] }) => Promise<string[]>;
 };
 
 export const createManifestStore = (repoRoot: string, currentVersion: string): ManifestStore => {
@@ -67,6 +68,33 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
         }
         throw error;
       }
+    },
+    // Crashed or re-planned runs re-mint page ids and leave the old shard files behind; the
+    // manifest is committed, so orphans would pollute the repo. Current-version shards only —
+    // frozen-version shards are immutable history.
+    pruneOrphanShards: async ({ keepPageIds, locales }) => {
+      const keep = new Set(keepPageIds);
+      const pruned: string[] = [];
+      for (const locale of locales) {
+        const dir = join(manifestDir(repoRoot), 'pages', locale);
+        let entries: string[];
+        try {
+          entries = await readdir(dir);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            continue;
+          }
+          throw error;
+        }
+        for (const name of entries) {
+          const pageId = name.endsWith('.yml') ? name.slice(0, -'.yml'.length) : undefined;
+          if (pageId !== undefined && !keep.has(pageId)) {
+            await rm(join(dir, name), { force: true });
+            pruned.push(`${locale}/${pageId}`);
+          }
+        }
+      }
+      return pruned;
     }
   };
 };

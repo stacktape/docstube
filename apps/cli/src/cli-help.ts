@@ -19,14 +19,14 @@ export const commandHelp = [
 ].join('\n');
 
 export const commandHelpByCommand: Record<string, string> = {
-  wizard: 'Usage: docstube wizard [--fresh]\n\nOpen the local setup wizard and control plane.',
+  wizard: 'Usage: docstube wizard [--port <n>]\n\nOpen the local setup wizard and control plane.',
   generate: 'Usage: docstube generate [--max-attempts <n>]\n\nGenerate docs from existing config.',
   refresh:
-    'Usage: docstube refresh\n\nRegenerate only the entities affected by code changes since the committed manifest.',
+    'Usage: docstube refresh [--max-attempts <n>]\n\nRegenerate only the entities affected by code changes since the committed manifest.',
   refine:
-    'Usage: docstube refine [page] [--failed] [--max-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
+    'Usage: docstube refine [page] [--failed] [--max-pages <n>] [--max-rounds-per-page <n>] [--total-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
   audit:
-    'Usage: docstube audit <path-or-url>\n\nExtract claims from an existing docs site and verify them against the codebase.',
+    'Usage: docstube audit <docs-dir> [--json]\n\nExtract claims from an existing docs site and verify them against the codebase.',
   validate: 'Usage: docstube validate\n\nValidate the docstube config family.',
   check:
     'Usage: docstube check [kind]\n       docstube check --list\n\nRun deterministic checks over the generated docs. Kinds derive from registered verifier plugins.',

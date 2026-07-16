@@ -28,6 +28,11 @@ const hasNoExecMeta = (fence: MdxCodeBlock): boolean => /(^|\s)no-exec(\s|$)/u.t
 const isModuleNotFound = (stderr: string): boolean =>
   /ERR_MODULE_NOT_FOUND|MODULE_NOT_FOUND|Cannot find (?:package|module)/u.test(stderr);
 
+// Same policy for bash: a sample invoking the documented CLI (`docstube …`) exits 127 in a
+// sandbox where it is not installed. Missing binary means "unprovable here", never "wrong".
+const isCommandNotFound = (exitCode: number, stderr: string): boolean =>
+  exitCode === 127 || /command not found|not recognized as an internal or external command/iu.test(stderr);
+
 const stderrTail = (stderr: string): string => {
   const lines = stderr
     .trimEnd()
@@ -132,6 +137,8 @@ export const snippetExecVerifier: VerifierDefinition = {
               coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
             } else if (!bashLanguages.has(language) && isModuleNotFound(run.stderr)) {
               // Unresolvable import in the sandbox: not proven, not failed.
+            } else if (bashLanguages.has(language) && isCommandNotFound(run.exitCode, run.stderr)) {
+              // Binary not installed in the sandbox: not proven, not failed.
             } else {
               const tail = stderrTail(run.stderr);
               findings.push(

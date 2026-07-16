@@ -224,6 +224,10 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     systemFlags: []
   };
   await store.writeIndex(index);
+  await store.pruneOrphanShards({
+    keepPageIds: index.pages.map((entry) => entry.id),
+    locales: [locale, ...config.locales.targets]
+  });
 
   const flagged =
     outcomes.some((outcome) => outcome.status === 'flagged') ||

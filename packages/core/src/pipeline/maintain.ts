@@ -382,6 +382,10 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     systemFlags: [...previousIndex.systemFlags, ...newSystemFlags]
   };
   await store.writeIndex(index);
+  await store.pruneOrphanShards({
+    keepPageIds: index.pages.map((entry) => entry.id),
+    locales: [locale, ...config.locales.targets]
+  });
 
   const flagged = anyPageFlagged || siteFindings.length > 0 || newSystemFlags.length > 0;
   const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
