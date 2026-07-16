@@ -1,0 +1,887 @@
+schemaVersion: 1
+locale: en
+version: latest
+sourceCommit: b3ef381e3e5d4b7db878a5523147870b47a03523
+generatedAt: 2026-07-16T21:04:09.122Z
+page:
+  id: pg_dywqe6ym44pa6ppfm8zm
+  kind: page
+  slug: writing-plugins
+  title: Writing plugins
+  description: Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold.
+  preamble:
+    - id: bl_b36f5xzg55jgagwz6yd6
+      kind: block
+      blockType: paragraph
+      contentHash: d8d116fd63bd73dbafe9abc98184d0b5cf13573a7557e253afb66faf8aedc431
+      variants: []
+      claims:
+        - id: cl_nka84wt3gc8b8870cqzw
+          kind: claim
+          text: "@docstube/plugin-sdk exports definePlugin as the plugin entry point."
+          anchor:
+            quote: "`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point"
+            prefix: ""
+            suffix: ""
+          claimClass: api-shape
+          guarantee: proven
+        - id: cl_rjvh0g2zkzqyyn21mvxz
+          kind: claim
+          text: "@docstube/plugin-sdk re-exports pluginManifestSchema, pluginPermissionsSchema, pluginCapabilityKindSchema, PluginManifest, PluginPermissions, PluginCapabilityKind, VerifierRunResult, Finding, and SymbolRecord."
+          anchor:
+            quote: including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`
+            prefix: ""
+            suffix: ""
+          claimClass: api-shape
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_b8400ar03yjc5w8k8n76
+      kind: block
+      blockType: paragraph
+      contentHash: f7f4377dee7ce4c28ca3b4887bfb6cb153c43ef1afcc6ee208d8045ee4ac1b2d
+      variants: []
+      claims:
+        - id: cl_7p5eavpxyp3j8brqgm48
+          kind: claim
+          text: A plugin module is loaded only when its default export is created by definePlugin.
+          anchor:
+            quote: A plugin module is loaded only when its default export is created by `definePlugin`
+            prefix: ""
+            suffix: ""
+          claimClass: behavioral
+          guarantee: proven
+        - id: cl_x1h4ek4ezdaddmqnhv92
+          kind: claim
+          text: The plugin loader checks plugin identity with isDocstubePlugin.
+          anchor:
+            quote: The loader checks that with `isDocstubePlugin`
+            prefix: ""
+            suffix: ""
+          claimClass: behavioral
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_2g9qpygsdjk18q3thx9k
+      kind: block
+      blockType: code-example
+      contentHash: 830cb3bfd6e73fd980b773e6fa4548ef5cb6fdde1099ca7f84369b5484d9dfac
+      language: ts
+      variants: []
+      claims: []
+      guarantee: proven
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+  sections:
+    - id: sc_7v3wp6v3jvzzswpfxgg3
+      kind: section
+      title: Manifest Validation
+      level: 2
+      anchor: manifest-validation
+      blocks:
+        - id: bl_v7d8akz6csfza8rf4vs0
+          kind: block
+          blockType: paragraph
+          contentHash: 26b0e8cdeb9267d07e8726976c88e36e0ea7fe05f519442f2a9086f347780ecb
+          variants: []
+          claims:
+            - id: cl_hkk2thxr9zbzp54c5rqy
+              kind: claim
+              text: definePlugin accepts DefinePluginInput.
+              anchor:
+                quote: "`definePlugin` accepts `DefinePluginInput`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_qhh4bqv053nkm1fce887
+              kind: claim
+              text: definePlugin parses the manifest portion with pluginManifestSchema.
+              anchor:
+                quote: parses the manifest portion with `pluginManifestSchema`
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_qhw51cbbkqvam8fmcnbj
+              kind: claim
+              text: definePlugin checks that register is a function.
+              anchor:
+                quote: checks that `register` is a function
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_ynb6wnzcfc52tv801bw3
+              kind: claim
+              text: definePlugin returns a branded DocstubePlugin.
+              anchor:
+                quote: returns a branded `DocstubePlugin`
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_w2kkb6g2dyx4wfxhxdnw
+          kind: block
+          blockType: paragraph
+          contentHash: cc9a33ac2e0063ab7b773255dd435d8c0746338bf0b21a1b3c5977ff3845116e
+          variants: []
+          claims:
+            - id: cl_g277ksa6a3e8yrysgxm5
+              kind: claim
+              text: pluginManifestSchema uses pluginApiVersion, pluginPermissionsSchema, and pluginCapabilityKindSchema.
+              anchor:
+                quote: "`pluginManifestSchema` uses `pluginApiVersion`, `pluginPermissionsSchema`, and `pluginCapabilityKindSchema`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_49qem27m1sac9tjv9c0h
+              kind: claim
+              text: pluginCapabilityKindSchema contains seven values.
+              anchor:
+                quote: The capability kind schema contains seven values
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_jkmmpchzf3aq5hqv2xfw
+          kind: block
+          blockType: code-example
+          contentHash: d6d44ad070db58746aaa711a08a260c286c737ee6fdf6be8b1d87aa52e599507
+          language: ts
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_g7czn1e7xz8zsmq7c8d5
+          kind: block
+          blockType: paragraph
+          contentHash: 1af6e146ce34bdacd67e3ff4d81b0f0d2d8ccee378f1400d7c223fb4c3fd0686
+          variants: []
+          claims:
+            - id: cl_shwnxy3ax6vvg3jgn25g
+              kind: claim
+              text: pluginPermissionsSchema includes network, exec, and writableRoots.
+              anchor:
+                quote: "`pluginPermissionsSchema` includes `network`, `exec`, and `writableRoots`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_yaj70138s3kv9mcmqnx8
+              kind: claim
+              text: pluginPermissionsSchema defaults network to false.
+              anchor:
+                quote: "`network` defaults to `false`"
+                prefix: ""
+                suffix: ""
+              claimClass: configuration
+              guarantee: proven
+            - id: cl_p3eef06fetrjg1z8d7wf
+              kind: claim
+              text: pluginPermissionsSchema defaults exec and writableRoots to empty arrays.
+              anchor:
+                quote: "`exec` and `writableRoots` default to empty arrays"
+                prefix: ""
+                suffix: ""
+              claimClass: configuration
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_1npp4272p5q513rjppep
+      kind: section
+      title: Registration Hooks
+      level: 2
+      anchor: registration-hooks
+      blocks:
+        - id: bl_hgrpdtf8jq2hvvwvjk1e
+          kind: block
+          blockType: paragraph
+          contentHash: f37bd345fa9067212560beb502598b2a6e4bb87cfc4f248835b49c7ec8c20f79
+          variants: []
+          claims:
+            - id: cl_4tzk79rm022g0fjc8e8y
+              kind: claim
+              text: PluginRegistrationHost is the registration surface passed to the plugin register function.
+              anchor:
+                quote: "`PluginRegistrationHost` is the registration surface passed to the plugin `register` function"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_bxv4ps1qgeksfphnhvkf
+          kind: block
+          blockType: table
+          contentHash: 5c42d36207a6ec2eb4007f3d14e77cdcd55942d092f558bc26f2123421237637
+          variants: []
+          claims:
+            - id: cl_1yg7rheeb48hz4sw39hs
+              kind: claim
+              text: PluginRegistrationHost has a verifier method accepting VerifierDefinition.
+              anchor:
+                quote: "| `verifier` | `VerifierDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_mem11hmddq3jrnpq7zkz
+              kind: claim
+              text: PluginRegistrationHost has a languagePack method accepting LanguagePackDefinition.
+              anchor:
+                quote: "| `languagePack` | `LanguagePackDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_1zest94ne8m0v9e829n9
+              kind: claim
+              text: PluginRegistrationHost has a contentSource method accepting ContentSourceDefinition.
+              anchor:
+                quote: "| `contentSource` | `ContentSourceDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_pzyw3cjh1rkk3g1e5h8s
+              kind: claim
+              text: PluginRegistrationHost has an importer method accepting ImporterDefinition.
+              anchor:
+                quote: "| `importer` | `ImporterDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_x2w05zk464tdpw9da44v
+              kind: claim
+              text: PluginRegistrationHost has a deployTarget method accepting DeployTargetDefinition.
+              anchor:
+                quote: "| `deployTarget` | `DeployTargetDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_mt11a3bjxw2c08m90y8z
+              kind: claim
+              text: PluginRegistrationHost has a searchProvider method accepting SearchProviderDefinition.
+              anchor:
+                quote: "| `searchProvider` | `SearchProviderDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_f8d5y0ypxeky4xgzp2hb
+              kind: claim
+              text: PluginRegistrationHost has a component method accepting ComponentDefinition.
+              anchor:
+                quote: "| `component` | `ComponentDefinition` |"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_jfy37q30vmvaf9exs8vz
+          kind: block
+          blockType: paragraph
+          contentHash: ef32e5981688603b517a886843b657ecedb96b5c552a17a0832f832b19eaacfd
+          variants: []
+          claims:
+            - id: cl_k6zyd99m60babx6kfvgb
+              kind: claim
+              text: createPluginHost records registrations for seven registration groups.
+              anchor:
+                quote: "`createPluginHost` records registrations for the same seven groups"
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_35sdzppwndjjhhvaysr5
+              kind: claim
+              text: createPluginHost checks each registered id or component name against the plugin manifest capabilities during registration.
+              anchor:
+                quote: During registration, it checks each registered id or component name against the plugin manifest capabilities
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_68qr6mm9dqs2f66p3g44
+              kind: claim
+              text: createPluginHost rejects an undeclared registration.
+              anchor:
+                quote: An undeclared registration is rejected
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_mh3tdf9m2dn01pxd7eve
+              kind: claim
+              text: createPluginHost rejects a duplicate id.
+              anchor:
+                quote: a duplicate id is rejected
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_zje6whrh3p1rv1kqw3gx
+              kind: claim
+              text: createPluginHost records a warning for a declared capability that was not registered.
+              anchor:
+                quote: a declared capability that was not registered is recorded as a warning
+                prefix: ""
+                suffix: ""
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_etgwc7zpbzcx4c8ycjgz
+      kind: section
+      title: Verifier Shape
+      level: 2
+      anchor: verifier-shape
+      blocks:
+        - id: bl_4785k3spyc6kab5cy7b0
+          kind: block
+          blockType: paragraph
+          contentHash: 5b5a871c1c6370b44d63da70094a7f7b30ab2f390bc8e93c03825c93495b7788
+          variants: []
+          claims:
+            - id: cl_hvzk65r19cwzaceaa11d
+              kind: claim
+              text: VerifierDefinition has id, title, optional description, scope, optional appliesTo, localeScope, proves, and verify.
+              anchor:
+                quote: "`VerifierDefinition` has `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_tbtpz6ap58hxkxzcn3q5
+          kind: block
+          blockType: paragraph
+          contentHash: 5330cd4b1e03155b46ab7318e8f9947cf80f9e4252b9b976e2ed637cb89e1766
+          variants: []
+          claims:
+            - id: cl_mqm87cn41am957zbbxmn
+              kind: claim
+              text: VerifierDefinition scope is typed as 'block' | 'page' | 'site'.
+              anchor:
+                quote: "`scope` is typed as `'block' | 'page' | 'site'`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_9ewcw4x0shm00kaz0g4v
+              kind: claim
+              text: VerifierDefinition localeScope is typed as 'source-only' | 'per-locale'.
+              anchor:
+                quote: "`localeScope` is typed as `'source-only' | 'per-locale'`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_4q17cn1a0sgtevnjd4y8
+              kind: claim
+              text: VerifierDefinition verify receives a VerifierContext and an array of PageArtifact values and returns a VerifierRunResult.
+              anchor:
+                quote: "`verify` receives a `VerifierContext` and an array of `PageArtifact` values, then returns a `VerifierRunResult`"
+                prefix: ""
+                suffix: ""
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_yfyay8m0g1es3wthzk12
+          kind: block
+          blockType: paragraph
+          contentHash: b57c9a2b6eb3bf7575ace09f967f400bb4439fd3784274b7be88587790e71dae
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_2rs8sjc4t291jvxh9dyh
+      kind: section
+      title: Loading Plugins
+      level: 2
+      anchor: loading-plugins
+      blocks:
+        - id: bl_z83brhpzza2w5nqxjjny
+          kind: block
+          blockType: paragraph
+          contentHash: 41724ac89bb750596a5044998a79f90b4392829325ecdb218538c43425d3c826
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_g5aazffysxkgf36ehgsn
+          kind: block
+          blockType: paragraph
+          contentHash: dd5d4fce87b3e530ffd65c38992b730891c871712f3d41131b78a02351d5487f
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_byjxkvc0nq3cnyv5frty
+          kind: block
+          blockType: paragraph
+          contentHash: f1732d8ac320d7fa6099e8468389aeed68d165a136ae38013961632302e60be0
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_tbqk2r4rwfhexpsk0efn
+          kind: block
+          blockType: code-example
+          contentHash: b01f3ddee9264805407c0f6c90350c96403916eb3af6ab44efd8a4522f3e11cd
+          language: yaml
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_w2hjmp1hjkxy6wb55349
+      kind: section
+      title: Scaffolding
+      level: 2
+      anchor: scaffolding
+      blocks:
+        - id: bl_78974fygdh2e69fsbfjx
+          kind: block
+          blockType: paragraph
+          contentHash: 8538b14cadc7fd4b820a1a74aba8e9cf5c93d39bdb707b7ae4e233cc42c93145
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_h9qkzvjdb8fv8f557cdk
+          kind: block
+          blockType: paragraph
+          contentHash: cfae7b38b524ca67df3f9b235dd67b5201de211d5627b596acce6e5b9d50097f
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_8p349ykw8scx4s43v68w
+          kind: block
+          blockType: code-example
+          contentHash: 3b32d3ede12fedb014d215117157de02143ebe36f781520d6ce7039cf17dbb6e
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_vfb0wp6bnemebpkgdnvd
+          kind: block
+          blockType: paragraph
+          contentHash: 8303f20e2e72aa7f6ac85736c4e08f7ba7f0fc4a23b84621ccda58ee475187a5
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+  guarantee: scored
+  provenance:
+    sources:
+      - symbol: ts:61e13aa4b15ee57c326f83034bc86eb018dcd37d03ed1a044369f6856aaec864
+        file: apps/cli/src/commands/plugin-command.ts
+        span:
+          - 11
+          - 15
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:77e7feaddb7992c60767be1c50de89b49c623806b6f8eaf8a11898eeec42c268
+        file: apps/cli/src/commands/plugin-command.ts
+        span:
+          - 26
+          - 67
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:97cdb1655a2044bcc458c87d1c3b025c63cdb35d44faea4c97598931513fac25
+        file: dist-dogfood/workspace/plugins/wordstats.ts
+        span:
+          - 49
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d4b1a1a7bf7c233d81d5b9cabbd221092c577531b11c010cb87e171717337028
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 8
+          - 8
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:823dfa65acb295d83362ce2580ea74e2e30754b7b4eae75be6b4c275ec179920
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 10
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9f3cb3ef4cb951135cc83c142bce547be8e108bb218edb9641fe4a8bfba4f494
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 17
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:816a1a29320d3ad22e689e9cc33a5c317226877a3980132fed7944a44e559f6d
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 19
+          - 27
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b23e4478a52cbecaca09807009a06b2e63292ee7ddf2c8e972fea7f38f16b6c9
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 28
+          - 28
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fe971c20f902f29a03ddf4ee600c2b72aab7795de5eade3c07156d23c79881af
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 30
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:71b0a4cce138990b0bd620ecec1f771d76855747cd91761a982f9aca2b0c6619
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 36
+          - 44
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:39ae74aa3c9d136997bb19b27e27ddecb803eebdd69661a2517f23780feb705f
+        file: packages/contracts/src/plugin-manifest-schema.ts
+        span:
+          - 45
+          - 45
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:343ffe3bab2943dfa51b43044b288f0e7972ef2e45d0f689f97f12b0f5fe8fb2
+        file: packages/core/src/plugins/load-plugins.ts
+        span:
+          - 12
+          - 21
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7712a6e96c7eeeaf09da2be7715d5190607ce66373c1baaa6c99d489473898ac
+        file: packages/core/src/plugins/load-plugins.ts
+        span:
+          - 35
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bfe46fe70e69c62982bacd214e700e40e14fc0ebae5b7d7e247baa06f10000b2
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 20
+          - 20
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3f346589afce91f63ccc07cdd0b0caf3f1c2737268d5a5a626151b331ff74803
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 22
+          - 26
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ae30d4e5326c1ddeb9349092856a8dd791d14e186f2012b6e21a1cc385341611
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 30
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:94848325ee1a00a9e699482d6df8cedb08ba2664d2360842353882b86a304715
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 50
+          - 157
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a78e98c6a0d3f920f5a0e427193e76c6445610cc67a282f4af8e20fcd2ccd758
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 6
+          - 6
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:cedd0db013eec5416df2110146c7ef6cc8bffdd8d4c42b62cf59533d7699af43
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 8
+          - 12
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5e8da5323fa130a2d92b12b84e0afaad95aa753aff0d2f469435dcaeb7035a6b
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 14
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5fad0fd3b16533e53433a61c871c063975cf88147fa9c8b7b4c28b40be64f812
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 21
+          - 28
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7502657e5532c57acdd8686ebbc83084830c50c761ec84c31758926e1f059630
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 30
+          - 31
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:421db5153c5417fd3ff95d076a342c7b3c336b9a5844f31503bf0f80fed3fce8
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 17
+          - 23
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6c52c778bb0441495eb397452734d3fa04656f43c980bb30ce5dbe5fb8fd3098
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 25
+          - 28
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:850a9f7a27c4d4a8dfa48eda69c076fcbb9e79b8825ad621c6222233c110e18a
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 30
+          - 33
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1557896987c7831768a72452770e6c493aea2032d499c0f0151670fa5448eaa8
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 37
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fc21a7fc0e488141c0f35d300e0d487dace61dfd361f6ae0856a16e3a3c2906d
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 44
+          - 48
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:047fec9aeafa7051932b2ab75f77c581988771081fa02f77989805f45ab2dab4
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 50
+          - 59
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1c04c1ebdaf5c938905460dca8806e2b608ae7ff8ec2522e6f8675fbc88a6cf3
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 61
+          - 66
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a079d508a9cb4ffa458239b286a00a46188c8a0832bb4451ed8bb6ff30e0cd15
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 68
+          - 82
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e5cf0c16cd6fde876503c56be2f05b7878f0c948d3d698559141c789ab1b95e5
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 84
+          - 93
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a0a66c25004144c9fb98be6f272627f42aec8af3c1df44e0e32a07db7d0808d2
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 95
+          - 100
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fb5771dfc248732d4828d60428ab34a868d5e6118c3b49bd5ecdaeea76b92909
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 102
+          - 115
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9f23229eb40317fd8442f9dc8df80b689c1ad272c9c84e046ac1e2eade29c803
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 117
+          - 122
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:926757b4c30c702a8bb1410eb31d614b995e2b6a1aaeb1a8280e769a3cccff4e
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 126
+          - 130
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1a80e56de746b923d7d9f851db4deeb0f16183ab54b4fb977d96c18a5bc78842
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 132
+          - 134
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:af99f76cf18eb11c58271cf3500326f3e9b31b2e0dc12de0a8929de67c4e0bf5
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 138
+          - 142
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e8efa1ec80c60a92bc6c72194ed0c0bfddb9a59a22857f91688cd4f8118ce7fc
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 144
+          - 148
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7631dfd33319e01414b47293452c845579c25f3f8e5b67d8277b55edfb085dc3
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 150
+          - 154
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a61edd83811a1e363fd399352a66b55accb5db95f77452e02dafffa1e449980a
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 159
+          - 165
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:818bc4e071b54eee5b4c9637b09447a0e096312c9868e712b52ae0f4ff7a3a19
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 167
+          - 175
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:cf814fd4915ad43ab809bee0c78d3d2111546d02e8807fd65e65e9b9779ed026
+        file: packages/skills/src/plugin-authoring-example.ts
+        span:
+          - 9
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:faa6dc359d51586df444714a8aa8775bd814ea461d2ccd58bd8774254af90ed1
+        file: packages/skills/src/plugin-authoring-example.ts
+        span:
+          - 21
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bb3daa8c1224fa5b147831526808c514ed74c6484d7a0c16cde45fc933822f85
+        file: packages/skills/src/plugin-authoring-example.ts
+        span:
+          - 40
+          - 105
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:85897f8621a653d05d6d903e37ce06afdcbd50066c215acc9ca5a7be43e354ac
+        file: packages/skills/src/plugin-authoring-example.ts
+        span:
+          - 107
+          - 170
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:57e23bc60b504ec52083b84d6d64e2adb0d37757ad033f5bc98b6b13f711780d
+        file: packages/skills/src/plugin-authoring-example.ts
+        span:
+          - 172
+          - 194
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c5b42f1e0134c0daf416ccfc12fe11bd847d7f8b3c0d745cb3db531cdc9cc20a
+        file: packages/skills/src/skill-plugin-authoring.ts
+        span:
+          - 9
+          - 334
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+    seedContext:
+      - ctx:codemap:eb5314ed39433347d28bd10bcd0bd60d663bcc9e59a613a87e9d27c4e0e73a86
+      - ctx:brief:f2eea9b9482f01d35c5ee3856cc8aecd5a5dec32b9bc790d013921390fa6fa8f
+    observedReads:
+      - file: docs-site/content/en/writing-plugins.mdx
+        contentHash: 27340cc5349e96774b9ae0c3aaf8fe91c62c4c0b23d42f10cc7ad9713fb19be4
+      - file: packages/plugin-sdk/src/define-plugin.ts
+        contentHash: c3a834b063290ab7b07493e760d774e0d0dca9c4a817356a7ed1b03f52b0c957
+      - file: packages/plugin-sdk/src/plugin-sdk.ts
+        contentHash: e57970984cd388a54fb1c264a3a4a5aa5bd9e5375bad5371bf8cbf003b195076
+      - file: packages/contracts/src/plugin-manifest-schema.ts
+        contentHash: 188a4fbbfbaceba1b0ba40ddd8b7aa5f7eedc56cad137e1b370221330d479cc9
+      - file: packages/core/src/plugins/load-plugins.ts
+        contentHash: 82595bca64283379a5ee1c14b124e7039c12cbfd8f71b06e8c7ef193b2384f6c
+      - file: packages/core/src/plugins/plugin-host.ts
+        contentHash: 5076367778064af78aebeba150995c9d32b0e30216f0a2f0a29b69c1646eda09
+      - file: packages/plugin-sdk/src/hook-types.ts
+        contentHash: 4b3c862fa958a8f161ca9a14acab6b859098f07b4060ddbb8f0a8d0470a82eba
+      - file: apps/cli/src/commands/plugin-command.ts
+        contentHash: 09b9f7a980a0d85da7c62baf53e33b40762177fd3f050ce241accfc120ebdb17
+      - file: packages/skills/src/plugin-authoring-example.ts
+        contentHash: 9820db694b6327f4cff854d2afa32d7fc72da4293a0ea2a7faf5eb23da143c8a
+      - file: packages/skills/src/skill-plugin-authoring.ts
+        contentHash: f96039fa2b29b64310ecdffc3ec6ae48cde4c6abf177e5466c5dc1d0605d7441
+      - file: dist-dogfood/workspace/plugins/wordstats.ts
+        contentHash: c68cc332e35a8b03b491eae90bde063c1b32574ae2a1fc6a4dcf8ce9de09baf2
+    verifications: []
+flags: []

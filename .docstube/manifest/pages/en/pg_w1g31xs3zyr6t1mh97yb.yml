@@ -1,0 +1,1081 @@
+schemaVersion: 1
+locale: en
+version: latest
+sourceCommit: b3ef381e3e5d4b7db878a5523147870b47a03523
+generatedAt: 2026-07-16T20:58:06.351Z
+page:
+  id: pg_w1g31xs3zyr6t1mh97yb
+  kind: page
+  slug: cli-reference
+  title: CLI reference
+  description: Command reference for the docstube CLI, including generation, refresh, verification, status, plugin, and upgrade commands.
+  preamble:
+    - id: bl_n0ey4r3rmzns2c75tng2
+      kind: block
+      blockType: paragraph
+      contentHash: 41ea410172a71d96113b19d97fdb29edc31cb6d4a5e1c6102660abd9cccbc941
+      variants: []
+      claims: []
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+  sections:
+    - id: sc_gj296edkw7mbh4qa30pe
+      kind: section
+      title: wizard
+      level: 2
+      anchor: wizard
+      blocks:
+        - id: bl_n3hj0vtpm3edkb840kjm
+          kind: block
+          blockType: paragraph
+          contentHash: 56ca9615f180fead7ae67447168cf6f80557929750b05800cb6e45558a508083
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_96e852hfjpbcmtepmb13
+          kind: block
+          blockType: paragraph
+          contentHash: 589bbc792dcf000c3a95365f844850901e49a128025010b13b4b86aad8f8a377
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_enrjnxazbsanhrshdjaq
+          kind: block
+          blockType: list
+          contentHash: fe154d4ce76b6e1d61eb884b8ce70280129c3d807311dbeac724c8b037dfafdd
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_2nyj7dqe8xpz7jswshfr
+          kind: block
+          blockType: code-example
+          contentHash: d8fa260907a94724a1bf158107e64edb90c48408096485b13f49f3b2b22d872e
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_qmxnn638kjtt1n4bm2f3
+      kind: section
+      title: generate
+      level: 2
+      anchor: generate
+      blocks:
+        - id: bl_68zxbf2vyyvw7zf3eg0e
+          kind: block
+          blockType: paragraph
+          contentHash: 34fb00143b6ef4971cc100e9553fd96d153a4a4360b7a8208ff7efcd2b115fb8
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_d0tpgyjffg90vaa8kxyf
+          kind: block
+          blockType: paragraph
+          contentHash: 589bbc792dcf000c3a95365f844850901e49a128025010b13b4b86aad8f8a377
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_4zefk371nrh344pz4vyb
+          kind: block
+          blockType: list
+          contentHash: 5ab9c556f625cd951c9eb9df78e787f3e80d733b2db81d98ac2f5dd620a383b7
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_7k66yt7smkwtabpnxj95
+          kind: block
+          blockType: code-example
+          contentHash: 78c94205859b61ef62beea52a2bfae676dfc72e5da295095fa08be229525c809
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_tgszs6xc4hee7yd21w6s
+      kind: section
+      title: refresh
+      level: 2
+      anchor: refresh
+      blocks:
+        - id: bl_9dmaxnabcxhm4mk6mc5r
+          kind: block
+          blockType: paragraph
+          contentHash: d7d15856d6b57f4853d394a89fbd02f50cb4225962e116f37008308da668410f
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_gzc3g97zn70jw86t5vwf
+          kind: block
+          blockType: paragraph
+          contentHash: 589bbc792dcf000c3a95365f844850901e49a128025010b13b4b86aad8f8a377
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_0mmb3sx4ee5p64qbtrwz
+          kind: block
+          blockType: list
+          contentHash: 5ab9c556f625cd951c9eb9df78e787f3e80d733b2db81d98ac2f5dd620a383b7
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_s22qmzhw49a6rshm4pq7
+          kind: block
+          blockType: code-example
+          contentHash: 9c9b09d4d3a78056877094de451c82194a79df291115ff672bf273a0a03ece94
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_3c3zkxfptrm627zj2vx6
+      kind: section
+      title: refine
+      level: 2
+      anchor: refine
+      blocks:
+        - id: bl_5xkc463preg1kjs7jez6
+          kind: block
+          blockType: paragraph
+          contentHash: e14288cbd240d22b7cb240caa188cdbfae8abf95bdd18303522944fb47f869e0
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_qa6mxqj3g58s0ce777ec
+          kind: block
+          blockType: paragraph
+          contentHash: 0e2b371f96de31d3288a5082c2a95bb2b8e000d9d694a30bf7a0580c9a1e95ab
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_kmsh4aj475wcqkdh64g2
+          kind: block
+          blockType: list
+          contentHash: 57097ad2617ed2777d8c1a9ea36f895976f00e5a61cc49bfa8d40a9084b98817
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_jg22mvsr91n1vcmh49eq
+          kind: block
+          blockType: paragraph
+          contentHash: 6936dbc7b0ed26f49f1fc5484cc3a99bf1acce1676711230efb9c2aefd14a813
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_nvawv1bkf8yp4jwyc47s
+          kind: block
+          blockType: code-example
+          contentHash: f9624e24bb924c212eba1a71abd60deb0ab1875c9a555150ea0f76300a702dfa
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_n13ycaffy2t58yjbyxy7
+      kind: section
+      title: audit
+      level: 2
+      anchor: audit
+      blocks:
+        - id: bl_gacah4d65z17vwv9c55k
+          kind: block
+          blockType: paragraph
+          contentHash: a0c3de7163e030f41941382ddfa7f3cea262c786d78ef5d50a5dc3a7b31beb5e
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_pm1x9tb8zvs2emp43znc
+          kind: block
+          blockType: paragraph
+          contentHash: 14ac106b7c2a49a5c076ac8d51c6cedb50a5b8707037fcac60021bb615b7d68a
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_sj713k256x4h4ss23921
+          kind: block
+          blockType: list
+          contentHash: f98a26b273559d52dcd5b05c65642dec96870b675cb4e6104bcada115ff0ebc0
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_sy0wd5ap080ky06ds59c
+          kind: block
+          blockType: code-example
+          contentHash: 5e3ee11f270d9bc6ec25164a738c08c25a1f685937d95eb2e8bda43d0ec7ab7a
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_nz7j7dt2wqypey2df6sw
+      kind: section
+      title: answer
+      level: 2
+      anchor: answer
+      blocks:
+        - id: bl_q95wnmr9hfpw41k1grm4
+          kind: block
+          blockType: paragraph
+          contentHash: c66f5b0b5cbcd5ad6c88e5f3372a316b5f24b0c19685e57af12cd891a5b034a6
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_w1xwxg9sjrkc57rsndfj
+          kind: block
+          blockType: paragraph
+          contentHash: a1281c0c1ec8472a90cef09a0535136633921747cbc472b3d67827fcd9075a28
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_hn70wn1jqnvxfenzr3nm
+          kind: block
+          blockType: list
+          contentHash: e159dafbd5533e3cf9e7a17a5310a3d76420fc8a458f16b995052381cc6b3ef8
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_syz7q715nqyw359pmazy
+          kind: block
+          blockType: code-example
+          contentHash: 2f30f3e7c52d4afcfc9550b9be89bbee271caeca84a2ac7980c49588a203c9d6
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_crrcnvfzhst9440m2vmc
+          kind: block
+          blockType: code-example
+          contentHash: 72e7cfb827a4cc09c253bee7eeb875a9fdae4628d4973d2035218ed7586f079c
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_j9c415kcqfwe046eprm7
+      kind: section
+      title: validate
+      level: 2
+      anchor: validate
+      blocks:
+        - id: bl_fxnmxcsqngr54s19vm0r
+          kind: block
+          blockType: paragraph
+          contentHash: 653b80efd10fa41427a4dcf2866513ab9bfd71d6e2c47915ed85097aaf81be27
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_ehmq0pb7mpeww4vy6dap
+          kind: block
+          blockType: code-example
+          contentHash: a88ef4e507b1217a236cf1b13502d87c016aa72bc076440e1f63c94e0cc0fb3b
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_6xak1c5t4nr131p7r7he
+      kind: section
+      title: check
+      level: 2
+      anchor: check
+      blocks:
+        - id: bl_xv2ybs1bprrq0mcqayx4
+          kind: block
+          blockType: paragraph
+          contentHash: 5d0db9695e0005809c9dcb3f5f8b6dbabc090cb683e61a38e146aa5641fdf59a
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_mfcmt2vkc4c2rs3c4e6y
+          kind: block
+          blockType: paragraph
+          contentHash: 14ac106b7c2a49a5c076ac8d51c6cedb50a5b8707037fcac60021bb615b7d68a
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_47g7852pr6sejq6m08kp
+          kind: block
+          blockType: list
+          contentHash: bc2c39e73de518606a66fea00ad56d3f990921f7910b1e5d9bf801d4a8327ac9
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_11q460v966mhgjbdaa0v
+          kind: block
+          blockType: code-example
+          contentHash: ddc9742afccc769e39927075f8cd26d5345629af18f0baa118ef2b810afe73d3
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_6vqz7zp5j0p6f5rbtcvv
+          kind: block
+          blockType: code-example
+          contentHash: 26056d4f79b4d10f1eb8676938ba0ee9065e6187daac039ccf47f515b86162e4
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_njv8yn5tbzhhdbgby6bt
+      kind: section
+      title: status
+      level: 2
+      anchor: status
+      blocks:
+        - id: bl_hfj1wcm7qn96c1kwbdhd
+          kind: block
+          blockType: paragraph
+          contentHash: 45b4e611d12bf2a934d53372854793b9e681b34f46f21e1884627a5882ae628f
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_gaz3r7sdqjyz0k9e4q66
+          kind: block
+          blockType: code-example
+          contentHash: 6ee4dc35ea62c912d30f3094a9f5a9edeb80009c7ea83946d461c5bd6acf30ec
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_0fzes5n7rvex0cvz297b
+      kind: section
+      title: doctor
+      level: 2
+      anchor: doctor
+      blocks:
+        - id: bl_497hsp2ydea3wh3gy14q
+          kind: block
+          blockType: paragraph
+          contentHash: f76f13309fa016994ffe83407634c3117533f3259b35f22cd908962b6ab6197a
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_qydy9xjj6radxt21108z
+          kind: block
+          blockType: code-example
+          contentHash: de34fa7a06d38c2b46ed63e1b1a7f9b540cb2fd26ff81aacca979b8bfa093870
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_ww9hrw5a7wfwkf6kgj0w
+      kind: section
+      title: plugin scaffold
+      level: 2
+      anchor: plugin-scaffold
+      blocks:
+        - id: bl_cbnycprgtrwmj31tq8yh
+          kind: block
+          blockType: paragraph
+          contentHash: 86ecc091915656133905483753cbb8cbe6f170bbdbf19f126889f3cfd50de414
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_rnpq434yyhk27tmjv44p
+          kind: block
+          blockType: paragraph
+          contentHash: 186c0c875986c3082767728d93fbd5baccc944b96b227a548ec1592b881ee500
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_f7nxa7z8d6ycvqyva98e
+          kind: block
+          blockType: list
+          contentHash: 7f90f3e747e57b469c4a4e217050ac9adc5e9d60bc2415a18cd93c8867c13df0
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_4t67vy0kex8v6p61bpgs
+          kind: block
+          blockType: code-example
+          contentHash: 84bd8e8105c50abe1127316b5b8a2874b6222512ffbd11934783c2041aa53ee1
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_1g6k1meq0hgg0fzvzd76
+      kind: section
+      title: upgrade
+      level: 2
+      anchor: upgrade
+      blocks:
+        - id: bl_k7f03b4tc57jc069ejmg
+          kind: block
+          blockType: paragraph
+          contentHash: 57fd405b193597dbd4cd190aa898501fc3b76d5c0ce2fbd899a9afb423bd8963
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_7ec4aa95emge5ab3vd58
+          kind: block
+          blockType: paragraph
+          contentHash: 95081a811cc56056d2287ba1f377f5461168ec0941412ba5d355f12ede8fd6fc
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_h21mtkepkcpkpfst8fmm
+          kind: block
+          blockType: list
+          contentHash: 3b7d464dbabb7e0839dc71c96207055ae7f4d88ec0ca657f28ed9aa33997e22c
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_5ajfnhm1424b5rsdx0vz
+          kind: block
+          blockType: code-example
+          contentHash: 3558f9520a011b08cebc6f5f6c843606b11b2238d11d7d72fb2ce690c99bfd8f
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_q8wfwqs99z1fvmhxn0q2
+          kind: block
+          blockType: code-example
+          contentHash: e640e1c37ed26f84af4d9ada01e83d9ad71fa38715ea82abd984e6e64e729af8
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_n7zb8ya83jdh7ehb6q84
+      kind: section
+      title: version
+      level: 2
+      anchor: version
+      blocks:
+        - id: bl_5r5fghs88r8rdyspm08b
+          kind: block
+          blockType: paragraph
+          contentHash: 22385f1af698112b68fc9cff75685c882345a3c1b1ef073a827e146d42ad7227
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_rz7bjve72rer4pkcerbf
+          kind: block
+          blockType: code-example
+          contentHash: 0eb979b994df0d75f55886ee623aa80a8c8d0f1c8533b40259255888dcff30c5
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_36p09mj2r5dbedxgd6na
+      kind: section
+      title: help
+      level: 2
+      anchor: help
+      blocks:
+        - id: bl_9yzh0jch8cmm8za2ahgm
+          kind: block
+          blockType: paragraph
+          contentHash: 6f2051f90a85f949b2d81f9e25fb28f5acdec627cf12d04109fc8e9ab7d877d1
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_4kn1s4afq70wwyhandb1
+          kind: block
+          blockType: code-example
+          contentHash: 9e43742559e8495a5373982ae259449930519563bca8d173166ef043c3746796
+          language: bash
+          variants: []
+          claims: []
+          guarantee: proven
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+  guarantee: scored
+  provenance:
+    sources:
+      - symbol: ts:492734251fae24ee5962f5260e35debd5347463ec6b658bd6dd4dae9cc2f7b74
+        file: apps/cli/src/cli-help.ts
+        span:
+          - 1
+          - 19
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5868005cf8aa74e793cf079e65b3fcc4a69b35f1bc9c0886cfa4128a94e00bd2
+        file: apps/cli/src/cli-help.ts
+        span:
+          - 21
+          - 40
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:72fdf16222c23c7cc23bdf5d5348ef9907ebe3dc80cdfd42482733171bb1e423
+        file: apps/cli/src/cli-help.ts
+        span:
+          - 42
+          - 47
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e1d69564b67ed1043b7d981a2116ad45d1643a49c82e610661fe39d59d00a32c
+        file: apps/cli/src/cli-output.ts
+        span:
+          - 1
+          - 4
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:0c07420c08c6634de01033675b0670d64c1e01a7d47b13f94c83e53d768e369b
+        file: apps/cli/src/cli-output.ts
+        span:
+          - 6
+          - 8
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4a885f4b00cf90e17b593608bdf20018fdc05ad251212c41b9c5e1f31028c25d
+        file: apps/cli/src/cli-output.ts
+        span:
+          - 10
+          - 13
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:0c19d8dc63ef2f314c4ec8a3f976a7cc896d161e658b375aaae640d3bfd8bf7e
+        file: apps/cli/src/commands/answer-command.ts
+        span:
+          - 9
+          - 13
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:99f6655c49b562cf9d07a082e6cebf677d7d16d2cb49b12bafd8be1a2b41ef0b
+        file: apps/cli/src/commands/answer-command.ts
+        span:
+          - 19
+          - 107
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:df9c242991c43c0a8e18527f612efa7e8afb18d1cf6ad22239233cfec1fa7d81
+        file: apps/cli/src/commands/audit-command.ts
+        span:
+          - 14
+          - 18
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:516e879cf31bb59be07a057fdf806878c1841d444a86f72d74ad10e41e7c2040
+        file: apps/cli/src/commands/audit-command.ts
+        span:
+          - 54
+          - 78
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:af70e28445481b23a9e693f3ce8d6af6513a3e731859f30b4a35d92958976aec
+        file: apps/cli/src/commands/check-command.ts
+        span:
+          - 20
+          - 24
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2fc73094b2d6f7e818320be364edf24aacf6931345d6e8edee592373197fabb6
+        file: apps/cli/src/commands/check-command.ts
+        span:
+          - 26
+          - 93
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:26a7fd9a73f05637e43e79b36a5368763ac68d8493b31e216546bd5a6037cb24
+        file: apps/cli/src/commands/doctor-command.ts
+        span:
+          - 8
+          - 10
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:8486b602c3ae854ef57833c7b6be62be2291a31b555685bbb9135ddb18c28fa5
+        file: apps/cli/src/commands/doctor-command.ts
+        span:
+          - 23
+          - 106
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:68259358e90fec4f600afdaec9832161cee1bfd2c4c2c0ddb3530a6b922298da
+        file: apps/cli/src/commands/generate-command.ts
+        span:
+          - 11
+          - 14
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3d945790571a3fc3a758723a6a65cd57dfd0380bae2a84238f3361a104c9d292
+        file: apps/cli/src/commands/generate-command.ts
+        span:
+          - 16
+          - 69
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:61e13aa4b15ee57c326f83034bc86eb018dcd37d03ed1a044369f6856aaec864
+        file: apps/cli/src/commands/plugin-command.ts
+        span:
+          - 11
+          - 15
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:77e7feaddb7992c60767be1c50de89b49c623806b6f8eaf8a11898eeec42c268
+        file: apps/cli/src/commands/plugin-command.ts
+        span:
+          - 26
+          - 67
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d9c2d3ad76e7f9a2f6f93592a1e6dfa6ed7cdd891bbe444bac08eb3d77570fe7
+        file: apps/cli/src/commands/refine-command.ts
+        span:
+          - 11
+          - 18
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1c2c09027858261d3360641460697167c45ccd62371082b355d2a57017b2796d
+        file: apps/cli/src/commands/refine-command.ts
+        span:
+          - 20
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:043fb8fdada09a8ba4f77f4568000111a480447331f6642d6c1eaec2dcc56de5
+        file: apps/cli/src/commands/refresh-command.ts
+        span:
+          - 11
+          - 14
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5289068c9e9bd91862c38994ca53122e7d5ed2d64d968e8dca04476ffa3b353c
+        file: apps/cli/src/commands/refresh-command.ts
+        span:
+          - 16
+          - 53
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:549adf56de24739e6e435a7b5781aa1ddd8b8c650a6370c1eb4e859c446d9855
+        file: apps/cli/src/commands/status-command.ts
+        span:
+          - 4
+          - 6
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:821ba85bf850791af103c8031fd6f6c0742cdb4a75a7d080863e8967d24b5bbb
+        file: apps/cli/src/commands/status-command.ts
+        span:
+          - 8
+          - 49
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3baea096e9c4d73f43b7e8515c88d77659de5b1dfde632e1f78286efd347c73b
+        file: apps/cli/src/commands/upgrade-command.ts
+        span:
+          - 13
+          - 13
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7a252b56e3b5b9a339581eaa076af8ce43cfbfe1a030c6752a0e845b89e2e634
+        file: apps/cli/src/commands/upgrade-command.ts
+        span:
+          - 15
+          - 15
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:000c47f31a9cf75fabfbb0e8b0432047da1023a4d28f3235f3b1d77833074c56
+        file: apps/cli/src/commands/upgrade-command.ts
+        span:
+          - 17
+          - 23
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c76d7e40faf089f172ae09b8ff3ac6466a9bff057ea6ce2a88d7ff8c4b589031
+        file: apps/cli/src/commands/upgrade-command.ts
+        span:
+          - 25
+          - 29
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e2bee59138079397660568a7e7ffbb408ffb705f522908183e933e94ec2894fb
+        file: apps/cli/src/commands/upgrade-command.ts
+        span:
+          - 31
+          - 42
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:afd26c6b673cabf8533fcfd27636a785c4ee4e9cc3c678b262059ac6d8c1fcf9
+        file: apps/cli/src/commands/upgrade-command.ts
+        span:
+          - 433
+          - 524
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:cc70534bcc77066a241ec4ae4559016df170ea6d8a322a0c16016f157b8e35eb
+        file: apps/cli/src/commands/validate-command.ts
+        span:
+          - 4
+          - 6
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b38718044376eb8dd3a9e160d94a56ffa11683c2e472b2c75942305ba8ed7a3d
+        file: apps/cli/src/commands/validate-command.ts
+        span:
+          - 8
+          - 23
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e67da136d4fd74470de32a11ed06ded46422df11859e0511b5ebe694d5eb21af
+        file: apps/cli/src/commands/wizard-command.ts
+        span:
+          - 26
+          - 32
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:812f92dcf3202562b47421026c029b3c496ef290fce50d58edc1e6d1d5653509
+        file: apps/cli/src/commands/wizard-command.ts
+        span:
+          - 44
+          - 111
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:63c42d9b2a589afecfb700d28ef129ae3c9889acc2da39a5a9bdc9079b3c11e3
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 7
+          - 7
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1b937188a9c53147eaf346ec4686f419dd475a570869e59d3983e777247942dc
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 9
+          - 9
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9baeb46541c171a11e0205b9d30723a61641298c3d653626a61808987f912418
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 11
+          - 19
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e99307f3726a2ab05882053d592976b7ce905b2134b15e119a651e9d71a7b6f1
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 21
+          - 21
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d31a4d4900d08f1f0d64913963b7a2ee2229e42c0558a09e5a8a0af7d30b5885
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 23
+          - 25
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b7568b68ac714d269811d9f41557be5a931666f31aaf82fe613a1dcf5dacfa06
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 27
+          - 29
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:294a7c15cd5e09ff2059232bf0c89c04ae87d433323c46e7723bf36d15a119d6
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 77
+          - 90
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:af17b4db2ba28eb2ddb742b5bebce8a134f148ddff5411863ef0d5eae279ed34
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 92
+          - 110
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d0419ab6d5aafda63ec550e68f1225ed44c3e57c540d9391ceb945f04dd77d78
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 112
+          - 116
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c22efcf5b07734419bb4ce399ceb0b5209cc0cbfa5ea986fd5c87ccaf45bee60
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 118
+          - 145
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:159fa4560860574ccc4e8fa405db8dd0aef7b66f0713c40895305ef934b5031d
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 147
+          - 165
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9a5c1d0c25b1de05c42c439372e82e0c906c272450c18103e1aa2cb98bd622db
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 167
+          - 183
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f63762fc6d2da5800ac532c6c70d2ace577cd826ac93355af31d47ef2d6ca744
+        file: apps/cli/src/runtime-telemetry.ts
+        span:
+          - 185
+          - 240
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+    seedContext:
+      - ctx:codemap:eb5314ed39433347d28bd10bcd0bd60d663bcc9e59a613a87e9d27c4e0e73a86
+      - ctx:brief:79951c2b2ee68f3ffc979463f9159f031a75866efb2f7b32f7ef0c3283231106
+    observedReads:
+      - file: apps/cli/src/cli-help.ts
+        contentHash: e229c6ec329806d0769a14afb634d1dce8e18601450dcdc396990a95a0726839
+      - file: apps/cli/src/cli.ts
+        contentHash: e9137cdf57f81b3e3f5795835d047e3a3d9a6e1846f299f2c29c8743fc0f9eb9
+      - file: apps/cli/src/commands/generate-command.ts
+        contentHash: 4cad80178ce4d2ce0f0cd8317bbe7d865c9a6faf220a607040db24d5f2452ed7
+      - file: apps/cli/src/commands/refresh-command.ts
+        contentHash: e85c784ac7d79af0f2d03a4e571c78fa1ff1541802cd23edad9f3658aaefbe5e
+      - file: apps/cli/src/commands/refine-command.ts
+        contentHash: d80fb3b3aebc02cc7a8099fc71d38307095a79a9245ea0de06bddc61b4797b28
+      - file: apps/cli/src/commands/wizard-command.ts
+        contentHash: 596a3c4b7c8089a81502c7d6d3de6c75cc4758bfe653fa5f5c11bb8fd4773b68
+      - file: apps/cli/src/commands/audit-command.ts
+        contentHash: ee75cf9d25afe190262207c49a524560aa28550616b97445e1fc232593a82e6c
+      - file: apps/cli/src/commands/answer-command.ts
+        contentHash: 2ff039ec35c004e23dfe3ef0c5a9eb27e1de41b28d2b1505c3f5ffc67c6ae1eb
+      - file: apps/cli/src/commands/check-command.ts
+        contentHash: a1465e0ed532fdcb5c1dc419ff18e31c2c1a03fdca673bafa77dfd29cd659240
+      - file: apps/cli/src/commands/status-command.ts
+        contentHash: a6f777f5371497216aa8bfa5664acc92f7be2416a9a8a633dd5e4674fb2844a9
+      - file: apps/cli/src/commands/doctor-command.ts
+        contentHash: b734aa98cc02a5569f3a8ac0df6cb1062df34f88ed0e122cbdd118f0b32f1edd
+      - file: apps/cli/src/commands/plugin-command.ts
+        contentHash: 09b9f7a980a0d85da7c62baf53e33b40762177fd3f050ce241accfc120ebdb17
+      - file: apps/cli/src/commands/validate-command.ts
+        contentHash: 999f4ec218fc32d02f4840ef06b3bdc9b5e144bae59403a177cd6f99cfd7d3f3
+      - file: apps/cli/src/commands/upgrade-command.ts
+        contentHash: 3a1ef996ed04f5650dfa476d3cef057b0ae94c8f20324431e8b324062160554c
+      - file: apps/cli/src/cli-output.ts
+        contentHash: b8504bbe7567af6c891e5006126c969746698c544005edaaf6782618c4923add
+      - file: apps/cli/src/runtime-telemetry.ts
+        contentHash: 14cec4b6524b743b9d52cf208e3124fa4e2fe6f7fed74ec6afbbddbcc73ac07a
+      - file: apps/cli/src/cli-help.spec.ts
+        contentHash: 85def75aadc57d4ea76bf2b37c9288e75f3ed0358041918d79d794ca57dc60c8
+    verifications: []
+flags:
+  - id: fl_7hqgp38qwcm45bwdp30z
+    kind: tribal-knowledge
+    status: resolved
+    summary: "writer question: The command-help strings mention `docstube wizard [--fresh]` and `docstube refine [page] [--failed] [--max-rounds <n>]`,…"
+    detail: The CLI reference page needs to document accepted flags without inventing behavior from stale help text.
+    entity:
+      version: latest
+      locale: en
+      pageId: pg_w1g31xs3zyr6t1mh97yb
+    question: The command-help strings mention `docstube wizard [--fresh]` and `docstube refine [page] [--failed] [--max-rounds <n>]`, but `apps/cli/src/cli.ts` defines `wizard --port` and refine budget flags `--max-pages`, `--max-rounds-per-page`, and `--total-rounds`. Should the help strings be updated to match the parser, or is there intended behavior not visible in the command parser?
+    answer:
+      text: "The help strings were stale and have been fixed to match the parser. Document the parser as the source of truth: wizard takes --port <n>; generate and refresh take --max-attempts <n>; refine takes [page] [--failed] [--max-pages <n>] [--max-rounds-per-page <n>] [--total-rounds <n>]; audit takes <docs-dir> [--json]. There is no --fresh or --max-rounds flag."
+      answeredAt: 2026-07-16T20:31:39.147Z
+      author: cli
+    runId: run_zdc1xg4347zhh2wyh3jg
+    createdAt: 2026-07-16T20:15:57.810Z

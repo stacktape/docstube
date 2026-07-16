@@ -1,0 +1,43 @@
+{
+  "site": "docstube",
+  "description": "Verified docs, generated from your code.",
+  "generatorVersion": "0.0.2",
+  "pages": [
+    {
+      "title": "CLI reference",
+      "slug": "cli-reference",
+      "url": "/cli-reference/",
+      "description": "Command reference for the docstube CLI, including generation, refresh, verification, status, plugin, and upgrade commands."
+    },
+    {
+      "title": "Configuration",
+      "slug": "configuration",
+      "url": "/configuration/",
+      "description": "Configure the docstube config family, agents, versions, locales, components, plugins, and comment-preserving edits."
+    },
+    {
+      "title": "Getting started",
+      "slug": "getting-started",
+      "url": "/getting-started/",
+      "description": "Install docstube, open the setup wizard, and generate your first verified docs site."
+    },
+    {
+      "title": "CI and the GitHub Action",
+      "slug": "github-action",
+      "url": "/github-action/",
+      "description": "Run docstube in GitHub Actions, open verified documentation PRs, deliver flags, and gate auto-merge from the committed manifest."
+    },
+    {
+      "title": "How verification works",
+      "slug": "how-verification-works",
+      "url": "/how-verification-works/",
+      "description": "How docstube assigns guarantee levels, runs built-in verifier checks, grounds claims, retries failed drafts, and keeps unresolved risk visible as flags."
+    },
+    {
+      "title": "Writing plugins",
+      "slug": "writing-plugins",
+      "url": "/writing-plugins/",
+      "description": "Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold."
+    }
+  ]
+}

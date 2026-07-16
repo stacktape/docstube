@@ -1,0 +1,633 @@
+# docstube
+
+> Verified docs, generated from your code.
+
+## CLI reference
+
+URL: /cli-reference/
+
+# CLI reference
+
+The CLI command surface includes `wizard`, `generate`, `refresh`, `refine`, `audit`, `answer`, `validate`, `check`, `status`, `doctor`, `plugin`, `upgrade`, `version`, and `help`.
+
+## `wizard`
+
+Opens the local setup wizard and control plane.
+
+Key flag:
+
+- `--port <n>` sets the local control-plane port. The parser accepts integers from `0` through `65535`.
+
+```bash
+docstube wizard --port 4317
+```
+
+## `generate`
+
+Generates docs from the existing config, then emits the site to the configured output directory.
+
+Key flag:
+
+- `--max-attempts <n>` sets the maximum write attempts per page. The parser requires a positive integer.
+
+```bash
+docstube generate --max-attempts 3
+```
+
+## `refresh`
+
+Regenerates entities affected by code changes since the committed manifest, then emits the site to the configured output directory.
+
+Key flag:
+
+- `--max-attempts <n>` sets the maximum write attempts per page. The parser requires a positive integer.
+
+```bash
+docstube refresh --max-attempts 2
+```
+
+## `refine`
+
+Improves generated pages by running rewrite rounds through the configured task runner.
+
+Key arguments and flags:
+
+- `[page]` targets one page slug.
+- `--failed` limits selection to pages with open flags.
+- `--max-pages <n>` limits how many pages are refined in the run.
+- `--max-rounds-per-page <n>` limits rewrite rounds for each selected page.
+- `--total-rounds <n>` sets a global rewrite-round budget for the run.
+
+Each refine budget flag must be a positive integer.
+
+```bash
+docstube refine getting-started --failed --max-pages 1 --max-rounds-per-page 2 --total-rounds 2
+```
+
+## `audit`
+
+Audits an existing docs directory by extracting claims and verifying them against the codebase. The command exits with code `1` when the report contains verified defects.
+
+Key argument and flag:
+
+- `<docs-dir>` is the docs directory to audit.
+- `--json` prints the audit report as formatted JSON.
+
+```bash
+docstube audit docs --json
+```
+
+## `answer`
+
+Lists open maintainer questions or answers one question by ID prefix. When an answer is accepted, the command writes it into `.docstube/knowledge/` for future runs.
+
+Arguments:
+
+- `<id>` is an open question ID prefix from `docstube answer`.
+- `"your answer"` is the answer text.
+
+```bash
+docstube answer
+```
+
+```bash
+docstube answer abc12345 "This behavior is intentionally kept for compatibility."
+```
+
+## `validate`
+
+Validates the docstube config family and reports the loaded doc type, persona count, top-level IA node count, and glossary term count.
+
+```bash
+docstube validate
+```
+
+## `check`
+
+Runs deterministic checks over generated docs. Check kinds are not a fixed CLI enum: the command builds a plugin host, registers built-in plugins, loads configured plugins, and derives available verifier IDs from that host.
+
+Key argument and flag:
+
+- `[kind]` runs only one verifier ID.
+- `--list` prints the verifier IDs registered for the project.
+
+```bash
+docstube check --list
+```
+
+```bash
+docstube check claim-grounding
+```
+
+## `status`
+
+Shows the current docs version, locales, pages, per-page guarantee status, flag counts, and aggregate guarantee counts. If no manifest exists yet, it prints a message telling the user to run generation first.
+
+```bash
+docstube status
+```
+
+## `doctor`
+
+Checks local runtime and project setup. The command checks Node version, Git availability, project detection, config-family loading, and the configured agent transport requirements.
+
+```bash
+docstube doctor
+```
+
+## `plugin scaffold`
+
+Scaffolds a plugin source file and test file under `plugins/`, then materializes the `plugin-authoring` skill under `.docstube/skills/`.
+
+Argument:
+
+- `<name>` is normalized to lowercase, strips a leading `docstube-plugin-`, replaces non-alphanumeric separators with `-`, and is used for `plugins/<name>.ts` and `plugins/<name>.spec.ts`.
+
+```bash
+docstube plugin scaffold linkstats
+```
+
+## `upgrade`
+
+Upgrades the docstube tool or reports upgrade instructions for install sources that the command should not modify directly.
+
+Key flags:
+
+- `--check` prints the current version, latest or target version, and whether an upgrade is available.
+- `--to <version>` selects a target version instead of the fetched latest version.
+
+```bash
+docstube upgrade --check
+```
+
+```bash
+docstube upgrade --to 0.0.3
+```
+
+## `version`
+
+Prints the CLI version.
+
+```bash
+docstube version
+```
+
+## `help`
+
+Prints the command overview or command-specific help.
+
+```bash
+docstube help refine
+```
+
+## Configuration
+
+URL: /configuration/
+
+# Configuration
+
+`configFileNames` defines the three YAML file names in the config family: `docstube.yml`, `ia.yml`, and `glossary.yaml`.
+
+`loadConfigFamily` reads those files from the repository root. It requires the config and IA files, parses them with `parseDocstubeConfig` and `parseIaFile`, and returns an empty glossary object with version `1` and no terms when the glossary file is absent.
+
+`docstubeConfigSchema` validates the main intent config. It covers document type, project context, personas, sources, agents, versions, locales, theme, site metadata, enabled components, configured plugins, coverage, output directory, telemetry, and reserved screenshot config.
+
+`iaSchema` validates the information architecture. It requires a non-empty tree. `iaNodeSchema` validates each node title and slug, and supports an optional brief, depth budget, page id, and children. Nodes with a brief are page targets; nodes without a brief are grouping nodes.
+
+`glossarySchema` validates terminology data. `glossaryTermSchema` requires a term and definition, and defaults aliases and avoid-list entries to empty arrays.
+
+## Agents
+
+`agentsConfigSchema` validates the agent block. `transportIdSchema` accepts `claude-cli`, `codex-cli`, `google`, `anthropic-api`, `openai-compatible`, and `replay`.
+
+`createTransportFromConfig` maps the validated agent config to the runtime transport. It supplies default models for `claude-cli`, `anthropic-api`, and `replay`; if another transport has no configured model, it raises a config error.
+
+For API transports, `createTransportFromConfig` forwards configured credential environment-variable names and base URLs to the Anthropic or OpenAI-compatible transport constructors. `agentsConfigSchema` validates the credential reference as an environment-variable name.
+
+`agentsConfigSchema` also accepts writer, reviewer, and translator role overrides. The current task-runner construction uses `createTransportFromConfig`, which reads the top-level agent transport and model.
+
+Agent budgets live in `agentsConfigSchema`. Turn and tool-call budgets default to positive integer limits. The optional run-cost cap is read by generate and maintain flows and passed to `createRunCostTracker`.
+
+`FREEZE_MARGIN_RATIO` is `0.85`. `createRunCostTracker` reports `shouldFreeze()` when reported spend reaches the configured cap multiplied by that margin. In generation, the freeze check happens between pages and before translations, not mid-page. Without a cap, `shouldFreeze()` stays false.
+
+## IA Depth
+
+`depthBudgetSchema` accepts `overview`, `standard`, and `deep`.
+
+`iaNodeSchema` validates slugs with a lowercase path-safe pattern made from ASCII letters, digits, and single hyphen-separated segments. `iaSchema` also accepts an optional positive integer page-count target.
+
+## Versions And Locales
+
+`versionsConfigSchema` defaults the current version label to `latest` and the frozen-version list to an empty array. `versionLabelSchema` validates version labels as path-safe strings that start with an ASCII letter or digit.
+
+`localesConfigSchema` defaults the source locale to `en` and target locales to an empty array. `localeCodeSchema` accepts locale codes such as `en` and `pt-BR`.
+
+## Components
+
+The main config schema validates components as an array of non-empty strings. Its schema comment describes the list as enabled MDX components that must exist in the block-type registry.
+
+`registryComponents` exposes the local UI component choices: `Callout`, `CodeBlock`, `CodeGroup`, `Terminal`, `Card`, `CardGrid`, `Steps`, `Tabs`, `FileTree`, `Badge`, `ParamTable`, and `ComparisonTable`.
+
+`builtinComponents` defines the built-in registry component metadata and prop schemas, and `builtinComponentNames` derives the built-in names from those definitions.
+
+## Plugins
+
+The main config schema validates plugins as an array of non-empty strings. Its schema comment describes entries as npm package names or repository-relative paths.
+
+`registerBuiltinPlugins` registers the built-in verifier, TypeScript language, and Python language plugins through the plugin host. `loadConfiguredPlugins` then loads each configured plugin from the config plugin list.
+
+Local plugin specifiers are imported from files under the target repository. Other specifiers are resolved from the target repository's package dependencies. A configured plugin must default-export a value recognized by `isDocstubePlugin`; otherwise `loadConfiguredPlugins` raises a plugin load error.
+
+## Programmatic Edits
+
+`editYamlDocument` uses the `yaml` Document API and serializes the edited document back to text. `setYamlIn` and `editConfigFile` build on that helper.
+
+`updateConfigValues` batches config edits, validates the edited document with `parseDocstubeConfig`, and writes only after validation succeeds.
+
+`writeIaFile` validates the next IA with `iaSchema` before writing. It preserves the document header comment when replacing the IA document; comments inside a replaced IA tree are not preserved by that structural rewrite.
+
+## Getting started
+
+URL: /getting-started/
+
+# Getting started
+
+Install docstube in the repository you want to document, then run the wizard and generate the site from the saved configuration.
+
+1. Install the npm package:
+
+`npm install --save-dev docstube`
+
+For a standalone binary instead of an npm install, use the installer for your platform from `https://installs.docstube.dev/`.
+
+2. Open the local setup wizard:
+
+`npx docstube wizard`
+
+The wizard command starts the local control plane and prints its local URL. It accepts an optional port:
+
+`npx docstube wizard --port 4321`
+
+3. Generate the first docs site:
+
+`npx docstube generate`
+
+`generate` loads the docstube config from the current workspace, runs the configured agent transport, writes generated MDX pages, writes manifest state, and emits the site.
+
+After the first successful run, the default output directory is:
+
+`docs-site/`
+
+The committed manifest state is written under:
+
+`.docstube/manifest/`
+
+That manifest includes `.docstube/manifest/manifest.yml` and page shards under `.docstube/manifest/pages/<locale>/`. The generated site uses the configured output directory; by default that is `docs-site`. When the site is emitted, the CLI prints that directory and the build command:
+
+`npm install && npm run build`
+
+If a run finishes with open flags, the CLI tells you to review them with:
+
+`npx docstube status`
+
+The `generate` command also accepts a per-page retry budget:
+
+`npx docstube generate --max-attempts 3`
+
+## CI and the GitHub Action
+
+URL: /github-action/
+
+# CI and the GitHub Action
+
+The GitHub Action runs docstube in a checked-out repository, reads the committed manifest, and opens or updates a documentation pull request. The action supports two modes: `generate` and `refresh`. If `mode` is not provided, it uses `refresh`.
+
+The action metadata lives at `apps/github-action/action.yml` in this repository. A workflow that uses `uses: ./apps/github-action` only works in a repository that actually contains that local action path, such as the docstube repository itself. For another repository, replace that local action identifier with the published or vendored action location you use. The source does not define a canonical public `uses:` reference.
+
+```yaml
+name: docstube
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  refresh-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run docstube
+        uses: ./apps/github-action
+        with:
+          mode: refresh
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+<Callout>
+The local `./apps/github-action` reference is the action identifier for repositories that include this action directory. If your project consumes docstube from outside this repository, replace it with the action location you have installed, vendored, or published.
+</Callout>
+
+For an initial documentation run, set `mode: generate`. For ongoing CI maintenance after code changes, use `mode: refresh`.
+
+The action input `mode` controls the CLI command that is run. Internally, the action invokes `npx --yes <docstube-package> <mode>`. The default package spec is `docstube@latest`, and the default mode is `refresh`.
+
+## What The Action Commits
+
+After the CLI finishes, the action reads `git status --porcelain`, filters the changed paths, and commits the remaining paths together. It excludes machine-local docstube state under `.docstube/db.sqlite`, `.docstube/cache/`, and `.docstube/runs/`.
+
+That means the pull request contains the docs changes and the committed manifest state together. The verified delta is computed from `.docstube/manifest/manifest.yml` and readable page shard files under `.docstube/manifest/pages/...`.
+
+If there are no commit-worthy changes, the action writes a job summary and does not open a pull request.
+
+## Refresh On Code Change
+
+Use `refresh` for normal CI maintenance. The action checks out the target base branch, creates or resets a docs branch, runs docstube, commits changed documentation and manifest files, pushes the branch, and opens or updates a pull request.
+
+By default, the target branch comes from `base-branch`, then `GITHUB_BASE_REF`, then `GITHUB_REF_NAME`, and finally `main`. The generated branch name defaults to `docstube/docs/<base-branch>`.
+
+## Auto-Merge Gate
+
+Auto-merge is only attempted when the action can compute a verified delta and the pull request number is known. The merge decision is based on open flags from page shards and manifest system flags.
+
+Open flags with these kinds block auto-merge:
+
+- `out-of-domain`
+- `tribal-knowledge`
+- `guarantee-downgrade`
+- `structural-change`
+- `system`
+
+Open `coverage` flags do not appear in the hardcoded blocking list.
+
+When no blocking open flag exists, the action calls GitHub's auto-merge API with squash merge. If GitHub rejects the request, the action leaves the pull request open and reports auto-merge as unavailable.
+
+## Flag Delivery
+
+When a pull request has open flags, the action posts a marker-tagged PR comment. On later runs, it updates the existing marker-tagged comment instead of creating a new one.
+
+The pull request body and job summary include changed pages, guarantee counts, open flag counts, the auto-merge decision, and committed files when a verified delta is available.
+
+## Tribal-Knowledge Digest
+
+Tribal-knowledge flags are also collected into a long-lived issue titled `docstube: open questions`. The action searches for an open issue with that title. If it exists, the action updates it; otherwise, it creates it.
+
+The digest issue body includes the open tribal-knowledge questions, plus entity, symbol, and flag details when those fields are present in the manifest data.
+
+## How verification works
+
+URL: /how-verification-works/
+
+# How verification works
+
+docstube stores verification state on entities. Pages, sections, blocks, and claims all carry one guarantee level: `proven`, `scored`, or `out-of-domain`.
+
+`proven` is computed from deterministic verifier coverage. `scored` means the entity has not been mechanically proven. `out-of-domain` is the contract value for declared-unprovable material such as tribal knowledge or intent. Parent guarantees roll up pessimistically from children, and an empty rollup returns `out-of-domain`.
+
+Freshly extracted pages, sections, and blocks start as `scored`. Verifier results can upgrade covered entities to `proven`; claim grounding can attach `proven` or `scored` claims.
+
+## Pipeline
+
+1. Build the codemap
+
+   `runGenerate` builds a codemap for the current commit with registered language packs. `buildCodemap` walks matching files, calls each pack, validates each symbol record, and sorts symbols by file, span, and hash.
+
+2. Write a page
+
+   `generatePage` creates a write task for one IA node. If a retry is needed, the previous attempt's findings are included in the next writer prompt.
+
+3. Extract entities
+
+   The generated MDX is parsed into a page entity tree. Code fences become `code-example` blocks. MDX flow components become `component:<Name>` blocks. Import and export statements are ignored as page plumbing.
+
+4. Run deterministic verifiers
+
+   `runVerifiers` runs registered verifiers that apply to the page artifact. Source-only verifiers run only for the configured source locale. Per-locale verifiers run for every locale artifact.
+
+5. Run persona review
+
+   `reviewPage` runs one review task per configured persona. Review findings with severity `error` gate the draft, but review does not assign `proven`.
+
+6. Ground claims
+
+   On a draft with no verifier or review errors, `attachExtractedClaims` extracts checkable claims and matches identifier-shaped references against the codemap. Grounded claims become `proven`; claims with no checkable identifiers become `scored`; stale references emit `claim-grounding` errors.
+
+7. Gate and retry
+
+   `generatePage` retries while error findings remain. The default page retry budget is three attempts. If errors remain after the budget, the page shard is written with an open `system` flag.
+
+After source pages are generated, `runGenerate` also runs site-scope verification across the generated artifact set. Site-scope errors are returned as `siteFindings` and make the run outcome `flagged`.
+
+## Guarantee Assignment
+
+Verifier definitions include `proves: boolean`.
+
+`assignGuarantees` upgrades an entity to `proven` only when the verifier has `proves: true`, the verifier result is `pass`, and the entity id appears in `coveredEntityIds`.
+
+A passing verifier does not override a failing verifier. If any error finding names an entity, that entity is removed from the proven set.
+
+Claims have an additional grounding path. `matchClaim` normalizes identifier-shaped references, ignores ambient runtime identifiers such as `Promise`, `JSON`, and `console`, and checks symbol names, container segments, and dotted container-tail paths in the codemap. A claim is a stale-reference defect only when every checkable identifier fails to ground.
+
+## Built-In Verifiers
+
+The built-in verifier plugin is `@docstube/verifiers`. It registers these verifier ids:
+
+| Verifier id | Scope | Locale scope | Proves | What it checks |
+| --- | --- | --- | --- | --- |
+| `mdx-compile` | page | per-locale | no | Validates YAML frontmatter and compiles the page with `@mdx-js/mdx`. |
+| `internal-links` | site | per-locale | yes | Resolves internal links against page slugs and validates same-page anchors against section anchors. External URLs are skipped. Cross-page anchors are not validated. |
+| `code-typecheck-ts` | block | source-only | yes | Typechecks `ts`, `tsx`, and `typescript` `code-example` blocks in isolation with TypeScript. Missing-module diagnostics are skipped. |
+| `entity-integrity` | page | per-locale | no | Checks duplicate entity ids, duplicate section anchors, SHA-256 block content hashes, registered component block types, and component metadata schemas. |
+| `snippet-exec` | block | source-only | yes | Executes runnable `bash`, `sh`, `js`, `javascript`, `ts`, and `typescript` code examples. Fences with `no-exec` are skipped. |
+| `shellcheck` | block | source-only | no | Runs `shellcheck -s bash -f json -` on `bash` and `sh` code examples when `shellcheck` is available. Shellcheck levels below `error` become warnings. |
+| `sample-parses` | block | per-locale | yes | Parses `json`, `yaml`, and `yml` code examples. JSON uses `JSON.parse`; YAML uses the `yaml` package. |
+| `prose-lints` | page | per-locale | no | Runs deterministic prose lints for banned phrases, repeated sentence openings, and monotone sentence lengths. Code fences, inline code, import/export statements, and JSX tags are excluded. |
+| `diagram-d2` | block | source-only | yes | Compiles `d2` code examples and checks whether extracted diagram nodes ground to codemap symbols. Ungrounded nodes warn by default; a `strict` fence makes grounding failures errors. |
+
+Warnings alone do not make a verifier fail. The shared verifier helper returns `fail` only when at least one finding has severity `error`. An internal verifier crash becomes an `error` result with a visible error finding.
+
+## Other Check IDs
+
+Some check ids are emitted by pipeline stages rather than registered verifier definitions:
+
+| Check id | Source |
+| --- | --- |
+| `claim-grounding` | Emitted when extracted claims reference identifiers that do not exist in the codemap. |
+| `claim-extraction` | Emitted as a warning when claim extraction returns no valid structured claim result. |
+| `translation-structure` | Emitted when a translated page cannot be aligned to the source page structure. |
+| `review-error` | Emitted as a warning when a persona reviewer returns no valid structured review. |
+
+## Visible Flags
+
+A failed page is not treated as clean after the retry budget is exhausted. The page shard receives an open `system` flag whose detail contains the remaining findings. Tribal-knowledge questions raised during writing become flags too, and previously open tribal-knowledge flags are carried into regenerated shards.
+
+The GitHub Action reads committed manifest shards to compute a verified delta. It counts `proven`, `scored`, and `out-of-domain` guarantees for content-bearing blocks and claims, and it collects open flags from page shards plus manifest system flags.
+
+Auto-merge is blocked when any open flag has one of these kinds: `out-of-domain`, `tribal-knowledge`, `guarantee-downgrade`, `structural-change`, or `system`. Open `coverage` flags are visible, but they are not in the hardcoded auto-merge blocking list.
+
+<Callout>
+Flagged-but-visible is the implemented failure mode: verified content can pass, uncertain or broken content remains inspectable, and blocking flags prevent unresolved states from silently auto-merging.
+</Callout>
+
+## Running Checks
+
+`docstube check --list` prints the verifier ids registered for the current project, including configured plugins.
+
+`docstube check` loads the manifest, reads source-locale page shards and MDX files, rebuilds the codemap for the current version commit, runs registered verifiers with site scope enabled, and prints each selected verifier result. It exits with code `1` when selected results contain error findings and exits with code `0` otherwise.
+
+## Plugin Verifiers
+
+Plugin authors register verifier definitions with `host.verifier`. The plugin host checks registrations against the plugin manifest: registering an undeclared verifier is an error, declaring a verifier without registering it produces a warning, and duplicate verifier ids are rejected.
+
+Verifier plugins run with a constrained context. File writes are limited to the plugin's declared writable roots, and process execution is limited to the executables declared in `permissions.exec`.
+
+## Writing plugins
+
+URL: /writing-plugins/
+
+# Writing Plugins
+
+`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. The SDK also re-exports the contract schemas and types plugin authors need, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
+
+A plugin module is loaded only when its default export is created by `definePlugin`. The loader checks that with `isDocstubePlugin`.
+
+```ts
+import { definePlugin } from '@docstube/plugin-sdk';
+import type {
+  Finding,
+  PageArtifact,
+  VerifierContext,
+  VerifierDefinition,
+  VerifierRunResult
+} from '@docstube/plugin-sdk';
+
+const verifierId = 'wordcount';
+const softLimit = 1500;
+const hardLimit = 3000;
+
+const countWords = (mdx: string): number =>
+  mdx
+    .replace(/```[\s\S]*?```/gu, ' ')
+    .split(/\s+/u)
+    .filter((word) => word.length > 0).length;
+
+const verify = async (_ctx: VerifierContext, pages: PageArtifact[]): Promise<VerifierRunResult> => {
+  const findings: Finding[] = [];
+  for (const artifact of pages) {
+    const words = countWords(artifact.mdx);
+    if (words <= softLimit) {
+      continue;
+    }
+    findings.push({
+      source: 'verifier',
+      check: verifierId,
+      severity: words > hardLimit ? 'error' : 'warning',
+      message: `page "${artifact.page.slug}" is ${words} words`,
+      entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
+      file: artifact.mdxPath,
+      suggestion: 'Split the page or tighten its longest sections.',
+      data: { words, softLimit, hardLimit }
+    });
+  }
+  return {
+    verifier: verifierId,
+    plugin: 'docstube-plugin-wordcount',
+    status: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass',
+    findings,
+    coveredEntityIds: pages.map((artifact) => artifact.page.id)
+  };
+};
+
+export const wordcountVerifier: VerifierDefinition = {
+  id: verifierId,
+  title: 'Page word budget',
+  description: 'Pages over 1500 words get a warning; pages over 3000 words fail the gate.',
+  scope: 'page',
+  localeScope: 'per-locale',
+  proves: false,
+  verify
+};
+
+export default definePlugin({
+  apiVersion: 1,
+  name: 'docstube-plugin-wordcount',
+  version: '0.1.0',
+  description: 'Verifier: warns on pages over the word budget and fails the gate past the hard limit.',
+  permissions: { network: false, exec: [], writableRoots: [] },
+  capabilities: [{ kind: 'verifier', ids: [verifierId] }],
+  register: (host) => {
+    host.verifier(wordcountVerifier);
+  }
+});
+```
+
+## Manifest Validation
+
+`definePlugin` accepts `DefinePluginInput`, parses the manifest portion with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
+
+`pluginManifestSchema` uses `pluginApiVersion`, `pluginPermissionsSchema`, and `pluginCapabilityKindSchema`. The capability kind schema contains seven values:
+
+```ts
+import { pluginCapabilityKindSchema } from '@docstube/plugin-sdk';
+
+const hookKinds = pluginCapabilityKindSchema.options;
+console.log(hookKinds);
+```
+
+`pluginPermissionsSchema` includes `network`, `exec`, and `writableRoots`. In the schema, `network` defaults to `false`, while `exec` and `writableRoots` default to empty arrays.
+
+## Registration Hooks
+
+`PluginRegistrationHost` is the registration surface passed to the plugin `register` function. It has seven methods, each accepting one exported definition type:
+
+| Method | Definition type |
+| --- | --- |
+| `verifier` | `VerifierDefinition` |
+| `languagePack` | `LanguagePackDefinition` |
+| `contentSource` | `ContentSourceDefinition` |
+| `importer` | `ImporterDefinition` |
+| `deployTarget` | `DeployTargetDefinition` |
+| `searchProvider` | `SearchProviderDefinition` |
+| `component` | `ComponentDefinition` |
+
+`createPluginHost` records registrations for the same seven groups. During registration, it checks each registered id or component name against the plugin manifest capabilities. An undeclared registration is rejected, a duplicate id is rejected, and a declared capability that was not registered is recorded as a warning.
+
+## Verifier Shape
+
+`VerifierDefinition` has `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
+
+`scope` is typed as `'block' | 'page' | 'site'`. `localeScope` is typed as `'source-only' | 'per-locale'`. `verify` receives a `VerifierContext` and an array of `PageArtifact` values, then returns a `VerifierRunResult`.
+
+`VerifierContext` includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, and `timeoutMs`.
+
+## Loading Plugins
+
+`loadConfiguredPlugins` loads every specifier in `config.plugins`.
+
+Local plugins are specifiers that start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
+
+After import, the loader reads the module default export and rejects it unless `isDocstubePlugin` returns true. Loaded plugins are registered with source `"local"` or `"npm"`.
+
+```yaml
+plugins:
+  - docstube-plugin-wordcount
+  - ./plugins/wordcount.ts
+```
+
+## Scaffolding
+
+The CLI `plugin` command is implemented by `runPluginCommand`. The supported action is `scaffold`.
+
+`docstube plugin scaffold <name>` writes `plugins/<name>.ts` and `plugins/<name>.spec.ts` from the plugin-authoring example source, then materializes `.docstube/skills/plugin-authoring/SKILL.md`.
+
+```bash
+docstube plugin scaffold wordcount
+```
+
+The scaffold command prints the local plugin entry to add to `docstube.yml`, points the authoring agent at `.docstube/skills/plugin-authoring/SKILL.md`, and notes that `docstube check --list` shows the check after the plugin registers a verifier.

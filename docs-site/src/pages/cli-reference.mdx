@@ -1,0 +1,188 @@
+---
+title: "CLI reference"
+description: "Command reference for the docstube CLI, including generation, refresh, verification, status, plugin, and upgrade commands."
+layout: "../layouts/DocLayout.astro"
+docstubeLocale: "en"
+docstubeGuarantee: "scored"
+docstubeBlocksProven: 17
+docstubeBlocksTotal: 51
+docstubeSources: [{"file":"apps/cli/src/cli-help.ts","line":1,"endLine":19,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/cli-help.ts","line":21,"endLine":40,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/cli-help.ts","line":42,"endLine":47,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/cli-output.ts","line":1,"endLine":4,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/cli-output.ts","line":6,"endLine":8,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/cli-output.ts","line":10,"endLine":13,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/answer-command.ts","line":9,"endLine":13,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/answer-command.ts","line":19,"endLine":107,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/audit-command.ts","line":14,"endLine":18,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/audit-command.ts","line":54,"endLine":78,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/check-command.ts","line":20,"endLine":24,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/check-command.ts","line":26,"endLine":93,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/doctor-command.ts","line":8,"endLine":10,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/doctor-command.ts","line":23,"endLine":106,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/generate-command.ts","line":11,"endLine":14,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/generate-command.ts","line":16,"endLine":69,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/plugin-command.ts","line":11,"endLine":15,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/plugin-command.ts","line":26,"endLine":67,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/refine-command.ts","line":11,"endLine":18,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/refine-command.ts","line":20,"endLine":57,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/refresh-command.ts","line":11,"endLine":14,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/refresh-command.ts","line":16,"endLine":53,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/status-command.ts","line":4,"endLine":6,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/status-command.ts","line":8,"endLine":49,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/upgrade-command.ts","line":13,"endLine":13,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/upgrade-command.ts","line":15,"endLine":15,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/upgrade-command.ts","line":17,"endLine":23,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/upgrade-command.ts","line":25,"endLine":29,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/upgrade-command.ts","line":31,"endLine":42,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/upgrade-command.ts","line":433,"endLine":524,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/validate-command.ts","line":4,"endLine":6,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/validate-command.ts","line":8,"endLine":23,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/wizard-command.ts","line":26,"endLine":32,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/wizard-command.ts","line":44,"endLine":111,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":7,"endLine":7,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":9,"endLine":9,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":11,"endLine":19,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":21,"endLine":21,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":23,"endLine":25,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":27,"endLine":29,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":77,"endLine":90,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":92,"endLine":110,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":112,"endLine":116,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":118,"endLine":145,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":147,"endLine":165,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":167,"endLine":183,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/runtime-telemetry.ts","line":185,"endLine":240,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"}]
+docstubeSections: [{"anchor":"wizard","title":"wizard","guarantee":"scored"},{"anchor":"generate","title":"generate","guarantee":"scored"},{"anchor":"refresh","title":"refresh","guarantee":"scored"},{"anchor":"refine","title":"refine","guarantee":"scored"},{"anchor":"audit","title":"audit","guarantee":"scored"},{"anchor":"answer","title":"answer","guarantee":"scored"},{"anchor":"validate","title":"validate","guarantee":"scored"},{"anchor":"check","title":"check","guarantee":"scored"},{"anchor":"status","title":"status","guarantee":"scored"},{"anchor":"doctor","title":"doctor","guarantee":"scored"},{"anchor":"plugin-scaffold","title":"plugin scaffold","guarantee":"scored"},{"anchor":"upgrade","title":"upgrade","guarantee":"scored"},{"anchor":"version","title":"version","guarantee":"scored"},{"anchor":"help","title":"help","guarantee":"scored"}]
+---
+
+import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
+
+
+# CLI reference
+
+The CLI command surface includes `wizard`, `generate`, `refresh`, `refine`, `audit`, `answer`, `validate`, `check`, `status`, `doctor`, `plugin`, `upgrade`, `version`, and `help`.
+
+## `wizard`
+
+Opens the local setup wizard and control plane.
+
+Key flag:
+
+- `--port <n>` sets the local control-plane port. The parser accepts integers from `0` through `65535`.
+
+```bash
+docstube wizard --port 4317
+```
+
+## `generate`
+
+Generates docs from the existing config, then emits the site to the configured output directory.
+
+Key flag:
+
+- `--max-attempts <n>` sets the maximum write attempts per page. The parser requires a positive integer.
+
+```bash
+docstube generate --max-attempts 3
+```
+
+## `refresh`
+
+Regenerates entities affected by code changes since the committed manifest, then emits the site to the configured output directory.
+
+Key flag:
+
+- `--max-attempts <n>` sets the maximum write attempts per page. The parser requires a positive integer.
+
+```bash
+docstube refresh --max-attempts 2
+```
+
+## `refine`
+
+Improves generated pages by running rewrite rounds through the configured task runner.
+
+Key arguments and flags:
+
+- `[page]` targets one page slug.
+- `--failed` limits selection to pages with open flags.
+- `--max-pages <n>` limits how many pages are refined in the run.
+- `--max-rounds-per-page <n>` limits rewrite rounds for each selected page.
+- `--total-rounds <n>` sets a global rewrite-round budget for the run.
+
+Each refine budget flag must be a positive integer.
+
+```bash
+docstube refine getting-started --failed --max-pages 1 --max-rounds-per-page 2 --total-rounds 2
+```
+
+## `audit`
+
+Audits an existing docs directory by extracting claims and verifying them against the codebase. The command exits with code `1` when the report contains verified defects.
+
+Key argument and flag:
+
+- `<docs-dir>` is the docs directory to audit.
+- `--json` prints the audit report as formatted JSON.
+
+```bash
+docstube audit docs --json
+```
+
+## `answer`
+
+Lists open maintainer questions or answers one question by ID prefix. When an answer is accepted, the command writes it into `.docstube/knowledge/` for future runs.
+
+Arguments:
+
+- `<id>` is an open question ID prefix from `docstube answer`.
+- `"your answer"` is the answer text.
+
+```bash
+docstube answer
+```
+
+```bash
+docstube answer abc12345 "This behavior is intentionally kept for compatibility."
+```
+
+## `validate`
+
+Validates the docstube config family and reports the loaded doc type, persona count, top-level IA node count, and glossary term count.
+
+```bash
+docstube validate
+```
+
+## `check`
+
+Runs deterministic checks over generated docs. Check kinds are not a fixed CLI enum: the command builds a plugin host, registers built-in plugins, loads configured plugins, and derives available verifier IDs from that host.
+
+Key argument and flag:
+
+- `[kind]` runs only one verifier ID.
+- `--list` prints the verifier IDs registered for the project.
+
+```bash
+docstube check --list
+```
+
+```bash
+docstube check claim-grounding
+```
+
+## `status`
+
+Shows the current docs version, locales, pages, per-page guarantee status, flag counts, and aggregate guarantee counts. If no manifest exists yet, it prints a message telling the user to run generation first.
+
+```bash
+docstube status
+```
+
+## `doctor`
+
+Checks local runtime and project setup. The command checks Node version, Git availability, project detection, config-family loading, and the configured agent transport requirements.
+
+```bash
+docstube doctor
+```
+
+## `plugin scaffold`
+
+Scaffolds a plugin source file and test file under `plugins/`, then materializes the `plugin-authoring` skill under `.docstube/skills/`.
+
+Argument:
+
+- `<name>` is normalized to lowercase, strips a leading `docstube-plugin-`, replaces non-alphanumeric separators with `-`, and is used for `plugins/<name>.ts` and `plugins/<name>.spec.ts`.
+
+```bash
+docstube plugin scaffold linkstats
+```
+
+## `upgrade`
+
+Upgrades the docstube tool or reports upgrade instructions for install sources that the command should not modify directly.
+
+Key flags:
+
+- `--check` prints the current version, latest or target version, and whether an upgrade is available.
+- `--to <version>` selects a target version instead of the fetched latest version.
+
+```bash
+docstube upgrade --check
+```
+
+```bash
+docstube upgrade --to 0.0.3
+```
+
+## `version`
+
+Prints the CLI version.
+
+```bash
+docstube version
+```
+
+## `help`
+
+Prints the command overview or command-specific help.
+
+```bash
+docstube help refine
+```

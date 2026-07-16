@@ -1,0 +1,1852 @@
+schemaVersion: 1
+locale: en
+version: latest
+sourceCommit: b3ef381e3e5d4b7db878a5523147870b47a03523
+generatedAt: 2026-07-16T20:43:38.084Z
+page:
+  id: pg_1be43rtwhtry6s1vgrff
+  kind: page
+  slug: how-verification-works
+  title: How verification works
+  description: How docstube assigns guarantee levels, runs built-in verifier checks, grounds claims, retries failed drafts, and keeps unresolved risk visible as flags.
+  preamble:
+    - id: bl_s8kh33hevqxygz62j7d4
+      kind: block
+      blockType: paragraph
+      contentHash: 142f3c55a97288604fc3bef672b7d41fda968251c548a744f617511896bff4c9
+      variants: []
+      claims:
+        - id: cl_b4c0apd7hqa258n1xsft
+          kind: claim
+          text: "Entities carry one guarantee level: `proven`, `scored`, or `out-of-domain`."
+          anchor:
+            quote: "Pages, sections, blocks, and claims all carry one guarantee level: `proven`, `scored`, or `out-of-domain`."
+            prefix: "docstube stores verification state on entities. "
+            suffix: |-
+              
+
+              `proven` is computed
+          claimClass: structural
+          guarantee: scored
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_d0sfvjahc9p2gvhs18ef
+      kind: block
+      blockType: paragraph
+      contentHash: 2c4cae0e6ea78ae72faec69a0aeab2f6b70108c6ca0bcc9202bef7cf2a01d06e
+      variants: []
+      claims:
+        - id: cl_bwy7a6zpw22gjyqaqtk3
+          kind: claim
+          text: An empty parent guarantee rollup returns `out-of-domain`.
+          anchor:
+            quote: an empty rollup returns `out-of-domain`.
+            prefix: "Parent guarantees roll up pessimistically from children, and "
+            suffix: |-
+              
+
+              Freshly extracted pages
+          claimClass: behavioral
+          guarantee: scored
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_43th5gd62cxfb4qapq0n
+      kind: block
+      blockType: paragraph
+      contentHash: 367b5d0e66ef104ce9acaf003863b3b788fa6475aee615ceb916bf407344368f
+      variants: []
+      claims:
+        - id: cl_4n1f9wp8pkddexmja5a0
+          kind: claim
+          text: Freshly extracted pages, sections, and blocks start as `scored`.
+          anchor:
+            quote: Freshly extracted pages, sections, and blocks start as `scored`.
+            prefix: ""
+            suffix: " Verifier results can upgrade"
+          claimClass: behavioral
+          guarantee: scored
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+  sections:
+    - id: sc_7pyc9kf1b5t4hatrk9f1
+      kind: section
+      title: Pipeline
+      level: 2
+      anchor: pipeline
+      blocks:
+        - id: bl_29bd098vg5ns3c28faeq
+          kind: block
+          blockType: list
+          contentHash: 918a7a9ce38a38dd372ed1db38fb8a31d9ab7d8154a8f782c40945d141428df9
+          variants: []
+          claims:
+            - id: cl_1zfhmpt15nt1h252r87a
+              kind: claim
+              text: "`runGenerate` builds a codemap for the current commit with registered language packs."
+              anchor:
+                quote: "`runGenerate` builds a codemap for the current commit with registered language packs."
+                prefix: "1. Build the codemap\n\n   "
+                suffix: " `buildCodemap` walks"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_11mex6qbsb3s2pff5nef
+              kind: claim
+              text: "`buildCodemap` walks matching files, calls each language pack, validates each symbol record, and sorts symbols by file, span, and hash."
+              anchor:
+                quote: "`buildCodemap` walks matching files, calls each pack, validates each symbol record, and sorts symbols by file, span, and hash."
+                prefix: "registered language packs. "
+                suffix: |-
+                  
+
+                  2. Write a page
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_mkyh3szzyndgkxhgnrp9
+              kind: claim
+              text: "`generatePage` creates a write task for one IA node."
+              anchor:
+                quote: "`generatePage` creates a write task for one IA node."
+                prefix: "2. Write a page\n\n   "
+                suffix: " If a retry is needed"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_pk4xsz59nqcttm9mm7yz
+              kind: claim
+              text: When `generatePage` retries, previous attempt findings are included in the next writer prompt.
+              anchor:
+                quote: If a retry is needed, the previous attempt's findings are included in the next writer prompt.
+                prefix: "one IA node. "
+                suffix: |-
+                  
+
+                  3. Extract entities
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_x360n1442enw7rffx3xt
+              kind: claim
+              text: Generated MDX is parsed into a page entity tree.
+              anchor:
+                quote: The generated MDX is parsed into a page entity tree.
+                prefix: "3. Extract entities\n\n   "
+                suffix: " Code fences become"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_vv3syx7t6khp9j07sa2k
+              kind: claim
+              text: Code fences become `code-example` blocks during entity extraction.
+              anchor:
+                quote: Code fences become `code-example` blocks.
+                prefix: "page entity tree. "
+                suffix: " MDX flow components become"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_bbp7p1jcwdyj7acf5bsx
+              kind: claim
+              text: MDX flow components become `component:<Name>` blocks during entity extraction.
+              anchor:
+                quote: MDX flow components become `component:<Name>` blocks.
+                prefix: "Code fences become `code-example` blocks. "
+                suffix: " Import and export statements"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_fp8kdpxnc6a6syhcbz9r
+              kind: claim
+              text: Import and export statements are ignored during page entity extraction.
+              anchor:
+                quote: Import and export statements are ignored as page plumbing.
+                prefix: "`component:<Name>` blocks. "
+                suffix: |-
+                  
+
+                  4. Run deterministic
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_8rycfraztw3b3b652bk9
+              kind: claim
+              text: "`runVerifiers` runs registered verifiers that apply to the page artifact."
+              anchor:
+                quote: "`runVerifiers` runs registered verifiers that apply to the page artifact."
+                prefix: "4. Run deterministic verifiers\n\n   "
+                suffix: " Source-only verifiers run"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_q3abj98ghe8fzkmpj0s1
+              kind: claim
+              text: Source-only verifiers run only for the configured source locale.
+              anchor:
+                quote: Source-only verifiers run only for the configured source locale.
+                prefix: "page artifact. "
+                suffix: " Per-locale verifiers run"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_jmcsv67fhjz1azp42tw9
+              kind: claim
+              text: Per-locale verifiers run for every locale artifact.
+              anchor:
+                quote: Per-locale verifiers run for every locale artifact.
+                prefix: "configured source locale. "
+                suffix: |-
+                  
+
+                  5. Run persona review
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_2rssgqccay71nn9mp2c7
+              kind: claim
+              text: "`reviewPage` runs one review task per configured persona."
+              anchor:
+                quote: "`reviewPage` runs one review task per configured persona."
+                prefix: "5. Run persona review\n\n   "
+                suffix: " Review findings with"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_c59r1hpfa2v1dep47pra
+              kind: claim
+              text: Review findings with severity `error` gate the draft.
+              anchor:
+                quote: Review findings with severity `error` gate the draft
+                prefix: "configured persona. "
+                suffix: ", but review does not"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_36q1pcxeb8402vhrkc2y
+              kind: claim
+              text: Review does not assign `proven`.
+              anchor:
+                quote: review does not assign `proven`.
+                prefix: "gate the draft, but "
+                suffix: |-
+                  
+
+                  6. Ground claims
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_cjvsxfdexvpxq7901wnn
+              kind: claim
+              text: "`attachExtractedClaims` extracts checkable claims and matches identifier-shaped references against the codemap for drafts with no verifier or review errors."
+              anchor:
+                quote: On a draft with no verifier or review errors, `attachExtractedClaims` extracts checkable claims and matches identifier-shaped references against the codemap.
+                prefix: "6. Ground claims\n\n   "
+                suffix: " Grounded claims become"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_jzdqyh8qvfbc2vq89n56
+              kind: claim
+              text: Grounded claims become `proven`.
+              anchor:
+                quote: Grounded claims become `proven`;
+                prefix: "against the codemap. "
+                suffix: " claims with no checkable"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_t73g81nak9jvchndgfb9
+              kind: claim
+              text: Claims with no checkable identifiers become `scored`.
+              anchor:
+                quote: claims with no checkable identifiers become `scored`;
+                prefix: "Grounded claims become `proven`; "
+                suffix: " stale references emit"
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_6ban1v5dz93najxdjsxt
+              kind: claim
+              text: Stale claim references emit `claim-grounding` errors.
+              anchor:
+                quote: stale references emit `claim-grounding` errors.
+                prefix: "identifiers become `scored`; "
+                suffix: |-
+                  
+
+                  7. Gate and retry
+              claimClass: behavioral
+              guarantee: scored
+            - id: cl_hnkert4w2825khehgxgg
+              kind: claim
+              text: "`generatePage` retries while error findings remain."
+              anchor:
+                quote: "`generatePage` retries while error findings remain."
+                prefix: "7. Gate and retry\n\n   "
+                suffix: " The default page retry"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_etzyphcsfgcsdwpa8k24
+              kind: claim
+              text: The default page retry budget is three attempts.
+              anchor:
+                quote: The default page retry budget is three attempts.
+                prefix: "error findings remain. "
+                suffix: " If errors remain"
+              claimClass: configuration
+              guarantee: scored
+            - id: cl_dfkc91vn349w4y0r2a7z
+              kind: claim
+              text: If errors remain after the retry budget, the page shard is written with an open `system` flag.
+              anchor:
+                quote: If errors remain after the budget, the page shard is written with an open `system` flag.
+                prefix: "three attempts. "
+                suffix: |-
+                  
+
+                  After source pages
+              claimClass: behavioral
+              guarantee: scored
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_3qna1934e2nfbh85g3kz
+          kind: block
+          blockType: paragraph
+          contentHash: 679e9636a5653751584500734c1a07b505381995db8d2725206cadf6db2748d6
+          variants: []
+          claims:
+            - id: cl_en4d86836syg1ray20gy
+              kind: claim
+              text: After source pages are generated, `runGenerate` runs site-scope verification across the generated artifact set.
+              anchor:
+                quote: After source pages are generated, `runGenerate` also runs site-scope verification across the generated artifact set.
+                prefix: ""
+                suffix: " Site-scope errors are"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_27k3259st3e6z1cq6hrm
+              kind: claim
+              text: Site-scope errors are returned as `siteFindings` and make the run outcome `flagged`.
+              anchor:
+                quote: Site-scope errors are returned as `siteFindings` and make the run outcome `flagged`.
+                prefix: "generated artifact set. "
+                suffix: |-
+                  
+
+                  ## Guarantee Assignment
+              claimClass: behavioral
+              guarantee: scored
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_ah8qj896gjd1k5y4ya90
+      kind: section
+      title: Guarantee Assignment
+      level: 2
+      anchor: guarantee-assignment
+      blocks:
+        - id: bl_8fwr6p7magntz7zjbm05
+          kind: block
+          blockType: paragraph
+          contentHash: efc38a9d38b472e207a5d33edad9309afbe4061cbbf9754a1336297cd2e0d34b
+          variants: []
+          claims:
+            - id: cl_f8pb0380cd8pee2gwchb
+              kind: claim
+              text: Verifier definitions include a `proves` boolean.
+              anchor:
+                quote: "Verifier definitions include `proves: boolean`."
+                prefix: ""
+                suffix: |-
+                  
+
+                  `assignGuarantees` upgrades
+              claimClass: api-shape
+              guarantee: scored
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_mwp176m94a4w1486wqab
+          kind: block
+          blockType: paragraph
+          contentHash: c79f490fe058b8d881e444c7ea13769423f7facadabd5d09ba4a6d8a7d145791
+          variants: []
+          claims:
+            - id: cl_wvcs766rax3a1sn2z9kv
+              kind: claim
+              text: "`assignGuarantees` upgrades an entity to `proven` only when the verifier has `proves: true`, the verifier result is `pass`, and the entity id appears in `coveredEntityIds`."
+              anchor:
+                quote: "`assignGuarantees` upgrades an entity to `proven` only when the verifier has `proves: true`, the verifier result is `pass`, and the entity id appears in `coveredEntityIds`."
+                prefix: ""
+                suffix: |-
+                  
+
+                  A passing verifier
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_c4fy7mm5mgn6stzbawr2
+          kind: block
+          blockType: paragraph
+          contentHash: f06c6234058c9e9987cee822765fe358e2d5a1c70aa70c2f197f848bcdd0c676
+          variants: []
+          claims:
+            - id: cl_e95gvcjxdve5394rfb40
+              kind: claim
+              text: If any error finding names an entity, that entity is removed from the proven set.
+              anchor:
+                quote: If any error finding names an entity, that entity is removed from the proven set.
+                prefix: "A passing verifier does not override a failing verifier. "
+                suffix: |-
+                  
+
+                  Claims follow
+              claimClass: behavioral
+              guarantee: scored
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_86nd291xqvd6kcp0mm92
+          kind: block
+          blockType: paragraph
+          contentHash: 6ea106d75caf0d34504334c16a7b69e60125d406bf932f7164fcf4f937b3472c
+          variants: []
+          claims:
+            - id: cl_bgdk9qfayazgv843xx7n
+              kind: claim
+              text: "`matchClaim` normalizes identifier-shaped references, ignores ambient runtime identifiers, and checks symbol names, container segments, and dotted container-tail paths in the codemap."
+              anchor:
+                quote: "`matchClaim` normalizes identifier-shaped references, ignores ambient runtime identifiers such as `Promise`, `JSON`, and `console`, and checks symbol names, container segments, and dotted container-tail paths in the codemap."
+                prefix: "additional grounding path. "
+                suffix: " A claim is"
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_zfeyhwdppvfkpt4fmn0j
+      kind: section
+      title: Built-In Verifiers
+      level: 2
+      anchor: built-in-verifiers
+      blocks:
+        - id: bl_yq03xga9j9k9ytefdacr
+          kind: block
+          blockType: paragraph
+          contentHash: 643e86dc8d87c92dbdbabb75c28ce3c5f3de6494c59f86107b43b41da0c5c986
+          variants: []
+          claims:
+            - id: cl_17qxwgf982p4rqjw1epx
+              kind: claim
+              text: The built-in verifier plugin is `@docstube/verifiers`.
+              anchor:
+                quote: The built-in verifier plugin is `@docstube/verifiers`.
+                prefix: ""
+                suffix: " It registers these verifier ids:"
+              claimClass: structural
+              guarantee: scored
+            - id: cl_6m86vpm07xyq8fpjmqnj
+              kind: claim
+              text: The `@docstube/verifiers` plugin registers verifier ids `mdx-compile`, `internal-links`, `code-typecheck-ts`, `entity-integrity`, `snippet-exec`, `shellcheck`, `sample-parses`, `prose-lints`, and `diagram-d2`.
+              anchor:
+                quote: "It registers these verifier ids:"
+                prefix: "The built-in verifier plugin is `@docstube/verifiers`. "
+                suffix: |-
+                  
+
+                  | Verifier id | Scope
+              claimClass: configuration
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_wbmdjew5pmpxn05bvj3r
+          kind: block
+          blockType: table
+          contentHash: bc47f65c8f716824c738a9fb2a983d5b3e7d9b2e2f3e2b9e315422fe819740a6
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_cd0z553eamjm45339e0r
+          kind: block
+          blockType: paragraph
+          contentHash: 5b4bb2ba88520e4b8fc3708d300a9c11644ff5f9768a8f096e81472245290956
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_k9bem3xdnpztypdeqdhv
+      kind: section
+      title: Other Check IDs
+      level: 2
+      anchor: other-check-ids
+      blocks:
+        - id: bl_29ff4fd36kc2hpcd3nn2
+          kind: block
+          blockType: paragraph
+          contentHash: 4309c581b3d88f08e1dc669ec31cd9d64b8811186c5de5ed1514698f5c297a1e
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_dxzqy5kkywr6v8kyk5jh
+          kind: block
+          blockType: table
+          contentHash: f2b62e3eafe2cf86e9db16b6e505a59fa87fa8162e0544d7ba743b159d5ead39
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_9xvz212wj5y30pc5xw0z
+      kind: section
+      title: Visible Flags
+      level: 2
+      anchor: visible-flags
+      blocks:
+        - id: bl_s9bjwqw9vp1ncjqzsy1m
+          kind: block
+          blockType: paragraph
+          contentHash: 604e042b3a02e1e9465b0f07c8719507d484fda1d393988d2c086777e7fda964
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_esxn2c6pq9s625sa9evz
+          kind: block
+          blockType: paragraph
+          contentHash: 084ce9a2ace3783d5e74e511d5fddf9b1dcdbc7b26e13a69e0996f5f2b4f9468
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_th83b64pp223qfeg6dfw
+          kind: block
+          blockType: paragraph
+          contentHash: 2ab676eb744dcdf728ebbe77b741f5308c1c2b24a539022c2fc13edd778fed88
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_y36sktc4snrxd6hs7raz
+          kind: block
+          blockType: component:Callout
+          metadata: {}
+          contentHash: bd4eadc47678bfa21960c4dce1b75ef2a29d593bc7c7fc36f70079ef89a20a31
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_8f7q9xmb29qxm62mwx8w
+      kind: section
+      title: Running Checks
+      level: 2
+      anchor: running-checks
+      blocks:
+        - id: bl_pkk2305rhw65w85nzqxf
+          kind: block
+          blockType: paragraph
+          contentHash: 3ee3a5064ebca485e8f622ac0c781b6ac9d6bae0ff31a490efc0ba9c66566b23
+          variants: []
+          claims:
+            - id: cl_vhk1jmfy27rd158texxy
+              kind: claim
+              text: "`docstube check --list` prints verifier ids registered for the current project, including configured plugins."
+              anchor:
+                quote: "`docstube check --list` prints the verifier ids registered for the current project, including configured plugins."
+                prefix: |+
+                  ## Running Checks
+
+                suffix: |-
+                  
+
+                  `docstube check` loads
+              claimClass: behavioral
+              guarantee: scored
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_01x8k72q8pg1dq0r07jg
+          kind: block
+          blockType: paragraph
+          contentHash: 95092e75a88ded8e032d459d6e87fb951479deddfeec8ed1a323727da5006da5
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_kyr4zjdzm9ymmzc4y9yn
+      kind: section
+      title: Plugin Verifiers
+      level: 2
+      anchor: plugin-verifiers
+      blocks:
+        - id: bl_fj48mcq0w6cmyfpwqbge
+          kind: block
+          blockType: paragraph
+          contentHash: 930b14f0a03bf04a254370d5571bd92c52dbbc688dbc3c9e81dec9251cc59d6a
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_a851g54ds4bxgkg70dbj
+          kind: block
+          blockType: paragraph
+          contentHash: 0e9d6e1f4892f96926cc7f4c37c9066b8a8aa794c9b93d5065b060c293942608
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+  guarantee: scored
+  provenance:
+    sources:
+      - symbol: ts:af70e28445481b23a9e693f3ce8d6af6513a3e731859f30b4a35d92958976aec
+        file: apps/cli/src/commands/check-command.ts
+        span:
+          - 20
+          - 24
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2fc73094b2d6f7e818320be364edf24aacf6931345d6e8edee592373197fabb6
+        file: apps/cli/src/commands/check-command.ts
+        span:
+          - 26
+          - 93
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bcd9a8bc69963a393013056cf33528126cc3c89af42e458e18d55ae31b624217
+        file: apps/github-action/src/merge-decision.ts
+        span:
+          - 8
+          - 10
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:37dd567e231e08c6c3563562f5831d217138a8541e1b4d0c1b3a20dee86a0f8f
+        file: apps/github-action/src/merge-decision.ts
+        span:
+          - 12
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:58c6f1a43545bd713215d7ec32c9862a3d2d5792b5bc4cff9a51730bbd309693
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 9
+          - 13
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f7bdcba7c4294962e03970952e9e0a92e5b056be947d8b3fbde4bb0817b3001a
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 15
+          - 23
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:658dfa7ac02078dd6803d0202a6020bf42c93eefa7767ffa75ba90645b2d2461
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 25
+          - 30
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9e3238ea527a8d42280309c9f3ec11363563a2ab73082a89b2c242457609fc39
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 32
+          - 32
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f8afa717332316eee692c15eb6d1ee920bd658d6377e9614d3d9ed5c63784641
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 34
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5d06deb569988a285eb2558183b5cada682f177266999924033fdce00f09064c
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 38
+          - 38
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:dff245dd3bb1303c73dd476cd5ec30324cc33077836454a85b86e8c5cfaa1f16
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 40
+          - 40
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7c9438453ae9cd4b39ed8df2e7c9ec14f30f080c47a0e645e9cb6df0f5236971
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 50
+          - 60
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d53e39af3c2627ec6cbfc826f75782883b37724464664bf0c130a43ec13220f1
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 62
+          - 62
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:69684865168b2ecd2d9357176ccf199864da9757a6bdfd63ffd5bc918bc5f57e
+        file: apps/github-action/src/verified-delta.ts
+        span:
+          - 78
+          - 130
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:331e6eec93e3c9e22a48860e55489b1da74e33635dfbb98e6cec3d9b5483ad6c
+        file: packages/codemap/src/build-codemap.ts
+        span:
+          - 12
+          - 22
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4a8801bada32593fe7977cbfa7ca0ea7de3aa5a344eaed13c85b12038fcaa7f4
+        file: packages/codemap/src/build-codemap.ts
+        span:
+          - 13
+          - 13
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:013fbe19e80f0e53983b28ee71b526b128eb7c02a27640bbb13d321c7fb72913
+        file: packages/codemap/src/build-codemap.ts
+        span:
+          - 14
+          - 14
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:16f684c60d4668e69d38d0da73afb2fbef1c48a323e17b92b9e548497e0aea79
+        file: packages/codemap/src/build-codemap.ts
+        span:
+          - 24
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f090c39a1f71ea4edc7b020bc413aa86cdb16c31ac3a79e13c1d5ca74cf80c15
+        file: packages/codemap/src/build-codemap.ts
+        span:
+          - 46
+          - 75
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:324b54c0f6750bf525d39f6da62e05ff571d614a05891498e4fa813568b862a2
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 15
+          - 25
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:60a12fb35dfab11cd793c6b55458a6f7e9d9469a74bb6dbd10d790514089f837
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 26
+          - 26
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:42383887df8671938cc511189c5e5972ea8fe641c6dd54985cfab2cf54fb31a9
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 28
+          - 30
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:210cd5800b7a1ca720cf92082c038ee2460b0bb52a487d82caa673d10582d4c0
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 31
+          - 31
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:15d5d422941a8df79cbb6af95d0de87c99e4d3cb2fef995e6f8e343d4b8e1fa2
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 33
+          - 33
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4e99640f0230184d524efa46de6e326344b212b0ba3848c0b04232ca389f7f71
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 37
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b52775f5b5496d35e2f176d1d590d0f7a2d0194ae390264677b6fb6a3f3cdb0d
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 42
+          - 42
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:44d9c1e4993f3eb9f303a435ccad57e9cca7b85d4714cc9bf2d33fa68c24c80e
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 45
+          - 45
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:49e61dabbaa52e3eee560eeb0ec94c3633a38fa5009a3c516a443912a01dcb0e
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 46
+          - 54
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:25f3124d8053b2c794e4851f66b6fe8f35de13f1145ca21eb975db65868c5660
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 56
+          - 65
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:106bc1b2a29dc1b02d26887feb261aca358a0ab9ece224a59cb4b5849537a472
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 66
+          - 66
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:348e618f83f8b055edf88aa6ceb55b1642172784cbf1db9337def440d8999e3c
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 68
+          - 71
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:34bbdc171e5496b5b66abc41fb21a3e04ba49b1313e8df9bd5e2dfdd51efb8f9
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 73
+          - 87
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:aed0705df85499b60d7421f70608dcc3b77e750d704727eb851400f09ebfc2c9
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 88
+          - 88
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a00a9e60d193cecd76ed9d2fdcdcdb8b16eceaefb41a554646168924002987da
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 92
+          - 100
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2933bf2ee5af0d60834f39a6cfeb15666feb73591ddc820db87d0f06a85ade39
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 101
+          - 101
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d48dd0b68a90255ab79934963e2d5145d6aaab05597d72c5ceb0492e8ee5c184
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 103
+          - 115
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3854eccb98f00c0e842b1ae9e929256d7c7b048f7e1a5ce7cf6b4c218ccf3e3d
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 116
+          - 116
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f42d84a9cb4434fe9486219016bfd8b36888522df1e93bc964f687ed19adfd4d
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 119
+          - 125
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:94fb7e1ff68ece98328a0cf16bdaa16e67e3c93967a332c14b9655b099bab50e
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 126
+          - 126
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:741c584bb98c2c94d7f70c23b019f5314e33c7517056f013107a4d57ea163d40
+        file: packages/contracts/src/entity-schema.ts
+        span:
+          - 128
+          - 146
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5232d43fb0c097a9283cab1ab75613232f7219ff2ff1bef122ed328e3be12930
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 8
+          - 8
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3747dda643343596ad9331324cb82bc449eeb8d5f18ad81b0897a0ebd37c5151
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 10
+          - 22
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b92d0b6498ea43a8611d23031fb9589cbd48b820fc07207dbf10d4fd4543428f
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 23
+          - 23
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bebf425fa70315f81e97bb649ccdd7ad00d2036b63958a668b2af08d223067ff
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 25
+          - 33
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:938747d5d2b942e12603981d40ca97be73b4ac07322436b0918041de4cb66ecd
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 34
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:432802eeb3356dc3c08b35c94c6f708078bb22f8064925ef899637920bd8955e
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 37
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b1f0dc233e45819cfa11ca7d0ccc03cc811ed47ece6a72aae756bed73ff3dac7
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 43
+          - 47
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1995acd94e7c8d3bac16d73999b14896e9d054fd64ae2c5ff3ceeaa4ef1b303e
+        file: packages/contracts/src/findings-schema.ts
+        span:
+          - 48
+          - 48
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:0c1df0f4bddae16de51e8fdcd4ec60980b962c611581305a828eef7fb8ba3241
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 8
+          - 21
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f57e2c65acadc8167b3199e255e5244593a278e405bc510988ab6d53b284bf0b
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 22
+          - 22
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b5f169067313fcb55979fb51863c8364ce0a981cb2f4d299b7f1e4c792d35c03
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 24
+          - 24
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:519a6f566ba8cca935ecdc57ef623c0a52256a83ce73bddd4e26c7dbd1ada26b
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 26
+          - 31
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5bc28303675af6a70076b25f82d572e6db601a6a16f0cd2127087d3e7ebcdac7
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 33
+          - 46
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ad939f4767cf676692323630bb282b06805f95765f505c8c3839a52125f25e0d
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 47
+          - 47
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5d00a2821128aa2724151005dc3d7c77e13870db0694760bdce82f797c5278e1
+        file: packages/contracts/src/flag-schema.ts
+        span:
+          - 51
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:76f5351de69feee4865678bc60033804f91d55ad0da4c03a4f2d74234997968d
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 19
+          - 25
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2b6c4d282eeaeb4e96e46fb7e1878c04e553fc0d5022889bb5d607fceb19c937
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 27
+          - 36
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c6f609195d261509d45445408071b302b260fb630e485b8aa262efec84e1e314
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 38
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:991d62da3147e0efa3c8307817f7f81c38472c473de62c8ee2e658e6bc481890
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 43
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e664dfc1cfc86c47a6b8c50b1f7595e3acc1fc721a2a5c7a47b25736f5ff0c72
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 58
+          - 58
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:200eda744d2999ac33f8ddf7f7378b023547bf579597bb09d7d6d7e9e6ebba9d
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 62
+          - 72
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:af56fc04c6c5e0d88e3e943b0c576fe49bfc9a9747e7c391bab865742dc8cfc9
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 73
+          - 73
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4e011816835593c37b54f0118b0d7fdb81552184e34eb2e250a028952aba64fd
+        file: packages/contracts/src/manifest-schema.ts
+        span:
+          - 75
+          - 84
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d16c82f32d3781454b3e491b75c21d1342e21112202c551953d0ec392f7edb3b
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 15
+          - 15
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fbdb4e2c27562901f28d1cbd88d9231a3dd7e732ed76dd088904b54cfcc689b1
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 16
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5fa74b7f957bbcbfc491e947df3cb3904f54ab6e9f1ddcdd5ab0cc165877c678
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 21
+          - 29
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:8994adaeef3aa75ed12c4f2363ac11ed6a5aa0304748ba907d216828edd9712d
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 32
+          - 37
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7c6c5470abcabb6d502638ca37a36cace9ea6e7202ee65c965b6a8fe413fd72b
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 38
+          - 38
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:657c10bb92f64aabdd0e6e8e38507b5167bba9209935a84ebcf35a54d463d151
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 41
+          - 44
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d24e36ff0287d88aa76df021de26dcc56e08fdace7378eeb1c61480d09d6ae0e
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 45
+          - 45
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:949ae3dcf45ef193bdd545fab1773b97ea10108a2bf7c4eab1b4db59fe44b094
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 47
+          - 47
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6e990a48226671c821e81f83ea4c9b31074bf4ac8899a3195b2d45b04460db8b
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 49
+          - 56
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:34d97492d1f74df398491f8b0befc2197f7c06a640d6537f48871e5d50bc9d0d
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 57
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7a58fc63a3bbe43532c70b275423b76048b4a7f0d08dc16066cb68524c1e0e95
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 59
+          - 65
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7ca460c19c27a2073e077ab13a5cf92271b3567300e92a437c793272ee25c9d3
+        file: packages/contracts/src/provenance-schema.ts
+        span:
+          - 66
+          - 66
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3f6edf752610b594f610a0e7e384bbce882ee2f3eccbe9bf35dfc04566219762
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 8
+          - 8
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9d535b72aafbd56b31c114d63c04ee52505241a9323d4115df6d81e37ccdfd95
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 9
+          - 24
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:14e7809b623584b247384654a0bb009ed6924c04cb43b7efd0e18c9e66d033f2
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 26
+          - 39
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:0072b2b9f7a7bd0abc90d5c6b92f7dd8fd3164da62d9f604b5c1e50e737afa99
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 40
+          - 40
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:740f078e3600dade88012d65d78f424ca873e321b35f5ad9375c16ae66eb25e1
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 42
+          - 48
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b63ed6eadc4796dbb000ca4bbade7ba1a24a6618760efed14e318527d52e24ec
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 49
+          - 49
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b32e45eca10957151932ef1ecbc8050f0649a46e48017be9b0ec7797ca107b88
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 51
+          - 58
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f8e1bb8c7bf0e013ed4bb3ee90250c066cffb87fcee8b3608247917cc96767ed
+        file: packages/contracts/src/symbol-schema.ts
+        span:
+          - 59
+          - 59
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:dbb9354ab09bad346f8e1db96333ae07a55114014ab4b6eda69acee9e0201a3f
+        file: packages/core/src/audit/extract-claims.ts
+        span:
+          - 11
+          - 11
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3f3e6ccd142170ab7676f549d5117d16a504dbee7f63415b613afc9d9e47881f
+        file: packages/core/src/audit/extract-claims.ts
+        span:
+          - 13
+          - 19
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:32b76c2c37cd754f6f3183f85006777a71dd471a3f9975f3d1fa42d6613781d3
+        file: packages/core/src/audit/extract-claims.ts
+        span:
+          - 20
+          - 20
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:55cbcdde672db98d95a46da048c4d99eba3c6504cdc38d6648351ead8d167522
+        file: packages/core/src/audit/extract-claims.ts
+        span:
+          - 22
+          - 24
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:64583dcc5002144b51771890d5e11b6bb62122b6a1659f19490ed3467dbeef11
+        file: packages/core/src/audit/extract-claims.ts
+        span:
+          - 51
+          - 64
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:08e6fef65a6237b3ca021957c904d53eff7835b68fdf644fb6adeca1ce551bc7
+        file: packages/core/src/audit/extract-claims.ts
+        span:
+          - 67
+          - 82
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a65bec0f7046b1b7c480a79c5358b8d6289bc7878437ec3438d02c4fc1b2db5e
+        file: packages/core/src/audit/match-claims.ts
+        span:
+          - 68
+          - 80
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ce8e0687937c79538a910fe4e13b2bb168d1c40f6c6e7a33f18949cc530a74bc
+        file: packages/core/src/audit/match-claims.ts
+        span:
+          - 82
+          - 89
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ea35bc5c26a8a0b425f1e53da29f92a3fb3a54601b76380fe80b52c4b37d8fd9
+        file: packages/core/src/audit/match-claims.ts
+        span:
+          - 91
+          - 105
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:30c78298d86105f2ba3a2afb325ee1b94686d680d85db42fdb69c01c212f5ce8
+        file: packages/core/src/audit/match-claims.ts
+        span:
+          - 116
+          - 120
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c16111fc22a489b7ec9c55a3472cdb91ac9d543f432e6e1a26b0d67408d543e8
+        file: packages/core/src/audit/match-claims.ts
+        span:
+          - 122
+          - 125
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4ac4ef0ce724767c1ab42bb3260d17e152a705fd0cd5d16cd0093d16642059bf
+        file: packages/core/src/audit/match-claims.ts
+        span:
+          - 131
+          - 162
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e25a1b85fd5e9ded30dfaa885861f4e486d51df657ab5312163a6cb7bc5a7625
+        file: packages/core/src/entities/extract-entities.ts
+        span:
+          - 18
+          - 18
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f061637db9adbfb0abc5ab5bf5f7f2ceaf6718cf5a91853e5361df1e000d1b89
+        file: packages/core/src/entities/extract-entities.ts
+        span:
+          - 50
+          - 54
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:25616c86d14f1c55c9f2a3d98245b9fef6e1cec82bc5968884c7045a470c31ef
+        file: packages/core/src/entities/extract-entities.ts
+        span:
+          - 138
+          - 151
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:813527af77f746a1e7cfa79437cecd0b1f1107ff6b609fee932ed3a9d5b1195f
+        file: packages/core/src/entities/extract-entities.ts
+        span:
+          - 153
+          - 157
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bf8157b123e28d2b1536bcf0efc712e09076b07a206169ece239b88b1d541e95
+        file: packages/core/src/entities/extract-entities.ts
+        span:
+          - 159
+          - 229
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:266cb82bbd189fe0efa1c258bbcd3f6289c4493c465cad85a427a81af3be667b
+        file: packages/core/src/pipeline/claims-stage.ts
+        span:
+          - 34
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6c3ecf5ceb73ce4b3f24093ce4c6c1845e64459ca7c0d5100c0333e375221c3e
+        file: packages/core/src/pipeline/claims-stage.ts
+        span:
+          - 43
+          - 115
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:01d349acf6a11f11ae6bc0525e859f149001df35f15f9d904bd47472ddfdbccc
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 35
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:cc6f516e1c332941a51160c97d8ebb10ede33b3f7daa8b9be1a1429c877da466
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 43
+          - 52
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:873962b7223a7264bcd27a2765eb06ed2634be609be7899dd4bc347529fc747f
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 54
+          - 61
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1cbfbf4077e6c4ccb85a491b068a2d1b78000377c0f97948e6609686e855ae37
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 65
+          - 248
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5c3d4b9b9b96d6841ff88b978b765315f355596a409a87d58d9f525e44bdb7d1
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 28
+          - 31
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2750cc8fef0636bf2fb7ab20c3e5ea174d05a9d5eb0081738a76259a32bb92cb
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 33
+          - 33
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:72423c2c4788e4f20c756f46b2f2668d3a2cd6870b2c4ae8f2807fd8353ffea8
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 35
+          - 39
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fc76031d8ffcbb33457eb346aac23fb5c9426936da6dae7139c21db9b0720195
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 41
+          - 59
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e726634c5a1162312d740f180dfc35490a62644245d1757df29807fa1597bc25
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 61
+          - 67
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c1d033f871ad8e42318c080a89c6dac1e40eb944ab047a8691037740b7e254a6
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 70
+          - 73
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6839a7713777a3868995caf83ad757f71fdb1da4f6d48d5526a8dae4d8f9ca99
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 75
+          - 75
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4cb246a827476de016f3f4f6e3d1a251116519808b57561048e4e5b713ed8735
+        file: packages/core/src/pipeline/page-runner.ts
+        span:
+          - 77
+          - 268
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5cbef92dbdf635a7189e1f80a0c026c9e214766c5a64a1f17b160794c6c72aec
+        file: packages/core/src/pipeline/review-page.ts
+        span:
+          - 13
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:047d86faaf2c2d82b849c3d76cea4530cb681c73cc91e65346b557c36e5a0c8f
+        file: packages/core/src/pipeline/review-page.ts
+        span:
+          - 44
+          - 62
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ca3a6a01bf2926930ca4256feb8bbf49616f52f011a9c4c5d77c31fb51ed4e54
+        file: packages/core/src/pipeline/review-page.ts
+        span:
+          - 64
+          - 73
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c3d7257244c8ef1cc97b9e6bb4e171129400a8ebfd85cdb0d9d2362b1901d692
+        file: packages/core/src/pipeline/review-page.ts
+        span:
+          - 97
+          - 114
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2d1c06cd7198cc0c35410e08c00e074b409b1e94e2e9907003176dfc59eea32f
+        file: packages/core/src/pipeline/translate-page.ts
+        span:
+          - 28
+          - 43
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c333cfceb7be95ca07ece0962b3ae47cd542762ead9909c493bada184faccc26
+        file: packages/core/src/pipeline/translate-page.ts
+        span:
+          - 75
+          - 113
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:878178b50ddb1296c65b56a01ed785dcba4a7fe4042c6391af9b88c06ce14b3e
+        file: packages/core/src/pipeline/translate-page.ts
+        span:
+          - 115
+          - 120
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ffd6765e3d7f79ad44d71c0e480373cba13cf796ffc3bbb37adffe466b98bdeb
+        file: packages/core/src/pipeline/translate-page.ts
+        span:
+          - 124
+          - 241
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6162c4218b4faa9cad669ce13a19f6b760fa99bc54e6a2c796472890220d390b
+        file: packages/core/src/pipeline/verify-page.ts
+        span:
+          - 84
+          - 93
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6b4e5212fa68998a2900c59b5cb19e22c8c8e8722d78bb99608ab45d87b95382
+        file: packages/core/src/pipeline/verify-page.ts
+        span:
+          - 112
+          - 162
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:be4594e12b71f3f57f956fd194c76bb35b75087fa42ae549d401c0d854f98537
+        file: packages/core/src/pipeline/verify-page.ts
+        span:
+          - 164
+          - 165
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3f176beb80b6a81a19d6cfc7896327e91af7d19914855249a4edc0b3e50fbdcf
+        file: packages/core/src/pipeline/verify-page.ts
+        span:
+          - 169
+          - 217
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e27cb7314cea3e55bac24fafc0d0d176f26d861de8cba9649fc770df520c4d47
+        file: packages/core/src/pipeline/write-page.ts
+        span:
+          - 8
+          - 20
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:0f117ee7dc0d0fa8a21251a5fd3996bf7283ac84b87a0a792185cd6b3807ee21
+        file: packages/core/src/pipeline/write-page.ts
+        span:
+          - 35
+          - 75
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5ba32f312d3a60a3aed77606b21eac1f75ef285a790ea1c3fd66cfcd47c44922
+        file: packages/core/src/pipeline/write-page.ts
+        span:
+          - 77
+          - 97
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e8bb1bfef852f6e0a4e1af1b2f4003c5415b38d499f7ec3edea2f82f21f081a4
+        file: packages/core/src/pipeline/write-page.ts
+        span:
+          - 99
+          - 114
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bfe46fe70e69c62982bacd214e700e40e14fc0ebae5b7d7e247baa06f10000b2
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 20
+          - 20
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3f346589afce91f63ccc07cdd0b0caf3f1c2737268d5a5a626151b331ff74803
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 22
+          - 26
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ae30d4e5326c1ddeb9349092856a8dd791d14e186f2012b6e21a1cc385341611
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 30
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:94848325ee1a00a9e699482d6df8cedb08ba2664d2360842353882b86a304715
+        file: packages/core/src/plugins/plugin-host.ts
+        span:
+          - 50
+          - 157
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:421db5153c5417fd3ff95d076a342c7b3c336b9a5844f31503bf0f80fed3fce8
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 17
+          - 23
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6c52c778bb0441495eb397452734d3fa04656f43c980bb30ce5dbe5fb8fd3098
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 25
+          - 28
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:850a9f7a27c4d4a8dfa48eda69c076fcbb9e79b8825ad621c6222233c110e18a
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 30
+          - 33
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1557896987c7831768a72452770e6c493aea2032d499c0f0151670fa5448eaa8
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 37
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fc21a7fc0e488141c0f35d300e0d487dace61dfd361f6ae0856a16e3a3c2906d
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 44
+          - 48
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:047fec9aeafa7051932b2ab75f77c581988771081fa02f77989805f45ab2dab4
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 50
+          - 59
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1c04c1ebdaf5c938905460dca8806e2b608ae7ff8ec2522e6f8675fbc88a6cf3
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 61
+          - 66
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a079d508a9cb4ffa458239b286a00a46188c8a0832bb4451ed8bb6ff30e0cd15
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 68
+          - 82
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e5cf0c16cd6fde876503c56be2f05b7878f0c948d3d698559141c789ab1b95e5
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 84
+          - 93
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a0a66c25004144c9fb98be6f272627f42aec8af3c1df44e0e32a07db7d0808d2
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 95
+          - 100
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fb5771dfc248732d4828d60428ab34a868d5e6118c3b49bd5ecdaeea76b92909
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 102
+          - 115
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9f23229eb40317fd8442f9dc8df80b689c1ad272c9c84e046ac1e2eade29c803
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 117
+          - 122
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:926757b4c30c702a8bb1410eb31d614b995e2b6a1aaeb1a8280e769a3cccff4e
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 126
+          - 130
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1a80e56de746b923d7d9f851db4deeb0f16183ab54b4fb977d96c18a5bc78842
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 132
+          - 134
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:af99f76cf18eb11c58271cf3500326f3e9b31b2e0dc12de0a8929de67c4e0bf5
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 138
+          - 142
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e8efa1ec80c60a92bc6c72194ed0c0bfddb9a59a22857f91688cd4f8118ce7fc
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 144
+          - 148
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7631dfd33319e01414b47293452c845579c25f3f8e5b67d8277b55edfb085dc3
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 150
+          - 154
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a61edd83811a1e363fd399352a66b55accb5db95f77452e02dafffa1e449980a
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 159
+          - 165
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:818bc4e071b54eee5b4c9637b09447a0e096312c9868e712b52ae0f4ff7a3a19
+        file: packages/plugin-sdk/src/hook-types.ts
+        span:
+          - 167
+          - 175
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9a691132fad73020b86aee30a36bd3b4f917287872032eef05619e6875b5576a
+        file: packages/verifiers/src/code-typecheck-ts.ts
+        span:
+          - 16
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3ada5cdf4e0f259179f2719a7f70a430ca5c9d2ac5d4eadbd3c7825a3b14d1f2
+        file: packages/verifiers/src/code-typecheck-ts.ts
+        span:
+          - 20
+          - 48
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7bc9e9dfd2764128316c44c5461ccfdaca294d50567619d46a0c53d4de45012c
+        file: packages/verifiers/src/code-typecheck-ts.ts
+        span:
+          - 52
+          - 62
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9efcd6951e6fca479ca843cd789b0196f446de8978e73ae0426cae55b8f21487
+        file: packages/verifiers/src/code-typecheck-ts.ts
+        span:
+          - 129
+          - 180
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:104f1dbccbc3a8e9c1ab69b73598dad3c0c605e258e1f3b38a07b511b7ba6b42
+        file: packages/verifiers/src/diagram-d2.ts
+        span:
+          - 39
+          - 44
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2f31939f5bb90b5d498dfb8314d130bdd48cc8506600abe585bbdff0fffdb082
+        file: packages/verifiers/src/diagram-d2.ts
+        span:
+          - 56
+          - 126
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a6a843a0cb3c81b16b2ac5ceb79ad2fa251c9f72008362d8c90e96252cbf553c
+        file: packages/verifiers/src/diagram-d2.ts
+        span:
+          - 131
+          - 153
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:875a30c2de04d90e6917816306d429d1df792448d2bf9d902833e6699c7a5351
+        file: packages/verifiers/src/diagram-d2.ts
+        span:
+          - 173
+          - 230
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d583d7ef2ecaee1d8d8a140ea1e575353929ddbddca61ed87bfb64f3198f9d49
+        file: packages/verifiers/src/entity-integrity.ts
+        span:
+          - 86
+          - 99
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ace1c816d06209ab3f41b54e2604b32fc9d68b362030a5c052031cc7fadd3836
+        file: packages/verifiers/src/internal-links.ts
+        span:
+          - 7
+          - 7
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ced5369e833f8139bf5031503636fc3969601d3f0ea77ef0e228a157c5ba70f7
+        file: packages/verifiers/src/internal-links.ts
+        span:
+          - 15
+          - 27
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:798d55a1b690a062fe4f5a6fd77a99964cb2295cd322d81542ca0319987bb6de
+        file: packages/verifiers/src/internal-links.ts
+        span:
+          - 35
+          - 97
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f3da0e2823c231b25eeb1054e0363345860ef60f4c95b6c334e7ea55667de23d
+        file: packages/verifiers/src/mdx-compile.ts
+        span:
+          - 90
+          - 114
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2acaab991207330a44b259508b570cef670de17525c2afa937b4de6121c08bda
+        file: packages/verifiers/src/prose-lints.ts
+        span:
+          - 43
+          - 71
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:dbcc768d26087dbf69a470f55ab7d795b6460cd93d6ab5146542ce644147e7a9
+        file: packages/verifiers/src/prose-lints.ts
+        span:
+          - 79
+          - 118
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:68465f9f0a4e5d09d383d3934712c59782584df806b2fe46e1a5a99557cfb026
+        file: packages/verifiers/src/prose-lints.ts
+        span:
+          - 202
+          - 215
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7c2aef99017c98d687a6fc36ef9364ae2cca9f8b8cc9a739faa570f815576da2
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 4
+          - 4
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1baa8b0673294f5eb1d038d635b12d756088efc69a093cb40b8daec12288d833
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 6
+          - 6
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:08b9a12b9695db34af96ca9e83c5821ff8a1f20a3d7b6f293bbe74135ee267a5
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 10
+          - 42
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5db20dccbf74f6b7b2c5022c1add6b54350bcf9468e836a27c64162279a36224
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 44
+          - 44
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:36f46cd8b0cde3c40d5c1d8090160beac04d9ba1bf993739d35b4abea9c40796
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 46
+          - 49
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5bd86d4aba7d46108987f38e984e404dd9138e006f8b99d865a529ee648fd324
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 52
+          - 55
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:66b8f774755e2739e909cdff368d9854272dd5fb4fafb95c9c01ae6067516116
+        file: packages/verifiers/src/run-support.ts
+        span:
+          - 59
+          - 66
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ec62b478220c96604a1dac17c091f6388ca5c74af6ba61e1d0b55ed3219af6c8
+        file: packages/verifiers/src/sample-parses.ts
+        span:
+          - 13
+          - 13
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f5c02275e09175020250407502a04482192766dd2d6c69c07e949623f78d2f8e
+        file: packages/verifiers/src/sample-parses.ts
+        span:
+          - 173
+          - 185
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:881b06147f6d0af76ac2887d01ee3766021f9e90069d188fff1bee11d9b95bd1
+        file: packages/verifiers/src/sample-parses.ts
+        span:
+          - 187
+          - 193
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:706bc5f14a272e3b5827c8e783cb99480916d4f252981e8d7fd8e4a6c327ae76
+        file: packages/verifiers/src/sample-parses.ts
+        span:
+          - 215
+          - 252
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2295f495749ee638843238c822fa72a0f42c949e702816fa0307bb0edea5060b
+        file: packages/verifiers/src/shellcheck.ts
+        span:
+          - 53
+          - 116
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c2008b95719ef864340f9ab1007ec344b70bdc36ebbaf5bb4aa163a48ca442cc
+        file: packages/verifiers/src/snippet-exec.ts
+        span:
+          - 83
+          - 182
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a41a3653dfaf43dca35419d5f87e58f98e99d867c775c057066dc807feac0fa0
+        file: packages/verifiers/src/verifiers.ts
+        span:
+          - 41
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+    seedContext:
+      - ctx:codemap:eb5314ed39433347d28bd10bcd0bd60d663bcc9e59a613a87e9d27c4e0e73a86
+      - ctx:brief:a19a01d4d04b11f5ab2cbc609346aaeb27a0a6936ab152fbd33ad1468b16a0f7
+    observedReads:
+      - file: packages/verifiers/src/verifiers.ts
+        contentHash: 607349a9c834f9a5916d8db33cf309710ce4baa9d87315540427f804ecb76694
+      - file: packages/core/src/pipeline/verify-page.ts
+        contentHash: cf43e6132a4226cd8059523b45b11372ec1078f19b28c77589d1cd130e171e31
+      - file: packages/core/src/pipeline/claims-stage.ts
+        contentHash: 0eab11ca8e0d6deef411a747ddc6c0dc625069b990f038e5d81ecdb8b6f3bd82
+      - file: packages/core/src/audit/extract-claims.ts
+        contentHash: 8e82eafcaacb453127de7a93e8528bf0fbf8a94c52ee119354eb9f95ef952c81
+      - file: packages/core/src/audit/match-claims.ts
+        contentHash: ec574a2c05231352c270b00704508706a12ad11d4134050b001a80f6d3e3dacf
+      - file: packages/verifiers/src/mdx-compile.ts
+        contentHash: 48eac060f0ec2eed23c46a71ba5a4f316f8cb6c8f6a8ded87bb1200c7596bd5a
+      - file: packages/verifiers/src/internal-links.ts
+        contentHash: 410268f0815e7a16d3f46c260b0a9b2cb272ca99283b8a79025111bdb76476fe
+      - file: packages/verifiers/src/code-typecheck-ts.ts
+        contentHash: 562bf576db888aef2d0ecc071011db0897021feececdc4e1a65b395de7439781
+      - file: packages/verifiers/src/entity-integrity.ts
+        contentHash: 530d225b83bc6d936e4944f06b87e5a5cf91ba4d022cf403b8e44d0878fa3bfd
+      - file: packages/verifiers/src/snippet-exec.ts
+        contentHash: 0e651d6c45df5298af3eb655d4b4f316fff6fc02310306b923af321d2014ffbe
+      - file: packages/verifiers/src/shellcheck.ts
+        contentHash: 20abde504fe4766aa61401055004f7f14889c2821864744b64ba000db97829ab
+      - file: packages/verifiers/src/sample-parses.ts
+        contentHash: bd759e09d298ba84f5f3d0cc62086fbef7995faa66af9bdf560689ebdf7338fa
+      - file: packages/verifiers/src/prose-lints.ts
+        contentHash: fd6ff9552aea2045acc143b2659f890f51bad5c688639adff6133c9d01d04831
+      - file: packages/verifiers/src/diagram-d2.ts
+        contentHash: 12839ee4dbf07a608f442308c9b7b65d04b39875830ceeae587df5dba1f20938
+      - file: packages/verifiers/src/run-support.ts
+        contentHash: dda461a16ff4129ba2cfd971f83de4d74d1856405cd9aa67c5b78b6ce7066de3
+      - file: packages/core/src/pipeline/generate.ts
+        contentHash: 77c76eb302107e1eec449f9e83ab525800e7fe71029db9a6349c09e7339bf6a7
+      - file: packages/core/src/pipeline/page-runner.ts
+        contentHash: fdfb6fed064ddf26d1891debfa489c18a4e64594f4db81457b9be5f4d886d8e6
+      - file: packages/core/src/pipeline/review-page.ts
+        contentHash: 7da493b60ecd900ffd09dea4814cfdf95058d3a3efd55bbe9469810202511a96
+      - file: packages/core/src/pipeline/write-page.ts
+        contentHash: d0e092f935231368cb2dc20f3147305fac81dde7897686ee3b7e7eb32c3f279a
+      - file: packages/contracts/src/entity-schema.ts
+        contentHash: 087a9fbfc3187487bbbb8842037818ab5b6e3535bf313170660bb273d21aaa19
+      - file: packages/contracts/src/findings-schema.ts
+        contentHash: b33df5620da6b5eb3eab57532f52d66169269a7f4ebb9f01bd4739785d469cac
+      - file: packages/contracts/src/provenance-schema.ts
+        contentHash: 18dceb452a07c16756523a998d4c186b34923e2bfb9524dac3909ea95f87db47
+      - file: packages/contracts/src/manifest-schema.ts
+        contentHash: dfe894ae762cb336062199d0ef789d5d567c90e18bd8f38b2cd9403534dbf756
+      - file: packages/plugin-sdk/src/plugin-sdk.ts
+        contentHash: e57970984cd388a54fb1c264a3a4a5aa5bd9e5375bad5371bf8cbf003b195076
+      - file: packages/plugin-sdk/src/hook-types.ts
+        contentHash: 4b3c862fa958a8f161ca9a14acab6b859098f07b4060ddbb8f0a8d0470a82eba
+      - file: packages/contracts/src/flag-schema.ts
+        contentHash: 355b16b63b0c9249a6178890746fb3806650649ab0f89a2a8567c712e349b969
+      - file: packages/core/src/pipeline/translate-page.ts
+        contentHash: 40bf501698d5dc69d358c5c200537dea8e07c62c6757e72fd2f38dad72423255
+      - file: packages/codemap/src/codemap.ts
+        contentHash: e29bb5260abcd82fc89be102802706a4c1269acb58060b108fbd91b6bfa5cca7
+      - file: docs-site/content/en/how-verification-works.mdx
+        contentHash: d4d87400f662c6fe0f3be763e1add3723ae822174bbe9e696937442e7d12cbe6
+      - file: docs-site/public/how-verification-works.md
+        contentHash: d4d87400f662c6fe0f3be763e1add3723ae822174bbe9e696937442e7d12cbe6
+      - file: packages/codemap/src/build-codemap.ts
+        contentHash: cdfe663b49ad3f0e061fe54b028e87be8e99ab16e5253f316eb13687f74d36cd
+      - file: packages/contracts/src/symbol-schema.ts
+        contentHash: 2c9cc21c4df33170c03d8a56faafddedd278956d41b85846bd30a722a54abed6
+      - file: packages/core/src/entities/extract-entities.ts
+        contentHash: f276d0ba4c6a3f5cc9c1db84b6e682d87ecf88beef3c47d44f3d667ef3b18576
+      - file: apps/cli/src/commands/check-command.ts
+        contentHash: a1465e0ed532fdcb5c1dc419ff18e31c2c1a03fdca673bafa77dfd29cd659240
+      - file: packages/core/src/plugins/plugin-host.ts
+        contentHash: 5076367778064af78aebeba150995c9d32b0e30216f0a2f0a29b69c1646eda09
+      - file: apps/github-action/src/verified-delta.ts
+        contentHash: 596238d8e3b9ff25b4118e2311ecaf3b581c85d5cfb49b451b50776227d254a0
+      - file: apps/github-action/src/merge-decision.ts
+        contentHash: ee3cff80305ccb76d64a1be8ada3b86263840b185efce9da5caefd31beffdece
+    verifications: []
+flags: []

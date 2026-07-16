@@ -1,0 +1,1469 @@
+schemaVersion: 1
+locale: en
+version: latest
+sourceCommit: b3ef381e3e5d4b7db878a5523147870b47a03523
+generatedAt: 2026-07-16T20:50:19.127Z
+page:
+  id: pg_826p9e48qvnssrwqtm84
+  kind: page
+  slug: configuration
+  title: Configuration
+  description: Configure the docstube config family, agents, versions, locales, components, plugins, and comment-preserving edits.
+  preamble:
+    - id: bl_h2763n5s63v1te6v9yrk
+      kind: block
+      blockType: paragraph
+      contentHash: efc29885b806fa8a71d07e9a38f2fd1777da1ba8250a510c2aaf49908bfcda11
+      variants: []
+      claims:
+        - id: cl_43m71a0ppa30sx7e7v3f
+          kind: claim
+          text: configFileNames defines the YAML file names docstube.yml, ia.yml, and glossary.yaml in the config family.
+          anchor:
+            quote: "`configFileNames` defines the three YAML file names in the config family: `docstube.yml`, `ia.yml`, and `glossary.yaml`."
+            prefix: ""
+            suffix: |-
+              
+
+              `loadConfigFamily`
+          claimClass: configuration
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_96mhrc48j02nt8hqscrk
+      kind: block
+      blockType: paragraph
+      contentHash: 899b94b10d2263c575f4c662bad8ea4c584552ab3981aabc88502628a391c0d8
+      variants: []
+      claims:
+        - id: cl_19sqsj8hvff8bmbs76r3
+          kind: claim
+          text: loadConfigFamily reads config family files from the repository root.
+          anchor:
+            quote: "`loadConfigFamily` reads those files from the repository root."
+            prefix: |+
+              `configFileNames` defines the three YAML file names in the config family: `docstube.yml`, `ia.yml`, and `glossary.yaml`.
+
+            suffix: " It requires the config and IA files"
+          claimClass: behavioral
+          guarantee: proven
+        - id: cl_35wydkd1cx1nk4e090mm
+          kind: claim
+          text: loadConfigFamily requires the config and IA files and parses them with parseDocstubeConfig and parseIaFile.
+          anchor:
+            quote: It requires the config and IA files, parses them with `parseDocstubeConfig` and `parseIaFile`
+            prefix: "`loadConfigFamily` reads those files from the repository root. "
+            suffix: ", and returns an empty glossary object"
+          claimClass: behavioral
+          guarantee: proven
+        - id: cl_a8b084pesnqwwywwgnbk
+          kind: claim
+          text: loadConfigFamily returns an empty glossary object with version 1 and no terms when the glossary file is absent.
+          anchor:
+            quote: returns an empty glossary object with version `1` and no terms when the glossary file is absent.
+            prefix: "It requires the config and IA files, parses them with `parseDocstubeConfig` and `parseIaFile`, and "
+            suffix: |-
+              
+
+              `docstubeConfigSchema`
+          claimClass: behavioral
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_p61q065fsckfjfnn4wq4
+      kind: block
+      blockType: paragraph
+      contentHash: 6bcd503d42893981e3a2f2debb9b00b6070e529ee0d06c1407264293345c697b
+      variants: []
+      claims:
+        - id: cl_5hadzfzmcmt5kcfqc5na
+          kind: claim
+          text: docstubeConfigSchema validates the main intent config.
+          anchor:
+            quote: "`docstubeConfigSchema` validates the main intent config."
+            prefix: ""
+            suffix: " It covers document type"
+          claimClass: api-shape
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_bx1vrqeb9eetyr15dc93
+      kind: block
+      blockType: paragraph
+      contentHash: 2bc21eec4eff2f577c8de33bf2b807dea00d86be17126d4177da68a270bfb1cc
+      variants: []
+      claims:
+        - id: cl_kgkj2e2jj64a7kp9dwfk
+          kind: claim
+          text: iaSchema validates the information architecture and requires a non-empty tree.
+          anchor:
+            quote: "`iaSchema` validates the information architecture. It requires a non-empty tree."
+            prefix: |+
+              configured plugins, coverage, output directory, telemetry, and reserved screenshot config.
+
+            suffix: " `iaNodeSchema` validates"
+          claimClass: api-shape
+          guarantee: proven
+        - id: cl_5z6jmys0qnrrpkjkf7fd
+          kind: claim
+          text: iaNodeSchema validates each node title and slug and supports optional brief, depth budget, page id, and children fields.
+          anchor:
+            quote: "`iaNodeSchema` validates each node title and slug, and supports an optional brief, depth budget, page id, and children."
+            prefix: "It requires a non-empty tree. "
+            suffix: " Nodes with a brief"
+          claimClass: api-shape
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+    - id: bl_kcjag538vbwq8h8pc2gj
+      kind: block
+      blockType: paragraph
+      contentHash: 41cdf94bd4edd33a3c7651f3fa5c11129a75eeff6d3c090b95567287f7d60d84
+      variants: []
+      claims:
+        - id: cl_nakg882bk87peq8gfp37
+          kind: claim
+          text: glossarySchema validates terminology data.
+          anchor:
+            quote: "`glossarySchema` validates terminology data."
+            prefix: |+
+              Nodes with a brief are page targets; nodes without a brief are grouping nodes.
+
+            suffix: " `glossaryTermSchema` requires"
+          claimClass: api-shape
+          guarantee: proven
+        - id: cl_fkry3dnt9b6n1a9jje2h
+          kind: claim
+          text: glossaryTermSchema requires a term and definition, and defaults aliases and avoid-list entries to empty arrays.
+          anchor:
+            quote: "`glossaryTermSchema` requires a term and definition, and defaults aliases and avoid-list entries to empty arrays."
+            prefix: "`glossarySchema` validates terminology data. "
+            suffix: |-
+              
+
+              ## Agents
+          claimClass: api-shape
+          guarantee: proven
+      guarantee: scored
+      provenance:
+        sources: []
+        seedContext: []
+        observedReads: []
+        verifications: []
+  sections:
+    - id: sc_dnp31hmk4ndjtab62j6k
+      kind: section
+      title: Agents
+      level: 2
+      anchor: agents
+      blocks:
+        - id: bl_ns4r8bgvc1dqw0hnhqs8
+          kind: block
+          blockType: paragraph
+          contentHash: 3a7110f2a8a3632502b0f48b7f122a45414495fd3f53adde6de58ca582c21e0e
+          variants: []
+          claims:
+            - id: cl_wb23jq8g2nnr3wqd9zsx
+              kind: claim
+              text: agentsConfigSchema validates the agent block.
+              anchor:
+                quote: "`agentsConfigSchema` validates the agent block."
+                prefix: |+
+                  ## Agents
+
+                suffix: " `transportIdSchema` accepts"
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_dhcwv118j29s0gbr2x1v
+              kind: claim
+              text: transportIdSchema accepts claude-cli, codex-cli, google, anthropic-api, openai-compatible, and replay.
+              anchor:
+                quote: "`transportIdSchema` accepts `claude-cli`, `codex-cli`, `google`, `anthropic-api`, `openai-compatible`, and `replay`."
+                prefix: "`agentsConfigSchema` validates the agent block. "
+                suffix: |-
+                  
+
+                  `createTransportFromConfig` maps
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_sqgw1rhmnse0nnwy5tac
+          kind: block
+          blockType: paragraph
+          contentHash: 0238b048ab50570bb3c9602037d441d89e685268cb5c37ca3fc7844f62c5ca2e
+          variants: []
+          claims:
+            - id: cl_1a2391j6kn801ys2pkzz
+              kind: claim
+              text: createTransportFromConfig maps the validated agent config to the runtime transport.
+              anchor:
+                quote: "`createTransportFromConfig` maps the validated agent config to the runtime transport."
+                prefix: |+
+                  `transportIdSchema` accepts `claude-cli`, `codex-cli`, `google`, `anthropic-api`, `openai-compatible`, and `replay`.
+
+                suffix: " It supplies default models"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_cemnt4gff4bvsq5b07g4
+              kind: claim
+              text: createTransportFromConfig supplies default models for claude-cli, anthropic-api, and replay.
+              anchor:
+                quote: It supplies default models for `claude-cli`, `anthropic-api`, and `replay`
+                prefix: "`createTransportFromConfig` maps the validated agent config to the runtime transport. "
+                suffix: ; if another transport has no configured model
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_zmdj67f9h0ndkc7p1j3z
+              kind: claim
+              text: createTransportFromConfig raises a config error if a non-defaulted transport has no configured model.
+              anchor:
+                quote: if another transport has no configured model, it raises a config error.
+                prefix: "It supplies default models for `claude-cli`, `anthropic-api`, and `replay`; "
+                suffix: |-
+                  
+
+                  For API transports
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_6yjv8jeeng21b6tmg5d6
+          kind: block
+          blockType: paragraph
+          contentHash: bb69dbc6d32d79b3de50b0f7c1a40de1a5c3fce51b19744364e9f0c7c54eb057
+          variants: []
+          claims:
+            - id: cl_etvfk7xv5pd72db58qxf
+              kind: claim
+              text: agentsConfigSchema validates credential references as environment-variable names.
+              anchor:
+                quote: "`agentsConfigSchema` validates the credential reference as an environment-variable name."
+                prefix: "configured credential environment-variable names and base URLs to the Anthropic or OpenAI-compatible transport constructors. "
+                suffix: |-
+                  
+
+                  `agentsConfigSchema` also accepts
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_edg6y6n0hbv1hexcrgy3
+          kind: block
+          blockType: paragraph
+          contentHash: c238abfb44bea318796c400c184b5b6ad578087f3aafa12f5f7bdaf72b97672c
+          variants: []
+          claims:
+            - id: cl_dj95zrk2tvvmxnndmtj0
+              kind: claim
+              text: agentsConfigSchema accepts writer, reviewer, and translator role overrides.
+              anchor:
+                quote: "`agentsConfigSchema` also accepts writer, reviewer, and translator role overrides."
+                prefix: ""
+                suffix: " The current task-runner construction"
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_aqvwvbf8p08phe9jp6r0
+              kind: claim
+              text: createTransportFromConfig reads the top-level agent transport and model.
+              anchor:
+                quote: "`createTransportFromConfig`, which reads the top-level agent transport and model."
+                prefix: "The current task-runner construction uses "
+                suffix: |-
+                  
+
+                  Agent budgets live
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_hnpdxjnna3ey79712yg1
+          kind: block
+          blockType: paragraph
+          contentHash: 221552fd68a05b86788602d754e03a43d7272fd7582be379c5b49a8021c27053
+          variants: []
+          claims:
+            - id: cl_h260zx6b010zbyt09j2s
+              kind: claim
+              text: createRunCostTracker receives the optional run-cost cap from generate and maintain flows.
+              anchor:
+                quote: The optional run-cost cap is read by generate and maintain flows and passed to `createRunCostTracker`.
+                prefix: "Turn and tool-call budgets default to positive integer limits. "
+                suffix: |-
+                  
+
+                  `FREEZE_MARGIN_RATIO`
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_m1dwm5vc8sn6rb6060jm
+          kind: block
+          blockType: paragraph
+          contentHash: 7f21b7326584e0d7926b1275e7579a7ce577b09f0d6d1661ef64c81f0eb9d1a0
+          variants: []
+          claims:
+            - id: cl_z8hmtm4ef1c0crka6j2p
+              kind: claim
+              text: FREEZE_MARGIN_RATIO is 0.85.
+              anchor:
+                quote: "`FREEZE_MARGIN_RATIO` is `0.85`."
+                prefix: ""
+                suffix: " `createRunCostTracker` reports"
+              claimClass: factual
+              guarantee: proven
+            - id: cl_gjmbv3gg4hdeha3mm4hv
+              kind: claim
+              text: createRunCostTracker reports shouldFreeze() when reported spend reaches the configured cap multiplied by FREEZE_MARGIN_RATIO.
+              anchor:
+                quote: "`createRunCostTracker` reports `shouldFreeze()` when reported spend reaches the configured cap multiplied by that margin."
+                prefix: "`FREEZE_MARGIN_RATIO` is `0.85`. "
+                suffix: " In generation, the freeze check"
+              claimClass: behavioral
+              guarantee: proven
+            - id: cl_8p5pd2x6xe8vf70ftnb0
+              kind: claim
+              text: createRunCostTracker shouldFreeze() stays false when no cap is configured.
+              anchor:
+                quote: Without a cap, `shouldFreeze()` stays false.
+                prefix: "In generation, the freeze check happens between pages and before translations, not mid-page. "
+                suffix: |-
+                  
+
+                  ## IA Depth
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_st7cp5ykk23z6r600zqk
+      kind: section
+      title: IA Depth
+      level: 2
+      anchor: ia-depth
+      blocks:
+        - id: bl_ykam4mr6kcfbpbr02tek
+          kind: block
+          blockType: paragraph
+          contentHash: 68f8f8d852e741c3fb507f24bfddebfaded40663e39c729866431d4794df928c
+          variants: []
+          claims:
+            - id: cl_v1y6pwwaa10n2avp1wa0
+              kind: claim
+              text: depthBudgetSchema accepts overview, standard, and deep.
+              anchor:
+                quote: "`depthBudgetSchema` accepts `overview`, `standard`, and `deep`."
+                prefix: |+
+                  ## IA Depth
+
+                suffix: |-
+                  
+
+                  `iaNodeSchema` validates
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_4bv8zaqt6nxq4gm462x1
+          kind: block
+          blockType: paragraph
+          contentHash: 9714108cd13bbb2db059027c14fa356b88e8c55e2b9f738cd8b5723c1da5ac75
+          variants: []
+          claims:
+            - id: cl_bsd9jpkxbh3wx1a9999r
+              kind: claim
+              text: iaNodeSchema validates slugs with a lowercase path-safe pattern made from ASCII letters, digits, and single hyphen-separated segments.
+              anchor:
+                quote: "`iaNodeSchema` validates slugs with a lowercase path-safe pattern made from ASCII letters, digits, and single hyphen-separated segments."
+                prefix: |+
+                  `depthBudgetSchema` accepts `overview`, `standard`, and `deep`.
+
+                suffix: " `iaSchema` also accepts"
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_bvwtsw55326cb8z7b671
+              kind: claim
+              text: iaSchema accepts an optional positive integer page-count target.
+              anchor:
+                quote: "`iaSchema` also accepts an optional positive integer page-count target."
+                prefix: "`iaNodeSchema` validates slugs with a lowercase path-safe pattern made from ASCII letters, digits, and single hyphen-separated segments. "
+                suffix: |-
+                  
+
+                  ## Versions And Locales
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_mgb986kfe76de55wmaag
+      kind: section
+      title: Versions And Locales
+      level: 2
+      anchor: versions-and-locales
+      blocks:
+        - id: bl_2wfx8gd466nmmb6nqzgr
+          kind: block
+          blockType: paragraph
+          contentHash: 91036ed487b941fd7f907d2c432f0afb5eda2eadaea69f39af79423eaf1df8ee
+          variants: []
+          claims:
+            - id: cl_xhfdhzcfdm0s252f563x
+              kind: claim
+              text: versionsConfigSchema defaults the current version label to latest and the frozen-version list to an empty array.
+              anchor:
+                quote: "`versionsConfigSchema` defaults the current version label to `latest` and the frozen-version list to an empty array."
+                prefix: |+
+                  ## Versions And Locales
+
+                suffix: " `versionLabelSchema` validates"
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_2m4p1m5gcmz378rxmzmy
+              kind: claim
+              text: versionLabelSchema validates version labels as path-safe strings that start with an ASCII letter or digit.
+              anchor:
+                quote: "`versionLabelSchema` validates version labels as path-safe strings that start with an ASCII letter or digit."
+                prefix: "`versionsConfigSchema` defaults the current version label to `latest` and the frozen-version list to an empty array. "
+                suffix: |-
+                  
+
+                  `localesConfigSchema`
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_9qm764c4rb6c9s0z3ph1
+          kind: block
+          blockType: paragraph
+          contentHash: 6412799161359a093b033d14e4b87f081116fbd7fbde47713d71c6f83f40a0e5
+          variants: []
+          claims:
+            - id: cl_fghqym8m5qfm2mw367cs
+              kind: claim
+              text: localesConfigSchema defaults the source locale to en and target locales to an empty array.
+              anchor:
+                quote: "`localesConfigSchema` defaults the source locale to `en` and target locales to an empty array."
+                prefix: ""
+                suffix: " `localeCodeSchema` accepts"
+              claimClass: api-shape
+              guarantee: proven
+            - id: cl_vj6npq7pehcwb8d4zeyh
+              kind: claim
+              text: localeCodeSchema accepts locale codes such as en and pt-BR.
+              anchor:
+                quote: "`localeCodeSchema` accepts locale codes such as `en` and `pt-BR`."
+                prefix: "`localesConfigSchema` defaults the source locale to `en` and target locales to an empty array. "
+                suffix: |-
+                  
+
+                  ## Components
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_r7assy80a11r4a4cpf6p
+      kind: section
+      title: Components
+      level: 2
+      anchor: components
+      blocks:
+        - id: bl_njashy8v6xjf2njh2jgz
+          kind: block
+          blockType: paragraph
+          contentHash: a9245516e598e7664e51e1bc81d4bf42dde601191d969621c458539aca8a6a84
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_5m0tpbe4dwf772x1za0q
+          kind: block
+          blockType: paragraph
+          contentHash: c8e612be8cdc7f1c3a48ef6049d5a876116080db4b16910393cb44d3cb974b7c
+          variants: []
+          claims:
+            - id: cl_4sejtkn19gq8s5brgx4s
+              kind: claim
+              text: registryComponents exposes Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, and ComparisonTable.
+              anchor:
+                quote: "`registryComponents` exposes the local UI component choices: `Callout`, `CodeBlock`, `CodeGroup`, `Terminal`, `Card`, `CardGrid`, `Steps`, `Tabs`, `FileTree`, `Badge`, `ParamTable`, and `ComparisonTable`."
+                prefix: |+
+                  Its schema comment describes the list as enabled MDX components that must exist in the block-type registry.
+
+                suffix: |-
+                  
+
+                  `builtinComponents` defines
+              claimClass: api-shape
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_1hedrag75fznafsgf6ch
+          kind: block
+          blockType: paragraph
+          contentHash: dcb34757f3bbe7f1bdb93fceb66fefaaf517d8296241acd6808bc0f9ebe0b63a
+          variants: []
+          claims:
+            - id: cl_0nsft6wch465vfywggce
+              kind: claim
+              text: builtinComponentNames derives the built-in names from builtinComponents definitions.
+              anchor:
+                quote: "`builtinComponentNames` derives the built-in names from those definitions."
+                prefix: "`builtinComponents` defines the built-in registry component metadata and prop schemas, and "
+                suffix: |-
+                  
+
+                  ## Plugins
+              claimClass: behavioral
+              guarantee: proven
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_qjzcqmb1n86yea7wvs2q
+      kind: section
+      title: Plugins
+      level: 2
+      anchor: plugins
+      blocks:
+        - id: bl_fx2x9eb0g90f4acwkt7f
+          kind: block
+          blockType: paragraph
+          contentHash: e9522d7d616d49fc1a2cd8904bdd3c228697b04a008bafa94eca1b80b09a4129
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_vsgmx5wdz4grtxqc9tj1
+          kind: block
+          blockType: paragraph
+          contentHash: 528bf530ece9093616b2ca9a469ececdfc3b9d965b66b6ae98bb771fe9423d1e
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_djep42db246gcz0a19gk
+          kind: block
+          blockType: paragraph
+          contentHash: 418082600f5a84e1b54df6498937f7cae2fd6081d060900d96a34d4f3b3e4971
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+    - id: sc_9z6nt8jzp35d2bsbs3hk
+      kind: section
+      title: Programmatic Edits
+      level: 2
+      anchor: programmatic-edits
+      blocks:
+        - id: bl_54mm3t4mpf6jw8nrtk08
+          kind: block
+          blockType: paragraph
+          contentHash: 0b2f89843dde7af6e9d79758554f21fa51de68f5b8c93c715f12615dbf3f14e0
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_5b6eytwmmk8z9xfjbkwj
+          kind: block
+          blockType: paragraph
+          contentHash: 80d565276c6dab2b7eba71d097671f6e520980311930eb4c1e69bc2b92ab1c37
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_bm5wg0dtt2t27pbdm48s
+          kind: block
+          blockType: paragraph
+          contentHash: b00f9c3609b8fc67b8526c92ccd09facb51a5864d4de1040c07437ca1daacf0e
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+      guarantee: scored
+  guarantee: scored
+  provenance:
+    sources:
+      - symbol: ts:2ca5d560f29b28d3e9b259af514d21cb5df4f3d8c1837e096b9870f267785797
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 14
+          - 27
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fb9519405fa4b102b14cfbd63b4e1fb477bc6f10e87f7dfe1b895177d3e37426
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 28
+          - 28
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:52644e1686c5e73c7bed0c60ad491098ba376a78df6f74231e9ce5191db66143
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 31
+          - 44
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5bdd918442fdc671f832316e60856b86071d9ef49837eb62a6c63845653b88a0
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 46
+          - 46
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:457f7efdafab9713ef5532110de72a8734554cc2c566caaf303d7794c389c2d9
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 47
+          - 47
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3d7cea7a7a97669014d6540ed2af6386e84618416b534725ccfc15a4f9f34626
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 48
+          - 48
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4a6c4180aab4d8c82fa30ff4479936390929e851c4bb5d7a3b3a4e39467fa576
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 50
+          - 50
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3526deaab94fd007a8ddd9214dba49d97d7a79d8e8dcf91d0d254665b7e38b77
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 51
+          - 51
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:19922e0bf008f55d0afac5753142d8dd0cdcee36982798abc73a22bdf89cf19e
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 55
+          - 63
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f5da6ba86b46255345ebbc9a76379c0beaed3acbdc681b69b341f7bc6a07a732
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 66
+          - 69
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9084612508569ba6cbb7e4eca448e8019e58fc6515fee7d8792838162c1f1bb1
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 71
+          - 77
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:813099b5e5ff1e7e69a3e1dfd0864aed4a78fc9165f6f19364997969222d71a5
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 79
+          - 88
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ac55b0f415bace1552444215091c16beec71e3408c21974d4570ebc7f42cb974
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 90
+          - 98
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:be432939811bd95c696fc9218b48464b780fb4027e896633f610b49e9c475b5d
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 100
+          - 111
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:bd12851fc64b78ea2ab4f97e88edd30ea7a1fffcc9446f43bd4195a97e70c8f1
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 113
+          - 114
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5c2a198337b9ddd6cb21856c68374e4132b21a3c6674b03257ed291f4ce0c1d0
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 116
+          - 126
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:25a956f5a7053b42a9d574896b5cc198e7b599bb1df9234af63d4fc1cd35be70
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 173
+          - 210
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3ecdc18a99015af6b3234fb65bb6baeab39d409df5161dc2142fc4c783459b3c
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 212
+          - 212
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1c7ad19905a17d0b8c89bddeb972567681a5cf6f87a4f8ceb5f4bc8699ca03a8
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 214
+          - 225
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:964f4ee8007a9a282ce3446e63e6c409b7a4b44f38521ea660f534a286b67b7f
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 226
+          - 226
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:218ab3e1c879a413217c848f9aeb2f95712c38cfac945747350418dea845169e
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 228
+          - 239
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:17f3d5e025babe6f87eff4b325c6a009c839f30fbfa6df271eb7ac16cae96f5a
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 241
+          - 270
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:88fec9c1c1fc6bd6c81909765db02b4ccbddfd9674d9140c2bfec919bcaf7a15
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 274
+          - 302
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6e9a8664e7fc42e83edf77b3559209806ba8d5f121a104699b4c81e5cec5c7d3
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 304
+          - 307
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3baae786760b0899b165dfb554e997a81501fae6002fd2a4d111e051fb684070
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 309
+          - 328
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d949c67e904134ae861fc7b342264bbd6d79fd682daab4a53fd15a351acc3830
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 337
+          - 353
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5dcab8ae9b7e4e933408a128476b20291cf2bee647289e50d8af5b5ebcf854c6
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 358
+          - 359
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1e38ef788c4e3aa4577da2494ee642e903bae5ebb96d802b93ba9353fdd3c32c
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 361
+          - 365
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c17ad1b8482087f7735c998f28c613ce3aa56cc83980ec83876732eddf0f8abb
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 367
+          - 367
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:da245e5c497f325086dafc1d4e50c76a869e4c2a5018ed1106f23226ec44720c
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 371
+          - 398
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9f78dd7cb251e91f1bb37cee9e1df494d9e4f5265d507bfdf6e6693f512ec5e4
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 423
+          - 481
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9d70cc2fcbd4796d422539a9cf0db74c4509e9675d71933c4d83c08847cd2ae3
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 483
+          - 484
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e7f560d7b89a071a6683ff5134c7b2bf656476e3720374e7198073b31f836e2e
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 531
+          - 595
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:112273393da502b1634d12d72d40ed4256a5cf3342d7c0877f4fda3e2dacf41c
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 8
+          - 8
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:8da3371ab18820c65a21216b574e04441b17b993b1d5c0941dbc2468d0105d80
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 9
+          - 9
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:129eaca3ddc917aa1a595bed043eb307e0fcfb75fec786330edb82f80c56dd65
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 11
+          - 14
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a4109f5654bec1cc00c8afe2c514428332390774e4f266db6da8f939c71619e2
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 15
+          - 15
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:0787732c1433259457e8893a2f859676875cf19765dea597b0355daf1f22e4f2
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 17
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:61a84b0a6cdfd76e9834af64a1f4fcfc9d51a69db46529bd58a52f970dec0e3c
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 19
+          - 25
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:20815b225c45c882c011959124dc4699ec284e81087a55409425695c1c0b6a32
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 27
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f03aea589822bca4cc82f58c9c5b312c656b6c7efb927ec51dd57083cc4cc722
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 35
+          - 35
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e8b5ba42860e13fa94c2413b3576937fad1d1e7725d20344aba0377edf2abb22
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 37
+          - 40
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e24682a7ce319d2c297f73f51c1e05b320db0b706b6f52a94b48286d37ed17a3
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 42
+          - 68
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:347c83c15d221c429cddb03e4a6eeacc301ce890e4c81c5f2263f721ae292b12
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 70
+          - 73
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:4ac6a04a105111630037d1099cf641fffffcd2308c192d9683471c056497f45e
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 75
+          - 78
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1cbc6c1d38bb7f2951ef44d8950821291039e36df25c60ac9d6e1cbdff584802
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 80
+          - 85
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b52027feb4fecff6e0e4226e2e82dfb98771a4ae5e7696bde14fce382d88bda0
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 87
+          - 93
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7dafa2aceed1ab2323f5f94fd7a194c5b9691392e4dbdd30fe40bd4f630afe56
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 97
+          - 113
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:08d250a5993078dea1c9326302ed4f905529c4aee96ca4569695dc9573d6086c
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 115
+          - 141
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3bfb68a6ec7e6659a7e62c8c7a81d007d5124451d453f724bc023afbc06a39bd
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 142
+          - 142
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1646d59477db130ea09a0cd1166278636902c13137be14fbb133d4af50163630
+        file: packages/contracts/src/config-schema.ts
+        span:
+          - 143
+          - 143
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3add184245251198c87d596020a67bd30174998396eae5d126e34d3eb6406b38
+        file: packages/contracts/src/fixtures.ts
+        span:
+          - 14
+          - 85
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1d6b3de0226d3beac2b5d2ab75807100413e19d74bb04cf3a1df97ff8592d7d1
+        file: packages/contracts/src/fixtures.ts
+        span:
+          - 87
+          - 95
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a64b0db4250f9b615a09f7c383d4bb37ec8eafa4102d2284b51d3c5e7ac4ba5d
+        file: packages/contracts/src/fixtures.ts
+        span:
+          - 97
+          - 102
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:80ce187bcfea6802e11047fb36b3a825b87285024070ad73f306edd4dcd59c80
+        file: packages/contracts/src/glossary-schema.ts
+        span:
+          - 5
+          - 11
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:23b2a18d8c20f8126ccda08eeedd5b205153ee72c70b2107dd7795aaea146756
+        file: packages/contracts/src/glossary-schema.ts
+        span:
+          - 12
+          - 12
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3fa98ac1832ac57e02702afba8bd64d941dc8b9b6bdb1c01f3a5ad90663e095d
+        file: packages/contracts/src/glossary-schema.ts
+        span:
+          - 14
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:10cf67e790a45095d24c8280cb156db0c8e5146a7c30f66105bb322127392695
+        file: packages/contracts/src/glossary-schema.ts
+        span:
+          - 18
+          - 18
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:734aed875f9aaed77c738bbf188ab301ec4dcfbc755103f27dbc4a8f0fe239fc
+        file: packages/contracts/src/ia-schema.ts
+        span:
+          - 9
+          - 9
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:f2ab20afdccca5b4f1c0362f2018f0cffdc4d1fcc04ab9f7ad78b681ee5e758c
+        file: packages/contracts/src/ia-schema.ts
+        span:
+          - 11
+          - 21
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fbbc7f34cd01f40d4aef4898ac4304ba91d4bb2adbdc8b39ab288f39680f6bef
+        file: packages/contracts/src/ia-schema.ts
+        span:
+          - 23
+          - 30
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:78f2e9b42450b0a276862981cd03a66f5ff8bf302f317e646eb2529aadf60c55
+        file: packages/contracts/src/ia-schema.ts
+        span:
+          - 32
+          - 38
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:38bd55bd3615891b6d5f97cc43fe40fe9774ea2b5e626ad9cf4e0f986f3a76f0
+        file: packages/contracts/src/ia-schema.ts
+        span:
+          - 39
+          - 39
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b2ab93964897561b95827fd85cacad3b481f9e5f3114d4f7a5c819925b770556
+        file: packages/contracts/src/ia-schema.ts
+        span:
+          - 41
+          - 53
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:04d9ebbdc8b1c03b4938f95e172d0f58ac359fe1efba07e8d8be1e8db0991998
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 8
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:84e2dde3d814e657e8b2910353056e88305d064939959b67e663dc5e3c8398a5
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 19
+          - 19
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:94b4af2912b0cccb9f219b2460f9df6a9e0081bdc359e25a316505bce3689c3f
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 21
+          - 29
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:3824cc0e67a0cfaede44fdcafa9016383dffdb0276112b6ff189075af2805c79
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 31
+          - 31
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ff7f036faf76d013ea351872b21f833f9ca8ed202507a4d67e725e23d6427bb0
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 33
+          - 33
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1c07ed973cb49e07c7f5f85b833c6605ead5244b0704fb212fa38aa4fdeb32d5
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 34
+          - 34
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b165027691253a127eee5975795735dda1f309f758873b5dcbbf85a49fe6faeb
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 35
+          - 35
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d8467953008b08b83df6d47a0603064687ee8b57d7ab700901cfbba7e6664482
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 36
+          - 36
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2ce851023e57d98268713e493fbe0cca18a854fcc32bd21fc55e869c8f2a0b56
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 37
+          - 37
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6d7474bb76a90cd382ed053fdd23cafadae34cbbb05ac2023cd267e10ce1149b
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 38
+          - 38
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:135823070c66d9988346daaf636b7f8019b5908fbd72526a4b8a864c551be83d
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 39
+          - 39
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:80b6a9bb7242f387352416667825b7589d36928c65eed271b525047810306dbc
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 41
+          - 43
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5079c604cceff82db17cec90e97500020cad2391d6f7a4a3b4d05b10634f4409
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 45
+          - 45
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:865e26bca61b7b1bd8bea5570b093f6186c005a434f47b1ef825e8aa265459df
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 48
+          - 50
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:55a38296c8df00ecb39d9c2124a5bd2e9d87fe04ee46c2727b2bc2f06ecf40e8
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 53
+          - 53
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:ac0de6a034ee93e8e83d55e5db5d4296aef1f6f43743796373a0d926d142d4e7
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 56
+          - 61
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5898f403ff7b434132c3147b9fec7280a9734c8e960dc3b438992e0ccba7a639
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 63
+          - 63
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:92abbf2c3fe92c6539b30156fa0ca9fa5eed5f0a120018ed34e60ee9b8ab2408
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 66
+          - 66
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7359e7042cc87ad831467be9255455854f0cc3ab74921ae0350cf2e0d1aeb5b1
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 68
+          - 68
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:45d5a7d03d18ecc2566a9e2c99422a12f7dde6649e075a879517d2dc419c4f12
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 69
+          - 69
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:407eb74ee5fc624252f9cb4d7f6504aeb409ed1640e5db0fa3320c7cbbeee2d2
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 72
+          - 74
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:c58fecc4a9c807e44beea692337cffd08ce517f83d18afdbfbbf1e5eeb9c88f2
+        file: packages/contracts/src/primitives.ts
+        span:
+          - 75
+          - 75
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:75cafe59403f1723afbf6bae5dadccc4f7cba46cbcda59d4aa96322bee1630b5
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 14
+          - 18
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5185b9a3331aa4121f3664fde354bee48a9bfd1fac4c254a2220d35eaf8a9eac
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 35
+          - 36
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b0e8519f762137acee3f369a2b9b56893a788472e012d44ce8d84803e97f5c0d
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 38
+          - 38
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:fbcd2d8f892b7a3d0d470475ff7aeab8d94f3c71dfa7c4dc4a0e3d7f29a4e81b
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 40
+          - 40
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:61950d146434b0649cc1c71493649325322e878bcb1170c06acb24a73eaced2d
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 53
+          - 58
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a267645cb75cf9071766a0c71286454c0636eec52a318ac0aa3dbce367137235
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 60
+          - 84
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:2268ac80a87fe584cf2f493e4aa0370d0aa9fc9c167e9ea3347d9bf4c6d5d164
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 88
+          - 92
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:b293a3209563c9015cae61d92f3e289083401d6053b518dc58d0b79e56a147af
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 94
+          - 94
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:dd51b942c5bcddb5127e3861db5e4531263be67b7619b3a16f5c054d006f7a71
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 96
+          - 99
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:8fdbf69c0137631449080626c378fcade2a3b0e2b320c99571b98b6c6ddb89a5
+        file: packages/core/src/config/config-io.ts
+        span:
+          - 101
+          - 109
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:630495e742ee4c7e473fc16a86ada0a6659a82f27e955f4f69a27c1dc38bd218
+        file: packages/core/src/config/write-config.ts
+        span:
+          - 16
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:71db1750f1787b783d78abb16ca6fd4101d47b15fa7c513aa9483c0be45d6a97
+        file: packages/core/src/config/write-config.ts
+        span:
+          - 32
+          - 55
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:92bf898f1e69fb26df94345d0fbf2a146f04f2cb780273046ce4b99f73413473
+        file: packages/core/src/config/write-config.ts
+        span:
+          - 61
+          - 83
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9810917e0ef6c91ff66dae127f061b1581dec5be213f34b315077ce52ae5d99b
+        file: packages/core/src/config/write-config.ts
+        span:
+          - 85
+          - 90
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:6a46d1b823b49eff9fce33930616c502761e4007854f2f7a84a2a3d464f82f2e
+        file: packages/core/src/config/write-config.ts
+        span:
+          - 92
+          - 92
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:45753e7adc98652b612637e4170fb7be3e3c0bb1992dc88e6c1e9c6c54bdb95f
+        file: packages/core/src/config/write-config.ts
+        span:
+          - 115
+          - 147
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:01d349acf6a11f11ae6bc0525e859f149001df35f15f9d904bd47472ddfdbccc
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 35
+          - 41
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:cc6f516e1c332941a51160c97d8ebb10ede33b3f7daa8b9be1a1429c877da466
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 43
+          - 52
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:873962b7223a7264bcd27a2765eb06ed2634be609be7899dd4bc347529fc747f
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 54
+          - 61
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1cbfbf4077e6c4ccb85a491b068a2d1b78000377c0f97948e6609686e855ae37
+        file: packages/core/src/pipeline/generate.ts
+        span:
+          - 65
+          - 248
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5fcaf070674b83a5537a8d0323643f954b2b0e6a4d0361b30f580ac5237d4b00
+        file: packages/core/src/pipeline/maintain.ts
+        span:
+          - 39
+          - 45
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a2c0791c878a4a6d3ccf156368b90a87d2196552f5fd96c66c6b7dedb7d90acf
+        file: packages/core/src/pipeline/maintain.ts
+        span:
+          - 47
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7076a75201c342adb66268a22ac07e8f2666807d020e18d353f14833d40ead74
+        file: packages/core/src/pipeline/maintain.ts
+        span:
+          - 138
+          - 402
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:1ef58df558ecbf23c7eacaffde5a8e810e13f68b400dc3815bafda14e15039a2
+        file: packages/core/src/pipeline/run-cost.ts
+        span:
+          - 7
+          - 7
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:e7c88a6a7d2e16694b4a7a9c41cd1bf5fbd102ff3a56565650e6e8f4471dbeb4
+        file: packages/core/src/pipeline/run-cost.ts
+        span:
+          - 9
+          - 16
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a4797f9cd0c859c5e46193f23bbbb9d7c7dd2effe8c74d2833b9c35462dcc7d8
+        file: packages/core/src/pipeline/run-cost.ts
+        span:
+          - 18
+          - 32
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:389df73b9b51ae289f0fbebb99c3cdcfa49b37cd1253b26b34c4c9c3c67bb7c0
+        file: packages/core/src/pipeline/run-cost.ts
+        span:
+          - 34
+          - 35
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:9aa9c31b7c234a45d5e2d515afd96cfde93a69615c83e60d74cd640ba4c60330
+        file: packages/core/src/pipeline/task-runner.ts
+        span:
+          - 40
+          - 77
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:d326ee0e23a46796200ce3b640079ae4e8b13da87681704f986ead1ffc22c7fa
+        file: packages/core/src/pipeline/task-runner.ts
+        span:
+          - 79
+          - 84
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:edca73ec7ca1f982b5f261f47a248d11a265b4a7d22a17230d314823287077ff
+        file: packages/core/src/pipeline/task-runner.ts
+        span:
+          - 86
+          - 99
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:343ffe3bab2943dfa51b43044b288f0e7972ef2e45d0f689f97f12b0f5fe8fb2
+        file: packages/core/src/plugins/load-plugins.ts
+        span:
+          - 12
+          - 21
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7712a6e96c7eeeaf09da2be7715d5190607ce66373c1baaa6c99d489473898ac
+        file: packages/core/src/plugins/load-plugins.ts
+        span:
+          - 35
+          - 57
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:a78e98c6a0d3f920f5a0e427193e76c6445610cc67a282f4af8e20fcd2ccd758
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 6
+          - 6
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:cedd0db013eec5416df2110146c7ef6cc8bffdd8d4c42b62cf59533d7699af43
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 8
+          - 12
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5e8da5323fa130a2d92b12b84e0afaad95aa753aff0d2f469435dcaeb7035a6b
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 14
+          - 17
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:5fad0fd3b16533e53433a61c871c063975cf88147fa9c8b7b4c28b40be64f812
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 21
+          - 28
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:7502657e5532c57acdd8686ebbc83084830c50c761ec84c31758926e1f059630
+        file: packages/plugin-sdk/src/define-plugin.ts
+        span:
+          - 30
+          - 31
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:aeadf8adb20c14930ddfba200bc9343204e797f9400e0604a5e653a003ec0320
+        file: packages/theme/src/components.ts
+        span:
+          - 16
+          - 154
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+      - symbol: ts:72e69b60ee60f818d2aae221df1a422cdf514d269c99e9820952d103bdaeecc4
+        file: packages/theme/src/components.ts
+        span:
+          - 156
+          - 156
+        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+    seedContext:
+      - ctx:codemap:eb5314ed39433347d28bd10bcd0bd60d663bcc9e59a613a87e9d27c4e0e73a86
+      - ctx:brief:28ed09691edc1c493c00d0a9e97c6e461725f0cce8350db5cddf43540fc0be3d
+    observedReads:
+      - file: packages/contracts/src/config-schema.ts
+        contentHash: 4e9a3313266870085f80cf8474bdd20212798e8a4f006c54354515c228336495
+      - file: packages/contracts/src/ia-schema.ts
+        contentHash: 5cea5d251d77748f63fc8145a8901443dcc07ccda2dff72a9c6db7c846aa1750
+      - file: packages/contracts/src/glossary-schema.ts
+        contentHash: f89e07e63f3e3287de3092b1477d7c0c77936074b172927c1865d00d75c03dc0
+      - file: packages/core/src/config/config-io.ts
+        contentHash: e83c92c4b6af97297cb7ccb8ed76b44f5d85462935bbf151201b8c7ee0c995c1
+      - file: packages/core/src/config/write-config.ts
+        contentHash: acbc7a5e7af7d5c14e68005b975044af5e875b11ef95fce82fad0ff8691c986e
+      - file: packages/core/src/pipeline/task-runner.ts
+        contentHash: b2ca8f431228a554b8075452f8c487d6096abc81ca5cc9b5cdefb3a4eabf77c9
+      - file: packages/core/src/pipeline/run-cost.ts
+        contentHash: d9a55ae70dfb7f3147c44bddb0e4cdc379d76254d1ae894abe9441d2a4863521
+      - file: packages/core/src/pipeline/generate.ts
+        contentHash: 77c76eb302107e1eec449f9e83ab525800e7fe71029db9a6349c09e7339bf6a7
+      - file: packages/core/src/pipeline/maintain.ts
+        contentHash: 14711fbe7db276d95fb976c762168aadd8b667721a464a2488b6d8839725ce24
+      - file: packages/contracts/src/config-schema.spec.ts
+        contentHash: c59f52730b141c788af1d057b6bebbf6c6859c04bc6d4b8093ac60fb4177a596
+      - file: docs-site/content/en/configuration.mdx
+        contentHash: b4beaac59cf553325c9b3afa8ab259cdfaf36485608bcb129262f53e8c399675
+      - file: apps/local-ui/src/wizard-state.ts
+        contentHash: ff59d6aea356a08bee34bdb240681084a8ca716981dc865036ae9b182f158a51
+      - file: packages/theme/src/components.ts
+        contentHash: ed2719216833feb9f5f82566aa0c95dbf3dd3b04f3f40ca14603a97b16d62b89
+      - file: packages/contracts/src/fixtures.ts
+        contentHash: a3c2984651ba76e3d332ff0acbbad8e53168889c649f01f1da0b2224297d4134
+      - file: packages/core/src/plugins/load-plugins.ts
+        contentHash: 82595bca64283379a5ee1c14b124e7039c12cbfd8f71b06e8c7ef193b2384f6c
+      - file: packages/plugin-sdk/src/define-plugin.ts
+        contentHash: c3a834b063290ab7b07493e760d774e0d0dca9c4a817356a7ed1b03f52b0c957
+      - file: packages/contracts/src/primitives.ts
+        contentHash: 8efe766e3c0ba394a1bc299e579ee5c8f42711914797571849d33b617a1da28a
+    verifications: []
+flags: []
