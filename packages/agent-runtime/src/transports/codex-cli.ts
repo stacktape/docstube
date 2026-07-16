@@ -268,8 +268,10 @@ export const createCodexCliTransport = (options: CodexCliTransportOptions = {}):
         if (result.timedOut) {
           throw new TransportError({ transport: 'codex-cli', message: 'codex CLI timed out', retryable: true });
         }
-        const combined = `${result.stdout}\n${result.stderr}`;
-        if (isRateLimitSignal(combined)) {
+        // Only a FAILED process can be rate limited, and only stderr is the CLI's own voice.
+        // Matching against stdout flags any run whose MODEL OUTPUT mentions rate limits
+        // (docstube documenting its own retry code tripped this live).
+        if (result.exitCode !== 0 && isRateLimitSignal(result.stderr)) {
           throw new TransportError({
             transport: 'codex-cli',
             message: 'codex CLI was rate limited',

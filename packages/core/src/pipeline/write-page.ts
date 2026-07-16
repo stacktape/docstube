@@ -51,6 +51,7 @@ export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
     'Hard rules:',
     '- Read the actual source with the provided tools before describing behavior. Base every claim on code you read.',
     '- Output pure MDX: frontmatter (title, description), then content. Exactly one H1. No entity ids, no HTML comments.',
+    '- Frontmatter must be valid YAML: double-quote the title and description values.',
     '- Never write import/export statements and never set a `layout` frontmatter key — the site build provides both.',
     `- ${components}`,
     '- Code examples must be complete and correct — they are compiled and executed.',

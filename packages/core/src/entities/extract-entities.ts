@@ -17,6 +17,25 @@ const mdxProcessor = unified().use(remarkParse).use(remarkMdx).use(remarkGfm).us
 
 export const parseMdx = (mdx: string): Root => mdxProcessor.parse(mdx) as Root;
 
+// Frontmatter is MODEL OUTPUT, so it may be invalid YAML (live-hit: an unquoted description
+// containing ": "). Extraction must never crash on it — fall back to a line-based scan so the
+// page still gets a title, and let the mdx-compile verifier report the syntax error for retry.
+const parseFrontmatterLeniently = (raw: string): Record<string, unknown> => {
+  try {
+    const parsed = parseYaml(raw) as Record<string, unknown> | null;
+    return parsed ?? {};
+  } catch {
+    const lenient: Record<string, unknown> = {};
+    for (const key of ['title', 'description']) {
+      const match = new RegExp(`^${key}:\\s*(.+)\\s*$`, 'm').exec(raw);
+      if (match?.[1] !== undefined) {
+        lenient[key] = match[1].replace(/^['"]|['"]$/g, '');
+      }
+    }
+    return lenient;
+  }
+};
+
 const nodeText = (node: unknown): string => {
   if (node === null || typeof node !== 'object') {
     return '';
@@ -154,11 +173,11 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
 
   for (const node of tree.children) {
     if (node.type === 'yaml') {
-      const frontmatter = parseYaml(node.value) as Record<string, unknown> | null;
-      if (frontmatter && typeof frontmatter.title === 'string') {
+      const frontmatter = parseFrontmatterLeniently(node.value);
+      if (typeof frontmatter.title === 'string') {
         title = frontmatter.title;
       }
-      if (frontmatter && typeof frontmatter.description === 'string') {
+      if (typeof frontmatter.description === 'string') {
         description = frontmatter.description;
       }
       continue;

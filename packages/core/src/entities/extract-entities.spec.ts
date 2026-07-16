@@ -59,6 +59,22 @@ describe('extractPageEntity', () => {
     expect(page.sections.map((section) => section.anchor)).toEqual(['usage', 'usage-2']);
   });
 
+  it('survives invalid frontmatter YAML and still recovers title/description leniently', () => {
+    // Live regression: an unquoted description containing ": " is invalid YAML; extraction must
+    // not crash on model output — the mdx-compile verifier owns reporting the syntax error.
+    const mdx = [
+      '---',
+      'title: Configuration',
+      'description: Configure the family: intent, ia, glossary',
+      '---',
+      '',
+      'Body text.'
+    ].join('\n');
+    const page = extractPageEntity({ mdx, slug: 'configuration' });
+    expect(page.title).toBe('Configuration');
+    expect(page.description).toBe('Configure the family: intent, ia, glossary');
+  });
+
   it('falls back to the ia title when no frontmatter or H1 exists', () => {
     const page = extractPageEntity({ mdx: 'Just a paragraph.', slug: 'notes', fallbackTitle: 'Notes' });
     expect(page.title).toBe('Notes');

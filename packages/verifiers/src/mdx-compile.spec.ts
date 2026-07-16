@@ -26,6 +26,25 @@ describe('mdx-compile', () => {
     expect(result.status).toBe('pass');
   });
 
+  it('fails frontmatter that is not valid YAML', async () => {
+    // Live regression: remark treats the frontmatter fence as opaque, so an unquoted value
+    // containing ": " compiled fine but crashed every downstream YAML consumer.
+    const mdx = '---\ntitle: Configuration\ndescription: Configure the family: intent, ia\n---\n\nBody.\n';
+    const artifact = makeArtifact(makePage({ slug: 'configuration' }), mdx);
+
+    const result = await mdxCompileVerifier.verify(makeContext(), [artifact]);
+
+    expect(result.status).toBe('fail');
+    expect(result.findings[0]?.severity).toBe('error');
+    expect(result.findings[0]?.message).toContain('frontmatter is not valid YAML');
+  });
+
+  it('accepts valid frontmatter', async () => {
+    const mdx = '---\ntitle: "Configuration"\ndescription: "Configure the family: intent, ia"\n---\n\nBody.\n';
+    const result = await mdxCompileVerifier.verify(makeContext(), [makeArtifact(makePage({ slug: 'ok' }), mdx)]);
+    expect(result.status).toBe('pass');
+  });
+
   it('fails broken JSX (unclosed tag) with line info', async () => {
     const artifact = makeArtifact(makePage({ slug: 'guide/broken' }), '# Title\n\n<Callout>\n\nnever closed\n');
 

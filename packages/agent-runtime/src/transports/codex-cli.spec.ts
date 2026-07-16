@@ -233,6 +233,23 @@ describe('createCodexCliTransport runSession', () => {
     expect((error as TransportError).message).toContain('exited with 2');
   });
 
+  it('does not misread rate-limit words in MODEL OUTPUT of a successful run as a rate limit', async () => {
+    // Live regression: docstube documenting its own retry/rate-limit code produced pages whose
+    // text contains "rate limited", which the old whole-output scan classified as a quota error.
+    const lines = [
+      '{"type":"thread.started","thread_id":"th_123"}',
+      '{"type":"turn.started"}',
+      '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Requests that are rate limited (429) are retried with backoff."}}',
+      '{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0}}'
+    ];
+    const transport = createCodexCliTransport({
+      mcpServerPath: 'server.ts',
+      runner: async () => ({ stdout: lines.join('\n'), stderr: '', exitCode: 0, timedOut: false })
+    });
+    const session = await transport.runSession(runInput(buildSpec()), { onTurn: () => {} });
+    expect(session.finalText).toContain('rate limited');
+  });
+
   it('detects rate limiting and marks the error retryable', async () => {
     const transport = createCodexCliTransport({
       mcpServerPath: 'server.ts',

@@ -293,8 +293,9 @@ export const createGoogleTransport = (options: GoogleTransportOptions = {}): Ses
         if (result.timedOut) {
           throw new TransportError({ transport: 'google', message: 'gemini CLI timed out', retryable: true });
         }
-        const combined = `${result.stdout}\n${result.stderr}`;
-        if (isRateLimitSignal(combined)) {
+        // Only a FAILED process can be rate limited, and only stderr is the CLI's own voice —
+        // stdout carries model output, which may legitimately mention rate limits.
+        if (result.exitCode !== 0 && isRateLimitSignal(result.stderr)) {
           throw new TransportError({
             transport: 'google',
             message: 'gemini CLI was rate limited',

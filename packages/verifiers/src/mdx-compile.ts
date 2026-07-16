@@ -1,4 +1,5 @@
 import { compile } from '@mdx-js/mdx';
+import { parse as parseYaml } from 'yaml';
 import type { Finding } from '@docstube/contracts';
 import type { PageArtifact, VerifierDefinition } from '@docstube/plugin-sdk';
 import { runVerifier } from './run-support.ts';
@@ -61,6 +62,31 @@ const compileErrorFinding = (artifact: PageArtifact, error: unknown): Finding =>
   };
 };
 
+// remark treats the frontmatter fence as opaque, so @mdx-js/mdx compiles pages whose frontmatter
+// is broken YAML — and those pages crash any downstream YAML consumer (live-hit: an unquoted
+// description containing ": "). Validate the fenced block ourselves.
+const frontmatterFinding = (artifact: PageArtifact): Finding | undefined => {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(artifact.mdx);
+  if (!match) {
+    return undefined;
+  }
+  try {
+    parseYaml(match[1] ?? '');
+    return undefined;
+  } catch (error) {
+    const reason = error instanceof Error ? (error.message.split('\n')[0] ?? 'invalid YAML') : 'invalid YAML';
+    return {
+      source: 'verifier',
+      check: verifierId,
+      severity: 'error',
+      message: `frontmatter is not valid YAML (${reason}) — quote values that contain ":" or "#"`,
+      entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
+      file: artifact.mdxPath,
+      span: [1, 1]
+    };
+  }
+};
+
 export const mdxCompileVerifier: VerifierDefinition = {
   id: verifierId,
   title: 'MDX compiles',
@@ -73,6 +99,10 @@ export const mdxCompileVerifier: VerifierDefinition = {
     runVerifier(verifierId, async () => {
       const findings: Finding[] = [];
       for (const artifact of pages) {
+        const frontmatterError = frontmatterFinding(artifact);
+        if (frontmatterError) {
+          findings.push(frontmatterError);
+        }
         try {
           await compile(artifact.mdx);
         } catch (error) {
