@@ -1,67 +1,75 @@
 import { z } from 'zod';
 
-// Lowercase kebab-case identifier shared by page IDs, section IDs, and slugs.
-// Concrete page/section ID rules layer on top of this primitive in page contracts.
-export const identifierSchema = z
+// Crockford base32 (lowercase, no i/l/o/u) — unambiguous in URLs, logs, and YAML.
+const ID_ALPHABET = '0123456789abcdefghjkmnpqrstvwxyz';
+const ID_BODY_LENGTH = 20;
+const ID_BODY_PATTERN = `[${ID_ALPHABET}]{${ID_BODY_LENGTH}}`;
+
+export const idPrefixes = {
+  page: 'pg',
+  section: 'sc',
+  block: 'bl',
+  claim: 'cl',
+  flag: 'fl',
+  run: 'run',
+  task: 'tk',
+  context: 'ctx'
+} as const;
+
+export type IdPrefix = (typeof idPrefixes)[keyof typeof idPrefixes];
+
+export const mintId = (prefix: IdPrefix): string => {
+  const bytes = new Uint8Array(ID_BODY_LENGTH);
+  crypto.getRandomValues(bytes);
+  let body = '';
+  for (const byte of bytes) {
+    body += ID_ALPHABET[byte % 32];
+  }
+  return `${prefix}_${body}`;
+};
+
+export const idSchema = (prefix: IdPrefix) => z.string().regex(new RegExp(`^${prefix}_${ID_BODY_PATTERN}$`));
+
+export const pageIdSchema = idSchema(idPrefixes.page);
+export const sectionIdSchema = idSchema(idPrefixes.section);
+export const blockIdSchema = idSchema(idPrefixes.block);
+export const claimIdSchema = idSchema(idPrefixes.claim);
+export const flagIdSchema = idSchema(idPrefixes.flag);
+export const runIdSchema = idSchema(idPrefixes.run);
+export const taskIdSchema = idSchema(idPrefixes.task);
+
+export const semverSchema = z
   .string()
-  .min(1, { error: 'identifier must not be empty' })
-  .max(128, { error: 'identifier must be at most 128 characters' })
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { error: 'identifier must be lowercase kebab-case' });
+  .regex(/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/, 'expected a semver version');
 
-export type Identifier = z.infer<typeof identifierSchema>;
+export const isoTimestampSchema = z.iso.datetime({ offset: true });
 
-// Repo-relative POSIX path. No leading slash, no backslashes, no `..` traversal, no NUL bytes.
-export const relativePathSchema = z
+// BCP-47 subset we support: "en", "de", "pt-BR".
+export const localeCodeSchema = z
   .string()
-  .min(1, { error: 'path must not be empty' })
-  .refine((value) => !value.startsWith('/'), { error: 'path must be repo-relative, not absolute' })
-  .refine((value) => !/^[a-zA-Z]:/.test(value), { error: 'path must be repo-relative, not absolute' })
-  .refine((value) => !value.includes('\\'), { error: 'path must use POSIX separators' })
-  .refine((value) => !value.split('/').includes('..'), { error: 'path must not contain `..` traversal' })
-  .refine((value) => !value.includes('\0'), { error: 'path must not contain NUL bytes' });
+  .regex(/^[a-z]{2,3}(-[A-Z]{2})?$/, 'expected a locale code like "en" or "pt-BR"');
 
-export type RelativePath = z.infer<typeof relativePathSchema>;
+// Docs version labels are user-declared, path-safe strings: "1.x", "v2", "2026-06".
+export const versionLabelSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
 
-// Finding severity taxonomy. Derived quality scores live separately from finding severity.
-export const severities = ['blocker', 'major', 'minor'] as const;
+// Repo-relative POSIX path (the manifest never stores absolute or Windows-style paths).
+export const repoPathSchema = z
+  .string()
+  .min(1)
+  .refine((value) => !value.includes('\\') && !value.startsWith('/') && !/^[A-Za-z]:/.test(value), {
+    message: 'expected a repo-relative POSIX path'
+  });
 
-export const severitySchema = z.enum(severities);
+export const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/);
 
+// Content-derived keys namespaced by producer: "ts:<sha256>", "py:<sha256>", "openapi:<sha256>".
+export const sourceKeySchema = z.string().regex(/^[a-z][a-z0-9-]*:[0-9a-f]{64}$/);
+
+export const severitySchema = z.enum(['info', 'warning', 'error']);
 export type Severity = z.infer<typeof severitySchema>;
 
-// ISO 8601 timestamp, UTC `Z` or an explicit offset.
-export const timestampSchema = z.iso.datetime({ offset: true });
-
-export type Timestamp = z.infer<typeof timestampSchema>;
-
-// Recursive JSON value. Used by contracts that carry opaque structured payloads.
-export const jsonValueSchema = z.json();
-
-export type JsonValue = z.infer<typeof jsonValueSchema>;
-
-// Semantic version per the semver.org reference grammar.
-const semverPattern =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
-
-export const semverSchema = z.string().regex(semverPattern, { error: 'must be a valid semantic version' });
-
-export type Semver = z.infer<typeof semverSchema>;
-
-// npm package name: optionally scoped, lowercase, URL-safe.
-const packageNamePattern = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
-
-export const packageNameSchema = z
-  .string()
-  .min(1, { error: 'package name must not be empty' })
-  .max(214, { error: 'package name must be at most 214 characters' })
-  .regex(packageNamePattern, { error: 'must be a valid npm package name' });
-
-export type PackageName = z.infer<typeof packageNameSchema>;
-
-// Minimal package version metadata shared across config, manifest, and adapter contracts.
-export const packageVersionSchema = z.object({
-  name: packageNameSchema,
-  version: semverSchema
-});
-
-export type PackageVersion = z.infer<typeof packageVersionSchema>;
+// Inclusive 1-based line range within a file.
+export const lineSpanSchema = z
+  .tuple([z.number().int().positive(), z.number().int().positive()])
+  .refine(([start, end]) => end >= start, { message: 'span end must be >= start' });
+export type LineSpan = z.infer<typeof lineSpanSchema>;

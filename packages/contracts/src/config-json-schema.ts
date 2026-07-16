@@ -3,25 +3,22 @@ import { docstubeConfigSchema } from './config-schema.ts';
 import { glossarySchema } from './glossary-schema.ts';
 import { iaSchema } from './ia-schema.ts';
 
-// JSON Schema generation for the config family. These power editor validation/autocomplete for
-// `docstube.yml`, `ia.yml`, and `glossary.yaml`, and are snapshot-tested so the published
-// contract surface cannot drift silently.
+// JSON Schemas generated from the same Zod that validates at runtime — shipped with the package
+// and registered on SchemaStore for zero-setup editor autocomplete (PRODUCT §3.9.5).
+export const docstubeConfigJsonSchema = (): Record<string, unknown> => ({
+  $id: 'https://docstube.dev/schemas/docstube.yml.json',
+  title: 'docstube.yml',
+  ...z.toJSONSchema(docstubeConfigSchema, { io: 'input', unrepresentable: 'any' })
+});
 
-export type JsonSchema = Record<string, unknown>;
+export const iaJsonSchema = (): Record<string, unknown> => ({
+  $id: 'https://docstube.dev/schemas/ia.yml.json',
+  title: 'ia.yml',
+  ...z.toJSONSchema(iaSchema, { io: 'input', unrepresentable: 'any' })
+});
 
-// `io: 'input'` reflects the on-disk shape: fields with defaults are optional in the file.
-const toInputJsonSchema = (schema: z.ZodType): JsonSchema =>
-  z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input' }) as unknown as JsonSchema;
-
-export const docstubeConfigJsonSchema = (): JsonSchema => toInputJsonSchema(docstubeConfigSchema);
-
-export const iaJsonSchema = (): JsonSchema => toInputJsonSchema(iaSchema);
-
-export const glossaryJsonSchema = (): JsonSchema => toInputJsonSchema(glossarySchema);
-
-// All config-family JSON Schemas keyed by their on-disk file name.
-export const configFamilyJsonSchemas = (): Record<'docstube.yml' | 'ia.yml' | 'glossary.yaml', JsonSchema> => ({
-  'docstube.yml': docstubeConfigJsonSchema(),
-  'ia.yml': iaJsonSchema(),
-  'glossary.yaml': glossaryJsonSchema()
+export const glossaryJsonSchema = (): Record<string, unknown> => ({
+  $id: 'https://docstube.dev/schemas/glossary.yaml.json',
+  title: 'glossary.yaml',
+  ...z.toJSONSchema(glossarySchema, { io: 'input', unrepresentable: 'any' })
 });
