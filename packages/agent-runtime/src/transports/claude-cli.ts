@@ -1,0 +1,295 @@
+import { readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { observedReadSchema } from '@docstube/contracts';
+import type { ObservedRead, TranscriptBlock } from '@docstube/contracts';
+import { isRateLimitSignal, TransportError } from '../errors.ts';
+import { mcpServerEnvVars } from '../mcp-stdio-server.ts';
+import { runSubprocess } from '../subprocess.ts';
+import { prepareForwardedTools } from './forwarded-tools.ts';
+import type { SubprocessRunner } from '../subprocess.ts';
+import type { SessionOutcome, SessionTransport, SessionTurn, TokenUsage } from '../transport.ts';
+
+// SessionTransport over the Claude Code CLI (knowledge/design/agent-transports.md): all built-in
+// tools disabled (--tools ""), only our MCP stdio server visible (--strict-mcp-config), full
+// transcript as stream-json. Subscription billing works through `claude setup-token`.
+//
+// The arg-building and event-parsing logic is pure and unit-tested; the live spawn stays thin.
+// Observed reads cross the process boundary through a JSONL sink file the MCP server appends to.
+
+const MCP_SERVER_NAME = 'docstube';
+const DEFAULT_TIMEOUT_MS = 20 * 60_000;
+
+export type ClaudeCliArgsInput = {
+  prompt: string;
+  systemPrompt: string;
+  model: string;
+  maxTurns: number;
+  mcpConfig: string;
+};
+
+export const buildClaudeCliArgs = (input: ClaudeCliArgsInput): string[] => [
+  '-p',
+  input.prompt,
+  '--output-format',
+  'stream-json',
+  '--input-format',
+  'stream-json',
+  '--verbose',
+  '--tools',
+  '',
+  '--strict-mcp-config',
+  '--mcp-config',
+  input.mcpConfig,
+  '--max-turns',
+  String(input.maxTurns),
+  '--system-prompt',
+  input.systemPrompt,
+  '--model',
+  input.model
+];
+
+export const buildClaudeMcpConfig = (input: {
+  serverPath: string;
+  command?: string;
+  nodeArgs?: string[];
+  env?: Record<string, string>;
+}): string =>
+  JSON.stringify({
+    mcpServers: {
+      [MCP_SERVER_NAME]: {
+        type: 'stdio',
+        command: input.command ?? 'node',
+        args: [...(input.nodeArgs ?? []), input.serverPath],
+        env: input.env ?? {}
+      }
+    }
+  });
+
+// Tools exposed over MCP appear to the model as "mcp__<server>__<tool>"; transcripts keep the
+// harness-canonical tool names so provenance and replay are transport-independent.
+const normalizeToolName = (name: string): string => {
+  const match = /^mcp__.+?__(.+)$/.exec(name);
+  return match?.[1] ?? name;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const textFromToolResultContent = (content: unknown): unknown => {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text : ''))
+      .filter((text) => text.length > 0)
+      .join('\n');
+  }
+  return content;
+};
+
+export type ClaudeStreamParseResult = {
+  turns: SessionTurn[];
+  finalText?: string;
+  usage: TokenUsage;
+  stopReason: 'complete' | 'max-turns' | 'error';
+  errorMessage?: string;
+};
+
+export const parseClaudeStreamEvents = (lines: readonly string[]): ClaudeStreamParseResult => {
+  const turns: SessionTurn[] = [];
+  let finalText: string | undefined;
+  let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  let stopReason: ClaudeStreamParseResult['stopReason'] = 'error';
+  let errorMessage: string | undefined = 'claude CLI produced no result event';
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    let event: unknown;
+    try {
+      event = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+    if (!isRecord(event)) {
+      continue;
+    }
+
+    if (event.type === 'assistant' && isRecord(event.message) && Array.isArray(event.message.content)) {
+      const blocks: TranscriptBlock[] = [];
+      for (const item of event.message.content) {
+        if (!isRecord(item)) {
+          continue;
+        }
+        if (item.type === 'text' && typeof item.text === 'string') {
+          blocks.push({ type: 'text', text: item.text });
+        } else if (item.type === 'tool_use' && typeof item.id === 'string' && typeof item.name === 'string') {
+          blocks.push({ type: 'tool-call', toolCallId: item.id, name: normalizeToolName(item.name), args: item.input });
+        }
+      }
+      if (blocks.length > 0) {
+        turns.push({ role: 'assistant', blocks });
+      }
+      continue;
+    }
+
+    if (event.type === 'user' && isRecord(event.message) && Array.isArray(event.message.content)) {
+      const blocks: TranscriptBlock[] = [];
+      for (const item of event.message.content) {
+        if (isRecord(item) && item.type === 'tool_result' && typeof item.tool_use_id === 'string') {
+          blocks.push({
+            type: 'tool-result',
+            toolCallId: item.tool_use_id,
+            result: textFromToolResultContent(item.content),
+            isError: item.is_error === true
+          });
+        }
+      }
+      if (blocks.length > 0) {
+        turns.push({ role: 'tool', blocks });
+      }
+      continue;
+    }
+
+    if (event.type === 'result') {
+      if (isRecord(event.usage)) {
+        usage = {
+          inputTokens: typeof event.usage.input_tokens === 'number' ? event.usage.input_tokens : 0,
+          outputTokens: typeof event.usage.output_tokens === 'number' ? event.usage.output_tokens : 0
+        };
+      }
+      if (typeof event.result === 'string') {
+        finalText = event.result;
+      }
+      const subtype = typeof event.subtype === 'string' ? event.subtype : '';
+      if (subtype === 'success' && event.is_error !== true) {
+        stopReason = 'complete';
+        errorMessage = undefined;
+      } else if (subtype.includes('max_turns')) {
+        stopReason = 'max-turns';
+        errorMessage = undefined;
+      } else {
+        stopReason = 'error';
+        errorMessage = typeof event.result === 'string' ? event.result : `claude CLI reported ${subtype || 'an error'}`;
+      }
+    }
+  }
+
+  return { turns, finalText, usage, stopReason, errorMessage };
+};
+
+export const parseObservedReadLines = (content: string): ObservedRead[] => {
+  const reads: ObservedRead[] = [];
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+    try {
+      const parsed = observedReadSchema.safeParse(JSON.parse(trimmed));
+      if (parsed.success) {
+        reads.push(parsed.data);
+      }
+    } catch {
+      // skip malformed lines — the sink is best-effort append-only
+    }
+  }
+  return reads;
+};
+
+const readObservedReadsSink = async (file: string): Promise<ObservedRead[]> => {
+  try {
+    return parseObservedReadLines(await readFile(file, 'utf8'));
+  } catch {
+    return [];
+  }
+};
+
+export type ClaudeCliTransportOptions = {
+  // Path to the MCP stdio server entry (src/mcp-stdio-server-bin.ts in dev, dist/mcp-stdio-server-bin.mjs built).
+  mcpServerPath: string;
+  executable?: string;
+  nodeCommand?: string;
+  // e.g. ['--conditions=docstube-source'] when running the server from TypeScript source.
+  nodeArgs?: string[];
+  timeoutMs?: number;
+  runner?: SubprocessRunner;
+  env?: Record<string, string>;
+};
+
+export const createClaudeCliTransport = (options: ClaudeCliTransportOptions): SessionTransport => {
+  const executable = options.executable ?? 'claude';
+  const runner = options.runner ?? runSubprocess;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  return {
+    mode: 'session',
+    id: 'claude-cli',
+    capabilities: { toolInjection: 'mcp', structuredOutput: false },
+    runSession: async (input, hooks): Promise<SessionOutcome> => {
+      const sinkFile = join(tmpdir(), `docstube-observed-reads-${crypto.randomUUID()}.jsonl`);
+      const forwarded = await prepareForwardedTools(input.tools);
+      try {
+        const mcpConfig = buildClaudeMcpConfig({
+          serverPath: options.mcpServerPath,
+          command: options.nodeCommand,
+          nodeArgs: options.nodeArgs,
+          env: {
+            ...options.env,
+            ...forwarded.env,
+            [mcpServerEnvVars.repoRoot]: input.repoRoot,
+            [mcpServerEnvVars.readRoots]: JSON.stringify(input.spec.workspace.readRoots),
+            [mcpServerEnvVars.observedReadsFile]: sinkFile
+          }
+        });
+        const args = buildClaudeCliArgs({
+          prompt: input.spec.userPrompt,
+          systemPrompt: input.spec.systemPrompt,
+          model: input.model,
+          maxTurns: input.spec.budget.maxTurns,
+          mcpConfig
+        });
+        const result = await runner({ command: executable, args, cwd: input.repoRoot, timeoutMs, env: options.env });
+        if (result.timedOut) {
+          throw new TransportError({ transport: 'claude-cli', message: 'claude CLI timed out', retryable: true });
+        }
+        const combined = `${result.stdout}\n${result.stderr}`;
+        if (isRateLimitSignal(combined)) {
+          throw new TransportError({
+            transport: 'claude-cli',
+            message: 'claude CLI was rate limited',
+            retryable: true,
+            rateLimited: true
+          });
+        }
+        if (result.exitCode !== 0) {
+          throw new TransportError({
+            transport: 'claude-cli',
+            message: `claude CLI exited with ${result.exitCode}: ${result.stderr.slice(0, 400)}`,
+            retryable: false
+          });
+        }
+        const parsed = parseClaudeStreamEvents(result.stdout.split(/\r?\n/));
+        for (const turn of parsed.turns) {
+          hooks.onTurn(turn);
+        }
+        for (const read of await readObservedReadsSink(sinkFile)) {
+          input.observedReads.record(read);
+        }
+        await forwarded.replay();
+        return {
+          finalText: parsed.finalText,
+          usage: parsed.usage,
+          stopReason: parsed.stopReason,
+          errorMessage: parsed.errorMessage
+        };
+      } finally {
+        await rm(sinkFile, { force: true });
+        await forwarded.cleanup();
+      }
+    }
+  };
+};
