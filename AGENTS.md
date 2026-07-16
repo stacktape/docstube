@@ -5,14 +5,18 @@ Guidance for AI coding agents and humans working in this repository.
 
 ## Source of truth
 
-The product specification is [`PRODUCT.md`](PRODUCT.md). It is the authoritative design document.
-Read it before any non-trivial work. If this file disagrees with `PRODUCT.md`, `PRODUCT.md` wins.
+The product specification is [`PRODUCT.md`](PRODUCT.md); the system design is
+[`ARCHITECTURE.md`](ARCHITECTURE.md). Read both before any non-trivial work. Precedence:
+`PRODUCT.md` wins on product semantics, `ARCHITECTURE.md` wins on code structure, and both beat
+this file. Design docs for specific subsystems live in `knowledge/design/`.
 
 ## What docstube is
 
 An open-source MIT CLI, localhost web UI, and GitHub Action that reads a codebase and generates
-verified, persona-targeted, always-current documentation using the user's own coding agents
-(`codex`, `claude`, `gemini`) or API keys. Output is MDX rendered by a custom Astro + React theme.
+verified, persona-targeted, always-current documentation using the user's own coding agents or
+API keys. docstube owns the agent harness and tool surface; vendor CLIs (`claude`, `codex`,
+Google's tooling) act as model+billing transports (see `knowledge/design/agent-transports.md`).
+Output is MDX rendered by a custom Astro + React theme.
 
 ## Current infrastructure
 
@@ -83,26 +87,35 @@ When supervising future fixes:
 
 ## Package layout
 
-Reusable/published workspace packages live in `packages/`:
+The authoritative layout with dependency directions is ARCHITECTURE.md §2. Summary — workspace
+packages in `packages/`:
 
-- `contracts` -> S0 Zod schemas, shared types, IDs, result taxonomies, public contract snapshots.
-- `core` -> config loading, state, orchestrator, local server, tRPC routers.
-- `agent` -> standalone `@docstube/agent` adapter interface and built-in adapters.
-- `verifiers` -> deterministic checks and result taxonomy.
-- `codemap` -> tree-sitter codemap and language plugins.
-- `extractors` -> TypeDoc / griffe API reference extraction.
-- `theme` -> Astro + React theme and registry component contracts.
+- `contracts` -> S0 Zod schemas: entity model, provenance, manifest, config, agent tasks, run
+  events. Depends on nothing; everything depends on it.
+- `plugin-sdk` -> the PUBLIC plugin API (`definePlugin`, hook types). Second published package,
+  experimental until 1.0. Plugins must never need `@docstube/core`.
+- `agent-runtime` -> the unified BYO-AI harness: docstube-owned loop + tools, observed-reads
+  provenance, cache, record/replay, transports (API + vendor CLIs as raw model transports).
+- `codemap` -> parser-agnostic codemap host: symbol hashing (the provenance key), diffing,
+  language-pack hosting.
+- `core` -> the kernel: config round-trip, plugin host, entity extraction/matching, manifest
+  shards + run journal, pipeline orchestrator.
+- `lang-typescript` -> first language pack (a plugin): TS compiler API extraction + snippet
+  toolchain. `lang-python`, `lang-java` follow this shape.
+- `verifiers` -> first-party verifier plugins.
+- `theme` -> Astro + React theme, component registry (each component = a block type), site
+  emission. Generated sites vendor it.
 - `skills` -> shipped `SKILL.md` sources and materialization helpers.
 
 Runnable workspace apps live in `apps/`:
 
 - `cli` -> the `docstube` binary, lazy command loading, no heavy deps on startup.
-- `local-ui` -> Vite + React localhost control plane.
+- `local-ui` -> Vite + React localhost control plane (being rebuilt against the new kernel).
 - `github-action` -> GitHub Action wrapper.
-- `web` -> public marketing website placeholder; implementation belongs to another agent/workstream.
+- `web` -> public marketing website; implementation belongs to another agent/workstream.
 
-Package entry files are named by responsibility (`core.ts`, `agent.ts`, `cli.ts`), not `index.ts`.
-Do not add `index.ts` files.
+Package entry files are named by responsibility (`core.ts`, `plugin-sdk.ts`, `cli.ts`), not
+`index.ts`. Do not add `index.ts` files.
 
 ## Release Rules
 

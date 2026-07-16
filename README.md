@@ -2,10 +2,11 @@
 
 # docstube
 
-**Verified, always-current documentation generated from your code.**
+**Verified docs, generated from your code.**
 
-docstube reads a repository, asks your own coding agents or API keys to write source-grounded MDX,
-checks the output deterministically, and renders a self-contained Astro docs site that you own.
+docstube reads a repository, uses your own coding agents or API keys to write source-grounded MDX,
+proves or flags every claim with deterministic verifiers, and renders a self-contained Astro docs
+site that you own. Fully autonomous within a declared domain: flagged, never silently wrong.
 
 [Website](https://docstube.dev) · [Discussions](../../discussions)
 
@@ -13,18 +14,22 @@ checks the output deterministically, and renders a self-contained Astro docs sit
 
 ## Current Status
 
-The repository contains the product implementation described in [PRODUCT.md](PRODUCT.md):
+The repository is mid-way through the v1 rewrite described in [PRODUCT.md](PRODUCT.md) and
+[ARCHITECTURE.md](ARCHITECTURE.md) (branch `rewrite-for-v1`):
 
-- CLI commands: `wizard`, `generate`, `refresh`, `refine`, `validate`, `check`, `status`,
-  `doctor`, `upgrade`, `version`, and `help`.
-- Local web UI: setup wizard, generation dashboard, and review/feedback flows.
-- Core pipeline: source mapping, extraction, writer/reviewer orchestration, deterministic gates,
-  provenance, refresh, refinement ranking, cache, transcripts, and generated docs assets.
+- Working today: `generate` (codemap → write → per-persona review → deterministic verify → gate →
+  manifest → site), `check` (kinds derive from registered verifier plugins), `status`, `doctor`,
+  `validate`, `upgrade`, verified translations for declared locales, and version snapshot cutting.
+- Being rebuilt on the new entity-model pipeline: `wizard`, `refresh`, `refine`, `audit`,
+  `plugin`, and the local web UI. These commands fail with an honest message until they land.
+- The plugin API ships as `@docstube/plugin-sdk` (experimental until 1.0): verifiers, language
+  packs, content sources, importers, deploy targets, search providers, and MDX components are all
+  plugins — including the built-in ones.
 - Distribution infrastructure: npm package, GitHub Release binaries, Stacktape-hosted install
   scripts, installer telemetry, and release workflows.
 
-The checked-in source is ahead of the last public npm ownership release until the release workflow
-is run again. Use the source workflow below for local testing.
+The checked-in source is ahead of the last public npm release. Use the source workflow below for
+local testing.
 
 ## Local Development
 
@@ -40,10 +45,9 @@ control plane. Other commands run without starting Vite:
 
 ```bash
 pnpm dev generate
-pnpm dev refresh
-pnpm dev refine --failed --max-rounds 1
 pnpm dev status
-pnpm dev check --all
+pnpm dev check --list
+pnpm dev check
 pnpm dev doctor
 ```
 
@@ -55,7 +59,6 @@ After a release is published, the normal Node path is:
 npx docstube wizard
 npx docstube generate
 npx docstube refresh
-npx docstube refine
 ```
 
 No-Node users install a standalone binary through the Stacktape-hosted scripts, which download
@@ -82,6 +85,8 @@ pnpm run dogfood:build
 pnpm run evals
 ```
 
+`pnpm run dogfood:build` runs docstube's own contracts package through the real pipeline with a
+deterministic writer — real codemap, real verifiers, real gate, no model calls.
 `pnpm run evals:live` is secrets-gated and requires a configured judge model/provider.
 
 Production release, Stacktape deploy, installer telemetry verification, and live-agent checks
@@ -90,14 +95,22 @@ deliberately.
 
 ## Repository Map
 
-- [PRODUCT.md](PRODUCT.md): authoritative product specification, architecture, and hard
-  boundaries.
+- [PRODUCT.md](PRODUCT.md): authoritative product specification and hard boundaries.
+- [ARCHITECTURE.md](ARCHITECTURE.md): the system design — entity model, plugin kernel, agent
+  harness, state model.
 - [AGENTS.md](AGENTS.md): coding style, package ownership, and agent operating rules.
+- `knowledge/design/`: subsystem design docs (agent transports, salvage inventory, …).
 - `apps/cli`: published `docstube` CLI package.
-- `apps/local-ui`: localhost web UI.
-- `apps/github-action`: GitHub Action wrapper around `docstube refresh`.
+- `apps/local-ui`: localhost web UI (wizard · dashboard · review · flag queue).
+- `apps/github-action`: GitHub Action wrapper (auto-merging refresh PRs).
 - `apps/install-events`: install telemetry Lambda.
-- `packages/core`: config, state, pipeline, local server, refresh/refine/status/doctor workflows.
+- `packages/contracts`: the S0 schema layer (entities, provenance, manifest, config).
+- `packages/plugin-sdk`: the public plugin API (second published package).
+- `packages/agent-runtime`: the BYO-AI harness — docstube owns the loop and tools; vendor CLIs
+  are model+billing transports.
+- `packages/core`: the kernel — config, plugin host, entity extraction, state, pipeline.
+- `packages/codemap` + `packages/lang-typescript`: symbol hashing/diffing and language packs.
+- `packages/verifiers`: built-in verifier plugins.
 - `packages/theme`: vendored Astro/React generated-site source.
 
 The public marketing website in `apps/web` is intentionally owned by a separate workstream.
