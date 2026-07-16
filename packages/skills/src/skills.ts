@@ -3,24 +3,24 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Finding } from '@docstube/contracts';
+import { pluginAuthoringSkillBody } from './skill-plugin-authoring.ts';
 
-export type BuiltInSkillId =
-  | 'component-reference'
-  | 'd2-authoring'
-  | 'editor'
-  | 'reviewer'
-  | 'verifier'
-  | 'writer'
-  | 'writing-conventions';
+// Re-exported so `docstube plugin scaffold` can write starter files from the same single source
+// of truth the plugin-authoring skill embeds.
+export {
+  examplePackageJsonSource,
+  examplePluginManifest,
+  examplePluginSource,
+  exampleSpecSource
+} from './plugin-authoring-example.ts';
+
+export type BuiltInSkillId = 'plugin-authoring' | 'reviewer' | 'writer' | 'writing-conventions';
 
 export const builtInSkillIds = [
   'writer',
   'reviewer',
-  'verifier',
-  'editor',
-  'component-reference',
-  'd2-authoring',
-  'writing-conventions'
+  'writing-conventions',
+  'plugin-authoring'
 ] as const satisfies readonly BuiltInSkillId[];
 
 export type BuiltInSkillDefinition = {
@@ -40,47 +40,82 @@ const skill = (id: BuiltInSkillId, title: string, body: readonly string[]): Buil
 
 export const builtInSkills = [
   skill('writer', 'docstube Writer', [
-    '- Write source-grounded MDX pages from the supplied page brief and codemap facts.',
-    '- Use only registered theme components and valid section markers.',
-    '- Do not invent APIs, file paths, examples, or capabilities that are not grounded in source facts.',
-    `- ${codeWinsRule}`
+    'You produce documentation where every claim is mechanically verified afterwards. Anything you',
+    'assert that the code does not support will be caught and rejected, so never invent behavior.',
+    '',
+    '## Hard rules',
+    '',
+    '- Read the actual source with the provided tools before describing behavior. Base every claim on',
+    '  code you read, not on what similar projects usually do.',
+    '- Output pure MDX: frontmatter with `title` and `description`, then content. Exactly one H1.',
+    '  No entity ids, no HTML comments.',
+    '- Never write `import`/`export` statements and never set a `layout` frontmatter key — the site',
+    '  build provides both.',
+    '- Use only the MDX components the task lists as enabled. If none are enabled, use plain',
+    '  Markdown/MDX primitives only.',
+    '- Code examples must be complete and correct — they are compiled and executed by verifiers.',
+    '- Use glossary terms exactly as defined and never use a term\'s listed "avoid" words.',
+    '- If something cannot be known from the code (intent, history, "why"), write what IS knowable',
+    '  and say nothing else. Do not speculate to fill a section.',
+    '',
+    '## Retries',
+    '',
+    'When a draft fails the gate you receive the findings. Fix every finding; change nothing that was',
+    'not flagged.',
+    '',
+    codeWinsRule
   ]),
   skill('reviewer', 'docstube Reviewer', [
-    '- Review generated pages for persona fit, missing assumptions, and source-grounding risk.',
-    '- Return structured findings with concrete page or section references.',
-    '- Do not assign numeric quality scores.',
-    `- ${codeWinsRule}`
-  ]),
-  skill('verifier', 'docstube Verifier', [
-    '- Prefer deterministic checks over judgement.',
-    '- Validate MDX, snippets, imports, links, D2, glossary usage, and API references before approving content.',
-    '- Emit structured findings only; never silently fix source facts.',
-    `- ${codeWinsRule}`
-  ]),
-  skill('editor', 'docstube Editor', [
-    '- Apply requested feedback narrowly and preserve verified facts.',
-    '- Route lasting writing preferences to instructions, criteria, glossary, or config updates.',
-    '- Do not rewrite unrelated generated pages.',
-    `- ${codeWinsRule}`
-  ]),
-  skill('component-reference', 'docstube Component Reference', [
-    '- Use Callout for notes, warnings, and risk callouts.',
-    '- Use Steps for ordered workflows and Terminal or CodeBlock for commands.',
-    '- Use Diagram only for D2-backed diagrams rendered by the build integration.',
-    '- Screenshot is reserved and must not be used until screenshot capture is designed.'
-  ]),
-  skill('d2-authoring', 'docstube D2 Authoring', [
-    '- Mermaid is not supported.',
-    '- D2 diagrams should be small, labelled, and sketch-rendered by default.',
-    '- Run the deterministic D2 check before considering a diagram done.',
-    '- Prefer semantic node labels over decorative layout tuning.'
+    'You review a generated page while embodying exactly one persona. Judge the page only through',
+    'that persona: their assumed knowledge, their terminology, their task.',
+    '',
+    '## Criteria outcomes',
+    '',
+    '- Apply every criterion you are given and report an explainable outcome for each one:',
+    '  `met`, `not-met`, or `not-applicable`, with 1-3 sentences of reasoning grounded in the page text.',
+    '- The default criteria are audience-fit (depth and terminology match the persona),',
+    '  correctness-risk (concrete claims are plausible given the source context; anything that smells',
+    '  invented is a finding), and brief-conformance (the page delivers what its brief promises).',
+    '- Never assign numeric quality scores — outcomes plus reasoning only.',
+    '',
+    '## Findings',
+    '',
+    '- Emit one finding per concrete problem, with `source: review` and `check` set to the criterion',
+    '  name (e.g. `audience-fit`).',
+    '- Severity `error` only when the page would mislead or block this persona; otherwise `warning`.',
+    '  Error findings send the page back for a bounded rewrite, so reserve them for real blockers.',
+    '- Never rewrite the page yourself, and never invent facts about the codebase; judge only what is',
+    '  in front of you. Guarantees are assigned by deterministic verifiers, never by review.',
+    '',
+    codeWinsRule
   ]),
   skill('writing-conventions', 'docstube Writing Conventions', [
-    '- Prefer specific nouns, repo-relative paths, and verifiable claims.',
-    '- Keep sections scannable and avoid marketing copy inside generated docs.',
-    '- Explain tradeoffs when the source code shows meaningful alternatives.',
-    `- ${codeWinsRule}`
-  ])
+    'Prose conventions for generated docs. Deterministic prose lints enforce the mechanical parts;',
+    'write so they have nothing to find.',
+    '',
+    '## Substance',
+    '',
+    '- Prefer specific nouns, repo-relative paths, exact command names, and verifiable claims over',
+    '  abstractions.',
+    '- No marketing copy inside docs. State what the code does; explain tradeoffs when the source',
+    '  shows meaningful alternatives.',
+    '- Lead each section with the thing the reader came for, not with context-setting throat-clearing.',
+    '',
+    '## Anti-slop',
+    '',
+    '- Banned AI-isms: "delve", "leverage" (as a verb), "seamless", "seamlessly", "robust",',
+    '  "cutting-edge", "comprehensive", "crucial", "empower", "unlock", "streamline", "dive into",',
+    '  "it\'s important to note", "it\'s worth noting", "in today\'s fast-paced world", and',
+    '  "whether you\'re a X or a Y" framings.',
+    '- Vary sentence length and openings. Never start three consecutive sentences with the same word,',
+    '  and do not let every paragraph settle into the same three-sentence rhythm.',
+    '- Avoid reflexive rule-of-three lists ("fast, simple, and reliable"); enumerate only when each',
+    '  item carries verifiable content.',
+    '- Use active voice and address the reader as "you" in instructions.',
+    '',
+    codeWinsRule
+  ]),
+  skill('plugin-authoring', 'docstube Plugin Authoring', pluginAuthoringSkillBody)
 ] as const satisfies readonly BuiltInSkillDefinition[];
 
 const builtInSkillMap = new Map<BuiltInSkillId, BuiltInSkillDefinition>(
@@ -325,12 +360,12 @@ export const createDriftReport = (input: {
     const fact = factsById.get(claim.id);
     if (fact && fact.statement !== claim.statement) {
       findings.push({
-        code: 'reference-doc-drift',
-        severity: 'major',
-        origin: 'verifier',
+        source: 'verifier',
+        check: 'reference-doc-drift',
+        severity: 'error',
         message: `Reference doc disagrees with code-grounded fact "${claim.id}". Code wins this conflict.`,
-        location: { path: claim.sourcePath },
-        meta: {
+        file: claim.sourcePath,
+        data: {
           codeFact: fact.statement,
           codeSourcePath: fact.sourcePath,
           referenceClaim: claim.statement

@@ -2,6 +2,13 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { pluginCapabilityKindSchema, pluginManifestSchema } from '@docstube/contracts';
+import {
+  examplePluginManifest,
+  examplePluginSource,
+  exampleSpecSource,
+  renderManifestLiteral
+} from './plugin-authoring-example.ts';
 import {
   builtInSkillIds,
   builtInSkills,
@@ -23,24 +30,41 @@ const withTempDir = async (run: (dir: string) => Promise<void>) => {
   }
 };
 
+const skillContent = (id: (typeof builtInSkillIds)[number]): string =>
+  builtInSkills.find((skill) => skill.id === id)?.content ?? '';
+
 describe('built-in skills', () => {
-  it('ships role-scoped and reference skills with code-wins guidance', () => {
-    expect(builtInSkillIds).toEqual([
-      'writer',
-      'reviewer',
-      'verifier',
-      'editor',
-      'component-reference',
-      'd2-authoring',
-      'writing-conventions'
-    ]);
+  it('ships the lean v1 skill set with code-wins guidance', () => {
+    expect(builtInSkillIds).toEqual(['writer', 'reviewer', 'writing-conventions', 'plugin-authoring']);
     expect(builtInSkills.map((skill) => skill.id)).toEqual(builtInSkillIds);
-    expect(builtInSkills.find((skill) => skill.id === 'writer')?.content).toContain(
-      'code-grounded facts, report the drift and treat code as authoritative'
-    );
-    expect(builtInSkills.find((skill) => skill.id === 'component-reference')?.content).toContain(
-      'Screenshot is reserved'
-    );
+    expect(skillContent('writer')).toContain('code-grounded facts, report the drift and treat code as authoritative');
+  });
+
+  it('writer skill mirrors the write-page hard rules', () => {
+    const content = skillContent('writer');
+    expect(content).toContain('Exactly one H1');
+    expect(content).toContain('Never write `import`/`export` statements');
+    expect(content).toContain('`layout` frontmatter key');
+    expect(content).toContain('compiled and executed');
+    expect(content).toContain('change nothing that was');
+  });
+
+  it('reviewer skill mirrors the review-page criteria semantics', () => {
+    const content = skillContent('reviewer');
+    expect(content).toContain('`met`, `not-met`, or `not-applicable`');
+    for (const criterion of ['audience-fit', 'correctness-risk', 'brief-conformance']) {
+      expect(content).toContain(criterion);
+    }
+    expect(content).toContain('Severity `error` only when the page would mislead or block this persona');
+    expect(content).toContain('Never assign numeric quality scores');
+  });
+
+  it('writing-conventions skill bans AI-isms and demands sentence variety', () => {
+    const content = skillContent('writing-conventions');
+    expect(content).toContain('"delve"');
+    expect(content).toContain('"seamless"');
+    expect(content).toContain('Vary sentence length');
+    expect(content).toContain('three consecutive sentences');
   });
 
   it('materializes skills non-destructively when users mark edits', async () => {
@@ -68,6 +92,51 @@ describe('built-in skills', () => {
       expect(second[0]).toMatchObject({ id: 'writer', status: 'preserved' });
       await expect(readFile(skillPath, 'utf8')).resolves.toContain('Keep this edit.');
     });
+  });
+});
+
+describe('plugin-authoring skill', () => {
+  const content = skillContent('plugin-authoring');
+
+  it('embeds a worked example whose manifest parses against the real plugin manifest schema', () => {
+    const parsed = pluginManifestSchema.parse(examplePluginManifest);
+    expect(parsed).toEqual(examplePluginManifest);
+    // Single source of truth: the interpolated plugin source ships verbatim inside the skill.
+    expect(content).toContain(examplePluginSource);
+    expect(content).toContain(exampleSpecSource);
+  });
+
+  it('contains a definePlugin code fence built from the validated manifest constant', () => {
+    // The example source itself contains ``` sequences, so locate the fence by its exact
+    // interpolated content instead of regex fence-matching.
+    const pluginFence = `\`\`\`ts\n${examplePluginSource}\n\`\`\``;
+    expect(content).toContain(pluginFence);
+    expect(examplePluginSource).toContain('definePlugin({');
+    expect(examplePluginSource).toContain(renderManifestLiteral(examplePluginManifest));
+    expect(examplePluginSource).toContain("name: 'docstube-plugin-wordcount'");
+    expect(examplePluginSource).toContain('apiVersion: 1,');
+  });
+
+  it('documents every capability kind the manifest schema accepts, and both loading paths', () => {
+    for (const kind of pluginCapabilityKindSchema.options) {
+      expect(content).toContain(`\`${kind}\``);
+    }
+    expect(content).toContain('plugins:');
+    expect(content).toContain('./plugins/wordcount.ts');
+    expect(content).toContain('docstube-plugin');
+  });
+
+  it('states the verifier contract fields exactly as the SDK defines them', () => {
+    for (const fragment of [
+      "scope: 'block' | 'page' | 'site'",
+      "localeScope: 'source-only' | 'per-locale'",
+      'proves: boolean',
+      'coveredEntityIds: string[]',
+      "status: 'pass' | 'fail' | 'error' | 'skipped'",
+      'verify: (ctx: VerifierContext, pages: PageArtifact[]) => Promise<VerifierRunResult>'
+    ]) {
+      expect(content).toContain(fragment);
+    }
   });
 });
 
@@ -130,12 +199,12 @@ describe('reference drift reporting', () => {
 
     expect(report.findings).toEqual([
       {
-        code: 'reference-doc-drift',
-        severity: 'major',
-        origin: 'verifier',
+        source: 'verifier',
+        check: 'reference-doc-drift',
+        severity: 'error',
         message: 'Reference doc disagrees with code-grounded fact "cli-generate-command". Code wins this conflict.',
-        location: { path: 'README.md' },
-        meta: {
+        file: 'README.md',
+        data: {
           codeFact: 'docstube generate',
           codeSourcePath: 'apps/cli/src/cli.ts',
           referenceClaim: 'docstube init'
