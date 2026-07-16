@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildClaudeCliArgs,
   buildClaudeMcpConfig,
+  buildClaudeStdinPrompt,
   parseClaudeStreamEvents,
   parseObservedReadLines
 } from './claude-cli.ts';
@@ -9,15 +10,15 @@ import {
 describe('buildClaudeCliArgs', () => {
   it('builds the exact non-interactive arg vector from the transport design', () => {
     const args = buildClaudeCliArgs({
-      prompt: 'Write the retry page.',
       systemPrompt: 'You write verified documentation.',
       model: 'claude-sonnet-5',
       maxTurns: 8,
       mcpConfig: '{"mcpServers":{}}'
     });
+    // No prompt in argv: --input-format stream-json makes the CLI ignore an argv prompt and
+    // read stdin instead (live-hit: silent empty run). The prompt travels via stdin.
     expect(args).toEqual([
       '-p',
-      'Write the retry page.',
       '--output-format',
       'stream-json',
       '--input-format',
@@ -26,6 +27,8 @@ describe('buildClaudeCliArgs', () => {
       '--tools',
       '',
       '--strict-mcp-config',
+      '--allowedTools',
+      'mcp__docstube',
       '--mcp-config',
       '{"mcpServers":{}}',
       '--max-turns',
@@ -35,6 +38,17 @@ describe('buildClaudeCliArgs', () => {
       '--model',
       'claude-sonnet-5'
     ]);
+  });
+});
+
+describe('buildClaudeStdinPrompt', () => {
+  it('wraps the prompt as a single stream-json user message line', () => {
+    const line = buildClaudeStdinPrompt('Write the retry page.');
+    expect(line.endsWith('\n')).toBe(true);
+    expect(JSON.parse(line)).toEqual({
+      type: 'user',
+      message: { role: 'user', content: [{ type: 'text', text: 'Write the retry page.' }] }
+    });
   });
 });
 
@@ -96,6 +110,7 @@ describe('parseClaudeStreamEvents', () => {
       '{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":8,"usage":{"input_tokens":10,"output_tokens":2}}'
     ]);
     expect(maxTurns.stopReason).toBe('max-turns');
+    expect(maxTurns.sawResult).toBe(true);
 
     const errored = parseClaudeStreamEvents([
       '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"boom"}'
@@ -108,7 +123,70 @@ describe('parseClaudeStreamEvents', () => {
     const parsed = parseClaudeStreamEvents(['not json', '', '{"type":"assistant","message":{"content":[]}}']);
     expect(parsed.stopReason).toBe('error');
     expect(parsed.errorMessage).toContain('no result event');
+    expect(parsed.sawResult).toBe(false);
     expect(parsed.turns).toEqual([]);
+  });
+
+  it('returns the parsed outcome when the CLI exits non-zero after a result event (max-turns)', async () => {
+    // Live regression: the CLI exits 1 after error_max_turns; a concluded session must reach the
+    // harness as a max-turns outcome, not crash the run as a TransportError.
+    const { createClaudeCliTransport } = await import('./claude-cli.ts');
+    const stdout = [
+      '{"type":"result","subtype":"error_max_turns","is_error":true,"num_turns":12,"usage":{"input_tokens":10,"output_tokens":2}}'
+    ].join('\n');
+    const transport = createClaudeCliTransport({
+      mcpServerPath: 'server.ts',
+      runner: async () => ({ stdout, stderr: '', exitCode: 1, timedOut: false })
+    });
+    const outcome = await transport.runSession(
+      {
+        spec: {
+          id: 'tk_00000000000000000000',
+          kind: 'review-page',
+          systemPrompt: 'sys',
+          userPrompt: 'user',
+          tools: [],
+          workspace: { readRoots: ['.'], writableRoots: [] },
+          budget: { maxTurns: 12, maxToolCalls: 12 },
+          output: { type: 'text' }
+        },
+        model: 'sonnet',
+        repoRoot: '.',
+        tools: [],
+        observedReads: { record: () => {} }
+      } as never,
+      { onTurn: () => {} }
+    );
+    expect(outcome.stopReason).toBe('max-turns');
+  });
+
+  it('still throws when the CLI exits non-zero with no result event', async () => {
+    const { createClaudeCliTransport } = await import('./claude-cli.ts');
+    const transport = createClaudeCliTransport({
+      mcpServerPath: 'server.ts',
+      runner: async () => ({ stdout: '', stderr: 'spawn failed', exitCode: 1, timedOut: false })
+    });
+    await expect(
+      transport.runSession(
+        {
+          spec: {
+            id: 'tk_00000000000000000000',
+            kind: 'review-page',
+            systemPrompt: 'sys',
+            userPrompt: 'user',
+            tools: [],
+            workspace: { readRoots: ['.'], writableRoots: [] },
+            budget: { maxTurns: 12, maxToolCalls: 12 },
+            output: { type: 'text' }
+          },
+          model: 'sonnet',
+          repoRoot: '.',
+          tools: [],
+          observedReads: { record: () => {} }
+        } as never,
+        { onTurn: () => {} }
+      )
+    ).rejects.toThrow('exited with 1');
   });
 });
 

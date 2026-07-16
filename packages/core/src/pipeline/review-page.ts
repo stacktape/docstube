@@ -54,7 +54,9 @@ export const buildReviewPageTask = (input: {
     userPrompt: reviewerUserPrompt(input.artifact, input.brief),
     tools: [],
     workspace: { readRoots: ['.'], writableRoots: [] },
-    budget: { maxTurns: 4, maxToolCalls: 4 },
+    // Session transports burn a turn per tool call, so a reviewer that greps a few sources before
+    // its verdict needs real headroom (live-hit: claude-cli reviews died at 4).
+    budget: { maxTurns: 12, maxToolCalls: 12 },
     output: {
       type: 'structured',
       jsonSchema: z.toJSONSchema(reviewResultSchema, { io: 'input', unrepresentable: 'any' })

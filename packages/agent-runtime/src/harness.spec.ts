@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { agentTaskSpecSchema, contentHash, idPrefixes, mintId } from '@docstube/contracts';
 import type { AgentTaskSpec } from '@docstube/contracts';
 import { ToolPolicyError } from './errors.ts';
-import { runAgentTask } from './harness.ts';
+import { runAgentTask, unwrapMdxResponse } from './harness.ts';
 import type { Transport } from './transport.ts';
 import { standardToolDescriptors } from './tools.ts';
 import type { AssistantTurn, CompleteInput, LoopTransport, SessionTransport } from './transport.ts';
@@ -319,5 +319,23 @@ describe('transport retry with backoff', () => {
         { transport: fatal, model: 'm', repoRoot: '.', retryDelaysMs: [1] }
       )
     ).rejects.toThrow(/bad auth/u);
+  });
+});
+
+describe('unwrapMdxResponse', () => {
+  const page = '---\ntitle: "X"\n---\n\n# X\n\nBody.';
+
+  it('unwraps chat prose plus a fenced page (live sonnet regression)', () => {
+    const wrapped = `Now I have enough to write the corrected page.\n\n\`\`\`mdx\n${page}\n\`\`\`\n`;
+    expect(unwrapMdxResponse(wrapped)).toBe(page);
+  });
+
+  it('leaves a page that already starts with frontmatter untouched, even with inner fences', () => {
+    const withExample = `${page}\n\n\`\`\`mdx\n---\ntitle: "Example"\n---\n\`\`\`\n`;
+    expect(unwrapMdxResponse(withExample)).toBe(withExample.trim());
+  });
+
+  it('leaves plain unfenced output untouched', () => {
+    expect(unwrapMdxResponse('# Just a heading\n\nText.')).toBe('# Just a heading\n\nText.');
   });
 });

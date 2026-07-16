@@ -101,6 +101,39 @@ describe('transcript cache', () => {
     expect(second.result).toEqual({ type: 'text', text: 'hello' });
   });
 
+  it('does not cache a completed session whose every tool call errored (ran blind)', async () => {
+    // Live regression: a tool-permission misconfig made every MCP call fail; the model concluded
+    // anyway and the degraded transcript would have replayed even after the config was fixed.
+    const cache = createTranscriptCache(join(cacheDir, 'blind'));
+    const spec = buildSpec();
+    const blindSession = {
+      mode: 'session' as const,
+      id: 'fake-session',
+      capabilities: { toolInjection: 'mcp' as const, structuredOutput: false },
+      runSession: async (_input: unknown, hooks: { onTurn: (turn: unknown) => void }) => {
+        hooks.onTurn({
+          role: 'assistant',
+          blocks: [{ type: 'tool-call', toolCallId: 't1', name: 'read_file', args: { path: 'x' } }]
+        });
+        hooks.onTurn({
+          role: 'tool',
+          blocks: [{ type: 'tool-result', toolCallId: 't1', result: 'permission denied', isError: true }]
+        });
+        return { finalText: 'blind conclusion', usage: { inputTokens: 5, outputTokens: 5 }, stopReason: 'complete' };
+      }
+    };
+    const first = await runAgentTask(spec, {
+      transport: blindSession as never,
+      model: 'test-model',
+      repoRoot: cacheDir,
+      cache
+    });
+    expect(first.stopReason).toBe('complete');
+
+    const cacheKey = computeTaskCacheKey(spec, { transport: 'fake-session', model: 'test-model' });
+    expect(await cache.get(cacheKey)).toBeUndefined();
+  });
+
   it('does not cache non-complete transcripts', async () => {
     const cache = createTranscriptCache(join(cacheDir, 'no-error-cache'));
     const spec = buildSpec();

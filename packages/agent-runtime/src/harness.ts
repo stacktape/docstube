@@ -81,8 +81,25 @@ const parseStructuredOutput = (text: string, jsonSchema: Record<string, unknown>
   return { ok: true, value };
 };
 
+// Some models wrap the page in chat prose plus a ```mdx fence despite the "pure MDX" instruction
+// (live-hit: sonnet shipped "Now I have enough to write the corrected page." + fenced page).
+// Unwrap ONLY when the response does not already start with frontmatter and a fence body does —
+// pages that legitimately contain mdx fence examples are untouched.
+export const unwrapMdxResponse = (finalText: string): string => {
+  const trimmed = finalText.trim();
+  if (trimmed.startsWith('---')) {
+    return trimmed;
+  }
+  const fence = /```(?:mdx|markdown|md)\r?\n([\s\S]*?)\r?\n```/u.exec(trimmed);
+  const body = fence?.[1]?.trim();
+  if (body !== undefined && body.startsWith('---')) {
+    return body;
+  }
+  return trimmed;
+};
+
 const buildTextResult = (spec: AgentTaskSpec, finalText: string): TaskResult =>
-  spec.output.type === 'mdx' ? { type: 'mdx', mdx: finalText } : { type: 'text', text: finalText };
+  spec.output.type === 'mdx' ? { type: 'mdx', mdx: unwrapMdxResponse(finalText) } : { type: 'text', text: finalText };
 
 const resolveToolImplementations = (
   spec: AgentTaskSpec,
@@ -322,8 +339,12 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
     error: state.error
   });
 
-  // Only completed transcripts are cacheable — budget stops and errors must rerun.
-  if (transcript.stopReason === 'complete' && options.cache) {
+  // Only completed transcripts are cacheable — budget stops and errors must rerun. A session
+  // whose every tool call errored also reruns: it "concluded" blind (live-hit: a tool-permission
+  // misconfig produced a degraded review that would have replayed even after the config fix).
+  const toolResults = state.turns.flatMap((turn) => turn.blocks.filter((block) => block.type === 'tool-result'));
+  const ranBlind = toolResults.length > 0 && toolResults.every((block) => block.isError === true);
+  if (transcript.stopReason === 'complete' && !ranBlind && options.cache) {
     await options.cache.put(transcript);
   }
   await options.transport.onTranscript?.({ transcript, spec, repoRoot: options.repoRoot });

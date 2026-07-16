@@ -21,16 +21,17 @@ const MCP_SERVER_NAME = 'docstube';
 const DEFAULT_TIMEOUT_MS = 20 * 60_000;
 
 export type ClaudeCliArgsInput = {
-  prompt: string;
   systemPrompt: string;
   model: string;
   maxTurns: number;
   mcpConfig: string;
 };
 
+// With --input-format stream-json the CLI reads user messages from STDIN and ignores an argv
+// prompt entirely (live-hit: the run exited silently with no result event). Stdin delivery also
+// sidesteps the Windows long-argv limits that crash codex.
 export const buildClaudeCliArgs = (input: ClaudeCliArgsInput): string[] => [
   '-p',
-  input.prompt,
   '--output-format',
   'stream-json',
   '--input-format',
@@ -39,6 +40,11 @@ export const buildClaudeCliArgs = (input: ClaudeCliArgsInput): string[] => [
   '--tools',
   '',
   '--strict-mcp-config',
+  // Non-interactive runs have nobody to click "approve": without this, every docstube tool call
+  // returns a permission error (live-hit). Allowing the whole server is safe — built-ins are off
+  // and --strict-mcp-config means ours is the only server.
+  '--allowedTools',
+  `mcp__${MCP_SERVER_NAME}`,
   '--mcp-config',
   input.mcpConfig,
   '--max-turns',
@@ -48,6 +54,9 @@ export const buildClaudeCliArgs = (input: ClaudeCliArgsInput): string[] => [
   '--model',
   input.model
 ];
+
+export const buildClaudeStdinPrompt = (prompt: string): string =>
+  `${JSON.stringify({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: prompt }] } })}\n`;
 
 export const buildClaudeMcpConfig = (input: {
   serverPath: string;
@@ -95,6 +104,9 @@ export type ClaudeStreamParseResult = {
   usage: TokenUsage;
   stopReason: 'complete' | 'max-turns' | 'error';
   errorMessage?: string;
+  // True when the stream contained a result event: the CLI ran the session to a conclusion, even
+  // if it then exited non-zero (it does for max-turns and error results).
+  sawResult: boolean;
 };
 
 export const parseClaudeStreamEvents = (lines: readonly string[]): ClaudeStreamParseResult => {
@@ -103,6 +115,7 @@ export const parseClaudeStreamEvents = (lines: readonly string[]): ClaudeStreamP
   let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   let stopReason: ClaudeStreamParseResult['stopReason'] = 'error';
   let errorMessage: string | undefined = 'claude CLI produced no result event';
+  let sawResult = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -156,6 +169,7 @@ export const parseClaudeStreamEvents = (lines: readonly string[]): ClaudeStreamP
     }
 
     if (event.type === 'result') {
+      sawResult = true;
       // total_cost_usd sits on the result event root and is the vendor-authoritative run cost.
       const costUsd = typeof event.total_cost_usd === 'number' ? event.total_cost_usd : undefined;
       if (isRecord(event.usage)) {
@@ -184,7 +198,7 @@ export const parseClaudeStreamEvents = (lines: readonly string[]): ClaudeStreamP
     }
   }
 
-  return { turns, finalText, usage, stopReason, errorMessage };
+  return { turns, finalText, usage, stopReason, errorMessage, sawResult };
 };
 
 export const parseObservedReadLines = (content: string): ObservedRead[] => {
@@ -251,13 +265,19 @@ export const createClaudeCliTransport = (options: ClaudeCliTransportOptions): Se
           }
         });
         const args = buildClaudeCliArgs({
-          prompt: input.spec.userPrompt,
           systemPrompt: input.spec.systemPrompt,
           model: input.model,
           maxTurns: input.spec.budget.maxTurns,
           mcpConfig
         });
-        const result = await runner({ command: executable, args, cwd: input.repoRoot, timeoutMs, env: options.env });
+        const result = await runner({
+          command: executable,
+          args,
+          cwd: input.repoRoot,
+          timeoutMs,
+          env: options.env,
+          input: buildClaudeStdinPrompt(input.spec.userPrompt)
+        });
         if (result.timedOut) {
           throw new TransportError({ transport: 'claude-cli', message: 'claude CLI timed out', retryable: true });
         }
@@ -271,14 +291,18 @@ export const createClaudeCliTransport = (options: ClaudeCliTransportOptions): Se
             rateLimited: true
           });
         }
-        if (result.exitCode !== 0) {
+        const parsed = parseClaudeStreamEvents(result.stdout.split(/\r?\n/));
+        // The CLI exits non-zero after max-turns and error results too (live-hit: a review task
+        // over its turn budget crashed the whole run). If the stream reached a result event, the
+        // session concluded — return the parsed outcome and let the harness decide; only a stream
+        // with no result is a real transport failure.
+        if (result.exitCode !== 0 && !parsed.sawResult) {
           throw new TransportError({
             transport: 'claude-cli',
             message: `claude CLI exited with ${result.exitCode}: ${result.stderr.slice(0, 400)}`,
             retryable: false
           });
         }
-        const parsed = parseClaudeStreamEvents(result.stdout.split(/\r?\n/));
         for (const turn of parsed.turns) {
           hooks.onTurn(turn);
         }
