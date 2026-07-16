@@ -1,0 +1,28 @@
+{
+  "name": "@docstube/lang-typescript",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "docstube-source": "./src/lang-typescript.ts",
+      "types": "./dist/lang-typescript.d.mts",
+      "import": "./dist/lang-typescript.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown src/lang-typescript.ts --format esm --dts --clean --target node24",
+    "typecheck": "tsc -p ../../tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@docstube/codemap": "workspace:*",
+    "@docstube/contracts": "workspace:*",
+    "@docstube/plugin-sdk": "workspace:*",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
+  }
+}

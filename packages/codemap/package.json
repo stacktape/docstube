@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@docstube/contracts": "workspace:*",
-    "web-tree-sitter": "^0.26.9",
+    "@docstube/plugin-sdk": "workspace:*",
     "zod": "^4.4.3"
   }
 }
