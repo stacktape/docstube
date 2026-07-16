@@ -20,16 +20,13 @@
   },
   "dependencies": {
     "@docstube/contracts": "workspace:*",
-    "@docstube/extractors": "workspace:*",
+    "@docstube/plugin-sdk": "workspace:*",
     "@mdx-js/mdx": "^3.1.1",
     "@terrastruct/d2": "^0.1.33",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
     "typescript": "^6.0.3",
-    "zod": "^4.4.3"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/react": "19.2.17",
-    "@types/react-dom": "19.2.3"
+    "zod": "^4.4.3"
   }
 }
