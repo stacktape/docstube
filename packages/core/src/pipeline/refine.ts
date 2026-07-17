@@ -161,7 +161,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   );
 
   const maxRunUsd = config.agents.budgets.maxRunUsd;
-  const costTracker = createRunCostTracker(maxRunUsd);
+  const costTracker = createRunCostTracker(maxRunUsd, config.agents.budgets.maxPlanUsagePercent);
 
   const ctx: PageRunContext = {
     repoRoot,
@@ -234,7 +234,15 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   await store.writeIndex({ ...index, configHash: hashValue(family.raw.config), iaHash: hashValue(family.raw.ia) });
 
   if (frozen && maxRunUsd !== undefined) {
-    await journal.append({ type: 'run-frozen', reason: freezeReason(maxRunUsd), spentUsd: costTracker.spentUsd() });
+    await journal.append({
+      type: 'run-frozen',
+      reason: freezeReason({
+        maxRunUsd,
+        maxPlanUsagePercent: config.agents.budgets.maxPlanUsagePercent,
+        planUsedPercent: costTracker.planUsedPercent()
+      }),
+      spentUsd: costTracker.spentUsd()
+    });
   }
   const flagged = refined.some((page) => page.status === 'flagged');
   const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';

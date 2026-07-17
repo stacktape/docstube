@@ -16,6 +16,7 @@ export type RunCostTracker = {
     costUsd?: number | undefined;
     inputTokens?: number | undefined;
     outputTokens?: number | undefined;
+    planUsedPercent?: number | undefined;
   }) => void;
   // Vendor-reported spend only; estimates are tracked separately.
   spentUsd: () => number;
@@ -29,15 +30,22 @@ export type RunCostTracker = {
   // True when at least one task's spend had to be estimated from tokens — callers should label
   // the displayed total "(partly estimated)".
   hasEstimates: () => boolean;
+  // Latest subscription plan usage (0-100) seen this run; undefined when no transport reported one.
+  planUsedPercent: () => number | undefined;
 };
 
-export const createRunCostTracker = (maxRunUsd?: number): RunCostTracker => {
+export const createRunCostTracker = (maxRunUsd?: number, maxPlanUsagePercent?: number): RunCostTracker => {
   let spent = 0;
   let estimated = 0;
   let reported = false;
   let hasEstimates = false;
+  let planUsedPercent: number | undefined;
   return {
     add: (usage) => {
+      // Plan usage is a level: keep the highest observation this run.
+      if (usage.planUsedPercent !== undefined) {
+        planUsedPercent = Math.max(planUsedPercent ?? 0, usage.planUsedPercent);
+      }
       if (usage.costUsd !== undefined) {
         spent += usage.costUsd;
         reported = true;
@@ -56,11 +64,31 @@ export const createRunCostTracker = (maxRunUsd?: number): RunCostTracker => {
     },
     spentUsd: () => spent,
     estimatedUsd: () => estimated,
-    shouldFreeze: () => maxRunUsd !== undefined && spent + estimated >= maxRunUsd * FREEZE_MARGIN_RATIO,
+    // A plan-usage signal means subscription billing: the plan governor is the truth there, and
+    // dollar ESTIMATES stop triggering the freeze (a flat-rate run was frozen at "$25 estimated"
+    // in the first live regen — real money never moved). Vendor-REPORTED dollars still count.
+    shouldFreeze: () => {
+      if (planUsedPercent !== undefined) {
+        return (
+          (maxPlanUsagePercent !== undefined && planUsedPercent >= maxPlanUsagePercent) ||
+          (maxRunUsd !== undefined && spent >= maxRunUsd * FREEZE_MARGIN_RATIO)
+        );
+      }
+      return maxRunUsd !== undefined && spent + estimated >= maxRunUsd * FREEZE_MARGIN_RATIO;
+    },
     hasReportedCost: () => reported,
-    hasEstimates: () => hasEstimates
+    hasEstimates: () => hasEstimates,
+    planUsedPercent: () => planUsedPercent
   };
 };
 
-export const freezeReason = (maxRunUsd: number): string =>
-  `run spend reached ${Math.round(FREEZE_MARGIN_RATIO * 100)}% of the $${maxRunUsd} cap — frozen with margin so in-flight work stays under the cap`;
+export const freezeReason = (input: {
+  maxRunUsd?: number | undefined;
+  maxPlanUsagePercent?: number | undefined;
+  planUsedPercent?: number | undefined;
+}): string =>
+  input.planUsedPercent !== undefined &&
+  input.maxPlanUsagePercent !== undefined &&
+  input.planUsedPercent >= input.maxPlanUsagePercent
+    ? `subscription plan usage reached ${Math.round(input.planUsedPercent)}% (cap ${input.maxPlanUsagePercent}%) — frozen so the plan window is not exhausted`
+    : `run spend reached ${Math.round(FREEZE_MARGIN_RATIO * 100)}% of the $${input.maxRunUsd ?? 0} cap — frozen with margin so in-flight work stays under the cap`;

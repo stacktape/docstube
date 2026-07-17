@@ -10,7 +10,8 @@ import {
   createRunCostTracker,
   ESTIMATE_USD_PER_1M_INPUT_TOKENS,
   ESTIMATE_USD_PER_1M_OUTPUT_TOKENS,
-  FREEZE_MARGIN_RATIO
+  FREEZE_MARGIN_RATIO,
+  freezeReason
 } from './run-cost.ts';
 
 // Cap-freeze behavior (PRODUCT §3.5): usage caps are approximate — the run freezes with margin
@@ -69,6 +70,29 @@ describe('createRunCostTracker', () => {
     expect(tracker.shouldFreeze()).toBe(true);
     expect(tracker.spentUsd()).toBe(5);
     expect(tracker.estimatedUsd()).toBeCloseTo(4, 10);
+  });
+
+  it('plan-usage governor: freezes at the plan threshold and silences estimate-based freezing', () => {
+    // Subscription transports report tokens but no dollars; the first live regen froze a
+    // flat-rate run at "$25 estimated". With a plan signal present, the plan cap is the truth.
+    const tracker = createRunCostTracker(1, 80);
+    tracker.add({ inputTokens: 10_000_000, outputTokens: 10_000_000, planUsedPercent: 30 });
+    // $200 of estimates would trip the $1 cap — but the 30% plan signal suppresses estimates.
+    expect(tracker.shouldFreeze()).toBe(false);
+    tracker.add({ inputTokens: 1, outputTokens: 1, planUsedPercent: 80 });
+    expect(tracker.shouldFreeze()).toBe(true);
+    expect(tracker.planUsedPercent()).toBe(80);
+  });
+
+  it('plan signal never silences vendor-REPORTED dollars', () => {
+    const tracker = createRunCostTracker(1, 80);
+    tracker.add({ costUsd: 0.9, planUsedPercent: 10 });
+    expect(tracker.shouldFreeze()).toBe(true);
+  });
+
+  it('freezeReason names the plan window when the plan cap tripped', () => {
+    expect(freezeReason({ maxRunUsd: 20, maxPlanUsagePercent: 80, planUsedPercent: 81 })).toContain('81%');
+    expect(freezeReason({ maxRunUsd: 20, maxPlanUsagePercent: 80, planUsedPercent: 10 })).toContain('$20');
   });
 
   it('a reported costUsd is never double-counted as an estimate, even with tokens present', () => {

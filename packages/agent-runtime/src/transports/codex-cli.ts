@@ -125,6 +125,21 @@ export type CodexJsonParseResult = {
 // item.completed agent_message -> assistant text turn; item.completed mcp_tool_call -> assistant
 // tool-call turn + tool tool-result turn; turn.completed accumulates usage; turn.failed / error
 // are fatal. Unknown event and item types are ignored, never fatal.
+// Subscription plan usage rides on token_count events as rate_limits.{primary,secondary}
+// .used_percent (5h and weekly windows). The effective usage is the max of the two — either
+// window running out stops the run. Parsed defensively from any event carrying rate_limits.
+const planUsedPercentOf = (event: Record<string, unknown>): number | undefined => {
+  const rateLimits = event.rate_limits;
+  if (!isRecord(rateLimits)) {
+    return undefined;
+  }
+  const percents = [rateLimits.primary, rateLimits.secondary]
+    .filter(isRecord)
+    .map((window) => window.used_percent)
+    .filter((value): value is number => typeof value === 'number' && value >= 0 && value <= 100);
+  return percents.length > 0 ? Math.max(...percents) : undefined;
+};
+
 export const parseCodexJsonEvents = (lines: readonly string[]): CodexJsonParseResult => {
   const turns: SessionTurn[] = [];
   let finalText: string | undefined;
@@ -145,6 +160,12 @@ export const parseCodexJsonEvents = (lines: readonly string[]): CodexJsonParseRe
     }
     if (!isRecord(event) || typeof event.type !== 'string') {
       continue;
+    }
+
+    // Latest wins: plan usage only moves forward within a session.
+    const planUsedPercent = planUsedPercentOf(event);
+    if (planUsedPercent !== undefined) {
+      usage.planUsedPercent = planUsedPercent;
     }
 
     // turn.completed usage carries token counts only — codex never reports a USD cost

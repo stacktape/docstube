@@ -13,8 +13,9 @@ export type ToolCallBlock = Extract<TranscriptBlock, { type: 'tool-call' }>;
 export type ToolResultBlock = Extract<TranscriptBlock, { type: 'tool-result' }>;
 
 // costUsd is set only when the vendor reports an authoritative cost (claude CLI's
-// total_cost_usd); otherwise the harness estimates it from model-pricing.ts.
-export type TokenUsage = { inputTokens: number; outputTokens: number; costUsd?: number };
+// total_cost_usd); otherwise the harness estimates it from model-pricing.ts. planUsedPercent is
+// subscription plan usage (0-100) when the vendor stream reports it (codex rate_limits).
+export type TokenUsage = { inputTokens: number; outputTokens: number; costUsd?: number; planUsedPercent?: number };
 
 export type LoopMessage =
   | { role: 'user'; text: string }

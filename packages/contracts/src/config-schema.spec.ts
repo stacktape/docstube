@@ -27,7 +27,12 @@ describe('docstube.yml schema', () => {
       personas: [{ id: 'app-developer', description: 'Builds apps on top of the library' }],
       site: { title: 'x' }
     });
-    expect(config.agents.budgets).toEqual({ maxRunUsd: 20, maxTurnsPerTask: 24, maxToolCallsPerTask: 64 });
+    expect(config.agents.budgets).toEqual({
+      maxRunUsd: 20,
+      maxTurnsPerTask: 24,
+      maxToolCallsPerTask: 64,
+      maxPlanUsagePercent: 80
+    });
     expect(config.agents.transport).toBe('claude-cli');
     expect(config.sources).toEqual({ openapi: [], asyncapi: [], imports: [] });
     expect(config.telemetry).toEqual({ enabled: true });

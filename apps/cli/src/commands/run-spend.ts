@@ -5,8 +5,11 @@ import type { CliOutput } from '../cli-output.ts';
 // number is never mistaken for a vendor-reported bill.
 export const reportRunSpend = (
   output: CliOutput,
-  summary: { spentUsd?: number | undefined; estimatedUsd?: number | undefined }
+  summary: { spentUsd?: number | undefined; estimatedUsd?: number | undefined; planUsedPercent?: number | undefined }
 ): void => {
+  if (summary.planUsedPercent !== undefined) {
+    output.info(`subscription plan usage: ${Math.round(summary.planUsedPercent)}% of the busier window`);
+  }
   if (summary.estimatedUsd !== undefined) {
     const total = (summary.spentUsd ?? 0) + summary.estimatedUsd;
     output.info(`agent spend this run: ~$${total.toFixed(4)} (partly estimated)`);

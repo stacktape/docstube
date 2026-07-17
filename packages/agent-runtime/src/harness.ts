@@ -107,6 +107,10 @@ const addUsage = (target: TokenUsage, delta: TokenUsage): void => {
   if (delta.costUsd !== undefined) {
     target.costUsd = (target.costUsd ?? 0) + delta.costUsd;
   }
+  // Plan usage is a level, not a quantity: keep the highest observation, never sum.
+  if (delta.planUsedPercent !== undefined) {
+    target.planUsedPercent = Math.max(target.planUsedPercent ?? 0, delta.planUsedPercent);
+  }
 };
 
 const buildTextResult = (spec: AgentTaskSpec, finalText: string): TaskResult =>
@@ -364,6 +368,7 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
       inputTokens: state.usage.inputTokens,
       outputTokens: state.usage.outputTokens,
       ...(costUsd !== undefined ? { costUsd } : {}),
+      ...(state.usage.planUsedPercent !== undefined ? { planUsedPercent: state.usage.planUsedPercent } : {}),
       cacheHit: false
     },
     stopReason: state.stopReason,

@@ -75,6 +75,10 @@ export const taskUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative().default(0),
   outputTokens: z.number().int().nonnegative().default(0),
   costUsd: z.number().nonnegative().optional(),
+  // Subscription plan usage (0-100) as reported by the vendor CLI at the time of this task
+  // (codex rate_limits used_percent, max of the 5h and weekly windows). The plan-usage governor
+  // freezes runs on this instead of estimated dollars when present.
+  planUsedPercent: z.number().min(0).max(100).optional(),
   cacheHit: z.boolean().default(false)
 });
 

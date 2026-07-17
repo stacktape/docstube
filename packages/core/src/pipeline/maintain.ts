@@ -60,6 +60,8 @@ export type RefreshSummary = {
   estimatedUsd?: number;
   // Kinds of the open flags raised this run — telemetry input (coarse failure modes).
   openFlagKinds: FlagKind[];
+  // Latest subscription plan usage (0-100) reported by the transport this run, when available.
+  planUsedPercent?: number;
 };
 
 const readOptionalFile = async (path: string): Promise<string | undefined> => {
@@ -206,7 +208,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   );
 
   const maxRunUsd = config.agents.budgets.maxRunUsd;
-  const costTracker = createRunCostTracker(maxRunUsd);
+  const costTracker = createRunCostTracker(maxRunUsd, config.agents.budgets.maxPlanUsagePercent);
 
   const ctx: PageRunContext = {
     repoRoot,
@@ -338,7 +340,11 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   if (frozen && maxRunUsd !== undefined) {
     await journal.append({
       type: 'run-frozen',
-      reason: freezeReason(maxRunUsd),
+      reason: freezeReason({
+        maxRunUsd,
+        maxPlanUsagePercent: config.agents.budgets.maxPlanUsagePercent,
+        planUsedPercent: costTracker.planUsedPercent()
+      }),
       spentUsd: costTracker.spentUsd() + costTracker.estimatedUsd()
     });
   }
@@ -456,6 +462,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     warnings: [...host.warnings(), ...newNodeWarnings],
     openFlagKinds,
     ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
-    ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {})
+    ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
+    ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})
   };
 };

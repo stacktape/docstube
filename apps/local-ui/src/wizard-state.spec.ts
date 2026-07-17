@@ -132,7 +132,7 @@ describe('buildConfigUpdates', () => {
       sources: { openapi: [], asyncapi: [], imports: [] },
       agents: {
         transport: 'claude-cli' as const,
-        budgets: { maxRunUsd: 20, maxTurnsPerTask: 24, maxToolCallsPerTask: 64 }
+        budgets: { maxRunUsd: 20, maxTurnsPerTask: 24, maxToolCallsPerTask: 64, maxPlanUsagePercent: 80 }
       },
       versions: { current: 'latest', frozen: [] },
       locales: { source: 'en', targets: [] },

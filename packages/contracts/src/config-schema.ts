@@ -73,7 +73,16 @@ export const agentsConfigSchema = z.object({
           'Approximate per-run USD cap. Cap-freeze stops the run between pages at 85% of this value so in-flight work stays under the cap.'
         ),
       maxTurnsPerTask: z.number().int().positive().default(24),
-      maxToolCallsPerTask: z.number().int().positive().default(64)
+      maxToolCallsPerTask: z.number().int().positive().default(64),
+      maxPlanUsagePercent: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(80)
+        .describe(
+          'For subscription transports that report plan usage (codex rate limits): freeze the run between pages once the busier window (5h or weekly) reaches this percentage. When a plan-usage signal is present, dollar ESTIMATES stop triggering the freeze — the plan signal is the truth for subscription billing.'
+        )
     })
     .prefault({})
 });

@@ -101,6 +101,21 @@ describe('parseCodexJsonEvents', () => {
     expect(parsed.turns[2]?.blocks[0]).toEqual({ type: 'text', text: '# Retry' });
   });
 
+  it('captures subscription plan usage from rate_limits, keeping the busier window and latest event', () => {
+    const parsed = parseCodexJsonEvents([
+      '{"type":"token_count","rate_limits":{"primary":{"used_percent":41.5,"window_minutes":300},"secondary":{"used_percent":12,"window_minutes":10080},"plan_type":"plus"}}',
+      '{"type":"token_count","rate_limits":{"primary":{"used_percent":43.2},"secondary":{"used_percent":12.5}}}',
+      '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}'
+    ]);
+    expect(parsed.usage.planUsedPercent).toBeCloseTo(43.2, 5);
+    // Malformed payloads never poison the signal.
+    const garbage = parseCodexJsonEvents([
+      '{"type":"token_count","rate_limits":{"primary":{"used_percent":"high"}}}',
+      '{"type":"turn.completed","usage":{"input_tokens":1,"output_tokens":1}}'
+    ]);
+    expect(garbage.usage.planUsedPercent).toBeUndefined();
+  });
+
   it('accumulates usage across multiple turns', () => {
     const parsed = parseCodexJsonEvents([
       '{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":0,"output_tokens":2,"reasoning_output_tokens":0}}',
