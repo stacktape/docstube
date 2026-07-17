@@ -1,0 +1,11 @@
+---
+// docstube Card renderer: soft raised surface with Outfit title; links get the marketing lift.
+const { description, href, title } = Astro.props;
+const Tag = href ? 'a' : 'section';
+---
+
+<Tag class="dt-card" data-component="Card" href={href}>
+  <strong class="dt-card-title">{title}</strong>
+  {description ? <span class="dt-card-description">{description}</span> : null}
+  <slot />
+</Tag>

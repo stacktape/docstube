@@ -1,0 +1,9 @@
+---
+// docstube CardGrid renderer.
+const { columns = 2 } = Astro.props;
+const columnCount = Math.min(Math.max(columns, 1), 4);
+---
+
+<div class="dt-card-grid" data-component="CardGrid" style={`grid-template-columns: repeat(${columnCount}, minmax(0, 1fr));`}>
+  <slot />
+</div>

@@ -3,6 +3,7 @@ title: "CI and the GitHub Action"
 description: "Run docstube in GitHub Actions, open verified documentation PRs, deliver flags, and gate auto-merge from the committed manifest."
 layout: "../layouts/DocLayout.astro"
 docstubeLocale: "en"
+docstubePageId: "pg_j7sf9qm14feh17cjy4n4"
 docstubeGuarantee: "proven"
 docstubeBlocksProven: 2
 docstubeBlocksTotal: 22
@@ -10,7 +11,18 @@ docstubeSources: [{"file":"apps/github-action/src/delta-report.ts","line":10,"en
 docstubeSections: [{"anchor":"inputs","title":"Inputs","guarantee":"scored"},{"anchor":"what-the-action-runs","title":"What The Action Runs","guarantee":"proven"},{"anchor":"manifest-delta","title":"Manifest Delta","guarantee":"scored"},{"anchor":"auto-merge-gate","title":"Auto-Merge Gate","guarantee":"scored"},{"anchor":"flag-delivery","title":"Flag Delivery","guarantee":"scored"}]
 ---
 
-import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
+import { default as Callout } from '../components/Callout.astro';
+import { default as CodeBlock } from '../components/CodeBlock.astro';
+import { default as CodeGroup } from '../components/CodeGroup.astro';
+import { default as Terminal } from '../components/Terminal.astro';
+import { default as Card } from '../components/Card.astro';
+import { default as CardGrid } from '../components/CardGrid.astro';
+import { default as Steps } from '../components/Steps.astro';
+import { default as Tabs } from '../components/Tabs.astro';
+import { default as FileTree } from '../components/FileTree.astro';
+import { default as Badge } from '../components/Badge.astro';
+import { default as ParamTable } from '../components/ParamTable.astro';
+import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
 
 # CI and the GitHub Action

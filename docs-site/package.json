@@ -10,10 +10,7 @@
   },
   "dependencies": {
     "@astrojs/mdx": "6.0.3",
-    "@astrojs/react": "5.0.7",
     "astro": "6.4.6",
-    "pagefind": "1.4.0",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "pagefind": "1.4.0"
   }
 }

@@ -1,0 +1,18 @@
+---
+// docstube ParamTable renderer: the API-reference row grammar from the mock — canvas surface,
+// fine separators, muted mono names, teal mono types (theme spec §2.8 scaled to production).
+const { params = [] } = Astro.props;
+---
+
+<div class="dt-param-table" data-component="ParamTable">
+  {params.map((param) => (
+    <div class="dt-param-row">
+      <div class="dt-param-head">
+        <code class="dt-param-name">{param.name}</code>
+        {param.required ? <span class="dt-param-required">required</span> : null}
+        {param.type ? <code class="dt-param-type">{param.type}</code> : null}
+      </div>
+      <p class="dt-param-description">{param.description}</p>
+    </div>
+  ))}
+</div>

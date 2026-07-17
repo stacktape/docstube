@@ -1,0 +1,8 @@
+---
+// docstube Badge renderer: compact mono status chip in the verification grammar.
+const { label, tone = 'info' } = Astro.props;
+---
+
+<span class={`dt-badge dt-badge--${tone}`} data-component="Badge">
+  {label ?? <slot />}
+</span>

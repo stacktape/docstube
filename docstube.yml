@@ -17,6 +17,8 @@ agents:
     # Subscription transport: codex reports tokens but no dollars, so spend here is the harness's
     # deliberately-conservative token estimate — the default $20 froze a full self-regen midway.
     maxRunUsd: 100
+theme:
+  name: docstube
 site:
   title: docstube
   description: Verified docs, generated from your code.

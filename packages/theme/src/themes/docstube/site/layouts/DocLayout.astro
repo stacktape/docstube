@@ -1,0 +1,443 @@
+---
+// docstube brand theme layout: header chrome with centered search + theme rail, three-pane shell
+// (sidebar / content / bent-rail TOC) per knowledge/design/theme-spec-docstube.md. Kernel proof
+// primitives (src/docstube/**) are mandatory mounts: the guarantee badge, section chips, sources
+// footer, entity wrapper, and Pagefind search are a conformance contract, not a theme choice.
+import '../styles/global.css';
+import DocstubeEntity from '../docstube/DocstubeEntity.astro';
+import DocstubeGuarantee from '../docstube/DocstubeGuarantee.astro';
+import DocstubeSearch from '../docstube/DocstubeSearch.astro';
+import DocstubeSectionChips from '../docstube/DocstubeSectionChips.astro';
+import DocstubeSources from '../docstube/DocstubeSources.astro';
+import {
+  footerCredit,
+  layoutMode,
+  navByLocale,
+  repoUrl,
+  siteDescription,
+  siteTitle,
+  siteUrl,
+  sourceLocale,
+  versions
+} from '../site-data.mjs';
+
+const { frontmatter } = Astro.props;
+const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTitle;
+const description = frontmatter.description || siteDescription;
+const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;
+const guarantee = frontmatter.docstubeGuarantee;
+const guaranteeTitle = `${frontmatter.docstubeBlocksProven ?? 0} of ${frontmatter.docstubeBlocksTotal ?? 0} blocks proven`;
+const locale = frontmatter.docstubeLocale ?? sourceLocale;
+const alternates = frontmatter.docstubeAlternates ?? [];
+const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
+const sources = frontmatter.docstubeSources ?? [];
+const sections = frontmatter.docstubeSections ?? [];
+const nav = navByLocale[locale] ?? navByLocale[sourceLocale] ?? [];
+
+const normalizePath = (path) => (path.endsWith('/') ? path : `${path}/`);
+const currentPath = normalizePath(Astro.url.pathname);
+const isCurrent = (href) => normalizePath(href) === currentPath;
+const currentGroup = nav.find((group) => group.entries.some((entry) => isCurrent(entry.href)));
+const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join(' › ');
+---
+
+<!doctype html>
+<html lang={locale} data-layout={layoutMode}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description ? <meta name="description" content={description} /> : null}
+    {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
+    {
+      siteUrl && alternates.length > 1
+        ? alternates.map((alternate) => (
+            <link rel="alternate" hreflang={alternate.locale} href={new URL(alternate.href, siteUrl).href} />
+          ))
+        : null
+    }
+    {
+      siteUrl && alternates.length > 1 && sourceAlternate ? (
+        <link rel="alternate" hreflang="x-default" href={new URL(sourceAlternate.href, siteUrl).href} />
+      ) : null
+    }
+    <meta property="og:title" content={title} />
+    {description ? <meta property="og:description" content={description} /> : null}
+    {canonicalUrl ? <meta property="og:url" content={canonicalUrl} /> : null}
+    <meta property="og:type" content="article" />
+    <link rel="preload" href="/fonts/outfit-700-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/inter-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-400-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <script is:inline>
+      // Theme boot: stored preference first, prefers-color-scheme otherwise — set before paint.
+      (() => {
+        let mode = null;
+        try {
+          mode = localStorage.getItem('docstube-theme');
+        } catch {}
+        if (mode !== 'light' && mode !== 'dark') {
+          mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = mode;
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="dt-header">
+      <div class="dt-header-left">
+        <button class="dt-nav-toggle" type="button" data-nav-toggle aria-label="Toggle navigation" aria-expanded="false">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        </button>
+        <a class="dt-brand" href="/">
+          <span class="dt-brand-mark" aria-hidden="true"></span>
+          {siteTitle}
+        </a>
+      </div>
+      <button class="dt-search-trigger" type="button" data-search-open>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7" /><path d="m21 21-4-4" /></svg>
+        <span class="dt-search-hint">Search documentation…</span>
+        <span class="dt-kbd" data-search-kbd>Ctrl K</span>
+      </button>
+      <div class="dt-header-right">
+        {versions.frozen.length > 0 ? (
+          <details class="dt-version-switcher">
+            <summary>{versions.current}</summary>
+            <nav aria-label="Versions">
+              <a href="/">{versions.current}</a>
+              {versions.frozen.map((label) => (
+                <a href={`/versions/${label}/`}>{label}</a>
+              ))}
+            </nav>
+          </details>
+        ) : null}
+        {alternates.length > 1 ? (
+          <nav class="dt-locale-switcher" aria-label="Language">
+            {alternates.map((alternate) => (
+              <a href={alternate.href} aria-current={alternate.locale === locale ? 'true' : undefined}>
+                {alternate.locale}
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        <div class="dt-theme-rail" data-theme-rail role="group" aria-label="Color theme">
+          <span class="dt-rail-pill" data-rail-pill aria-hidden="true"></span>
+          <button type="button" data-theme-mode="light" aria-label="Light theme">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4" /><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M18.4 5.6l-.7.7M6.3 17.7l-.7.7" stroke-linecap="round" /></svg>
+            <span>Light</span>
+          </button>
+          <button type="button" data-theme-mode="dark" aria-label="Dark theme">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <span>Dark</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="dt-shell">
+      <aside class="dt-sidebar" data-sidebar aria-label="Documentation">
+        <div class="dt-sidebar-inner">
+          {nav.map((group) => (
+            <section class="dt-nav-group">
+              {group.label ? <p class="dt-nav-group-label">{group.label}</p> : null}
+              <nav>
+                {group.entries.map((entry) => (
+                  <a class="dt-nav-item" href={entry.href} aria-current={isCurrent(entry.href) ? 'page' : undefined}>
+                    {entry.label}
+                  </a>
+                ))}
+              </nav>
+            </section>
+          ))}
+        </div>
+      </aside>
+      <div class="dt-sidebar-backdrop" data-sidebar-backdrop></div>
+
+      <main id="content" class="dt-main">
+        <div class="dt-article">
+          <div class="dt-page-meta">
+            {breadcrumb ? <p class="dt-breadcrumb">{breadcrumb}</p> : null}
+            {guarantee ? <DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} /> : null}
+          </div>
+          <DocstubeEntity entityId={frontmatter.docstubePageId} guarantee={guarantee}>
+            <slot />
+          </DocstubeEntity>
+          <DocstubeSources sources={sources} repoUrl={repoUrl} />
+          {footerCredit ? (
+            <footer class="dt-footer">Docs by <a href="https://docstube.dev">docstube</a></footer>
+          ) : null}
+        </div>
+      </main>
+
+      <aside class="dt-toc" aria-label="On this page" data-toc hidden>
+        <div class="dt-toc-inner">
+          <p class="dt-toc-label">On this page</p>
+          <div class="dt-toc-body" data-toc-body></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="dt-search-modal" data-search-modal hidden>
+      <div class="dt-search-backdrop" data-search-close></div>
+      <div class="dt-search-panel" role="dialog" aria-modal="true" aria-label="Search documentation">
+        <DocstubeSearch />
+        <p class="dt-search-empty">Search is indexed at build time — run the site build to enable it.</p>
+      </div>
+    </div>
+
+    <DocstubeSectionChips sections={sections} />
+
+    <script>
+      // Shared behavior: theme rail, animated pill rails, search modal, mobile drawer, copy
+      // buttons, and the bent in-page TOC rail (the theme's signature element).
+      const root = document.documentElement;
+      const rails = [];
+
+      const movePill = (rail) => {
+        const pill = rail.querySelector('[data-rail-pill]');
+        const on = rail.querySelector('.dt-on') || rail.querySelector('button');
+        if (!pill || !on) return;
+        pill.style.left = `${on.offsetLeft}px`;
+        pill.style.top = `${on.offsetTop}px`;
+        pill.style.width = `${on.offsetWidth}px`;
+        pill.style.height = `${on.offsetHeight}px`;
+      };
+
+      const selectRailButton = (rail, button) => {
+        const buttons = [...rail.querySelectorAll('button')];
+        for (const other of buttons) {
+          other.classList.toggle('dt-on', other === button);
+          if (other.hasAttribute('role') || other.hasAttribute('aria-selected')) {
+            other.setAttribute('aria-selected', other === button ? 'true' : 'false');
+          }
+        }
+        movePill(rail);
+        return buttons.indexOf(button);
+      };
+
+      const setupRail = (rail, onSelect) => {
+        rails.push(rail);
+        rail.addEventListener('click', (event) => {
+          const button = event.target instanceof Element ? event.target.closest('button') : null;
+          if (!button || !rail.contains(button)) return;
+          const index = selectRailButton(rail, button);
+          if (onSelect) onSelect(index);
+        });
+        movePill(rail);
+      };
+
+      // Theme rail: persisted pill slider driving :root[data-theme].
+      const themeRail = document.querySelector('[data-theme-rail]');
+      if (themeRail) {
+        const syncTheme = () => {
+          const active = themeRail.querySelector(`[data-theme-mode="${root.dataset.theme}"]`);
+          if (active) selectRailButton(themeRail, active);
+        };
+        setupRail(themeRail, () => {
+          const on = themeRail.querySelector('.dt-on');
+          const mode = on instanceof HTMLElement ? on.dataset.themeMode : undefined;
+          if (mode !== 'light' && mode !== 'dark') return;
+          root.dataset.theme = mode;
+          try {
+            localStorage.setItem('docstube-theme', mode);
+          } catch {}
+        });
+        syncTheme();
+      }
+
+      // Component rails: Tabs (pill only) and CodeGroup (pill + panel switching).
+      for (const rail of document.querySelectorAll('[data-component="Tabs"] [data-rail]')) {
+        setupRail(rail);
+      }
+      for (const group of document.querySelectorAll('[data-code-group]')) {
+        const rail = group.querySelector('[data-rail]');
+        const panels = [...group.querySelectorAll('.dt-code-block')];
+        if (!rail || panels.length === 0) continue;
+        panels.forEach((panel, index) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.setAttribute('role', 'tab');
+          button.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+          if (index === 0) button.classList.add('dt-on');
+          button.textContent = panel.getAttribute('data-label') || `Tab ${index + 1}`;
+          rail.append(button);
+          panel.hidden = index !== 0;
+        });
+        setupRail(rail, (index) => {
+          panels.forEach((panel, panelIndex) => {
+            panel.hidden = panelIndex !== index;
+          });
+        });
+      }
+
+      const placeRails = () => rails.forEach(movePill);
+      requestAnimationFrame(placeRails);
+      window.addEventListener('load', placeRails);
+      window.addEventListener('resize', placeRails);
+
+      // Copy buttons: delegated handler + injected buttons on bare markdown code fences.
+      const copyMarkup =
+        '<svg class="dt-copy-idle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>' +
+        '<svg class="dt-copy-done" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 5 5 9-11" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      for (const pre of document.querySelectorAll('pre.astro-code')) {
+        if (pre.closest('[data-component]')) continue;
+        const frame = document.createElement('div');
+        frame.className = 'dt-code-frame';
+        pre.replaceWith(frame);
+        frame.append(pre);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dt-copy';
+        button.setAttribute('data-copy', '');
+        button.setAttribute('aria-label', 'Copy code');
+        button.innerHTML = copyMarkup;
+        frame.append(button);
+      }
+      document.addEventListener('click', async (event) => {
+        const button = event.target instanceof Element ? event.target.closest('[data-copy]') : null;
+        if (!button) return;
+        const scope = button.closest('[data-code-group]') || button.closest('figure') || button.parentElement;
+        if (!scope) return;
+        const pre = [...scope.querySelectorAll('pre')].find((candidate) => !candidate.closest('[hidden]'));
+        if (!pre) return;
+        try {
+          await navigator.clipboard.writeText(pre.innerText.replace(/\n$/, ''));
+          button.classList.add('dt-copied');
+          setTimeout(() => button.classList.remove('dt-copied'), 1600);
+        } catch {}
+      });
+
+      // Search modal over the kernel Pagefind mount; Ctrl/Cmd+K toggles.
+      const searchModal = document.querySelector('[data-search-modal]');
+      const searchKbd = document.querySelector('[data-search-kbd]');
+      if (searchKbd && /Mac|iPhone|iPad/.test(navigator.platform)) searchKbd.textContent = '⌘K';
+      const focusSearch = (attempt = 0) => {
+        const input = searchModal?.querySelector('input');
+        if (input instanceof HTMLElement) input.focus();
+        else if (attempt < 10) setTimeout(() => focusSearch(attempt + 1), 120);
+      };
+      const openSearch = () => {
+        if (!searchModal) return;
+        searchModal.hidden = false;
+        document.body.classList.add('dt-modal-open');
+        focusSearch();
+      };
+      const closeSearch = () => {
+        if (!searchModal) return;
+        searchModal.hidden = true;
+        document.body.classList.remove('dt-modal-open');
+      };
+      for (const opener of document.querySelectorAll('[data-search-open]')) {
+        opener.addEventListener('click', openSearch);
+      }
+      for (const closer of document.querySelectorAll('[data-search-close]')) {
+        closer.addEventListener('click', closeSearch);
+      }
+      document.addEventListener('keydown', (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+          event.preventDefault();
+          if (searchModal?.hidden) openSearch();
+          else closeSearch();
+        }
+        if (event.key === 'Escape' && searchModal && !searchModal.hidden) closeSearch();
+      });
+      const searchEmpty = document.querySelector('.dt-search-empty');
+      if (searchEmpty) {
+        const hideWhenReady = (attempt = 0) => {
+          if (searchModal?.querySelector('input')) searchEmpty.remove();
+          else if (attempt < 25) setTimeout(() => hideWhenReady(attempt + 1), 200);
+        };
+        hideWhenReady();
+      }
+
+      // Mobile navigation drawer.
+      const navToggle = document.querySelector('[data-nav-toggle]');
+      const closeDrawer = () => {
+        document.body.classList.remove('dt-nav-open');
+        navToggle?.setAttribute('aria-expanded', 'false');
+      };
+      navToggle?.addEventListener('click', () => {
+        const open = document.body.classList.toggle('dt-nav-open');
+        navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      document.querySelector('[data-sidebar-backdrop]')?.addEventListener('click', closeDrawer);
+      document.querySelector('[data-sidebar]')?.addEventListener('click', (event) => {
+        if (event.target instanceof Element && event.target.closest('a')) closeDrawer();
+      });
+
+      // In-page TOC: built from rendered h2/h3 headings, with the bent SVG rail encoding depth
+      // (30px row rhythm; top-level track at x=2, nested track at x=14, S-bends between depths).
+      const tocRoot = document.querySelector('[data-toc]');
+      const tocBody = document.querySelector('[data-toc-body]');
+      const article = document.querySelector('[data-docstube-entity-id]');
+      if (tocRoot && tocBody && article) {
+        const headings = [...article.querySelectorAll('h2[id], h3[id]')];
+        if (headings.length >= 2) {
+          tocRoot.hidden = false;
+          const rowHeight = 30;
+          const xs = headings.map((heading) => (heading.tagName === 'H3' ? 14 : 2));
+          const height = headings.length * rowHeight;
+          const svgNs = 'http://www.w3.org/2000/svg';
+          const svg = document.createElementNS(svgNs, 'svg');
+          svg.setAttribute('width', '24');
+          svg.setAttribute('height', String(height));
+          svg.setAttribute('viewBox', `0 0 24 ${height}`);
+          svg.setAttribute('fill', 'none');
+          svg.setAttribute('aria-hidden', 'true');
+          let base = `M${xs[0]} 8`;
+          for (let index = 1; index < xs.length; index++) {
+            const rowTop = index * rowHeight;
+            if (xs[index] !== xs[index - 1]) {
+              base +=
+                ` L${xs[index - 1]} ${rowTop - 8}` +
+                ` C${xs[index - 1]} ${rowTop - 2} ${xs[index]} ${rowTop - 2} ${xs[index]} ${rowTop + 4}`;
+            }
+          }
+          base += ` L${xs[xs.length - 1]} ${height - 8}`;
+          const basePath = document.createElementNS(svgNs, 'path');
+          basePath.setAttribute('d', base);
+          basePath.setAttribute('stroke', 'var(--dt-border)');
+          basePath.setAttribute('stroke-width', '1.5');
+          basePath.setAttribute('stroke-linecap', 'round');
+          const activePath = document.createElementNS(svgNs, 'path');
+          activePath.setAttribute('stroke', 'var(--dt-accent)');
+          activePath.setAttribute('stroke-width', '2.5');
+          activePath.setAttribute('stroke-linecap', 'round');
+          svg.append(basePath, activePath);
+          tocBody.append(svg);
+
+          const links = headings.map((heading, index) => {
+            const link = document.createElement('a');
+            link.className = `dt-toc-item${heading.tagName === 'H3' ? ' dt-toc-item--nested' : ''}`;
+            link.href = `#${heading.id}`;
+            const clone = heading.cloneNode(true);
+            for (const chip of clone.querySelectorAll('.dt-guarantee')) chip.remove();
+            link.textContent = (clone.textContent || '').trim();
+            link.dataset.index = String(index);
+            tocBody.append(link);
+            return link;
+          });
+
+          let activeIndex = -1;
+          const setActive = (index) => {
+            if (index === activeIndex) return;
+            activeIndex = index;
+            links.forEach((link, linkIndex) => link.classList.toggle('dt-on', linkIndex === index));
+            const rowTop = index * rowHeight;
+            activePath.setAttribute('d', `M${xs[index]} ${rowTop + 6} L${xs[index]} ${rowTop + 24}`);
+          };
+          const spy = () => {
+            let index = 0;
+            headings.forEach((heading, headingIndex) => {
+              if (heading.getBoundingClientRect().top <= 120) index = headingIndex;
+            });
+            setActive(index);
+          };
+          spy();
+          document.addEventListener('scroll', spy, { passive: true });
+        }
+      }
+    </script>
+  </body>
+</html>

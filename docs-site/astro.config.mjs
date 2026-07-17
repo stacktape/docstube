@@ -1,5 +1,4 @@
 import mdx from '@astrojs/mdx';
-import react from '@astrojs/react';
 import { defineConfig } from 'astro/config';
 
 // TODO(review-ui): rehype plugin slot — a `markdown.processor` rehype plugin will inject
@@ -7,6 +6,11 @@ import { defineConfig } from 'astro/config';
 // §3.4). Section-level guarantee chips already ship (injected by the layout by anchor);
 // block-level addressing is deliberately not faked in v1.
 export default defineConfig({
-  integrations: [mdx(), react()],
+  integrations: [mdx()],
   output: 'static',
+  markdown: {
+    shikiConfig: {
+      themes: { light: "vitesse-light", dark: "dark-plus" },
+    }
+  },
 });

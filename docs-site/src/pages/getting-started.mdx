@@ -3,6 +3,7 @@ title: "Getting started"
 description: "Install docstube, open the setup wizard, and generate the first documentation site."
 layout: "../layouts/DocLayout.astro"
 docstubeLocale: "en"
+docstubePageId: "pg_tbbjg36mmhe9ncc1xaxg"
 docstubeGuarantee: "scored"
 docstubeBlocksProven: 0
 docstubeBlocksTotal: 22
@@ -10,7 +11,18 @@ docstubeSources: [{"file":"apps/cli/src/cli-help.ts","line":1,"endLine":19,"comm
 docstubeSections: [{"anchor":"open-the-wizard","title":"Open the wizard","guarantee":"scored"},{"anchor":"generate-the-site","title":"Generate the site","guarantee":"scored"},{"anchor":"check-the-result","title":"Check the result","guarantee":"scored"}]
 ---
 
-import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
+import { default as Callout } from '../components/Callout.astro';
+import { default as CodeBlock } from '../components/CodeBlock.astro';
+import { default as CodeGroup } from '../components/CodeGroup.astro';
+import { default as Terminal } from '../components/Terminal.astro';
+import { default as Card } from '../components/Card.astro';
+import { default as CardGrid } from '../components/CardGrid.astro';
+import { default as Steps } from '../components/Steps.astro';
+import { default as Tabs } from '../components/Tabs.astro';
+import { default as FileTree } from '../components/FileTree.astro';
+import { default as Badge } from '../components/Badge.astro';
+import { default as ParamTable } from '../components/ParamTable.astro';
+import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
 
 # Getting started

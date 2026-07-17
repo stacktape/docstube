@@ -89,7 +89,11 @@ export const defaultThemeTokens: Record<string, string> = {
 // performs a hidden lookup; the CLI resolves here and passes the bundle in. Plugin-provided themes
 // join through the plugin host later; this map stays the offline-guaranteed set.
 export const builtinThemes: Record<string, () => Promise<ThemeBundle>> = {
-  basic: async () => (await import('./themes/basic/bundle.generated.ts')).themeBundle
+  basic: async () => (await import('./themes/basic/bundle.generated.ts')).themeBundle,
+  // The docstube brand look (light default + dark) — the marketing site's sample docs made real.
+  docstube: async () => (await import('./themes/docstube/bundle.generated.ts')).themeBundle,
+  // Faithful dark-only port of the stacktape docs theme (Tailwind 4 + shiki + React islands).
+  stacktape: async () => (await import('./themes/stacktape/bundle.generated.ts')).themeBundle
 };
 
 export const builtinThemeNames = (): string[] => Object.keys(builtinThemes);

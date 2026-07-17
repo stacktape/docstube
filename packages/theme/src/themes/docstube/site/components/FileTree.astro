@@ -1,0 +1,20 @@
+---
+// docstube FileTree renderer: mono rows on the canvas surface, indent from path depth,
+// accent-tinted folder icons.
+const { entries = [] } = Astro.props;
+const depthOf = (path) => path.replace(/\/$/, '').split('/').length - 1;
+const nameOf = (path) => path.replace(/\/$/, '').split('/').at(-1) ?? path;
+---
+
+<ul class="dt-file-tree" data-component="FileTree">
+  {entries.map((entry) => (
+    <li data-kind={entry.kind ?? 'file'} style={`padding-left: ${depthOf(entry.path) * 18}px;`}>
+      {(entry.kind ?? 'file') === 'directory' ? (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke-linejoin="round" /></svg>
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 3v5h5" stroke-linejoin="round" /><path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke-linejoin="round" /></svg>
+      )}
+      {nameOf(entry.path)}
+    </li>
+  ))}
+</ul>

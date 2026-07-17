@@ -3,6 +3,7 @@ title: "How verification works"
 description: "How docstube assigns proof levels, runs built-in verifiers, grounds claims, and ships visible flags instead of silent errors."
 layout: "../layouts/DocLayout.astro"
 docstubeLocale: "en"
+docstubePageId: "pg_1be43rtwhtry6s1vgrff"
 docstubeGuarantee: "scored"
 docstubeBlocksProven: 8
 docstubeBlocksTotal: 21
@@ -10,7 +11,18 @@ docstubeSources: [{"file":"apps/github-action/src/verified-delta.ts","line":9,"e
 docstubeSections: [{"anchor":"the-pipeline","title":"The pipeline","guarantee":"scored"},{"anchor":"deterministic-verifier-results","title":"Deterministic verifier results","guarantee":"scored"},{"anchor":"built-in-verifier-ids","title":"Built-in verifier ids","guarantee":"scored"},{"anchor":"claim-grounding","title":"Claim grounding","guarantee":"scored"},{"anchor":"why-flags-ship","title":"Why flags ship","guarantee":"scored"}]
 ---
 
-import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
+import { default as Callout } from '../components/Callout.astro';
+import { default as CodeBlock } from '../components/CodeBlock.astro';
+import { default as CodeGroup } from '../components/CodeGroup.astro';
+import { default as Terminal } from '../components/Terminal.astro';
+import { default as Card } from '../components/Card.astro';
+import { default as CardGrid } from '../components/CardGrid.astro';
+import { default as Steps } from '../components/Steps.astro';
+import { default as Tabs } from '../components/Tabs.astro';
+import { default as FileTree } from '../components/FileTree.astro';
+import { default as Badge } from '../components/Badge.astro';
+import { default as ParamTable } from '../components/ParamTable.astro';
+import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
 
 # How verification works

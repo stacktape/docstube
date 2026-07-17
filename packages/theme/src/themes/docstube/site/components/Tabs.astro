@@ -1,0 +1,25 @@
+---
+// docstube Tabs renderer: the animated segmented-control pill from the mock. The registry
+// contract carries one children slot, so the rail is presentational selection state; panel
+// content renders below it.
+const { defaultValue, tabs = [] } = Astro.props;
+const activeValue = defaultValue ?? tabs[0]?.value;
+---
+
+<div class="dt-tabs" data-component="Tabs">
+  <div class="dt-rail" data-rail role="tablist">
+    <span class="dt-rail-pill" data-rail-pill aria-hidden="true"></span>
+    {tabs.map((tab) => (
+      <button
+        class={tab.value === activeValue ? 'dt-on' : undefined}
+        type="button"
+        role="tab"
+        aria-selected={tab.value === activeValue ? 'true' : 'false'}
+        data-tab-value={tab.value}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+  <div class="dt-tabs-panel"><slot /></div>
+</div>

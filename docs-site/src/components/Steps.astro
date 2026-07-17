@@ -1,0 +1,9 @@
+---
+// docstube Steps renderer: solid accent circle for step 1, tinted circles after, connecting rule
+// (theme spec §2.7 scaled to production size).
+const { items = [] } = Astro.props;
+---
+
+<ol class="dt-steps" data-component="Steps">
+  {items.map((item) => <li>{item}</li>)}
+</ol>

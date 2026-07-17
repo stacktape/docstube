@@ -1,0 +1,16 @@
+---
+// docstube ComparisonTable renderer: paper header row over the canvas body, no zebra striping,
+// horizontal scroll on overflow (theme spec §2.8/§4.9).
+const { columns = [], rows = [] } = Astro.props;
+---
+
+<div class="dt-comparison-table" data-component="ComparisonTable">
+  <table>
+    <thead>
+      <tr>{columns.map((column) => <th scope="col">{column}</th>)}</tr>
+    </thead>
+    <tbody>
+      {rows.map((row) => <tr>{row.map((cell) => <td>{String(cell)}</td>)}</tr>)}
+    </tbody>
+  </table>
+</div>

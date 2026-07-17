@@ -3,6 +3,7 @@ title: "Configuration"
 description: "Configure the docstube config family, agents, versions, locales, components, plugins, and comment-preserving edits."
 layout: "../layouts/DocLayout.astro"
 docstubeLocale: "en"
+docstubePageId: "pg_826p9e48qvnssrwqtm84"
 docstubeGuarantee: "scored"
 docstubeBlocksProven: 0
 docstubeBlocksTotal: 27
@@ -10,7 +11,18 @@ docstubeSources: [{"file":"apps/local-ui/src/wizard-state.ts","line":14,"endLine
 docstubeSections: [{"anchor":"docstube-yml","title":"docstube.yml","guarantee":"scored"},{"anchor":"ia-yml","title":"ia.yml","guarantee":"scored"},{"anchor":"glossary-yaml","title":"glossary.yaml","guarantee":"scored"},{"anchor":"agents","title":"Agents","guarantee":"scored"},{"anchor":"versions-and-locales","title":"Versions And Locales","guarantee":"scored"},{"anchor":"components","title":"Components","guarantee":"scored"},{"anchor":"plugins","title":"Plugins","guarantee":"scored"},{"anchor":"programmatic-edits","title":"Programmatic Edits","guarantee":"scored"}]
 ---
 
-import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
+import { default as Callout } from '../components/Callout.astro';
+import { default as CodeBlock } from '../components/CodeBlock.astro';
+import { default as CodeGroup } from '../components/CodeGroup.astro';
+import { default as Terminal } from '../components/Terminal.astro';
+import { default as Card } from '../components/Card.astro';
+import { default as CardGrid } from '../components/CardGrid.astro';
+import { default as Steps } from '../components/Steps.astro';
+import { default as Tabs } from '../components/Tabs.astro';
+import { default as FileTree } from '../components/FileTree.astro';
+import { default as Badge } from '../components/Badge.astro';
+import { default as ParamTable } from '../components/ParamTable.astro';
+import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
 
 # Configuration

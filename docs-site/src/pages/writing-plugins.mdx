@@ -3,6 +3,7 @@ title: "Writing plugins"
 description: "Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold."
 layout: "../layouts/DocLayout.astro"
 docstubeLocale: "en"
+docstubePageId: "pg_7rhvg4r9f5vc3q877dzf"
 docstubeGuarantee: "scored"
 docstubeBlocksProven: 14
 docstubeBlocksTotal: 25
@@ -10,7 +11,18 @@ docstubeSources: [{"file":"apps/cli/src/commands/plugin-command.ts","line":11,"e
 docstubeSections: [{"anchor":"manifest-validation","title":"Manifest validation","guarantee":"proven"},{"anchor":"registration-hooks","title":"Registration hooks","guarantee":"scored"},{"anchor":"verifier-shape","title":"Verifier shape","guarantee":"proven"},{"anchor":"permissions","title":"Permissions","guarantee":"scored"},{"anchor":"loading-plugins","title":"Loading plugins","guarantee":"proven"},{"anchor":"scaffolding","title":"Scaffolding","guarantee":"proven"}]
 ---
 
-import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
+import { default as Callout } from '../components/Callout.astro';
+import { default as CodeBlock } from '../components/CodeBlock.astro';
+import { default as CodeGroup } from '../components/CodeGroup.astro';
+import { default as Terminal } from '../components/Terminal.astro';
+import { default as Card } from '../components/Card.astro';
+import { default as CardGrid } from '../components/CardGrid.astro';
+import { default as Steps } from '../components/Steps.astro';
+import { default as Tabs } from '../components/Tabs.astro';
+import { default as FileTree } from '../components/FileTree.astro';
+import { default as Badge } from '../components/Badge.astro';
+import { default as ParamTable } from '../components/ParamTable.astro';
+import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
 
 # Writing plugins

@@ -1,0 +1,18 @@
+---
+// docstube CodeBlock renderer: the unified code surface with floating chrome (theme spec §2.4).
+// data-label feeds the CodeGroup tab rail; the copy button is handled by the layout's delegated
+// [data-copy] listener.
+const { code = '', language, title } = Astro.props;
+const label = title ?? language;
+---
+
+<figure class="dt-code-block" data-component="CodeBlock" data-label={label}>
+  <figcaption class="dt-code-chrome">
+    <span class="dt-code-label">{label ?? 'code'}</span>
+    <button class="dt-copy" type="button" data-copy aria-label="Copy code">
+      <svg class="dt-copy-idle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+      <svg class="dt-copy-done" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 5 5 9-11" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+  </figcaption>
+  <pre><code data-language={language}>{code}</code></pre>
+</figure>

@@ -1,0 +1,19 @@
+---
+// docstube CodeGroup renderer: child CodeBlocks share one code surface with the animated
+// segmented tab rail from the mock. The layout script builds the tabs from each child's
+// data-label and switches panels; without JS all panels render stacked.
+const { title } = Astro.props;
+---
+
+<section class="dt-code-group" data-component="CodeGroup" data-code-group>
+  <div class="dt-code-group-chrome">
+    <div class="dt-rail" data-rail role="tablist" aria-label={title ?? 'Code examples'}>
+      <span class="dt-rail-pill" data-rail-pill aria-hidden="true"></span>
+    </div>
+    <button class="dt-copy" type="button" data-copy aria-label="Copy code">
+      <svg class="dt-copy-idle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+      <svg class="dt-copy-done" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 5 5 9-11" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+  </div>
+  <div class="dt-code-group-panels"><slot /></div>
+</section>

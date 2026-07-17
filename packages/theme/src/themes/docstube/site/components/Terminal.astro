@@ -1,0 +1,20 @@
+---
+// docstube Terminal renderer: dark terminal chrome with window dots, prompt, and muted output.
+const { command, output, title } = Astro.props;
+---
+
+<figure class="dt-terminal" data-component="Terminal">
+  <figcaption class="dt-terminal-chrome">
+    <span class="dt-terminal-dot" aria-hidden="true"></span>
+    <span class="dt-terminal-dot" aria-hidden="true"></span>
+    <span class="dt-terminal-dot" aria-hidden="true"></span>
+    <span class="dt-terminal-title">{title ?? 'terminal'}</span>
+    <button class="dt-copy" type="button" data-copy aria-label="Copy command">
+      <svg class="dt-copy-idle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+      <svg class="dt-copy-done" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 5 5 9-11" stroke-linecap="round" stroke-linejoin="round" /></svg>
+    </button>
+  </figcaption>
+  <pre>{command ? <code class="dt-terminal-command">{command}</code> : null}{
+    output ? <code class="dt-terminal-output">{output}</code> : null
+  }</pre>
+</figure>
