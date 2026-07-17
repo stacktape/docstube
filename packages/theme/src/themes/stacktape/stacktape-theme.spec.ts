@@ -12,6 +12,14 @@ import { themeBundle } from './bundle.generated.ts';
 // guarantee levels' visible labels, and the stable data attributes — same shape as the basic
 // theme's proof-conformance.spec.ts. String-level assertions; building the site is CI's job.
 
+const bundleText = (path: string): string => {
+  const file = themeBundle.files.find((candidate) => candidate.path === path);
+  if (!file || !('content' in file)) {
+    throw new Error(`expected text bundle file at ${path}`);
+  }
+  return file.content;
+};
+
 describe('proof conformance (stacktape theme)', () => {
   let siteRoot: string;
 
@@ -182,5 +190,45 @@ describe('stacktape theme bundle', () => {
         expect(content).toContain(`/fonts/${family}-${weight}-latin.woff2`);
       }
     }
+  });
+
+  it('gives keyboard focus a visible accent outline instead of suppressing it', () => {
+    const css = bundleText('src/styles/global.css');
+    expect(css).toMatch(/\*:focus-visible \{\s*outline: 2px solid var\(--color-brand\);\s*outline-offset: 2px;/u);
+    expect(css).not.toMatch(/\*:focus-visible \{\s*outline: none/u);
+  });
+
+  it('wraps native tables in a horizontal scroller without dropping the table skin', () => {
+    const css = bundleText('src/styles/global.css');
+    expect(css).toMatch(/\.mdx-content \.stp-table-scroll \{[^}]*overflow-x: auto/u);
+    expect(css).toContain('.mdx-content .stp-table-scroll > table {');
+    const layout = bundleText('src/layouts/DocLayout.astro');
+    expect(layout).toContain("wrapper.className = 'stp-table-scroll';");
+  });
+
+  it('exposes sidebar collapse state and drops collapsed links from the tab order', () => {
+    const sidebar = bundleText('src/components/Sidebar.tsx');
+    expect(sidebar).toContain('aria-expanded={expanded}');
+    expect(sidebar).toContain('aria-controls={childrenId}');
+    expect(sidebar).toContain('inert={!expanded}');
+  });
+
+  it('collapses motion under prefers-reduced-motion while keeping the spec 150ms view transition', () => {
+    const css = bundleText('src/styles/global.css');
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?transition-duration: 0\.001ms !important/u
+    );
+    expect(css).toContain('animation-duration: 150ms !important;');
+  });
+
+  it('closes the mobile drawer on Escape and restores focus to the hamburger', () => {
+    const layout = bundleText('src/layouts/DocLayout.astro');
+    expect(layout).toContain("document.querySelector<HTMLElement>('[data-stp-hamburger]')?.focus();");
+    expect(layout).toContain("if (event.key === 'Escape') closeMobileNav();");
+  });
+
+  it('reveals dimmed [!code focus] lines on keyboard focus as well as hover', () => {
+    const css = bundleText('src/styles/global.css');
+    expect(css).toContain('.stp-code-shell:focus-within .has-focused .line:not(.focused)');
   });
 });

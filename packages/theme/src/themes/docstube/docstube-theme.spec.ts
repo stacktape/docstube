@@ -166,4 +166,55 @@ describe('docstube theme bundle smoke', () => {
     expect(layout).toContain('data-nav-toggle');
     expect(layout).toContain('data-search-modal');
   });
+
+  it('uses AA-compliant status text variants while icons and fills keep the spec colors', () => {
+    const css = bundleText('src/styles/global.css');
+    for (const token of [
+      '--status-proven-text: #0d7a50;',
+      '--status-scored-text: #09727b;',
+      '--status-flagged-text: #8f5a07;',
+      '--status-danger-text: #b23a31;'
+    ]) {
+      expect(css).toContain(token);
+    }
+    expect(css).toMatch(/\.dt-guarantee--proven \{[^}]*color: var\(--status-proven-text\)/u);
+    expect(css).toMatch(/\.dt-guarantee--proven::before \{[^}]*background: var\(--status-proven\)/u);
+    expect(css).toMatch(/\.dt-badge--warning \{[^}]*color: var\(--status-flagged-text\)/u);
+    expect(css).toMatch(/\.dt-badge--danger \{[^}]*color: var\(--status-danger-text\)/u);
+  });
+
+  it('traps and restores focus for the search modal and the mobile drawer', () => {
+    const layout = bundleText('src/layouts/DocLayout.astro');
+    expect(layout).toContain('const trapTab = (container, event) => {');
+    expect(layout).toContain('if (searchReturnFocus instanceof HTMLElement) searchReturnFocus.focus();');
+    expect(layout).toContain("if (event.key === 'Tab' && searchOpen && searchPanel) trapTab(searchPanel, event);");
+    expect(layout).toContain("if (event.key === 'Escape' && drawerOpen()) closeDrawer();");
+    expect(layout).toContain("if (event.key === 'Tab' && drawerOpen() && sidebar) trapTab(sidebar, event);");
+  });
+
+  it('renders Tabs and CodeGroup as keyboard-operable tablists', () => {
+    const tabs = bundleText('src/components/Tabs.astro');
+    expect(tabs).toContain('role="tablist"');
+    expect(tabs).toContain('role="tabpanel"');
+    expect(tabs).toContain('tabindex={tab.value === activeValue ? 0 : -1}');
+    const layout = bundleText('src/layouts/DocLayout.astro');
+    expect(layout).toContain("panel.setAttribute('role', 'tabpanel');");
+    expect(layout).toContain("button.setAttribute('aria-controls', panelId);");
+    expect(layout).toContain("if (event.key === 'ArrowRight' || event.key === 'ArrowDown')");
+    expect(layout).toContain('other.tabIndex = other === button ? 0 : -1;');
+  });
+
+  it('builds the bent TOC rail from arbitrary h2-h6 depths', () => {
+    const layout = bundleText('src/layouts/DocLayout.astro');
+    expect(layout).toContain("article.querySelectorAll('h2[id], h3[id], h4[id], h5[id], h6[id]')");
+    expect(layout).toContain(
+      'const depths = headings.map((heading) => Number.parseInt(heading.tagName.slice(1), 10) - 2);'
+    );
+  });
+
+  it('keeps header controls from colliding at intermediate widths', () => {
+    const css = bundleText('src/styles/global.css');
+    expect(css).toContain('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);');
+    expect(css).toMatch(/@media \(max-width: 1100px\) \{[\s\S]*?\.dt-search-trigger \{\s*width: min\(260px, 30vw\);/u);
+  });
 });

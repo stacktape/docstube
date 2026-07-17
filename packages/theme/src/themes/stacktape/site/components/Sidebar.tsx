@@ -110,15 +110,23 @@ function SidebarRow({ entry, active }: { entry: SidebarEntry; active: boolean })
   );
 }
 
+const slugifyLabel = (label: string): string =>
+  label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
 function SidebarGroupSection({
   group,
   expanded,
   currentPath,
+  navId,
   onToggle
 }: {
   group: SidebarGroup;
   expanded: boolean;
   currentPath: string;
+  navId: string;
   onToggle: () => void;
 }) {
   const rows = group.entries.map((entry) => (
@@ -129,12 +137,16 @@ function SidebarGroupSection({
   if (group.label === null) {
     return <div style={{ marginBottom: 8 }}>{rows}</div>;
   }
+  // navId disambiguates the desktop and mobile sidebar instances so aria-controls ids stay unique.
+  const childrenId = `stp-nav-${navId}-${slugifyLabel(group.label)}`;
   return (
     <div style={{ position: 'relative', marginBottom: 8 }}>
       <div
         className="stp-nav-group-header"
         role="button"
         tabIndex={0}
+        aria-expanded={expanded}
+        aria-controls={childrenId}
         onClick={onToggle}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
@@ -146,7 +158,15 @@ function SidebarGroupSection({
         <span style={{ flex: 1 }}>{group.label}</span>
         <ChevronIcon expanded={expanded} />
       </div>
-      <div aria-hidden={!expanded} className="stp-nav-children" style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}>
+      {/* inert drops collapsed links out of the tab order and accessibility tree while they
+          animate closed and stay in the DOM (spec §3.5 collapsed-state semantics). */}
+      <div
+        id={childrenId}
+        aria-hidden={!expanded}
+        inert={!expanded}
+        className="stp-nav-children"
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+      >
         <div>
           <span className="stp-nav-guide" />
           {rows}
@@ -156,7 +176,7 @@ function SidebarGroupSection({
   );
 }
 
-export function Sidebar({ groups, pathname }: { groups: SidebarGroup[]; pathname: string }) {
+export function Sidebar({ groups, pathname, navId }: { groups: SidebarGroup[]; pathname: string; navId: string }) {
   // All groups start expanded (docstube sites have no configured default-open set); stored user
   // overrides load after mount so SSR markup and first client render always match.
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
@@ -190,6 +210,7 @@ export function Sidebar({ groups, pathname }: { groups: SidebarGroup[]; pathname
           group={group}
           expanded={group.label === null ? true : (overrides[group.label] ?? true)}
           currentPath={currentPath}
+          navId={navId}
           onToggle={() => group.label !== null && toggle(group.label)}
         />
       ))}

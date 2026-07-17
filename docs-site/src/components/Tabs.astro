@@ -1,7 +1,8 @@
 ---
 // docstube Tabs renderer: the animated segmented-control pill from the mock. The registry
 // contract carries one children slot, so the rail is presentational selection state; panel
-// content renders below it.
+// content renders below it. Tab buttons ship a roving tabindex (active tab is the only tab
+// stop) and the layout script adds arrow-key selection over the role=tablist rail.
 const { defaultValue, tabs = [] } = Astro.props;
 const activeValue = defaultValue ?? tabs[0]?.value;
 ---
@@ -15,11 +16,12 @@ const activeValue = defaultValue ?? tabs[0]?.value;
         type="button"
         role="tab"
         aria-selected={tab.value === activeValue ? 'true' : 'false'}
+        tabindex={tab.value === activeValue ? 0 : -1}
         data-tab-value={tab.value}
       >
         {tab.label}
       </button>
     ))}
   </div>
-  <div class="dt-tabs-panel"><slot /></div>
+  <div class="dt-tabs-panel" role="tabpanel"><slot /></div>
 </div>

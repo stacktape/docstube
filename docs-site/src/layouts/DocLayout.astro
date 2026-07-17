@@ -87,7 +87,7 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
 
     <header class="dt-header">
       <div class="dt-header-left">
-        <button class="dt-nav-toggle" type="button" data-nav-toggle aria-label="Toggle navigation" aria-expanded="false">
+        <button class="dt-nav-toggle" type="button" data-nav-toggle aria-label="Toggle navigation" aria-expanded="false" aria-controls="dt-sidebar">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
         </button>
         <a class="dt-brand" href="/">
@@ -136,7 +136,7 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
     </header>
 
     <div class="dt-shell">
-      <aside class="dt-sidebar" data-sidebar aria-label="Documentation">
+      <aside class="dt-sidebar" id="dt-sidebar" data-sidebar aria-label="Documentation">
         <div class="dt-sidebar-inner">
           {nav.map((group) => (
             <section class="dt-nav-group">
@@ -206,11 +206,14 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
 
       const selectRailButton = (rail, button) => {
         const buttons = [...rail.querySelectorAll('button')];
+        const isTablist = rail.getAttribute('role') === 'tablist';
         for (const other of buttons) {
           other.classList.toggle('dt-on', other === button);
           if (other.hasAttribute('role') || other.hasAttribute('aria-selected')) {
             other.setAttribute('aria-selected', other === button ? 'true' : 'false');
           }
+          // roving tabindex: only the selected tab is a tab stop; arrow keys reach the rest
+          if (isTablist) other.tabIndex = other === button ? 0 : -1;
         }
         movePill(rail);
         return buttons.indexOf(button);
@@ -224,6 +227,26 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
           const index = selectRailButton(rail, button);
           if (onSelect) onSelect(index);
         });
+        if (rail.getAttribute('role') === 'tablist') {
+          const initial = rail.querySelector('.dt-on') || rail.querySelector('button');
+          if (initial) selectRailButton(rail, initial);
+          rail.addEventListener('keydown', (event) => {
+            const buttons = [...rail.querySelectorAll('button')];
+            const current = buttons.indexOf(document.activeElement);
+            if (current === -1 || buttons.length === 0) return;
+            let next = null;
+            if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % buttons.length;
+            else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+              next = (current - 1 + buttons.length) % buttons.length;
+            } else if (event.key === 'Home') next = 0;
+            else if (event.key === 'End') next = buttons.length - 1;
+            if (next === null) return;
+            event.preventDefault();
+            buttons[next].focus();
+            const index = selectRailButton(rail, buttons[next]);
+            if (onSelect) onSelect(index);
+          });
+        }
         movePill(rail);
       };
 
@@ -246,19 +269,27 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         syncTheme();
       }
 
-      // Component rails: Tabs (pill only) and CodeGroup (pill + panel switching).
+      // Component rails: Tabs (pill only) and CodeGroup (pill + panel switching). Both are real
+      // tablists: role=tab buttons with roving tabindex and arrow-key selection via setupRail.
       for (const rail of document.querySelectorAll('[data-component="Tabs"] [data-rail]')) {
         setupRail(rail);
       }
+      let codeGroupCount = 0;
       for (const group of document.querySelectorAll('[data-code-group]')) {
         const rail = group.querySelector('[data-rail]');
         const panels = [...group.querySelectorAll('.dt-code-block')];
         if (!rail || panels.length === 0) continue;
+        codeGroupCount += 1;
         panels.forEach((panel, index) => {
+          const panelId = panel.id || `dt-code-panel-${codeGroupCount}-${index + 1}`;
+          panel.id = panelId;
+          panel.setAttribute('role', 'tabpanel');
           const button = document.createElement('button');
           button.type = 'button';
           button.setAttribute('role', 'tab');
           button.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
+          button.setAttribute('aria-controls', panelId);
+          button.tabIndex = index === 0 ? 0 : -1;
           if (index === 0) button.classList.add('dt-on');
           button.textContent = panel.getAttribute('data-label') || `Tab ${index + 1}`;
           rail.append(button);
@@ -308,25 +339,55 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         } catch {}
       });
 
-      // Search modal over the kernel Pagefind mount; Ctrl/Cmd+K toggles.
+      // Shared focus containment: while a modal surface is open, Tab cycles inside it and
+      // closing restores focus to the element that opened it.
+      const focusablesIn = (container) =>
+        [
+          ...container.querySelectorAll(
+            'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        ].filter((el) => el instanceof HTMLElement && !el.closest('[hidden]'));
+      const trapTab = (container, event) => {
+        const focusables = focusablesIn(container);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const active = document.activeElement;
+        if (event.shiftKey && (active === first || !container.contains(active))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || !container.contains(active))) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+
+      // Search modal over the kernel Pagefind mount; Ctrl/Cmd+K toggles, Escape closes, focus is
+      // trapped in the dialog and returned to the opener on close.
       const searchModal = document.querySelector('[data-search-modal]');
+      const searchPanel = searchModal?.querySelector('.dt-search-panel');
       const searchKbd = document.querySelector('[data-search-kbd]');
       if (searchKbd && /Mac|iPhone|iPad/.test(navigator.platform)) searchKbd.textContent = '⌘K';
+      let searchReturnFocus = null;
       const focusSearch = (attempt = 0) => {
-        const input = searchModal?.querySelector('input');
+        if (searchModal?.hidden !== false) return;
+        const input = searchModal.querySelector('input');
         if (input instanceof HTMLElement) input.focus();
         else if (attempt < 10) setTimeout(() => focusSearch(attempt + 1), 120);
       };
       const openSearch = () => {
         if (!searchModal) return;
+        searchReturnFocus = document.activeElement;
         searchModal.hidden = false;
         document.body.classList.add('dt-modal-open');
         focusSearch();
       };
       const closeSearch = () => {
-        if (!searchModal) return;
+        if (!searchModal || searchModal.hidden) return;
         searchModal.hidden = true;
         document.body.classList.remove('dt-modal-open');
+        if (searchReturnFocus instanceof HTMLElement) searchReturnFocus.focus();
+        searchReturnFocus = null;
       };
       for (const opener of document.querySelectorAll('[data-search-open]')) {
         opener.addEventListener('click', openSearch);
@@ -339,8 +400,11 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
           event.preventDefault();
           if (searchModal?.hidden) openSearch();
           else closeSearch();
+          return;
         }
-        if (event.key === 'Escape' && searchModal && !searchModal.hidden) closeSearch();
+        const searchOpen = searchModal && !searchModal.hidden;
+        if (event.key === 'Escape' && searchOpen) closeSearch();
+        if (event.key === 'Tab' && searchOpen && searchPanel) trapTab(searchPanel, event);
       });
       const searchEmpty = document.querySelector('.dt-search-empty');
       if (searchEmpty) {
@@ -351,38 +415,53 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         hideWhenReady();
       }
 
-      // Mobile navigation drawer.
+      // Mobile navigation drawer: Escape closes it (consistent with the search modal), Tab is
+      // trapped inside the drawer while open, and closing restores focus to the toggle.
       const navToggle = document.querySelector('[data-nav-toggle]');
+      const sidebar = document.querySelector('[data-sidebar]');
+      const drawerOpen = () => document.body.classList.contains('dt-nav-open');
       const closeDrawer = () => {
+        if (!drawerOpen()) return;
         document.body.classList.remove('dt-nav-open');
         navToggle?.setAttribute('aria-expanded', 'false');
+        if (navToggle instanceof HTMLElement) navToggle.focus();
       };
       navToggle?.addEventListener('click', () => {
         const open = document.body.classList.toggle('dt-nav-open');
         navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open && sidebar) focusablesIn(sidebar)[0]?.focus();
       });
       document.querySelector('[data-sidebar-backdrop]')?.addEventListener('click', closeDrawer);
-      document.querySelector('[data-sidebar]')?.addEventListener('click', (event) => {
+      sidebar?.addEventListener('click', (event) => {
         if (event.target instanceof Element && event.target.closest('a')) closeDrawer();
       });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && drawerOpen()) closeDrawer();
+        if (event.key === 'Tab' && drawerOpen() && sidebar) trapTab(sidebar, event);
+      });
 
-      // In-page TOC: built from rendered h2/h3 headings, with the bent SVG rail encoding depth
-      // (30px row rhythm; top-level track at x=2, nested track at x=14, S-bends between depths).
+      // In-page TOC: built from rendered h2–h6 headings, with the bent SVG rail encoding depth
+      // (spec §4.3: generate the rail programmatically from heading depth; 30px row rhythm). The
+      // h2 track sits at x=2 and each extra heading level indents 12px, with S-bends between
+      // rows whenever the depth changes.
       const tocRoot = document.querySelector('[data-toc]');
       const tocBody = document.querySelector('[data-toc-body]');
       const article = document.querySelector('[data-docstube-entity-id]');
       if (tocRoot && tocBody && article) {
-        const headings = [...article.querySelectorAll('h2[id], h3[id]')];
+        const headings = [...article.querySelectorAll('h2[id], h3[id], h4[id], h5[id], h6[id]')];
         if (headings.length >= 2) {
           tocRoot.hidden = false;
           const rowHeight = 30;
-          const xs = headings.map((heading) => (heading.tagName === 'H3' ? 14 : 2));
+          const indentStep = 12;
+          const depths = headings.map((heading) => Number.parseInt(heading.tagName.slice(1), 10) - 2);
+          const xs = depths.map((depth) => 2 + depth * indentStep);
+          const svgWidth = Math.max(24, Math.max(...xs) + 10);
           const height = headings.length * rowHeight;
           const svgNs = 'http://www.w3.org/2000/svg';
           const svg = document.createElementNS(svgNs, 'svg');
-          svg.setAttribute('width', '24');
+          svg.setAttribute('width', String(svgWidth));
           svg.setAttribute('height', String(height));
-          svg.setAttribute('viewBox', `0 0 24 ${height}`);
+          svg.setAttribute('viewBox', `0 0 ${svgWidth} ${height}`);
           svg.setAttribute('fill', 'none');
           svg.setAttribute('aria-hidden', 'true');
           let base = `M${xs[0]} 8`;
@@ -409,7 +488,9 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
 
           const links = headings.map((heading, index) => {
             const link = document.createElement('a');
-            link.className = `dt-toc-item${heading.tagName === 'H3' ? ' dt-toc-item--nested' : ''}`;
+            link.className = `dt-toc-item${depths[index] > 0 ? ' dt-toc-item--nested' : ''}`;
+            // row text sits 18px right of its rail track at every depth (20px at h2, 32px at h3, …)
+            link.style.paddingLeft = `${xs[index] + 18}px`;
             link.href = `#${heading.id}`;
             const clone = heading.cloneNode(true);
             for (const chip of clone.querySelectorAll('.dt-guarantee')) chip.remove();

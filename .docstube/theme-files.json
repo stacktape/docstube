@@ -124,7 +124,7 @@
     },
     {
       "path": "src/components/Tabs.astro",
-      "hash": "74fdd85f346adb139f0c0d9f92cb55645212bddb689950fec0c69cc03edae9b2"
+      "hash": "aedc8f4c01d632fed90a95dc5b3d08656e23522903355b089d18f344817b7cc5"
     },
     {
       "path": "src/components/Terminal.astro",
@@ -132,7 +132,7 @@
     },
     {
       "path": "src/layouts/DocLayout.astro",
-      "hash": "dd9bb046d541bbe7b07650140f74e0b41eca62e3889fdb4c03805f579634e05f"
+      "hash": "7c1bf951d92b4b50c283d1d05323a720c93924c1617ff233a4ccd2fc3625ac4e"
     },
     {
       "path": "src/styles/fonts.css",
@@ -140,7 +140,7 @@
     },
     {
       "path": "src/styles/global.css",
-      "hash": "8c065556e422ba41aa65beae3da100950da40229262b81ab2d0d46e641483aeb"
+      "hash": "901243cadb0569a2330be7d2633cf1291e925db296d3a6ed7ea0e0cc37c0a3d1"
     }
   ]
 }

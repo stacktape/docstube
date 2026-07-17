@@ -105,10 +105,10 @@ const navGroups = nav.map((group) => ({ label: group.label, entries: group.entri
     <div class="stp-page-wrapper">
       <div class="stp-mobile-nav" transition:persist="docs-mobile-nav">
         <hr class="stp-mobile-divider" />
-        <Sidebar client:load groups={navGroups} pathname={Astro.url.pathname} />
+        <Sidebar client:load groups={navGroups} pathname={Astro.url.pathname} navId="mobile" />
       </div>
       <aside class="stp-sidebar" aria-label="Documentation" transition:persist="docs-sidebar">
-        <Sidebar client:load groups={navGroups} pathname={Astro.url.pathname} />
+        <Sidebar client:load groups={navGroups} pathname={Astro.url.pathname} navId="desktop" />
       </aside>
       <main id="main-content">
         <div class="stp-toolbar">
@@ -256,6 +256,19 @@ const navGroups = nav.map((group) => ({ label: group.label, entries: group.entri
         }
       };
 
+      // Native tables: wrap each in a horizontal scroller so wide API/config tables scroll
+      // rather than clip inside the 905px content box (registry tables ship their own wrapper).
+      const wrapTables = () => {
+        for (const table of document.querySelectorAll<HTMLElement>('.mdx-content table:not([data-stp-scrollable])')) {
+          table.dataset.stpScrollable = 'true';
+          if (table.closest('.stp-comparison-wrapper') || table.closest('.stp-table-scroll')) continue;
+          const wrapper = document.createElement('div');
+          wrapper.className = 'stp-table-scroll';
+          table.replaceWith(wrapper);
+          wrapper.append(table);
+        }
+      };
+
       // Content tabs (the registry Tabs component renders the strip only).
       const wireContentTabs = () => {
         for (const tabList of document.querySelectorAll<HTMLElement>(
@@ -274,21 +287,30 @@ const navGroups = nav.map((group) => ({ label: group.label, entries: group.entri
       const enhance = () => {
         decorateCodeBlocks();
         hydrateCodeGroups();
+        wrapTables();
         wireContentTabs();
       };
       document.addEventListener('astro:page-load', enhance);
       enhance();
 
-      // Mobile drawer: the hamburger toggles the attribute the CSS keys on; navigation closes it.
+      // Mobile drawer: the hamburger toggles the attribute the CSS keys on; navigation and
+      // Escape close it, and closing returns focus to the hamburger so keyboard users are not
+      // stranded in the removed drawer content.
+      const closeMobileNav = () => {
+        if (!document.documentElement.hasAttribute('data-mobile-nav-open')) return;
+        document.documentElement.removeAttribute('data-mobile-nav-open');
+        document.querySelector<HTMLElement>('[data-stp-hamburger]')?.focus();
+      };
       document.addEventListener('click', (event) => {
         const target = event.target as HTMLElement | null;
         if (target?.closest('[data-stp-hamburger]')) {
           document.documentElement.toggleAttribute('data-mobile-nav-open');
         }
       });
-      document.addEventListener('astro:after-swap', () => {
-        document.documentElement.removeAttribute('data-mobile-nav-open');
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeMobileNav();
       });
+      document.addEventListener('astro:after-swap', closeMobileNav);
     </script>
   </body>
 </html>

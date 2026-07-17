@@ -397,11 +397,14 @@
     max-width: 100%;
   }
 
+  /* The source removed all focus outlines; keyboard operability (spec §3.5, §5.7) needs a
+     visible treatment, so pointer focus stays clean and keyboard focus gets the accent ring. */
   *:focus {
     outline: none;
   }
   *:focus-visible {
-    outline: none;
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
   }
 
   button,
@@ -437,6 +440,21 @@
   ::view-transition-old(main-content),
   ::view-transition-new(main-content) {
     animation-duration: 150ms !important;
+  }
+}
+/* Reduced motion: collapse every element transition/animation (nav expansion, chevrons, TOC
+   snake, tab pill, hover fades, grow-down) to an imperceptible duration. The view-transition
+   pseudo-elements above are not element-tree nodes, so the spec's 150ms fade survives. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  html {
+    scroll-behavior: auto;
   }
 }
 @keyframes stp-quick-fade-out {
@@ -649,6 +667,21 @@
       0 0 0 1px rgba(255, 255, 255, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.2);
   }
+  /* The layout script wraps each native table in this scroller so wide API/config tables scroll
+     horizontally instead of clipping; the outer shadows move to the wrapper so they survive the
+     overflow clip while the table keeps its inset highlight. */
+  .mdx-content .stp-table-scroll {
+    margin: 20px 0 16px;
+    overflow-x: auto;
+    border-radius: 8px;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+  .mdx-content .stp-table-scroll > table {
+    margin: 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
   .mdx-content thead {
     background: rgba(0, 0, 0, 0.2);
   }
@@ -744,8 +777,9 @@
   );
   border-left: 2px solid rgba(137, 180, 250, 0.8);
 }
-/* [!code focus]: the source collapses unfocused runs to "..."; the compile-time adaptation dims
-   them instead and reveals on hover. */
+/* [!code focus]: the source collapses unfocused runs to "..." with interactive expansion; this
+   static-site adaptation dims them instead and reveals on hover/keyboard focus. Recorded as a
+   documented adaptation in theme.ts next to the shiki transformer config. */
 .stp-code-shell .has-focused .line:not(.focused) {
   opacity: 0.4;
   filter: grayscale(0.75);
@@ -753,7 +787,8 @@
     opacity 250ms ease,
     filter 250ms ease;
 }
-.stp-code-shell:hover .has-focused .line:not(.focused) {
+.stp-code-shell:hover .has-focused .line:not(.focused),
+.stp-code-shell:focus-within .has-focused .line:not(.focused) {
   opacity: 0.8;
   filter: grayscale(0.2);
 }

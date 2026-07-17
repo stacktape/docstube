@@ -29,6 +29,11 @@ export const manifest: ThemeManifest = {
     globalStyleEntry: 'styles/global.css',
     // The source site highlights with shiki `catppuccin-mocha` (single theme — dark-only). The
     // transformers module ports the spec's [!code highlight]/[!code focus] comment markers.
+    // DOCUMENTED ADAPTATION — [!code focus]: the source collapses unfocused runs to "..." with
+    // interactive expansion; that needs per-block runtime state the static pipeline does not
+    // carry, so this theme dims unfocused lines (opacity .4, grayscale) and restores them on
+    // hover or keyboard focus-within instead. The CSS lives under `.has-focused` in
+    // styles/global.css; behavior is intentionally not equivalent to the source.
     shiki: { themes: ['catppuccin-mocha'], transformers: ['code/shiki-transformers.mjs'] }
   },
   // Declared in registry order so the generated MDX import line stays stable.

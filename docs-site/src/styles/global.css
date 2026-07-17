@@ -32,6 +32,14 @@
   --status-scored-bg: color-mix(in srgb, var(--status-scored) 12%, transparent);
   --status-flagged-bg: color-mix(in srgb, var(--status-flagged) 12%, transparent);
   --status-danger-bg: color-mix(in srgb, var(--status-danger) 12%, transparent);
+  /* status TEXT variants: the spec hues fail WCAG AA as small text in light mode (#15a06b
+     3.35:1, #c2790b 3.48:1, #d6584f 3.91:1 vs white; worse on the 12% tinted badge fills), so
+     text darkens to these AA-compliant values (all >= 4.5:1 on the tinted fills) while borders,
+     icons, and background accents keep the spec colors. */
+  --status-proven-text: #0d7a50;
+  --status-scored-text: #09727b;
+  --status-flagged-text: #8f5a07;
+  --status-danger-text: #b23a31;
 
   /* elevation (spec §1.7) */
   --shadow-soft: 0 1px 2px rgba(13, 50, 48, 0.04), 0 6px 20px -8px rgba(13, 50, 48, 0.12);
@@ -67,6 +75,11 @@
   --status-scored: #36bebe;
   --status-flagged: #e0a13e;
   --status-danger: #ef8079;
+  /* dark status hues already clear AA on the charcoal surfaces, so text uses them directly */
+  --status-proven-text: var(--status-proven);
+  --status-scored-text: var(--status-scored);
+  --status-flagged-text: var(--status-flagged);
+  --status-danger-text: var(--status-danger);
 }
 
 /* ---------- base ---------- */
@@ -136,7 +149,9 @@ samp {
   border-bottom: 1px solid var(--dt-border);
   display: grid;
   gap: 8px;
-  grid-template-columns: 1fr auto 1fr;
+  /* minmax(0, …) lets the side columns shrink below content size, so the brand ellipsizes and
+     the switcher cluster never collides with the centered search at intermediate widths */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   height: var(--dt-header-height);
   padding: 0 16px;
   position: sticky;
@@ -154,6 +169,7 @@ samp {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  min-width: 0;
 }
 .dt-brand {
   align-items: center;
@@ -164,8 +180,10 @@ samp {
   font-weight: 700;
   gap: 8px;
   letter-spacing: -0.01em;
+  min-width: 0;
   overflow: hidden;
   text-decoration: none;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .dt-brand-mark {
@@ -204,9 +222,15 @@ samp {
   font-family: inherit;
   font-size: 13px;
   gap: 8px;
+  min-width: 0;
   padding: 7px 10px;
   transition: border-color 0.15s ease;
   width: min(340px, 38vw);
+}
+.dt-search-trigger .dt-search-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dt-search-trigger:hover {
   border-color: var(--dt-border-strong);
@@ -753,16 +777,18 @@ samp {
 }
 .dt-guarantee--proven {
   background: var(--status-proven-bg);
-  color: var(--status-proven);
+  color: var(--status-proven-text);
 }
 .dt-guarantee--proven::before {
+  background: var(--status-proven);
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.7 9.5 3.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 .dt-guarantee--scored {
   background: var(--status-scored-bg);
-  color: var(--status-scored);
+  color: var(--status-scored-text);
 }
 .dt-guarantee--scored::before {
+  background: var(--status-scored);
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='4.4' fill='none' stroke='%23000' stroke-width='1.7'/%3E%3Ccircle cx='6' cy='6' r='1.7'/%3E%3C/svg%3E");
 }
 .dt-guarantee--out-of-domain {
@@ -986,6 +1012,9 @@ body.dt-modal-open {
   margin: 0 0 2px !important;
 }
 .dt-callout-content {
+  /* body prose stays ink-soft per spec §2.7 ("prose-first"); only the icon/border/tint carry the
+     tone color, which also keeps callout text AA in light mode. */
+  color: var(--dt-text-soft);
   font-size: 14.5px;
 }
 .dt-callout-content > :first-child {
@@ -1166,15 +1195,15 @@ a.dt-card:hover {
 }
 .dt-badge--success {
   background: var(--status-proven-bg);
-  color: var(--status-proven);
+  color: var(--status-proven-text);
 }
 .dt-badge--warning {
   background: var(--status-flagged-bg);
-  color: var(--status-flagged);
+  color: var(--status-flagged-text);
 }
 .dt-badge--danger {
   background: var(--status-danger-bg);
-  color: var(--status-danger);
+  color: var(--status-danger-text);
 }
 
 /* ParamTable: the API-reference row grammar (paper header over canvas body, teal types) */
@@ -1209,7 +1238,7 @@ a.dt-card:hover {
 .dt-param-required {
   background: var(--status-flagged-bg);
   border-radius: 4px;
-  color: var(--status-flagged);
+  color: var(--status-flagged-text);
   font-family: var(--font-code, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 600;
@@ -1274,6 +1303,14 @@ a.dt-card:hover {
     grid-template-columns: var(--dt-sidebar-width) minmax(0, 1fr);
   }
   .dt-toc {
+    display: none;
+  }
+  /* compact the header before the 900px drawer cutover: version + locale + theme controls
+     otherwise collide with the centered 340px search field in the 900–1100px band */
+  .dt-search-trigger {
+    width: min(260px, 30vw);
+  }
+  .dt-theme-rail button span {
     display: none;
   }
 }
