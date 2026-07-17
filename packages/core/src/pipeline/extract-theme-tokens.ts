@@ -10,7 +10,7 @@ import { agentTaskSpecSchema, idPrefixes, mintId } from '@docstube/contracts';
 // same token editor the "Design it here" path uses.
 
 // The docstube theme token vocabulary — mirrors defaultThemeTokens in
-// packages/theme/src/emit-site.ts (copied, not imported: core must not depend on the theme
+// packages/theme/src/theme-manifest.ts (copied, not imported: core must not depend on the theme
 // package). Keep the two lists in sync.
 export const themeTokenNames = [
   'surface',

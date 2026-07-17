@@ -1,0 +1,119 @@
+---
+// Basic theme layout. Kernel proof primitives (src/docstube/**) are mandatory mounts: the
+// guarantee badge, section chips, sources footer, and entity wrapper are a conformance contract,
+// not a theme choice — this layout styles them, it does not decide whether they exist.
+import '../styles/global.css';
+import DocstubeEntity from '../docstube/DocstubeEntity.astro';
+import DocstubeGuarantee from '../docstube/DocstubeGuarantee.astro';
+import DocstubeSearch from '../docstube/DocstubeSearch.astro';
+import DocstubeSectionChips from '../docstube/DocstubeSectionChips.astro';
+import DocstubeSources from '../docstube/DocstubeSources.astro';
+import {
+  footerCredit,
+  layoutMode,
+  navByLocale,
+  repoUrl,
+  siteDescription,
+  siteTitle,
+  siteUrl,
+  sourceLocale,
+  versions
+} from '../site-data.mjs';
+
+const { frontmatter } = Astro.props;
+const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTitle;
+const description = frontmatter.description || siteDescription;
+const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;
+const guarantee = frontmatter.docstubeGuarantee;
+const guaranteeTitle = `${frontmatter.docstubeBlocksProven ?? 0} of ${frontmatter.docstubeBlocksTotal ?? 0} blocks proven`;
+const locale = frontmatter.docstubeLocale ?? sourceLocale;
+const alternates = frontmatter.docstubeAlternates ?? [];
+const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
+const sources = frontmatter.docstubeSources ?? [];
+const sections = frontmatter.docstubeSections ?? [];
+const nav = navByLocale[locale] ?? navByLocale[sourceLocale] ?? [];
+---
+
+<!doctype html>
+<html lang={locale} data-layout={layoutMode}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    {description ? <meta name="description" content={description} /> : null}
+    {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
+    {
+      siteUrl && alternates.length > 1
+        ? alternates.map((alternate) => (
+            <link rel="alternate" hreflang={alternate.locale} href={new URL(alternate.href, siteUrl).href} />
+          ))
+        : null
+    }
+    {
+      siteUrl && alternates.length > 1 && sourceAlternate ? (
+        <link rel="alternate" hreflang="x-default" href={new URL(sourceAlternate.href, siteUrl).href} />
+      ) : null
+    }
+    <meta property="og:title" content={title} />
+    {description ? <meta property="og:description" content={description} /> : null}
+    {canonicalUrl ? <meta property="og:url" content={canonicalUrl} /> : null}
+    <meta property="og:type" content="article" />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+    <div class="site-shell">
+      <aside class="site-nav" aria-label="Documentation">
+        <strong>{siteTitle}</strong>
+        {/* TODO(sectioned): the 'sectioned' layout renders top-level groups as sidebar section
+            headers for now; the per-section tab bar is a follow-up. */}
+        {nav.map((group) => (
+          <section class="nav-group">
+            {group.label ? <p class="nav-group-label">{group.label}</p> : null}
+            <nav>
+              {group.entries.map((entry) => (
+                <a href={entry.href} aria-current={Astro.url.pathname === entry.href ? 'page' : undefined}>
+                  {entry.label}
+                </a>
+              ))}
+            </nav>
+          </section>
+        ))}
+      </aside>
+      <main id="content" class="content">
+        <header class="site-toolbar">
+          <DocstubeSearch />
+          {versions.frozen.length > 0 ? (
+            <details class="dt-version-switcher">
+              <summary>{versions.current}</summary>
+              <nav aria-label="Versions">
+                <a href="/">{versions.current}</a>
+                {/* Frozen snapshot content emission is pending; these routes land in a later wave. */}
+                {versions.frozen.map((label) => (
+                  <a href={`/versions/${label}/`}>{label}</a>
+                ))}
+              </nav>
+            </details>
+          ) : null}
+          {alternates.length > 1 ? (
+            <nav class="dt-locale-switcher" aria-label="Language">
+              {alternates.map((alternate) => (
+                <a href={alternate.href} aria-current={alternate.locale === locale ? 'true' : undefined}>
+                  {alternate.locale}
+                </a>
+              ))}
+            </nav>
+          ) : null}
+          {guarantee ? <DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} /> : null}
+        </header>
+        <DocstubeEntity entityId={frontmatter.docstubePageId} guarantee={guarantee}>
+          <slot />
+        </DocstubeEntity>
+        <DocstubeSources sources={sources} repoUrl={repoUrl} />
+        {footerCredit ? (
+          <footer class="site-footer">Docs by <a href="https://docstube.dev">docstube</a></footer>
+        ) : null}
+      </main>
+    </div>
+    <DocstubeSectionChips sections={sections} />
+  </body>
+</html>

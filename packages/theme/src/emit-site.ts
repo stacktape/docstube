@@ -1,12 +1,28 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
-import { builtinComponentNames } from './components.ts';
+import { applyThemeBundle } from './apply-theme-bundle.ts';
+import type { ThemeConflict } from './apply-theme-bundle.ts';
 import { docsMcpReadmeMd, docsMcpServerMjs } from './mcp-server-source.ts';
+import {
+  docstubeEntityAstro,
+  docstubeGuaranteeAstro,
+  docstubeSearchAstro,
+  docstubeSectionChipsAstro,
+  docstubeSourcesAstro
+} from './proof-source.ts';
+import { ThemeError } from './theme-manifest.ts';
+import type { ThemeBuild, ThemeBundle } from './theme-manifest.ts';
 
 // Emits a fully self-contained Astro site: generated sites vendor everything they need and never
 // depend on a @docstube/* package at runtime (ARCHITECTURE.md §2). The site builds with plain
 // `npm install && npm run build`.
+//
+// Ownership (knowledge/design/theming.md): content MDX, public/*.md mirrors, llms.txt,
+// site-data.mjs, the MCP server, Pagefind wiring, and src/docstube/** proof primitives are
+// kernel/content-owned. src/layouts/**, src/components/**, src/styles/** come from the resolved
+// theme bundle. astro.config.mjs and package.json are kernel-generated from invariants plus the
+// theme's typed build hooks.
 
 export type EmitSitePage = {
   shard: PageShard;
@@ -19,6 +35,9 @@ export type EmitSiteInput = {
   outDir: string;
   config: DocstubeConfig;
   index: ManifestIndex;
+  // The resolved theme bundle. The CLI resolves it (builtinThemes[config.theme.name]) — emitSite
+  // never performs a hidden registry lookup.
+  theme: ThemeBundle;
   // Source-locale pages, routed at /<slug>.
   pages: EmitSitePage[];
   // Target-locale shards (same page ids/slugs, different locale), routed at /<locale>/<slug>.
@@ -30,35 +49,41 @@ export type EmitSiteInput = {
   // Public URL of the source repository (e.g. https://github.com/acme/widget). When set, source
   // citations link to <repoUrl>/blob/<commit>/<file>#L<line>; plain text otherwise.
   repoUrl?: string;
+  // Overwrite user-modified theme-owned files instead of reporting conflicts.
+  forceTheme?: boolean;
 };
 
-// Design-token defaults; config.theme.tokens entries override or extend these.
-export const defaultThemeTokens: Record<string, string> = {
-  surface: '#ffffff',
-  'surface-muted': '#f4f7f8',
-  'surface-raised': '#eef4f3',
-  text: '#192122',
-  'text-muted': '#526061',
-  border: '#d5dfdf',
-  accent: '#087f7b',
-  'accent-strong': '#075f63',
-  success: '#1a7f37',
-  warning: '#8f5d00',
-  danger: '#b42318',
-  'font-family': 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
+export type EmitSiteResult = {
+  // Theme-owned files that were NOT touched because the user modified them (reported, never
+  // silently destroyed). The CLI prints these.
+  themeConflicts: ThemeConflict[];
 };
 
-// Exact pins (no ranges): a generated site must build identically whenever it is rebuilt, and a
-// docstube release is only ever validated against these versions. `docstube refresh` updates them.
-const generatedSiteDependencies = {
+// Kernel invariants pinned exactly (no ranges): a generated site must build identically whenever
+// it is rebuilt, and a docstube release is only ever validated against these versions.
+// `docstube refresh` updates them. Theme dependencies merge on top; a conflicting pin is an error.
+const kernelBaseDependencies: Record<string, string> = {
   '@astrojs/mdx': '6.0.3',
-  '@astrojs/react': '5.0.7',
   astro: '6.4.6',
   // Baseline static search (PRODUCT §4.1); indexes dist/ in the postbuild step.
-  pagefind: '1.4.0',
-  react: '19.2.7',
-  'react-dom': '19.2.7'
-} as const;
+  pagefind: '1.4.0'
+};
+
+const mergeDependencies = (theme: ThemeBundle): Record<string, string> => {
+  const merged: Record<string, string> = { ...kernelBaseDependencies };
+  for (const [name, version] of Object.entries(theme.manifest.dependencies)) {
+    const existing = merged[name];
+    if (existing !== undefined && existing !== version) {
+      throw new ThemeError(
+        'theme-dependency-conflict',
+        `theme "${theme.manifest.name}" pins ${name}@${version} but the kernel requires ${name}@${existing}`,
+        { package: name, themeVersion: version, kernelVersion: existing }
+      );
+    }
+    merged[name] = version;
+  }
+  return Object.fromEntries(Object.entries(merged).toSorted(([left], [right]) => left.localeCompare(right)));
+};
 
 type NavEntry = { label: string; href: string };
 type NavGroup = { label: string | null; entries: NavEntry[] };
@@ -195,9 +220,29 @@ type SectionChip = { anchor: string; title: string; guarantee: string };
 const sectionChips = (page: PageEntity): SectionChip[] =>
   page.sections.map((section) => ({ anchor: section.anchor, title: section.title, guarantee: section.guarantee }));
 
+// The component imports injected into every page route, generated from the theme's renderer map:
+// contract name -> '<site-relative module>[#ExportName]' (export defaults to the contract name).
+// Writer MDX must not import theme components itself — these lines put them all in scope.
+const rendererImportLines = (renderers: Record<string, string>, up: string): string[] => {
+  const byModule = new Map<string, string[]>();
+  for (const [contractName, target] of Object.entries(renderers)) {
+    const hashIndex = target.indexOf('#');
+    const modulePath = hashIndex === -1 ? target : target.slice(0, hashIndex);
+    const exportName = hashIndex === -1 ? contractName : target.slice(hashIndex + 1);
+    const specifier = exportName === contractName ? contractName : `${exportName} as ${contractName}`;
+    const list = byModule.get(modulePath) ?? [];
+    list.push(specifier);
+    byModule.set(modulePath, list);
+  }
+  return [...byModule].map(
+    ([modulePath, specifiers]) => `import { ${specifiers.join(', ')} } from '${up}${modulePath}';`
+  );
+};
+
 type PageRouteContext = {
   sourceLocale: string;
   alternatesBySlug: Map<string, LocaleAlternate[]>;
+  renderers: Record<string, string>;
 };
 
 const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => {
@@ -216,12 +261,14 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
   }));
   const chips = sectionChips(page.shard.page);
   const injected = [
+    // Every theme bundle ships this exact layout path (validated by applyThemeBundle).
     `layout: ${JSON.stringify(`${up}layouts/DocLayout.astro`)}`,
     ...(frontmatterHasKey(frontmatter, 'title') ? [] : [`title: ${JSON.stringify(page.shard.page.title)}`]),
     ...(page.shard.page.description !== undefined && !frontmatterHasKey(frontmatter, 'description')
       ? [`description: ${JSON.stringify(page.shard.page.description)}`]
       : []),
     `docstubeLocale: ${JSON.stringify(locale)}`,
+    `docstubePageId: ${JSON.stringify(page.shard.page.id)}`,
     `docstubeGuarantee: ${JSON.stringify(page.shard.page.guarantee)}`,
     `docstubeBlocksProven: ${counts.proven}`,
     `docstubeBlocksTotal: ${counts.total}`,
@@ -236,15 +283,14 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
     ...injected,
     '---',
     '',
-    // Writer MDX must not import theme components itself — this line puts them all in scope.
-    `import { ${builtinComponentNames.join(', ')} } from '${up}components/theme-components.tsx';`,
+    ...rendererImportLines(context.renderers, up),
     '',
     body.trimEnd(),
     ''
   ].join('\n');
 };
 
-const generatedSitePackageJson = (): string =>
+const generatedSitePackageJson = (dependencies: Record<string, string>): string =>
   `${JSON.stringify(
     {
       name: 'docstube-generated-site',
@@ -257,29 +303,54 @@ const generatedSitePackageJson = (): string =>
         postbuild: 'pagefind --site dist',
         preview: 'astro preview'
       },
-      dependencies: generatedSiteDependencies
+      dependencies
     },
     null,
     2
   )}\n`;
 
-const astroConfigMjs = (config: DocstubeConfig): string =>
-  [
+// The kernel owns astro.config.mjs: generated from invariants (MDX, static output, base URL) plus
+// the theme's typed build hooks — themes never own the config file.
+const astroConfigMjs = (config: DocstubeConfig, build: ThemeBuild): string => {
+  const shiki = build.shiki;
+  const transformerImports = (shiki?.transformers ?? []).map(
+    (modulePath, index) => `import themeShikiTransformers${index} from './src/${modulePath}';`
+  );
+  const shikiThemeLines =
+    shiki === undefined
+      ? []
+      : shiki.themes.length > 1
+        ? [`      themes: { light: ${JSON.stringify(shiki.themes[0])}, dark: ${JSON.stringify(shiki.themes[1])} },`]
+        : [`      theme: ${JSON.stringify(shiki.themes[0])},`];
+  const shikiTransformerLines =
+    shiki === undefined || (shiki.transformers ?? []).length === 0
+      ? []
+      : [
+          `      transformers: [${(shiki.transformers ?? []).map((_, index) => `...themeShikiTransformers${index}`).join(', ')}],`
+        ];
+  return [
     "import mdx from '@astrojs/mdx';",
-    "import react from '@astrojs/react';",
     "import { defineConfig } from 'astro/config';",
+    ...(build.integrationsModule === undefined
+      ? []
+      : [`import themeIntegrations from './src/${build.integrationsModule}';`]),
+    ...transformerImports,
     '',
     '// TODO(review-ui): rehype plugin slot — a `markdown.processor` rehype plugin will inject',
     '// data-entity-id attributes on arbitrary blocks from the manifest sidecar (ARCHITECTURE.md',
     '// §3.4). Section-level guarantee chips already ship (injected by the layout by anchor);',
     '// block-level addressing is deliberately not faked in v1.',
     'export default defineConfig({',
-    '  integrations: [mdx(), react()],',
+    `  integrations: [mdx()${build.integrationsModule === undefined ? '' : ', ...themeIntegrations'}],`,
     "  output: 'static',",
     ...(config.site.baseUrl === undefined ? [] : [`  site: ${JSON.stringify(config.site.baseUrl)},`]),
+    ...(shiki === undefined
+      ? []
+      : ['  markdown: {', '    shikiConfig: {', ...shikiThemeLines, ...shikiTransformerLines, '    }', '  },']),
     '});',
     ''
   ].join('\n');
+};
 
 type SiteDataInput = {
   config: DocstubeConfig;
@@ -304,326 +375,31 @@ const siteDataMjs = (input: SiteDataInput): string =>
     ''
   ].join('\n');
 
-const tokenCssLines = (config: DocstubeConfig): string[] => {
-  const tokens = { ...defaultThemeTokens, ...config.theme.tokens };
-  return Object.entries(tokens).map(([name, value]) => `    --${name}: ${value};`);
+const kebabCase = (name: string): string => name.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`);
+
+// Kernel-emitted src/docstube/tokens.css: the theme's token defaults merged with the config
+// theme.tokens overrides, exposed as CSS custom properties. The four semantic tokens
+// (accent/accentDark/fontBody/fontCode) are honored by every theme; the legacy 'font-family'
+// token stays an alias of the final body font so the existing token vocabulary keeps working.
+export const tokensCss = (theme: ThemeBundle, config: DocstubeConfig): string => {
+  const overrides = config.theme.tokens;
+  const merged: Record<string, string> = { ...theme.manifest.tokens, ...overrides };
+  const legacyFont = overrides['font-family'];
+  if (legacyFont !== undefined && overrides.fontBody === undefined) {
+    merged.fontBody = legacyFont;
+  }
+  if (merged.fontBody !== undefined) {
+    merged['font-family'] = merged.fontBody;
+  }
+  const lines = Object.entries(merged).map(([name, value]) => `  --${kebabCase(name)}: ${value};`);
+  return [
+    '/* Generated by docstube (kernel-owned): theme token defaults + config theme.tokens. */',
+    ':root {',
+    ...lines,
+    '}',
+    ''
+  ].join('\n');
 };
-
-const docLayoutAstro = (config: DocstubeConfig): string =>
-  [
-    '---',
-    'import {',
-    '  footerCredit,',
-    '  layoutMode,',
-    '  navByLocale,',
-    '  repoUrl,',
-    '  siteDescription,',
-    '  siteTitle,',
-    '  siteUrl,',
-    '  sourceLocale,',
-    '  versions',
-    "} from '../site-data.mjs';",
-    '',
-    'const { frontmatter } = Astro.props;',
-    'const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTitle;',
-    'const description = frontmatter.description || siteDescription;',
-    'const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;',
-    'const guarantee = frontmatter.docstubeGuarantee;',
-    "const guaranteeLabels = { proven: 'verified', scored: 'reviewed', 'out-of-domain': 'unverified' };",
-    'const guaranteeTitle = `${frontmatter.docstubeBlocksProven ?? 0} of ${frontmatter.docstubeBlocksTotal ?? 0} blocks proven`;',
-    'const locale = frontmatter.docstubeLocale ?? sourceLocale;',
-    'const alternates = frontmatter.docstubeAlternates ?? [];',
-    'const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);',
-    'const sources = frontmatter.docstubeSources ?? [];',
-    'const sections = frontmatter.docstubeSections ?? [];',
-    'const nav = navByLocale[locale] ?? navByLocale[sourceLocale] ?? [];',
-    'const sourceHref = (source) =>',
-    '  repoUrl',
-    "    ? `${repoUrl.replace(/\\/$/, '')}/blob/${source.commit}/${source.file}${source.line ? `#L${source.line}` : ''}`",
-    '    : undefined;',
-    '---',
-    '',
-    '<!doctype html>',
-    '<html lang={locale} data-layout={layoutMode}>',
-    '  <head>',
-    '    <meta charset="utf-8" />',
-    '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
-    '    <title>{title}</title>',
-    '    {description ? <meta name="description" content={description} /> : null}',
-    '    {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}',
-    '    {',
-    '      siteUrl && alternates.length > 1',
-    '        ? alternates.map((alternate) => (',
-    '            <link rel="alternate" hreflang={alternate.locale} href={new URL(alternate.href, siteUrl).href} />',
-    '          ))',
-    '        : null',
-    '    }',
-    '    {',
-    '      siteUrl && alternates.length > 1 && sourceAlternate ? (',
-    '        <link rel="alternate" hreflang="x-default" href={new URL(sourceAlternate.href, siteUrl).href} />',
-    '      ) : null',
-    '    }',
-    '    <meta property="og:title" content={title} />',
-    '    {description ? <meta property="og:description" content={description} /> : null}',
-    '    {canonicalUrl ? <meta property="og:url" content={canonicalUrl} /> : null}',
-    '    <meta property="og:type" content="article" />',
-    '  </head>',
-    '  <body>',
-    '    <a class="skip-link" href="#content">Skip to content</a>',
-    '    <div class="site-shell">',
-    '      <aside class="site-nav" aria-label="Documentation">',
-    '        <strong>{siteTitle}</strong>',
-    "        {/* TODO(sectioned): the 'sectioned' layout renders top-level groups as sidebar section",
-    '            headers for now; the per-section tab bar is a follow-up. */}',
-    '        {nav.map((group) => (',
-    '          <section class="nav-group">',
-    '            {group.label ? <p class="nav-group-label">{group.label}</p> : null}',
-    '            <nav>',
-    '              {group.entries.map((entry) => (',
-    "                <a href={entry.href} aria-current={Astro.url.pathname === entry.href ? 'page' : undefined}>",
-    '                  {entry.label}',
-    '                </a>',
-    '              ))}',
-    '            </nav>',
-    '          </section>',
-    '        ))}',
-    '      </aside>',
-    '      <main id="content" class="content">',
-    '        <header class="site-toolbar">',
-    '          <div id="dt-search" class="dt-search"></div>',
-    '          {versions.frozen.length > 0 ? (',
-    '            <details class="dt-version-switcher">',
-    '              <summary>{versions.current}</summary>',
-    '              <nav aria-label="Versions">',
-    '                <a href="/">{versions.current}</a>',
-    '                {/* Frozen snapshot content emission is pending; these routes land in a later wave. */}',
-    '                {versions.frozen.map((label) => (',
-    '                  <a href={`/versions/${label}/`}>{label}</a>',
-    '                ))}',
-    '              </nav>',
-    '            </details>',
-    '          ) : null}',
-    '          {alternates.length > 1 ? (',
-    '            <nav class="dt-locale-switcher" aria-label="Language">',
-    '              {alternates.map((alternate) => (',
-    "                <a href={alternate.href} aria-current={alternate.locale === locale ? 'true' : undefined}>",
-    '                  {alternate.locale}',
-    '                </a>',
-    '              ))}',
-    '            </nav>',
-    '          ) : null}',
-    '          {guarantee ? (',
-    '            <span class={`dt-guarantee dt-guarantee--${guarantee}`} title={guaranteeTitle}>',
-    '              {guaranteeLabels[guarantee] ?? guarantee}',
-    '            </span>',
-    '          ) : null}',
-    '        </header>',
-    '        <slot />',
-    '        {sources.length > 0 ? (',
-    '          <footer class="dt-sources">',
-    '            <h2>Sources</h2>',
-    '            <ul>',
-    '              {sources.map((source) => {',
-    '                const label = source.line ? `${source.file}:${source.line}` : source.file;',
-    '                const href = sourceHref(source);',
-    '                return (',
-    '                  <li>',
-    '                    {href ? (',
-    '                      <a href={href}>',
-    '                        <code>{label}</code>',
-    '                      </a>',
-    '                    ) : (',
-    '                      <code>{label}</code>',
-    '                    )}',
-    '                    <span class="dt-source-commit">@{source.commit.slice(0, 7)}</span>',
-    '                  </li>',
-    '                );',
-    '              })}',
-    '            </ul>',
-    '          </footer>',
-    '        ) : null}',
-    '        {footerCredit ? (',
-    '          <footer class="site-footer">Docs by <a href="https://docstube.dev">docstube</a></footer>',
-    '        ) : null}',
-    '      </main>',
-    '    </div>',
-    '    {sections.length > 0 ? (',
-    '      <script type="application/json" id="dt-section-guarantees" set:html={JSON.stringify(sections)} />',
-    '    ) : null}',
-    '    <script is:inline>',
-    '      // Section guarantee chips: headings get github-slugger ids from Astro, matching the',
-    '      // section anchors in the manifest. Progressive enhancement — missing anchors no-op.',
-    '      (() => {',
-    "        const data = document.getElementById('dt-section-guarantees');",
-    '        if (!data) return;',
-    "        const labels = { proven: 'verified', scored: 'reviewed', 'out-of-domain': 'unverified' };",
-    '        for (const section of JSON.parse(data.textContent)) {',
-    '          const heading = document.getElementById(section.anchor);',
-    '          if (!heading) continue;',
-    "          const chip = document.createElement('span');",
-    "          chip.className = 'dt-guarantee dt-section-chip dt-guarantee--' + section.guarantee;",
-    '          chip.textContent = labels[section.guarantee] ?? section.guarantee;',
-    "          heading.append(' ', chip);",
-    '        }',
-    '      })();',
-    '    </script>',
-    '    <script is:inline>',
-    '      // Pagefind search: progressive enhancement. The UI assets exist only after the pagefind',
-    '      // postbuild step ran; when absent (astro dev, or postbuild skipped) the site still works.',
-    '      (() => {',
-    "        const container = document.getElementById('dt-search');",
-    '        if (!container) return;',
-    "        const stylesheet = document.createElement('link');",
-    "        stylesheet.rel = 'stylesheet';",
-    "        stylesheet.href = '/pagefind/pagefind-ui.css';",
-    "        const script = document.createElement('script');",
-    "        script.src = '/pagefind/pagefind-ui.js';",
-    '        script.onload = () => {',
-    "          new PagefindUI({ element: '#dt-search', showSubResults: true });",
-    '        };',
-    '        script.onerror = () => {',
-    '          stylesheet.remove();',
-    '          script.remove();',
-    '        };',
-    '        document.head.append(stylesheet, script);',
-    '      })();',
-    '    </script>',
-    '  </body>',
-    '</html>',
-    '',
-    '<style is:global>',
-    '  :root {',
-    '    color-scheme: light;',
-    ...tokenCssLines(config),
-    '    font-family: var(--font-family);',
-    '  }',
-    '  * { box-sizing: border-box; }',
-    '  body { margin: 0; background: var(--surface); color: var(--text); }',
-    '  a { color: var(--accent-strong); }',
-    '  .skip-link { left: 16px; padding: 8px 12px; position: fixed; top: -48px; }',
-    '  .skip-link:focus { background: var(--surface); border: 1px solid var(--border); top: 16px; z-index: 2; }',
-    '  .site-shell { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 100vh; }',
-    '  .site-nav { background: var(--surface-muted); border-right: 1px solid var(--border); padding: 24px; }',
-    '  .site-nav strong { display: block; margin-bottom: 20px; }',
-    '  .nav-group { margin-bottom: 18px; }',
-    '  .nav-group-label { color: var(--text-muted); font-size: 0.78rem; letter-spacing: 0.06em; margin: 0 0 6px; text-transform: uppercase; }',
-    '  .nav-group nav { display: grid; gap: 4px; }',
-    '  .nav-group a { border-radius: 8px; color: var(--text); padding: 7px 10px; text-decoration: none; }',
-    '  .nav-group a[aria-current="page"] { background: var(--surface-raised); color: var(--accent-strong); }',
-    '  .content { max-width: 860px; padding: 40px 48px 56px; width: 100%; }',
-    '  .site-toolbar { align-items: center; display: flex; gap: 12px; justify-content: flex-end; margin-bottom: 8px; }',
-    '  .dt-search { flex: 1; }',
-    '  .dt-version-switcher { position: relative; }',
-    '  .dt-version-switcher summary { border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 0.85rem; padding: 4px 10px; }',
-    '  .dt-version-switcher nav { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; display: grid; min-width: 120px; padding: 6px; position: absolute; right: 0; z-index: 3; }',
-    '  .dt-version-switcher nav a { border-radius: 6px; padding: 5px 8px; text-decoration: none; }',
-    '  .dt-locale-switcher { display: flex; gap: 4px; }',
-    '  .dt-locale-switcher a { border: 1px solid var(--border); border-radius: 999px; font-size: 0.8rem; padding: 3px 9px; text-decoration: none; text-transform: uppercase; }',
-    '  .dt-locale-switcher a[aria-current="true"] { background: var(--surface-raised); border-color: var(--accent); }',
-    '  .dt-guarantee { border: 1px solid var(--border); border-radius: 999px; font-size: 0.78rem; font-weight: 600; padding: 3px 10px; }',
-    '  .dt-guarantee--proven { background: #e7f5ec; border-color: #b6dfc4; color: var(--success); }',
-    '  .dt-guarantee--scored { background: #fdf3e1; border-color: #ecd9ab; color: var(--warning); }',
-    '  .dt-guarantee--out-of-domain { background: var(--surface-muted); color: var(--text-muted); }',
-    '  .dt-section-chip { font-size: 0.7rem; font-weight: 500; vertical-align: middle; }',
-    '  .dt-sources { border-top: 1px solid var(--border); margin-top: 48px; padding-top: 20px; }',
-    '  .dt-sources h2 { border-top: 0; font-size: 1rem; margin: 0 0 10px; padding-top: 0; }',
-    '  .dt-sources ul { list-style: none; margin: 0; padding: 0; }',
-    '  .dt-sources li { color: var(--text-muted); font-size: 0.85rem; padding: 2px 0; }',
-    '  .dt-source-commit { color: var(--text-muted); font-size: 0.8rem; margin-left: 8px; }',
-    '  .site-footer { border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.9rem; margin-top: 48px; padding-top: 20px; }',
-    '  h1, h2, h3 { letter-spacing: 0; line-height: 1.15; }',
-    '  h1 { font-size: 2.4rem; margin: 0 0 20px; }',
-    '  h2 { border-top: 1px solid var(--border); font-size: 1.6rem; margin: 36px 0 16px; padding-top: 28px; }',
-    '  p, li { color: var(--text-muted); line-height: 1.65; }',
-    '  code { background: var(--surface-muted); border-radius: 4px; padding: 2px 5px; }',
-    '  table { border-collapse: collapse; margin: 20px 0; width: 100%; }',
-    '  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }',
-    '  .dt-callout, .dt-card, .dt-code-block, .dt-terminal { border: 1px solid var(--border); border-radius: 8px; margin: 20px 0; }',
-    '  .dt-callout { background: var(--surface-muted); border-left: 4px solid var(--accent); padding: 16px 18px; }',
-    '  .dt-callout--warning { border-left-color: var(--warning); }',
-    '  .dt-callout--danger { border-left-color: var(--danger); }',
-    '  .dt-callout--success { border-left-color: var(--success); }',
-    '  .dt-card-grid { display: grid; gap: 14px; margin: 20px 0; }',
-    '  .dt-card { color: var(--text); display: grid; gap: 8px; padding: 16px; text-decoration: none; }',
-    '  .dt-code-block, .dt-terminal { background: #101718; color: #eef4f3; overflow: hidden; }',
-    '  .dt-code-block pre, .dt-terminal pre { margin: 0; overflow-x: auto; padding: 16px; }',
-    '  .dt-code-block code, .dt-terminal code { background: transparent; color: inherit; display: block; padding: 0; }',
-    '  .dt-code-block figcaption, .dt-terminal figcaption { border-bottom: 1px solid #2c3536; font-size: 0.85rem; padding: 10px 16px; }',
-    '  .dt-steps { counter-reset: steps; display: grid; gap: 10px; list-style: none; margin: 20px 0; padding: 0; }',
-    '  .dt-steps li { background: var(--surface-muted); border-radius: 8px; counter-increment: steps; padding: 12px 14px; }',
-    '  .dt-steps li::before { color: var(--accent-strong); content: counter(steps) ". "; font-weight: 700; }',
-    '  .dt-tab-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }',
-    '  .dt-tab-list button { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 12px; }',
-    '  .dt-tab-list button[aria-selected="true"] { background: var(--accent); color: #ffffff; }',
-    '  .dt-file-tree { background: var(--surface-muted); border-radius: 8px; font-family: ui-monospace, monospace; list-style: none; margin: 20px 0; padding: 14px 18px; }',
-    '  .dt-file-tree li[data-kind="directory"] { font-weight: 600; }',
-    '  .dt-badge { border: 1px solid var(--border); border-radius: 999px; font-size: 0.8rem; padding: 2px 9px; }',
-    '  .dt-badge--success { color: var(--success); }',
-    '  .dt-badge--warning { color: var(--warning); }',
-    '  .dt-badge--danger { color: var(--danger); }',
-    '  @media (max-width: 760px) { .site-shell { grid-template-columns: 1fr; } .site-nav { border-bottom: 1px solid var(--border); border-right: 0; } .content { padding: 28px 20px 40px; } .dt-card-grid { grid-template-columns: 1fr !important; } }',
-    '</style>',
-    ''
-  ].join('\n');
-
-const themeComponentsTsx = (): string =>
-  [
-    "import type { ReactNode } from 'react';",
-    '',
-    "type Tone = 'info' | 'note' | 'success' | 'warning' | 'danger';",
-    '',
-    "export function Callout({ children, title, tone = 'info' }: { children?: ReactNode; title?: string; tone?: Tone }) {",
-    '  return <aside className={`dt-callout dt-callout--${tone}`} data-component="Callout">{title ? <strong>{title}</strong> : null}<div>{children}</div></aside>;',
-    '}',
-    '',
-    'export function CodeBlock({ code, language, title }: { code?: string; language?: string; title?: string }) {',
-    '  return <figure className="dt-code-block" data-component="CodeBlock">{title ? <figcaption>{title}</figcaption> : null}<pre><code data-language={language}>{code}</code></pre></figure>;',
-    '}',
-    '',
-    'export function CodeGroup({ children, title }: { children?: ReactNode; title?: string }) {',
-    '  return <section className="dt-code-group" data-component="CodeGroup">{title ? <h3>{title}</h3> : null}{children}</section>;',
-    '}',
-    '',
-    'export function Terminal({ command, output, title }: { command?: string; output?: string; title?: string }) {',
-    '  return <figure className="dt-terminal" data-component="Terminal">{title ? <figcaption>{title}</figcaption> : null}<pre>{command ? <code>$ {command}</code> : null}{output ? <code>{output}</code> : null}</pre></figure>;',
-    '}',
-    '',
-    'export function Card({ description, href, title }: { description?: string; href?: string; title: string }) {',
-    '  const content = <><strong>{title}</strong>{description ? <span>{description}</span> : null}</>;',
-    '  return href ? <a className="dt-card" data-component="Card" href={href}>{content}</a> : <section className="dt-card" data-component="Card">{content}</section>;',
-    '}',
-    '',
-    'export function CardGrid({ children, columns = 2 }: { children?: ReactNode; columns?: number }) {',
-    '  const columnCount = Math.min(Math.max(columns, 1), 4);',
-    '  return <div className="dt-card-grid" data-component="CardGrid" style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}>{children}</div>;',
-    '}',
-    '',
-    'export function Steps({ items = [] }: { items?: string[] }) {',
-    '  return <ol className="dt-steps" data-component="Steps">{items.map((item) => <li key={item}>{item}</li>)}</ol>;',
-    '}',
-    '',
-    'export function Tabs({ defaultValue, tabs }: { defaultValue?: string; tabs: { label: string; value: string }[] }) {',
-    '  const activeValue = defaultValue ?? tabs[0]?.value;',
-    '  return <div className="dt-tabs" data-component="Tabs"><div className="dt-tab-list" role="tablist">{tabs.map((tab) => <button aria-selected={tab.value === activeValue} key={tab.value} role="tab" type="button">{tab.label}</button>)}</div></div>;',
-    '}',
-    '',
-    'export function FileTree({ entries }: { entries: { path: string; kind?: "file" | "directory" }[] }) {',
-    '  return <ul className="dt-file-tree" data-component="FileTree">{entries.map((entry) => <li data-kind={entry.kind ?? "file"} key={`${entry.kind ?? "file"}:${entry.path}`}>{entry.path}</li>)}</ul>;',
-    '}',
-    '',
-    'export function Badge({ children, label, tone = "info" }: { children?: ReactNode; label?: string; tone?: Tone }) {',
-    '  return <span className={`dt-badge dt-badge--${tone}`} data-component="Badge">{label ?? children}</span>;',
-    '}',
-    '',
-    'export function ParamTable({ params }: { params: { name: string; type?: string; required?: boolean; description: string }[] }) {',
-    '  return <table className="dt-param-table" data-component="ParamTable"><tbody>{params.map((param) => <tr key={param.name}><th>{param.name}{param.required ? " *" : ""}</th><td>{param.type ? <code>{param.type}</code> : null}</td><td>{param.description}</td></tr>)}</tbody></table>;',
-    '}',
-    '',
-    'export function ComparisonTable({ columns, rows }: { columns: string[]; rows: (string | number | boolean)[][] }) {',
-    '  return <table className="dt-comparison-table" data-component="ComparisonTable"><thead><tr>{columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{String(cell)}</td>)}</tr>)}</tbody></table>;',
-    '}',
-    ''
-  ].join('\n');
 
 type LlmsPage = {
   title: string;
@@ -715,21 +491,34 @@ const writeTextFile = async (path: string, content: string): Promise<void> => {
   await writeFile(path, content, 'utf8');
 };
 
-export const emitSite = async (input: EmitSiteInput): Promise<void> => {
+export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> => {
   const siteRoot = join(input.repoRoot, input.outDir);
+  const theme = input.theme;
   const sourceLocale = input.config.locales.source;
   const translations = input.translations ?? [];
   const navByLocale = buildNavByLocale(input.index, sourceLocale, translations);
   const alternatesBySlug = buildAlternatesBySlug(input.pages, translations, sourceLocale);
-  const routeContext: PageRouteContext = { sourceLocale, alternatesBySlug };
+  const routeContext: PageRouteContext = { sourceLocale, alternatesBySlug, renderers: theme.manifest.renderers };
   const pages = llmsPages(input.pages);
   const baseUrl = input.config.site.baseUrl;
   const currentVersion =
     input.index.versions.find((version) => version.status === 'current')?.label ?? input.config.versions.current;
 
+  // Theme-owned files + kernel-generated config, applied with the ownership-manifest algorithm
+  // (stale theme files from a previous theme are removed; user-modified files are preserved).
+  const applied = await applyThemeBundle({
+    siteRoot,
+    bundle: theme,
+    previousManifestPath: join(input.repoRoot, '.docstube', 'theme-files.json'),
+    themeVersion: input.index.docstubeVersion,
+    kernelConfigFiles: [
+      { path: 'package.json', content: generatedSitePackageJson(mergeDependencies(theme)) },
+      { path: 'astro.config.mjs', content: astroConfigMjs(input.config, theme.manifest.build) }
+    ],
+    ...(input.forceTheme === undefined ? {} : { force: input.forceTheme })
+  });
+
   const writes: Array<Promise<void>> = [
-    writeTextFile(join(siteRoot, 'package.json'), generatedSitePackageJson()),
-    writeTextFile(join(siteRoot, 'astro.config.mjs'), astroConfigMjs(input.config)),
     writeTextFile(join(siteRoot, '.gitignore'), 'dist/\nnode_modules/\n.astro/\n'),
     writeTextFile(
       join(siteRoot, 'src/site-data.mjs'),
@@ -741,8 +530,14 @@ export const emitSite = async (input: EmitSiteInput): Promise<void> => {
         repoUrl: input.repoUrl
       })
     ),
-    writeTextFile(join(siteRoot, 'src/layouts/DocLayout.astro'), docLayoutAstro(input.config)),
-    writeTextFile(join(siteRoot, 'src/components/theme-components.tsx'), themeComponentsTsx()),
+    // Kernel-owned proof primitives + design tokens (src/docstube/**): every theme layout mounts
+    // these; rewritten on every emit, never part of the theme bundle.
+    writeTextFile(join(siteRoot, 'src/docstube/tokens.css'), tokensCss(theme, input.config)),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), docstubeGuaranteeAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), docstubeSourcesAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeEntity.astro'), docstubeEntityAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), docstubeSectionChipsAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeSearch.astro'), docstubeSearchAstro()),
     writeTextFile(join(siteRoot, 'public/llms.txt'), llmsText(input.config, pages)),
     writeTextFile(join(siteRoot, 'public/llms-full.txt'), llmsFullText(input.config, pages)),
     writeTextFile(join(siteRoot, 'mcp/site-index.json'), siteIndexJson(input.config, input.index, input.pages)),
@@ -781,4 +576,5 @@ export const emitSite = async (input: EmitSiteInput): Promise<void> => {
   }
 
   await Promise.all(writes);
+  return { themeConflicts: applied.conflicts };
 };

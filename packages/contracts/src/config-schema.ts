@@ -98,8 +98,20 @@ export const localesConfigSchema = z.strictObject({
 });
 
 export const themeConfigSchema = z.strictObject({
+  // Built-in theme rendering the emitted site. The wizard always writes an explicit name, so a
+  // later change of the shipped default never restyles an existing repo. Unknown names are a hard
+  // error at emit time (listing the available themes).
+  name: z.string().min(1).default('basic'),
   // Design tokens (CSS custom-property values) applied to the emitted site.
-  tokens: z.record(z.string(), z.string()).default({})
+  tokens: z
+    .record(z.string(), z.string())
+    .default({})
+    .describe(
+      'Design-token overrides. Four semantic tokens are honored by EVERY theme: accent (brand color), ' +
+        'accentDark (accent for dark surfaces/modes), fontBody (body font stack), fontCode (code font stack). ' +
+        "Any other name is a theme-scoped CSS custom property — it maps onto the selected theme's own " +
+        'variables and may do nothing under a different theme.'
+    )
 });
 
 // logo/favicon are SITE metadata (PRODUCT §3.9.2 groups them with title/description) — a hand

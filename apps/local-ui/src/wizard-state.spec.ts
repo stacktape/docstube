@@ -116,9 +116,10 @@ describe('validation and reducer', () => {
       locales: { source: 'en', targets: [] },
       site: { title: 'Acme Docs' }
     });
-    // Untouched optional groups stay out of the scaffolded file.
+    // Untouched optional groups stay out of the scaffolded file — except the theme name, which is
+    // always explicit so a later default change never restyles an existing repo.
     expect(config).not.toHaveProperty('sources');
-    expect(config).not.toHaveProperty('theme');
+    expect(config.theme).toEqual({ name: 'basic' });
     expect(buildIa(filledState()).schemaVersion).toBe(1);
   });
 
@@ -127,8 +128,9 @@ describe('validation and reducer', () => {
     state = wizardReducer(state, { type: 'set-site-field', field: 'logo', value: 'assets/logo.svg' });
     state = wizardReducer(state, { type: 'set-site-field', field: 'favicon', value: 'assets/favicon.ico' });
     const config = buildConfigInput(state);
-    // No tokens were set, so no theme group at all — logo/favicon are site metadata.
-    expect(config).not.toHaveProperty('theme');
+    // No tokens were set, so the theme group carries only the explicit name — logo/favicon are
+    // site metadata.
+    expect(config.theme).toEqual({ name: 'basic' });
     expect(config.site).toMatchObject({ logo: 'assets/logo.svg', favicon: 'assets/favicon.ico' });
     // The scaffolded config must survive the strict schema, or `docstube wizard` writes a file
     // every later command rejects.
@@ -152,7 +154,7 @@ describe('buildConfigUpdates', () => {
       },
       versions: { current: 'latest', frozen: [] },
       locales: { source: 'en', targets: [] },
-      theme: { tokens: {} },
+      theme: { name: 'basic', tokens: {} },
       site: { title: 'Acme Docs', description: '', layout: 'single-tree' as const, footerCredit: true },
       components: ['Callout'],
       plugins: [],

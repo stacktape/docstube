@@ -46,7 +46,10 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
     }
 
     const store = createManifestStore(input.workspaceDir, family.config.versions.current);
-    await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    const emitResult = await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    for (const conflict of emitResult.themeConflicts) {
+      output.info(`  theme-conflict  ${conflict}`);
+    }
     reportRunSpend(output, summary);
     output.info(`run ${summary.runId}: ${summary.outcome}`);
     // RefineSummary carries no findings or flag kinds (owned by another workstream); only the

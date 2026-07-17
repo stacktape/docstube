@@ -380,7 +380,9 @@ export const buildConfigInput = (state: WizardState): Record<string, unknown> =>
     ...(hasSources ? { sources: { openapi: state.openapi, asyncapi: state.asyncapi, imports: state.imports } } : {}),
     versions: { current: state.currentVersion, frozen: state.frozenVersions },
     locales: { source: state.sourceLocale, targets: state.targetLocales },
-    ...(Object.keys(tokens).length > 0 ? { theme: { tokens } } : {}),
+    // The theme name is always written explicitly (knowledge/design/theming.md): a later change
+    // of the shipped default must never restyle an already-scaffolded repo.
+    theme: { name: 'basic', ...(Object.keys(tokens).length > 0 ? { tokens } : {}) },
     // logo/favicon are SITE metadata (matching configPairs above); the strict theme schema is
     // tokens-only and rejects them.
     site: {

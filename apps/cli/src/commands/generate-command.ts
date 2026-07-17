@@ -41,10 +41,13 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
 
     // Assemble the self-contained site from what the pipeline shipped.
     const store = createManifestStore(input.workspaceDir, family.config.versions.current);
-    const emitted = await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
-    if (!emitted) {
+    const emitResult = await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    if (!emitResult.emitted) {
       output.error('pipeline finished but wrote no manifest — this is a bug');
       return { exitCode: 1 };
+    }
+    for (const conflict of emitResult.themeConflicts) {
+      output.info(`  theme-conflict  ${conflict}`);
     }
     output.info(`site emitted to ${family.config.outDir}/ — build it with: npm install && npm run build`);
 

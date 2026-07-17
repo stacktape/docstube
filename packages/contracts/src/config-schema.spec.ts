@@ -89,6 +89,19 @@ describe('docstube.yml schema', () => {
     ).toBe(false);
   });
 
+  it("defaults theme.name to 'basic' and keeps it overridable next to tokens", () => {
+    const config = docstubeConfigSchema.parse(fixtureConfigInput);
+    expect(config.theme).toEqual({ name: 'basic', tokens: {} });
+    const themed = docstubeConfigSchema.parse({
+      ...fixtureConfigInput,
+      theme: { name: 'stacktape', tokens: { accent: '#36bebe', fontBody: 'Inter' } }
+    });
+    expect(themed.theme.name).toBe('stacktape');
+    expect(themed.theme.tokens).toEqual({ accent: '#36bebe', fontBody: 'Inter' });
+    // Still strict: unknown theme keys are a hard error.
+    expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, theme: { nmae: 'basic' } }).success).toBe(false);
+  });
+
   it('accepts the reserved autonomy block without requiring it', () => {
     const config = docstubeConfigSchema.parse({
       ...fixtureConfigInput,

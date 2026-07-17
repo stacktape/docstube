@@ -9,6 +9,7 @@
     "coverage/**",
     ".docstube/**",
     ".docstube-build/**",
+    "packages/theme/src/themes/*/bundle.generated.ts",
     "pnpm-lock.yaml",
     "PLAN.md",
     "BUSINESS.md"

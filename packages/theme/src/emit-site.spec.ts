@@ -50,28 +50,71 @@ describe('emitSite', () => {
     };
     expect(packageJson.dependencies.pagefind).toBeDefined();
     expect(packageJson.scripts.postbuild).toBe('pagefind --site dist');
-    const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
+    // Pagefind wiring is kernel-owned: the loader ships as a src/docstube primitive the theme mounts.
+    const search = await readFile(join(siteRoot, 'src/docstube/DocstubeSearch.astro'), 'utf8');
     // Progressive enhancement: the UI loads /pagefind/pagefind-ui.js only when present.
-    expect(layout).toContain("script.src = '/pagefind/pagefind-ui.js';");
-    expect(layout).toContain('id="dt-search"');
-    expect(layout).toContain('script.onerror');
+    expect(search).toContain("script.src = '/pagefind/pagefind-ui.js';");
+    expect(search).toContain('id="dt-search"');
+    expect(search).toContain('script.onerror');
+    const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
+    expect(layout).toContain('<DocstubeSearch />');
   });
 
-  it('applies design tokens (with defaults) and the footer credit in the layout', async () => {
+  it('applies design tokens (with defaults) in the kernel tokens.css and the footer credit in the layout', async () => {
+    const tokens = await readFile(join(siteRoot, 'src/docstube/tokens.css'), 'utf8');
+    expect(tokens).toContain('--accent: #123456;');
+    expect(tokens).toContain('--surface: #ffffff;');
+    expect(tokens).toContain('--text: #192122;');
+    // Semantic tokens land as kebab-cased custom properties every theme maps onto.
+    expect(tokens).toContain('--font-body: ');
+    expect(tokens).toContain('--font-code: ');
+    const styles = await readFile(join(siteRoot, 'src/styles/global.css'), 'utf8');
+    expect(styles).toContain("@import '../docstube/tokens.css';");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    expect(layout).toContain('--accent: #123456;');
-    expect(layout).toContain('--surface: #ffffff;');
-    expect(layout).toContain('--text: #192122;');
     expect(layout).toContain('Docs by <a href="https://docstube.dev">docstube</a>');
   });
 
-  it('renders the guarantee badge with a blocks-proven title', async () => {
+  it('generates astro.config.mjs from kernel invariants plus the theme build hooks', async () => {
+    const astroConfig = await readFile(join(siteRoot, 'astro.config.mjs'), 'utf8');
+    expect(astroConfig).toContain("import mdx from '@astrojs/mdx';");
+    expect(astroConfig).toContain("import themeIntegrations from './src/integrations.mjs';");
+    expect(astroConfig).toContain('integrations: [mdx(), ...themeIntegrations],');
+    expect(astroConfig).toContain("output: 'static',");
+  });
+
+  it('writes the .docstube/theme-files.json ownership manifest over theme + kernel-config paths only', async () => {
+    const manifest = JSON.parse(await readFile(join(siteRoot, '..', '.docstube/theme-files.json'), 'utf8')) as {
+      theme: string;
+      themeVersion: string;
+      files: Array<{ path: string; hash: string }>;
+    };
+    expect(manifest.theme).toBe('basic');
+    expect(manifest.themeVersion).toBe('0.0.2');
+    const paths = manifest.files.map((file) => file.path);
+    expect(paths).toContain('src/layouts/DocLayout.astro');
+    expect(paths).toContain('src/components/theme-components.tsx');
+    expect(paths).toContain('astro.config.mjs');
+    expect(paths).toContain('package.json');
+    // Content/kernel emissions are never theme-owned.
+    expect(paths.some((path) => path.startsWith('src/pages/'))).toBe(false);
+    expect(paths.some((path) => path.startsWith('src/docstube/'))).toBe(false);
+    expect(paths.some((path) => path.startsWith('public/'))).toBe(false);
+    expect(paths).not.toContain('src/site-data.mjs');
+    for (const file of manifest.files) {
+      expect(file.hash).toMatch(/^[0-9a-f]{64}$/u);
+    }
+  });
+
+  it('renders the guarantee badge as the kernel DocstubeGuarantee primitive with a blocks-proven title', async () => {
+    const badge = await readFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), 'utf8');
+    expect(badge).toContain('dt-guarantee--${guarantee}');
+    expect(badge).toContain('data-docstube-guarantee={guarantee}');
+    expect(badge).toContain('"proven":"verified"');
+    expect(badge).toContain('"scored":"reviewed"');
+    expect(badge).toContain('"out-of-domain":"unverified"');
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    expect(layout).toContain('dt-guarantee--${guarantee}');
+    expect(layout).toContain('<DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} />');
     expect(layout).toContain('blocks proven');
-    expect(layout).toContain("proven: 'verified'");
-    expect(layout).toContain("scored: 'reviewed'");
-    expect(layout).toContain("'out-of-domain': 'unverified'");
   });
 
   it('writes one route per page at its nested slug path with injected frontmatter', async () => {
@@ -147,13 +190,17 @@ describe('emitSite', () => {
     expect(install).toContain('docstubeSections: ');
     expect(install).toContain('"anchor":"requirements","title":"Requirements","guarantee":"proven"');
 
-    const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    expect(layout).toContain('class="dt-sources"');
-    expect(layout).toContain('<h2>Sources</h2>');
+    const sourcesFooter = await readFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), 'utf8');
+    expect(sourcesFooter).toContain('class="dt-sources"');
+    expect(sourcesFooter).toContain('<h2>Sources</h2>');
     // Linkified only when repoUrl is set; plain text otherwise.
-    expect(layout).toContain('/blob/${source.commit}/${source.file}');
-    expect(layout).toContain('dt-section-guarantees');
-    expect(layout).toContain('dt-section-chip');
+    expect(sourcesFooter).toContain('/blob/${source.commit}/${source.file}');
+    const chipInjector = await readFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), 'utf8');
+    expect(chipInjector).toContain('dt-section-guarantees');
+    expect(chipInjector).toContain('dt-section-chip');
+    const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
+    expect(layout).toContain('<DocstubeSources sources={sources} repoUrl={repoUrl} />');
+    expect(layout).toContain('<DocstubeSectionChips sections={sections} />');
     const siteData = await readFile(join(siteRoot, 'src/site-data.mjs'), 'utf8');
     expect(siteData).toContain('export const repoUrl = "https://github.com/acme/fixture";');
   });

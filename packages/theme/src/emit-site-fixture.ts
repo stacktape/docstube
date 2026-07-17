@@ -7,6 +7,7 @@ import {
 } from '@docstube/contracts';
 import type { PageEntity } from '@docstube/contracts';
 import type { EmitSiteInput } from './emit-site.ts';
+import { themeBundle as basicThemeBundle } from './themes/basic/bundle.generated.ts';
 
 // Test-only fixture shared by the emit-site and docs-mcp-server specs. Not exported from
 // theme.ts, so it never ships in the built package.
@@ -58,6 +59,7 @@ export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOption
     outDir: 'docs-site',
     config,
     index,
+    theme: basicThemeBundle,
     pages: [
       { shard: buildFixturePageShard(installPage), mdx: installMdx },
       { shard: buildFixturePageShard(setupPage), mdx: setupMdx }

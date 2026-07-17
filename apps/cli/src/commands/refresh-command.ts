@@ -35,9 +35,13 @@ export const runRefreshCommand = async (input: RefreshCommandInput, output: CliO
       output.info(`  warn  ${warning}`);
     }
 
-    // Re-emit the self-contained site from the updated manifest.
+    // Re-emit the self-contained site from the updated manifest (this is also where a changed
+    // theme.name swaps the site's theme files, ownership-manifest-driven).
     const store = createManifestStore(input.workspaceDir, family.config.versions.current);
-    await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    const emitResult = await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    for (const conflict of emitResult.themeConflicts) {
+      output.info(`  theme-conflict  ${conflict}`);
+    }
     output.info(`site emitted to ${family.config.outDir}/ — build it with: npm install && npm run build`);
 
     if (summary.outcome === 'flagged') {

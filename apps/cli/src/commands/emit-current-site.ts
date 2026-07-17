@@ -3,8 +3,9 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { ConfigFamily, ManifestStore } from '@docstube/core';
-import { emitSite } from '@docstube/theme';
-import type { EmitSitePage } from '@docstube/theme';
+import { configError } from '@docstube/core';
+import { builtinThemes, emitSite } from '@docstube/theme';
+import type { EmitSitePage, ThemeBundle } from '@docstube/theme';
 
 const execFileAsync = promisify(execFile);
 
@@ -29,15 +30,34 @@ export const detectRepoUrl = async (workspaceDir: string): Promise<string | unde
   }
 };
 
+// The CLI resolves the configured theme from the built-in registry — emitSite never performs a
+// hidden lookup. An unknown name is a hard config error listing what is available.
+export const resolveConfiguredTheme = async (themeName: string): Promise<ThemeBundle> => {
+  const loadTheme = builtinThemes[themeName];
+  if (loadTheme === undefined) {
+    throw configError(
+      `unknown theme "${themeName}" in docstube.yml — available themes: ${Object.keys(builtinThemes).join(', ')}`,
+      { themeName, availableThemes: Object.keys(builtinThemes) }
+    );
+  }
+  return loadTheme();
+};
+
+export type EmitCurrentSiteResult = {
+  emitted: boolean;
+  // Theme-owned files the user modified: preserved/skipped, reported by the calling command.
+  themeConflicts: string[];
+};
+
 export const emitCurrentSite = async (input: {
   workspaceDir: string;
   family: ConfigFamily;
   store: ManifestStore;
-}): Promise<boolean> => {
+}): Promise<EmitCurrentSiteResult> => {
   const { workspaceDir, family, store } = input;
   const index = await store.readIndex();
   if (index === undefined) {
-    return false;
+    return { emitted: false, themeConflicts: [] };
   }
   const readPages = async (locale: string): Promise<EmitSitePage[]> => {
     const pages: EmitSitePage[] = [];
@@ -63,16 +83,25 @@ export const emitCurrentSite = async (input: {
     .filter((version) => version.status === 'frozen')
     .map((version) => version.label);
   const repoUrl = await detectRepoUrl(workspaceDir);
+  const theme = await resolveConfiguredTheme(family.config.theme.name);
 
-  await emitSite({
+  const result = await emitSite({
     repoRoot: workspaceDir,
     outDir: family.config.outDir,
     config: family.config,
     index,
+    theme,
     pages,
     ...(translations.length > 0 ? { translations } : {}),
     ...(frozenVersions.length > 0 ? { frozenVersions } : {}),
     ...(repoUrl === undefined ? {} : { repoUrl })
   });
-  return true;
+  return {
+    emitted: true,
+    themeConflicts: result.themeConflicts.map((conflict) =>
+      conflict.kind === 'kept'
+        ? `${conflict.path} — modified by you, kept (the previous theme's copy was not deleted)`
+        : `${conflict.path} — modified by you, not overwritten with the theme's copy`
+    )
+  };
 };
