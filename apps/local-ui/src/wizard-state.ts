@@ -346,8 +346,8 @@ export const configPairs = (state: WizardState): ConfigPair[] => [
   { path: ['locales', 'source'], value: state.sourceLocale },
   { path: ['locales', 'targets'], value: state.targetLocales },
   { path: ['theme', 'tokens'], value: filteredTokens(state.themeTokens) },
-  ...(state.logo.trim().length === 0 ? [] : [{ path: ['theme', 'logo'], value: state.logo }]),
-  ...(state.favicon.trim().length === 0 ? [] : [{ path: ['theme', 'favicon'], value: state.favicon }]),
+  ...(state.logo.trim().length === 0 ? [] : [{ path: ['site', 'logo'], value: state.logo }]),
+  ...(state.favicon.trim().length === 0 ? [] : [{ path: ['site', 'favicon'], value: state.favicon }]),
   { path: ['site', 'title'], value: state.siteTitle },
   { path: ['site', 'description'], value: state.siteDescription },
   { path: ['components'], value: state.components }
@@ -505,8 +505,8 @@ const hydrateFromFamily = (state: WizardState, config: DocstubeConfig, ia: Ia): 
     sourceLocale: config.locales.source,
     targetLocales: [...config.locales.targets],
     themeTokens: { ...emptyTokens(), ...config.theme.tokens },
-    logo: config.theme.logo ?? '',
-    favicon: config.theme.favicon ?? '',
+    logo: config.site.logo ?? '',
+    favicon: config.site.favicon ?? '',
     siteTitle: config.site.title,
     siteDescription: config.site.description,
     components: [...config.components]

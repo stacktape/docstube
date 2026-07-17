@@ -60,11 +60,29 @@ export const verificationRecordSchema = z.object({
 });
 export type VerificationRecord = z.infer<typeof verificationRecordSchema>;
 
+// Review evidence for a 'scored' badge: which persona reviewed, what each criterion concluded,
+// and in which run — the committed manifest must explain every badge, not just 'proven' ones
+// (founder decision 2026-07-17; the v2 signed manifest needs this evidence anyway). Reasoning
+// prose stays in the run journal; the manifest carries only the compact verdicts.
+export const reviewRecordSchema = z.object({
+  persona: z.string().min(1),
+  criteria: z.array(
+    z.object({
+      criterion: z.string().min(1),
+      outcome: z.enum(['met', 'not-met', 'not-applicable'])
+    })
+  ),
+  runId: z.string().min(1),
+  at: isoTimestampSchema
+});
+export type ReviewRecord = z.infer<typeof reviewRecordSchema>;
+
 export const provenanceSchema = z.object({
   sources: z.array(sourceRefSchema).default([]),
   // Context-assembly items handed to the writer (ctx_… ids into the run journal).
   seedContext: z.array(z.string()).default([]),
   observedReads: z.array(observedReadSchema).default([]),
-  verifications: z.array(verificationRecordSchema).default([])
+  verifications: z.array(verificationRecordSchema).default([]),
+  reviews: z.array(reviewRecordSchema).default([])
 });
 export type Provenance = z.infer<typeof provenanceSchema>;

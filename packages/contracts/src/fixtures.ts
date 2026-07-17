@@ -25,7 +25,7 @@ export const buildFixturePage = (): PageEntity => ({
       variants: [],
       claims: [],
       guarantee: 'scored',
-      provenance: { sources: [], seedContext: [], observedReads: [], verifications: [] }
+      provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
     }
   ],
   sections: [
@@ -64,7 +64,8 @@ export const buildFixturePage = (): PageEntity => ({
                 result: 'pass',
                 at: now
               }
-            ]
+            ],
+            reviews: []
           },
           claims: [
             {
@@ -81,7 +82,7 @@ export const buildFixturePage = (): PageEntity => ({
     }
   ],
   guarantee: 'scored',
-  provenance: { sources: [], seedContext: [], observedReads: [], verifications: [] }
+  provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
 });
 
 export const buildFixturePageShard = (page: PageEntity): PageShard => ({

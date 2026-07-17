@@ -12,7 +12,13 @@ import type { BlockTypeRegistry, PageArtifact, VerifierContext } from '@docstube
 // Test-only builders: small, hand-rolled pages whose entity tree stays consistent with the MDX
 // the specs pair them with. Not exported from the package entry.
 
-const emptyProvenance = (): Provenance => ({ sources: [], seedContext: [], observedReads: [], verifications: [] });
+const emptyProvenance = (): Provenance => ({
+  sources: [],
+  seedContext: [],
+  observedReads: [],
+  verifications: [],
+  reviews: []
+});
 
 export const makeClaim = (text: string): ClaimEntity => ({
   id: mintId(idPrefixes.claim),

@@ -173,6 +173,10 @@ describe('runGenerate', () => {
     // Symbols in observed-read files become page-level sources (grounds coverage + refresh scoping).
     expect(shard?.page.provenance.sources.length).toBeGreaterThan(0);
     expect(shard?.page.provenance.sources.every((source) => source.file === 'src/greeter.ts')).toBe(true);
+    // The committed manifest explains the 'scored' badge too: compact review verdicts travel in
+    // provenance (persona + per-criterion outcome + run id), not just deterministic verifications.
+    expect(shard?.page.provenance.reviews.length).toBeGreaterThan(0);
+    expect(shard?.page.provenance.reviews[0]).toMatchObject({ persona: expect.any(String), runId: expect.any(String) });
     // The clean ts snippet is proven by code-typecheck-ts.
     const codeBlock = shard?.page.sections
       .flatMap((section) => section.blocks)

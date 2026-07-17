@@ -1,5 +1,13 @@
 import type { PageArtifact } from '@docstube/plugin-sdk';
-import type { Codemap, Finding, IaNode, PageShard, ToolDescriptor, Transcript } from '@docstube/contracts';
+import type {
+  Codemap,
+  Finding,
+  IaNode,
+  PageShard,
+  ReviewResult,
+  ToolDescriptor,
+  Transcript
+} from '@docstube/contracts';
 import { hashValue, idPrefixes, mintId } from '@docstube/contracts';
 import type { AgentTaskSpec } from '@docstube/contracts';
 import type { ConfigFamily } from '../config/config-io.ts';
@@ -83,6 +91,7 @@ export const generatePage = async (
   let findings: Finding[] = [];
   let lastArtifact: PageArtifact | undefined;
   let lastTranscript: Transcript | undefined;
+  let lastReviews: ReviewResult[] = [];
   let attemptsUsed = 0;
   // One collector across attempts: retries re-asking the same question stay a single flag.
   const questionCollector = createQuestionCollector();
@@ -164,6 +173,7 @@ export const generatePage = async (
       journal: ctx.journal,
       costTracker: ctx.costTracker
     });
+    lastReviews = reviews;
     findings = [
       ...errorFindings(results),
       ...reviews.flatMap((review) => review.findings.filter((finding) => finding.severity === 'error'))
@@ -211,6 +221,22 @@ export const generatePage = async (
   if (lastArtifact === undefined || lastTranscript === undefined) {
     throw new CoreError('pipeline-failed', `page "${node.slug}" produced no artifact`);
   }
+
+  // The committed manifest explains every badge: the shipped page carries compact verdicts from
+  // the reviews that scored it (reasoning prose stays in the run journal).
+  const reviewRecords = lastReviews.map((review) => ({
+    persona: review.persona,
+    criteria: review.criteria.map((criterion) => ({ criterion: criterion.criterion, outcome: criterion.outcome })),
+    runId: ctx.journal.runId,
+    at: new Date().toISOString()
+  }));
+  lastArtifact = {
+    ...lastArtifact,
+    page: {
+      ...lastArtifact.page,
+      provenance: { ...lastArtifact.page.provenance, reviews: reviewRecords }
+    }
+  };
 
   // Flags travel with the shard: regeneration rebuilds the shard, so tribal-knowledge flags (the
   // durable Q&A trail) are carried forward verbatim. Other kinds are NOT carried — the page was

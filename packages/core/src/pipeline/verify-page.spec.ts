@@ -3,7 +3,7 @@ import { buildFixturePage, contentHash, idPrefixes, mintId } from '@docstube/con
 import type { BlockEntity, ClaimEntity, PageEntity } from '@docstube/contracts';
 import { liftClaimGroundedBlocks, recomputeRollups } from './verify-page.ts';
 
-const emptyProvenance = { sources: [], seedContext: [], observedReads: [], verifications: [] };
+const emptyProvenance = { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] };
 
 const proseBlock = (text: string, claims: ClaimEntity[] = []): BlockEntity => ({
   id: mintId(idPrefixes.block),

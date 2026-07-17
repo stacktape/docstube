@@ -128,7 +128,7 @@ const buildBlock = (mdx: string, node: RootContent): BlockEntity => {
     claims: [],
     // Initial level; the verify stage upgrades to proven / caps to out-of-domain.
     guarantee: 'scored',
-    provenance: { sources: [], seedContext: [], observedReads: [], verifications: [] }
+    provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
   };
 };
 
@@ -224,6 +224,6 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
     preamble,
     sections,
     guarantee: 'scored',
-    provenance: { sources: [], seedContext: [], observedReads: [], verifications: [] }
+    provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
   };
 };

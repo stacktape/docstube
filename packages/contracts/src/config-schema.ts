@@ -90,17 +90,19 @@ export const localesConfigSchema = z.object({
 
 export const themeConfigSchema = z.object({
   // Design tokens (CSS custom-property values) applied to the emitted site.
-  tokens: z.record(z.string(), z.string()).default({}),
-  logo: repoPathSchema.optional(),
-  favicon: repoPathSchema.optional()
+  tokens: z.record(z.string(), z.string()).default({})
 });
 
+// logo/favicon are SITE metadata (PRODUCT §3.9.2 groups them with title/description) — a hand
+// editor looks for `favicon:` under `site:`, not `theme:`.
 export const siteConfigSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
   baseUrl: z.string().url().optional(),
   layout: z.enum(['single-tree', 'sectioned']).default('single-tree'),
-  footerCredit: z.boolean().default(true)
+  footerCredit: z.boolean().default(true),
+  logo: repoPathSchema.optional(),
+  favicon: repoPathSchema.optional()
 });
 
 // Reserved v2 policy-engine surface (PRODUCT §4.2) — validated now, enforced later. v1 uses the
