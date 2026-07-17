@@ -11,7 +11,7 @@ import type {
 } from '@docstube/contracts';
 import { rollUpGuarantee } from '@docstube/contracts';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import { createBlockRegistry } from '../entities/block-registry.ts';
@@ -30,11 +30,18 @@ const createPluginFs = (repoRoot: string, writableRoots: string[]): PluginFs => 
     }
   },
   writeFile: async (path, content) => {
-    const allowed = writableRoots.some((root) => path === root || path.startsWith(`${root.replace(/\/$/, '')}/`));
+    // Accidental-escape protection on RESOLVED paths ('cache/../../x' must not pass a prefix
+    // check). Not a security boundary: plugins are in-process JS (ARCHITECTURE.md §6.3
+    // honest-but-soft enforcement) — this catches bugs, not malice.
+    const target = resolvePath(repoRoot, path);
+    const allowed = writableRoots.some((root) => {
+      const resolvedRoot = resolvePath(repoRoot, root);
+      const relativePath = relative(resolvedRoot, target);
+      return relativePath === '' || (!relativePath.startsWith('..') && !isAbsolute(relativePath));
+    });
     if (!allowed) {
       throw new Error(`plugin write to "${path}" is outside its declared writableRoots [${writableRoots.join(', ')}]`);
     }
-    const target = join(repoRoot, path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, content, 'utf8');
   }

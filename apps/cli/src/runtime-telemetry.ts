@@ -220,6 +220,8 @@ export const createPostHogRuntimeTelemetryTransport =
     }
 
     const host = (env.DOCSTUBE_POSTHOG_HOST ?? env.POSTHOG_HOST ?? 'https://us.i.posthog.com').replace(/\/+$/u, '');
+    // Bounded: a stalled telemetry endpoint must never hang the CLI at exit. The abort error is
+    // swallowed by sendRuntimeTelemetry's catch — telemetry loss is never a command failure.
     await fetch(`${host}/capture/`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -228,7 +230,8 @@ export const createPostHogRuntimeTelemetryTransport =
         event: 'docstube cli command',
         distinct_id: context.distinctId,
         properties: event
-      })
+      }),
+      signal: AbortSignal.timeout(2000)
     });
   };
 
@@ -266,26 +269,41 @@ export const runCliCommandWithTelemetry = async (input: {
   let enabled = !envDisablesTelemetry(env);
   let firstRun = false;
   let distinctId: string | undefined;
+  // Resolving the preference writes to the user's home directory; a read-only home (locked-down
+  // CI image, restricted account) must never brick the command — telemetry just stays off for
+  // this run, with no file writes and no disclosure.
+  const safelyResolvePreference = async (): Promise<ResolvedTelemetryPreference | undefined> => {
+    try {
+      return await resolveTelemetryPreference({
+        userConfigDir: input.userConfigDir,
+        workspaceDir: input.workspaceDir
+      });
+    } catch {
+      return undefined;
+    }
+  };
   if (enabled && !envHasTelemetryPreference(env)) {
-    const resolved = await resolveTelemetryPreference({
-      userConfigDir: input.userConfigDir,
-      workspaceDir: input.workspaceDir
-    });
-    enabled = resolved.preference.enabled;
-    firstRun = resolved.firstRun;
-    distinctId = resolved.preference.distinctId;
-    if (firstRun) {
-      input.onDisclosure?.(runtimeTelemetryDisclosureMessage);
+    const resolved = await safelyResolvePreference();
+    if (resolved === undefined) {
+      enabled = false;
+    } else {
+      enabled = resolved.preference.enabled;
+      firstRun = resolved.firstRun;
+      distinctId = resolved.preference.distinctId;
+      if (firstRun) {
+        input.onDisclosure?.(runtimeTelemetryDisclosureMessage);
+      }
     }
   } else if (enabled) {
     // DOCSTUBE_TELEMETRY=true: honor it without a disclosure, but still keep one stable
     // anonymous id per user.
-    const resolved = await resolveTelemetryPreference({
-      userConfigDir: input.userConfigDir,
-      workspaceDir: input.workspaceDir
-    });
-    distinctId = resolved.preference.distinctId;
-    firstRun = resolved.firstRun;
+    const resolved = await safelyResolvePreference();
+    if (resolved === undefined) {
+      enabled = false;
+    } else {
+      distinctId = resolved.preference.distinctId;
+      firstRun = resolved.firstRun;
+    }
   }
 
   // Notice-first: the disclosure run itself sends NOTHING — events start from the next run.

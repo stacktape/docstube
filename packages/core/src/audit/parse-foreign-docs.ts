@@ -65,8 +65,9 @@ export const parseForeignDocs = async (options: { docsDir: string }): Promise<Pa
   const pages: ForeignDocPage[] = [];
   const skipped: Array<{ file: string; reason: string }> = [];
   for (const file of files) {
-    const markdown = await readFile(join(options.docsDir, file), 'utf8');
+    // The read sits inside the try: one unreadable file is a skipped page, never an aborted audit.
     try {
+      const markdown = await readFile(join(options.docsDir, file), 'utf8');
       const page = extractPageEntity({ mdx: markdown, slug: slugFromDocPath(file), fallbackTitle: file });
       pages.push({ file, page, markdown });
     } catch (error) {

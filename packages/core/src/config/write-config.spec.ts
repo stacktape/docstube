@@ -119,6 +119,23 @@ describe('scaffoldConfigFamily', () => {
     );
   });
 
+  it('never overwrites under a create race — two concurrent scaffolds cannot both win', async () => {
+    // The 'wx' write flag is the real guard: even when both scaffolds pass the existence check
+    // before either writes, at most one creates each file and the loser gets the same error.
+    const repoRoot = await makeRepoRoot();
+    const results = await Promise.allSettled([
+      scaffoldConfigFamily(repoRoot, { config: fixtureConfigInput, ia: fixtureIa }),
+      scaffoldConfigFamily(repoRoot, { config: fixtureConfigInput, ia: fixtureIa })
+    ]);
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    expect(fulfilled.length).toBeLessThanOrEqual(1);
+    const reasons = results.flatMap((result) => (result.status === 'rejected' ? [result.reason as Error] : []));
+    expect(reasons.length).toBeGreaterThanOrEqual(1);
+    for (const reason of reasons) {
+      expect(reason.message).toMatch(/refusing to overwrite/);
+    }
+  });
+
   it('validates the seed before touching disk', async () => {
     const repoRoot = await makeRepoRoot();
     const invalidConfig = { ...fixtureConfigInput, personas: [] };

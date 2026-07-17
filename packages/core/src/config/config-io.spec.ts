@@ -1,6 +1,9 @@
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CoreError } from '../errors.ts';
-import { parseDocstubeConfig, setYamlIn } from './config-io.ts';
+import { editConfigFile, parseDocstubeConfig, setYamlIn } from './config-io.ts';
 
 const configYaml = `# docstube configuration — hand-tuned, do not lose this comment
 schemaVersion: 1
@@ -35,5 +38,26 @@ describe('comment-preserving edits', () => {
     expect(updated).toContain('Renamed Docs');
     // Still valid config after the edit.
     expect(parseDocstubeConfig(updated).site.title).toBe('Renamed Docs');
+  });
+});
+
+describe('editConfigFile', () => {
+  it('validates the edited document against the owning schema and writes nothing on failure', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-editcfg-'));
+    await writeFile(join(repoRoot, 'docstube.yml'), configYaml, 'utf8');
+
+    await expect(
+      editConfigFile(repoRoot, 'docstube.yml', (doc) => {
+        doc.setIn(['docType'], 'blog');
+      })
+    ).rejects.toMatchObject({ code: 'config-invalid' });
+    expect(await readFile(join(repoRoot, 'docstube.yml'), 'utf8')).toBe(configYaml);
+
+    await editConfigFile(repoRoot, 'docstube.yml', (doc) => {
+      doc.setIn(['site', 'title'], 'Edited Docs');
+    });
+    const edited = await readFile(join(repoRoot, 'docstube.yml'), 'utf8');
+    expect(edited).toContain('# docstube configuration — hand-tuned, do not lose this comment');
+    expect(parseDocstubeConfig(edited).site.title).toBe('Edited Docs');
   });
 });

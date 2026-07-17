@@ -23,6 +23,14 @@ describe('manifest shards', () => {
     expect(explicitCurrent).toBe('pages/en/pg_x.yml');
   });
 
+  it('accepts abbreviated, SHA-1, and SHA-256 commit ids on shards and versions', () => {
+    const shard = buildFixturePageShard(buildFixturePage());
+    for (const commit of ['a1b2c3d', 'a'.repeat(40), 'b'.repeat(64)]) {
+      expect(pageShardSchema.safeParse({ ...shard, sourceCommit: commit }).success).toBe(true);
+    }
+    expect(pageShardSchema.safeParse({ ...shard, sourceCommit: 'c'.repeat(65) }).success).toBe(false);
+  });
+
   it('requires at least one declared version in the index', () => {
     const index = {
       schemaVersion: 1,

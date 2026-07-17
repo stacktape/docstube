@@ -9,7 +9,7 @@ import {
 } from './primitives.ts';
 
 // Guarantee levels are computed, never asserted (ARCHITECTURE.md §4):
-//   proven         at least one passing deterministic verification covers the claim class
+//   proven         a deterministic tool checked it (verifier pass for code, codemap grounding for claims)
 //   scored         criteria-based AI review only
 //   out-of-domain  declared unprovable (tribal knowledge, intent) — flagged, never silently wrong
 export const guaranteeLevelSchema = z.enum(['proven', 'scored', 'out-of-domain']);
@@ -37,7 +37,8 @@ export const sourceRefSchema = z.object({
   symbol: sourceKeySchema,
   file: repoPathSchema,
   span: lineSpanSchema.optional(),
-  commit: z.string().regex(/^[0-9a-f]{7,40}$/)
+  // 7..64 hex chars: abbreviated through full SHA-1 (40) and SHA-256 (64) git object ids.
+  commit: z.string().regex(/^[0-9a-f]{7,64}$/)
 });
 export type SourceRef = z.infer<typeof sourceRefSchema>;
 

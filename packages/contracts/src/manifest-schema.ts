@@ -30,7 +30,7 @@ export const manifestVersionSchema = z.object({
   status: z.enum(['current', 'frozen']),
   commit: z
     .string()
-    .regex(/^[0-9a-f]{7,40}$/)
+    .regex(/^[0-9a-f]{7,64}$/)
     .optional(),
   cutAt: isoTimestampSchema.optional()
 });
@@ -63,7 +63,7 @@ export const pageShardSchema = z.object({
   schemaVersion: z.literal(1),
   locale: localeCodeSchema,
   version: versionLabelSchema,
-  sourceCommit: z.string().regex(/^[0-9a-f]{7,40}$/),
+  sourceCommit: z.string().regex(/^[0-9a-f]{7,64}$/),
   generatedAt: isoTimestampSchema,
   page: pageEntitySchema,
   flags: z.array(flagSchema).default([]),

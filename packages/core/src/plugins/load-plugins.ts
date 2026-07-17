@@ -23,7 +23,8 @@ export const registerBuiltinPlugins = async (host: PluginHost): Promise<void> =>
 const importPluginModule = async (specifier: string, repoRoot: string): Promise<unknown> => {
   if (specifier.startsWith('.') || isAbsolute(specifier)) {
     // Local plugins are repo files; Node's type stripping lets users write them in TypeScript.
-    return import(pathToFileURL(join(repoRoot, specifier)).href);
+    // Absolute specifiers are already full paths — joining them onto repoRoot would corrupt them.
+    return import(pathToFileURL(isAbsolute(specifier) ? specifier : join(repoRoot, specifier)).href);
   }
   // npm plugins are the *user's* dependency, resolved from the target repo — never from the
   // docstube installation (which may be a standalone binary).

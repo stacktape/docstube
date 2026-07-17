@@ -120,6 +120,56 @@ describe('attachExtractedClaims', () => {
     expect(claims.map((claim) => claim.guarantee).toSorted()).toEqual(['proven', 'scored']);
   });
 
+  it('anchors a repeated quote by prefix/suffix context, first occurrence on ties', async () => {
+    const repeatedMdx = `---
+title: Guide
+---
+
+# Guide
+
+Calling \`greet\` returns a string. Fast by default.
+
+## Details
+
+In loud mode, \`greet\` returns a string. Uppercased always.
+`;
+    const artifact: PageArtifact = {
+      page: extractPageEntity({ mdx: repeatedMdx, slug: 'guide' }),
+      mdx: repeatedMdx,
+      mdxPath: 'content/en/guide.mdx',
+      locale: 'en',
+      version: 'latest'
+    };
+    const journal = await createRunJournal(repoRoot, 'run_00000000000000000002');
+    const result = await attachExtractedClaims({
+      artifact,
+      codemap,
+      journal,
+      runTask: scriptedExtraction([
+        {
+          text: 'loud mode uppercases the result',
+          anchor: { quote: 'returns a string.', prefix: 'In loud mode, `greet` ', suffix: ' Uppercased always.' },
+          claimClass: 'behavioral',
+          identifiers: ['greet']
+        },
+        {
+          text: 'greet returns a string',
+          anchor: { quote: 'returns a string.' },
+          claimClass: 'api-shape',
+          identifiers: ['greet']
+        }
+      ])
+    });
+
+    expect(result.attached).toBe(2);
+    expect(result.unanchored).toBe(0);
+    // The context-disambiguated claim lands on the section paragraph, not the first occurrence.
+    const sectionBlock = result.page.sections.flatMap((section) => section.blocks)[0];
+    expect(sectionBlock?.claims.map((claim) => claim.text)).toEqual(['loud mode uppercases the result']);
+    // The context-free claim ties across occurrences and keeps the first (the preamble).
+    expect(result.page.preamble[0]?.claims.map((claim) => claim.text)).toEqual(['greet returns a string']);
+  });
+
   it('never duplicates claims carried from a previous shard', async () => {
     const journal = await createRunJournal(repoRoot, 'run_00000000000000000001');
     const artifact = buildArtifact();

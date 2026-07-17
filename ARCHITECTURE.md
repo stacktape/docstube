@@ -323,7 +323,7 @@ Cache          transcript keyed by hash(model, prompts, tool surface, budget, in
 | `openai-compatible` | Chat Completions/Responses tool calling against any base URL (presets: OpenAI, Ollama, …) | API key / local |
 | `claude-cli` | vendor CLI in non-interactive mode, built-in tools disabled, our ToolSurface exposed via MCP (stdio), structured output stream parsed | Claude subscription |
 | `codex-cli` | same pattern via `codex exec --json` + MCP (read-only sandbox; `apply_patch` can't be disabled — scratch-dir + discard) | ChatGPT subscription |
-| `google` | gemini-cli (OSS, maintained) with API-key/Vertex auth — its personal-subscription billing died 2026-06; Antigravity `agy` added once its headless surface is documentable | API key now; `agy` later |
+| `google` (internal/experimental) | Antigravity CLI `agy` (gemini-cli's replacement) — NOT a public transport: an upstream bug drops subprocess stdout, so it is reachable only via `DOCSTUBE_TRANSPORT_OVERRIDE`. Public v1 transports are the four rows above | API key |
 | `replay` | plays recorded transcripts; the only transport CI may use | free |
 
 Transports declare capabilities (`toolInjection: native | mcp | none`, `structuredOutput`,

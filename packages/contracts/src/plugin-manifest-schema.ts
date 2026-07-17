@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { semverSchema } from './primitives.ts';
+import { repoPathSchema, semverSchema } from './primitives.ts';
 
 // Every plugin declares what it is and what it needs up front (npm-style trust posture,
 // PRODUCT §3.4). Declarations are shown to the user at first run and cross-checked against what
@@ -12,7 +12,8 @@ export const pluginPermissionsSchema = z.object({
   // Executables the plugin may spawn ("shellcheck", "pyright"). Empty = none.
   exec: z.array(z.string().min(1)).default([]),
   // Repo-relative roots the plugin may write into via host-provided FS handles. Empty = read-only.
-  writableRoots: z.array(z.string().min(1)).default([])
+  // repoPathSchema rejects absolute paths and traversal segments at the declaration boundary.
+  writableRoots: z.array(repoPathSchema).default([])
 });
 export type PluginPermissions = z.infer<typeof pluginPermissionsSchema>;
 

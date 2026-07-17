@@ -12,6 +12,8 @@ export type WritePromptInput = {
   node: IaNode;
   // Findings from a failed gate attempt, attached on retry.
   priorFindings: Finding[];
+  // The failed attempt's MDX, attached on retry so the writer edits it instead of rewriting.
+  priorDraft?: string | undefined;
   enabledComponents: string[];
   // Durable writing instructions from .docstube/instructions/ (feedback learning).
   instructions: string[];
@@ -75,15 +77,29 @@ export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
 };
 
 export const buildWriterUserPrompt = (input: WritePromptInput): string => {
+  const findingLines = input.priorFindings.map(
+    (finding) => `- [${finding.check}] ${finding.message}${finding.file ? ` (${finding.file})` : ''}`
+  );
   const findingsBlock =
     input.priorFindings.length > 0
-      ? [
-          '',
-          'Your previous draft FAILED verification. Fix every finding below; change nothing that was not flagged:',
-          ...input.priorFindings.map(
-            (finding) => `- [${finding.check}] ${finding.message}${finding.file ? ` (${finding.file})` : ''}`
-          )
-        ]
+      ? input.priorDraft === undefined
+        ? [
+            '',
+            'Your previous draft FAILED verification. Fix every finding below; change nothing that was not flagged:',
+            ...findingLines
+          ]
+        : [
+            '',
+            'Your previous draft FAILED verification. Edit the draft below to fix every finding; change nothing',
+            'that was not flagged. Output the complete corrected page.',
+            '',
+            '--- PREVIOUS DRAFT START ---',
+            input.priorDraft,
+            '--- PREVIOUS DRAFT END ---',
+            '',
+            'Findings to fix:',
+            ...findingLines
+          ]
       : [];
   return [
     `Write the documentation page "${input.node.title}" (slug: ${input.node.slug}).`,

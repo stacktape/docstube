@@ -151,6 +151,52 @@ describe('event payload', () => {
   });
 });
 
+describe('resilience', () => {
+  it('an unwritable preference path disables telemetry for the run instead of failing the command', async () => {
+    // A FILE occupies the user config dir path, so mkdir/write under it fail — the read-only-home
+    // stand-in. The command must still run; telemetry silently stays off.
+    const blockedDir = join(workspaceDir, 'blocked-config-dir');
+    await writeFile(blockedDir, 'not a directory', 'utf8');
+
+    let ran = false;
+    const captured: RuntimeTelemetryEvent[] = [];
+    const disclosures: string[] = [];
+    const result = await runCliCommandWithTelemetry({
+      command: 'doctor',
+      env: {},
+      workspaceDir,
+      userConfigDir: blockedDir,
+      onDisclosure: (message) => disclosures.push(message),
+      transport: (event) => {
+        captured.push(event);
+      },
+      run: () => {
+        ran = true;
+        return { exitCode: 0 };
+      }
+    });
+
+    expect(ran).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(captured).toEqual([]);
+    expect(disclosures).toEqual([]);
+  });
+
+  it('the PostHog transport bounds its request with an abort timeout so a stalled endpoint never hangs exit', async () => {
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal('fetch', async (_url: string, init: { signal?: AbortSignal }) => {
+      signal = init.signal;
+      return new Response('{}');
+    });
+    const transport = createPostHogRuntimeTelemetryTransport({ DOCSTUBE_POSTHOG_PROJECT_TOKEN: 'phc_test' });
+    await transport(
+      { event: 'cli-command', command: 'generate', status: 'succeeded', version: '0.0.2', surface: 'runtime' },
+      { distinctId: 'anon-timeout' }
+    );
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
 describe('countRunFailureModes', () => {
   it('aggregates checks, flag kinds, and freezes into registry codes only', () => {
     const counts = countRunFailureModes({

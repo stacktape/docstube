@@ -102,6 +102,25 @@ describe('mapOpenAiResponse', () => {
     expect(turn.blocks[1]).toEqual({ type: 'tool-call', toolCallId: 'call_3', name: 'grep', args: '{broken' });
     expect(turn.stopReason).toBe('end');
   });
+
+  it('maps content_filter and unknown finish reasons to error turns — filtered output never ships', () => {
+    const filtered = mapOpenAiResponse({
+      choices: [{ message: { content: 'partial output' }, finish_reason: 'content_filter' }]
+    });
+    expect(filtered.stopReason).toBe('error');
+    expect(filtered.errorMessage).toContain('content_filter');
+
+    const unknown = mapOpenAiResponse({
+      choices: [{ message: { content: 'x' }, finish_reason: 'mystery_reason' }]
+    });
+    expect(unknown.stopReason).toBe('error');
+    expect(unknown.errorMessage).toContain('mystery_reason');
+  });
+
+  it('treats an absent finish reason as a finished answer', () => {
+    const turn = mapOpenAiResponse({ choices: [{ message: { content: 'done' }, finish_reason: null }] });
+    expect(turn.stopReason).toBe('end');
+  });
 });
 
 describe('presets', () => {

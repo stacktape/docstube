@@ -593,48 +593,54 @@ const parsePorcelainStatus = (stdout: string): readonly string[] =>
       return renamedPath ?? path;
     });
 
-const createGitClient = (): GitHubActionGitClient => ({
+export const createGitClient = (run: GitHubActionProcessRunner = runProcess): GitHubActionGitClient => ({
   checkoutBase: async (input) => {
-    await runProcess('git', ['fetch', 'origin', input.baseBranch, '--depth=1'], { cwd: input.workspaceDir });
-    const checkout = await runProcess('git', ['checkout', input.baseBranch], { cwd: input.workspaceDir });
+    // Every step is checked: a failed fetch or pull would silently branch the docs off a stale
+    // base and the resulting PR would revert newer docs commits.
+    const fetch = await run('git', ['fetch', 'origin', input.baseBranch, '--depth=1'], { cwd: input.workspaceDir });
+    if (fetch.exitCode !== 0) {
+      throw new Error(fetch.stderr || `Failed to fetch origin/${input.baseBranch}.`);
+    }
+    const checkout = await run('git', ['checkout', input.baseBranch], { cwd: input.workspaceDir });
     if (checkout.exitCode !== 0) {
       throw new Error(checkout.stderr || `Failed to checkout ${input.baseBranch}.`);
     }
-    await runProcess('git', ['pull', '--ff-only', 'origin', input.baseBranch], { cwd: input.workspaceDir });
+    const pull = await run('git', ['pull', '--ff-only', 'origin', input.baseBranch], { cwd: input.workspaceDir });
+    if (pull.exitCode !== 0) {
+      throw new Error(pull.stderr || `Failed to fast-forward ${input.baseBranch} from origin.`);
+    }
   },
   createBranch: async (input) => {
-    const result = await runProcess('git', ['checkout', '-B', input.branchName], { cwd: input.workspaceDir });
+    const result = await run('git', ['checkout', '-B', input.branchName], { cwd: input.workspaceDir });
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || `Failed to create ${input.branchName}.`);
     }
   },
   changedFiles: async (input) => {
-    const result = await runProcess('git', ['status', '--porcelain'], { cwd: input.workspaceDir });
+    const result = await run('git', ['status', '--porcelain'], { cwd: input.workspaceDir });
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || 'Failed to read git status.');
     }
     return parsePorcelainStatus(result.stdout);
   },
   commitPaths: async (input) => {
-    await runProcess('git', ['config', 'user.name', 'github-actions[bot]'], { cwd: input.workspaceDir });
-    await runProcess('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], {
+    await run('git', ['config', 'user.name', 'github-actions[bot]'], { cwd: input.workspaceDir });
+    await run('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com'], {
       cwd: input.workspaceDir
     });
-    const add = await runProcess('git', ['add', '--', ...input.paths], { cwd: input.workspaceDir });
+    const add = await run('git', ['add', '--', ...input.paths], { cwd: input.workspaceDir });
     if (add.exitCode !== 0) {
       throw new Error(add.stderr || 'Failed to stage docstube changes.');
     }
-    const commit = await runProcess('git', ['commit', '-m', input.message], { cwd: input.workspaceDir });
+    const commit = await run('git', ['commit', '-m', input.message], { cwd: input.workspaceDir });
     if (commit.exitCode !== 0) {
       throw new Error(commit.stderr || 'Failed to commit docstube changes.');
     }
   },
   pushBranch: async (input) => {
-    const result = await runProcess(
-      'git',
-      ['push', '--force-with-lease', 'origin', `HEAD:refs/heads/${input.branchName}`],
-      { cwd: input.workspaceDir }
-    );
+    const result = await run('git', ['push', '--force-with-lease', 'origin', `HEAD:refs/heads/${input.branchName}`], {
+      cwd: input.workspaceDir
+    });
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || `Failed to push ${input.branchName}.`);
     }

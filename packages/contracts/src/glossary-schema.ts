@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 // glossary.yaml — canonical terminology. The theme auto-links terms; the glossary verifier
 // enforces consistent usage; the feedback categorizer routes terminology feedback here.
-export const glossaryTermSchema = z.object({
+export const glossaryTermSchema = z.strictObject({
   term: z.string().min(1),
   definition: z.string().min(1),
   aliases: z.array(z.string().min(1)).default([]),
@@ -11,7 +11,7 @@ export const glossaryTermSchema = z.object({
 });
 export type GlossaryTerm = z.infer<typeof glossaryTermSchema>;
 
-export const glossarySchema = z.object({
+export const glossarySchema = z.strictObject({
   schemaVersion: z.literal(1),
   terms: z.array(glossaryTermSchema).default([])
 });

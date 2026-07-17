@@ -110,6 +110,21 @@ const iaHeader = [
   ' Each node with a `brief` becomes a page; nodes without one are pure grouping nodes.'
 ].join('\n');
 
+// Create-only write: the 'wx' flag makes the no-overwrite guarantee atomic — a config created
+// between an existence check and this write is never clobbered.
+const writeNewFile = async (path: string, content: string): Promise<void> => {
+  try {
+    await writeFile(path, content, { encoding: 'utf8', flag: 'wx' });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw configError(`refusing to overwrite existing ${path} — edit it via the wizard or by hand instead`, {
+        path
+      });
+    }
+    throw error;
+  }
+};
+
 // First-run scaffold: creates docstube.yml + ia.yml. Refuses to overwrite — existing files are
 // user-owned and must only ever be edited through the comment-preserving paths above.
 export const scaffoldConfigFamily = async (repoRoot: string, seed: ConfigFamilySeed): Promise<ScaffoldResult> => {
@@ -140,8 +155,9 @@ export const scaffoldConfigFamily = async (repoRoot: string, seed: ConfigFamilyS
       });
     }
   }
-  // Write the raw seed (intent only), not the defaults-expanded parse result.
-  await writeFile(configPath, documentWithHeader(seed.config, configHeader), 'utf8');
-  await writeFile(iaPath, documentWithHeader(seed.ia, iaHeader), 'utf8');
+  // Write the raw seed (intent only), not the defaults-expanded parse result. The existence check
+  // above only makes the common case fail before the first byte lands; writeNewFile is the guard.
+  await writeNewFile(configPath, documentWithHeader(seed.config, configHeader));
+  await writeNewFile(iaPath, documentWithHeader(seed.ia, iaHeader));
   return { configPath, iaPath };
 };

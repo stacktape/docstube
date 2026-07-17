@@ -54,12 +54,18 @@ export const localeCodeSchema = z
 export const versionLabelSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
 
 // Repo-relative POSIX path (the manifest never stores absolute or Windows-style paths).
+// '.' (the repo root itself) is allowed; traversal and self-referencing segments are not.
 export const repoPathSchema = z
   .string()
   .min(1)
   .refine((value) => !value.includes('\\') && !value.startsWith('/') && !/^[A-Za-z]:/.test(value), {
     message: 'expected a repo-relative POSIX path'
-  });
+  })
+  .refine(
+    (value) =>
+      value === '.' || value.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..'),
+    { message: 'path must not contain empty, "." or ".." segments' }
+  );
 
 export const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/);
 

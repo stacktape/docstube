@@ -6,6 +6,7 @@ import {
   createDocstubeActionBranchName,
   createDocstubeActionConcurrencyGroup,
   createDocstubeCliRunner,
+  createGitClient,
   readGitHubActionInputsFromEnv,
   runGitHubAction
 } from './github-action.ts';
@@ -15,8 +16,9 @@ import type {
   GitHubActionGitClient,
   GitHubActionIssueClient,
   GitHubActionMergeControl,
-  GitHubActionPullRequestClient,
-  GitHubPullRequest
+  GitHubActionProcessRunner,
+  GitHubPullRequest,
+  GitHubActionPullRequestClient
 } from './github-action.ts';
 import {
   buildFixtureFlag,
@@ -442,5 +444,37 @@ describe('inputs and CLI invocation', () => {
     expect(() =>
       readGitHubActionInputsFromEnv({ GITHUB_WORKSPACE: '/repo', INPUT_MODE: 'refresh', 'INPUT_DRY-RUN': 'true' })
     ).toThrow('dry-run input was removed');
+  });
+});
+
+const scriptedGitRunner = (failOnSubcommand?: string) => {
+  const calls: string[][] = [];
+  const run: GitHubActionProcessRunner = async (command, args) => {
+    calls.push([command, ...args]);
+    const failed = args[0] === failOnSubcommand;
+    return { exitCode: failed ? 1 : 0, stderr: failed ? `${args[0]} failed` : '', stdout: '' };
+  };
+  return { calls, run };
+};
+
+describe('createGitClient.checkoutBase', () => {
+  it('runs fetch, checkout, and ff-only pull in order on the happy path', async () => {
+    const { calls, run } = scriptedGitRunner();
+    await createGitClient(run).checkoutBase({ baseBranch: 'main', workspaceDir: '.' });
+    expect(calls.map((call) => call[1])).toEqual(['fetch', 'checkout', 'pull']);
+  });
+
+  it('throws when fetch or pull fails instead of silently branching off a stale base', async () => {
+    const fetchFailure = scriptedGitRunner('fetch');
+    await expect(
+      createGitClient(fetchFailure.run).checkoutBase({ baseBranch: 'main', workspaceDir: '.' })
+    ).rejects.toThrow('fetch failed');
+    // A failed fetch stops immediately — no checkout over unknown state.
+    expect(fetchFailure.calls).toHaveLength(1);
+
+    const pullFailure = scriptedGitRunner('pull');
+    await expect(
+      createGitClient(pullFailure.run).checkoutBase({ baseBranch: 'main', workspaceDir: '.' })
+    ).rejects.toThrow('pull failed');
   });
 });

@@ -6,7 +6,7 @@ import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { runGenerate } from './generate.ts';
 import type { TaskToolImplementation } from './page-runner.ts';
-import { questionKey, questionsSimilar } from './tribal-knowledge.ts';
+import { loadKnowledge, questionKey, questionsSimilar } from './tribal-knowledge.ts';
 
 // The full tribal-knowledge lifecycle (PRODUCT §4.1): the writer asks through the harness tool
 // (non-blocking), the question becomes exactly one open flag (ask-once), a human answer becomes
@@ -122,6 +122,31 @@ describe('questionsSimilar', () => {
     expect(questionsSimilar('Why greet loud?', 'Why shout instead?')).toBe(false);
     // Exact same short question (normalized) still dedups.
     expect(questionsSimilar('Why greet?', 'why   GREET?')).toBe(true);
+  });
+});
+
+describe('loadKnowledge', () => {
+  it('parses knowledge files with CRLF line endings — a Windows autocrlf checkout must not drop answers', async () => {
+    const dir = join(repoRoot, '.docstube', 'knowledge');
+    await mkdir(dir, { recursive: true });
+    const crlfContent = [
+      '---',
+      'question: Why was the loud option added?',
+      'answeredAt: 2026-01-01T00:00:00.000Z',
+      '---',
+      '',
+      'Shouting is a presentation concern.',
+      ''
+    ].join('\r\n');
+    await writeFile(join(dir, 'abcdef0123456789.md'), crlfContent, 'utf8');
+
+    const entries = await loadKnowledge(repoRoot);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      key: 'abcdef0123456789',
+      question: 'Why was the loud option added?',
+      answer: 'Shouting is a presentation concern.'
+    });
   });
 });
 

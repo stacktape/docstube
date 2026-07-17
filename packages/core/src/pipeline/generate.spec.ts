@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
+import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate, unwrapMdxFence } from './generate.ts';
 
 // End-to-end pipeline test over a real temp repo with the real builtin plugins (verifiers +
@@ -194,10 +195,83 @@ describe('runGenerate', () => {
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
 
     expect(writeCalls).toHaveLength(2);
-    // The retry prompt carries the findings forward.
+    // The retry prompt carries the findings forward AND the failed draft, as an edit instruction.
     expect(writeCalls[1]?.userPrompt).toContain('FAILED verification');
     expect(writeCalls[1]?.userPrompt).toContain('code-typecheck-ts');
+    expect(writeCalls[1]?.userPrompt).toContain('--- PREVIOUS DRAFT START ---');
+    expect(writeCalls[1]?.userPrompt).toContain("const message: number = 'not a number';");
     expect(summary.outcome).toBe('passed');
+  }, 60_000);
+
+  it('clamps a non-positive maxAttemptsPerPage to one attempt instead of crashing', async () => {
+    const { runTask, writeCalls } = scriptedRunner([goodMdx]);
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 0 });
+    expect(writeCalls).toHaveLength(1);
+    expect(summary.pages[0]?.attempts).toBe(1);
+  }, 60_000);
+
+  it('threads the standard read-only tools into review tasks — reviewers get source access', async () => {
+    const descriptor = {
+      name: 'read_file',
+      description: 'Read a repo file.',
+      paramsJsonSchema: { type: 'object', properties: { path: { type: 'string' } } }
+    };
+    const { runTask, reviewCalls } = scriptedRunner([goodMdx]);
+    await runGenerate({ repoRoot, runTask, toolDescriptors: [descriptor] });
+    expect(reviewCalls[0]?.tools.map((tool) => tool.name)).toContain('read_file');
+  }, 60_000);
+
+  it('journals a run-completed failed event when the pipeline escapes with an error', async () => {
+    const runId = 'run_00000000000000000009';
+    await expect(
+      runGenerate({
+        repoRoot,
+        runTask: () => Promise.reject(new Error('transport exploded')),
+        toolDescriptors: [],
+        runId
+      })
+    ).rejects.toThrow('transport exploded');
+    const journal = await createRunJournal(repoRoot, runId);
+    const events = await journal.readAll();
+    const terminal = events.at(-1);
+    expect(terminal).toMatchObject({ type: 'run-completed', outcome: 'failed', error: 'transport exploded' });
+  }, 60_000);
+
+  it('journals a warning when a persona review is skipped (invalid reviewer output)', async () => {
+    const runId = 'run_00000000000000000010';
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return {
+          ...baseTranscript(spec),
+          observedReads: [],
+          turns: [],
+          result: { type: 'structured', value: { nonsense: true } }
+        };
+      }
+      if (spec.kind === 'audit-extract-claims') {
+        return {
+          ...baseTranscript(spec),
+          observedReads: [],
+          turns: [],
+          result: { type: 'structured', value: { claims: [] } }
+        };
+      }
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: goodMdx }] }],
+        result: { type: 'mdx', mdx: goodMdx }
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], runId });
+    // A skipped review never gates the page, but it must be visible in the journal.
+    expect(summary.pages[0]?.status).toBe('passed');
+    const journal = await createRunJournal(repoRoot, runId);
+    const events = await journal.readAll();
+    const warning = events
+      .flatMap((event) => (event.type === 'findings' ? event.findings : []))
+      .find((finding) => finding.check === 'review-error');
+    expect(warning?.severity).toBe('warning');
+    expect(warning?.message).toContain('app-developer');
   }, 60_000);
 
   it('retries when a persona reviewer finds an error-severity problem', async () => {
@@ -335,6 +409,53 @@ describe('runGenerate', () => {
     expect(summary.outcome).toBe('flagged');
     expect(summary.translations[0]?.status).toBe('flagged');
     expect(summary.translations[0]?.findings[0]?.check).toBe('translation-structure');
+    // A failed translation never emits MDX under the locale path: the fallback artifact is the
+    // untranslated source page, and shipping it as "de" would be silently wrong.
+    await expect(readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8')).rejects.toThrow(
+      /ENOENT/
+    );
+    // The shard (with its open flag) still persists so status and the flag queue see the failure.
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const deShard = await store.readPageShard({ locale: 'de', pageId: index?.pages[0]?.id ?? '' });
+    expect(deShard?.flags.some((flag) => flag.status === 'open')).toBe(true);
+  }, 60_000);
+
+  it('rejects a translation that alters a code block — byte-identical or flagged, never downgraded', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), `${configYaml}locales:\n  source: en\n  targets: [de]\n`);
+    // Structure is intact; only the code block's content changed — an altered command must be an
+    // alignment error, not a silent guarantee downgrade.
+    const alteredCodeTranslation = goodMdx
+      .replace('# Getting started', '# Erste Schritte')
+      .replace("greet({ name: 'Ada' })", "greet({ name: 'Bob' })");
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      if (spec.kind === 'audit-extract-claims') {
+        return {
+          ...baseTranscript(spec),
+          observedReads: [],
+          turns: [],
+          result: { type: 'structured', value: { claims: [] } }
+        };
+      }
+      const mdx = spec.kind === 'translate-page' ? alteredCodeTranslation : goodMdx;
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
+        result: { type: 'mdx', mdx }
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    expect(summary.outcome).toBe('flagged');
+    expect(summary.translations[0]?.status).toBe('flagged');
+    expect(summary.translations[0]?.findings[0]?.check).toBe('translation-structure');
+    expect(summary.translations[0]?.findings[0]?.message).toContain('byte-identical');
+    await expect(readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8')).rejects.toThrow(
+      /ENOENT/
+    );
   }, 60_000);
 
   it('site-scope findings land as open system flags on the named page shard, deduped across runs', async () => {

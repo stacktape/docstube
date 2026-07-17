@@ -372,7 +372,6 @@ export const iaChanged = (state: WizardState): boolean => JSON.stringify(buildIa
 export const buildConfigInput = (state: WizardState): Record<string, unknown> => {
   const tokens = filteredTokens(state.themeTokens);
   const hasSources = state.openapi.length > 0 || state.asyncapi.length > 0 || state.imports.length > 0;
-  const hasTheme = Object.keys(tokens).length > 0 || state.logo.trim().length > 0 || state.favicon.trim().length > 0;
   return {
     schemaVersion: 1,
     docType: state.docType,
@@ -381,18 +380,14 @@ export const buildConfigInput = (state: WizardState): Record<string, unknown> =>
     ...(hasSources ? { sources: { openapi: state.openapi, asyncapi: state.asyncapi, imports: state.imports } } : {}),
     versions: { current: state.currentVersion, frozen: state.frozenVersions },
     locales: { source: state.sourceLocale, targets: state.targetLocales },
-    ...(hasTheme
-      ? {
-          theme: {
-            tokens,
-            ...(state.logo.trim().length === 0 ? {} : { logo: state.logo }),
-            ...(state.favicon.trim().length === 0 ? {} : { favicon: state.favicon })
-          }
-        }
-      : {}),
+    ...(Object.keys(tokens).length > 0 ? { theme: { tokens } } : {}),
+    // logo/favicon are SITE metadata (matching configPairs above); the strict theme schema is
+    // tokens-only and rejects them.
     site: {
       title: state.siteTitle,
-      ...(state.siteDescription.trim().length === 0 ? {} : { description: state.siteDescription })
+      ...(state.siteDescription.trim().length === 0 ? {} : { description: state.siteDescription }),
+      ...(state.logo.trim().length === 0 ? {} : { logo: state.logo }),
+      ...(state.favicon.trim().length === 0 ? {} : { favicon: state.favicon })
     },
     components: state.components
   };

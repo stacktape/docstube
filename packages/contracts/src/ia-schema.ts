@@ -20,7 +20,9 @@ export type IaNode = {
   children?: IaNode[] | undefined;
 };
 
-export const iaNodeSchema: z.ZodType<IaNode> = z.object({
+// Strict: ia.yml is human-edited, so a typo'd key (`breif`) must be a hard error, not a silently
+// dropped field that quietly turns a page into a grouping node.
+export const iaNodeSchema: z.ZodType<IaNode> = z.strictObject({
   title: z.string().min(1),
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   brief: z.string().optional(),
@@ -29,13 +31,42 @@ export const iaNodeSchema: z.ZodType<IaNode> = z.object({
   children: z.array(z.lazy(() => iaNodeSchema)).optional()
 });
 
-export const iaSchema = z.object({
-  schemaVersion: z.literal(1),
-  // With the `sectioned` site layout, top-level nodes render as section tabs.
-  tree: z.array(iaNodeSchema).min(1),
-  // Global page-count target the depth policy works against (PRODUCT §7.2).
-  pageCountTarget: z.number().int().positive().optional()
-});
+export const iaSchema = z
+  .strictObject({
+    schemaVersion: z.literal(1),
+    // With the `sectioned` site layout, top-level nodes render as section tabs.
+    tree: z.array(iaNodeSchema).min(1),
+    // Global page-count target the depth policy works against (PRODUCT §7.2).
+    pageCountTarget: z.number().int().positive().optional()
+  })
+  .superRefine((ia, ctx) => {
+    // ia.yml is hand-edited: copy-pasted nodes must fail here, not silently collide the manifest
+    // shard (pageId) or the emitted route (pages write content/<locale>/<slug>.mdx by bare slug).
+    const seenPageIds = new Set<string>();
+    const seenPageSlugs = new Set<string>();
+    for (const node of walkIaNodes(ia.tree)) {
+      if (node.pageId !== undefined) {
+        if (seenPageIds.has(node.pageId)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['tree'],
+            message: `duplicate pageId "${node.pageId}" — every IA node must own a distinct page`
+          });
+        }
+        seenPageIds.add(node.pageId);
+      }
+      if (node.brief !== undefined || node.pageId !== undefined) {
+        if (seenPageSlugs.has(node.slug)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['tree'],
+            message: `duplicate page slug "${node.slug}" — two pages would collide on the same route`
+          });
+        }
+        seenPageSlugs.add(node.slug);
+      }
+    }
+  });
 export type Ia = z.infer<typeof iaSchema>;
 
 export const walkIaNodes = (tree: readonly IaNode[]): IaNode[] => {

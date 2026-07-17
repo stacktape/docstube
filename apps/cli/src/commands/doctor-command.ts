@@ -87,11 +87,12 @@ export const runDoctorCommand = async (input: DoctorCommandInput, output: CliOut
       });
     }
   } catch (error) {
+    // An unusable docstube.yml means every pipeline command will fail — doctor must exit non-zero.
     checks.push({
       name: 'config family',
       ok: false,
       detail: error instanceof CoreError ? (error.message.split('\n')[0] ?? 'invalid') : 'unreadable',
-      critical: false
+      critical: true
     });
   }
 

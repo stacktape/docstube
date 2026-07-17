@@ -79,7 +79,9 @@ export const loadKnowledge = async (repoRoot: string): Promise<KnowledgeEntry[]>
   const entries: KnowledgeEntry[] = [];
   for (const name of files) {
     const raw = await readFile(join(knowledgeDir(repoRoot), name), 'utf8');
-    const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/u);
+    // CRLF-tolerant: knowledge files are committed, so a Windows autocrlf checkout hands us \r\n
+    // and an LF-only pattern would silently drop every stored answer.
+    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/u);
     if (!match) {
       continue;
     }

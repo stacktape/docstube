@@ -105,11 +105,26 @@ export const mapAnthropicResponse = (payload: unknown): AssistantTurn => {
       errorMessage: `output truncated at ${usage.outputTokens} tokens (stop_reason max_tokens); raise maxOutputTokens`
     };
   }
-  return {
-    blocks,
-    usage,
-    stopReason: parsed.data.stop_reason === 'tool_use' ? 'tool-use' : 'end'
-  };
+  if (parsed.data.stop_reason === 'tool_use') {
+    return { blocks, usage, stopReason: 'tool-use' };
+  }
+  // Allowlist: only end_turn (or an absent stop reason) is a finished answer. 'refusal' is the
+  // model declining, 'pause_turn' is an unfinished long turn the harness cannot continue, and any
+  // unknown value is unproven — all surface as error turns rather than shipping as complete.
+  if (
+    parsed.data.stop_reason === 'end_turn' ||
+    parsed.data.stop_reason === undefined ||
+    parsed.data.stop_reason === null
+  ) {
+    return { blocks, usage, stopReason: 'end' };
+  }
+  const errorMessage =
+    parsed.data.stop_reason === 'refusal'
+      ? 'model refused to answer (stop_reason refusal)'
+      : parsed.data.stop_reason === 'pause_turn'
+        ? 'turn paused before completion (stop_reason pause_turn) — the harness has no continuation support'
+        : `response ended with unknown stop_reason "${parsed.data.stop_reason}"`;
+  return { blocks, usage, stopReason: 'error', errorMessage };
 };
 
 export type AnthropicApiTransportOptions = {

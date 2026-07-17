@@ -27,6 +27,10 @@ export const cutVersionSnapshot = async (input: {
     throw new CoreError('config-invalid', `cannot freeze "${input.label}" — it is the current (live) version label`);
   }
 
+  // Re-cutting an existing label REPLACES the snapshot: stale shards from the prior cut must not
+  // survive next to the new ones (a page removed since the last cut would otherwise linger).
+  await store.removeVersionShards(input.label);
+
   let pagesFrozen = 0;
   for (const entry of index.pages) {
     for (const locale of index.locales) {

@@ -289,6 +289,63 @@ tree:
     expect(third.outcome).toBe('passed');
   }, 180_000);
 
+  it('reports flagged when a carried (unchanged) page still ships open non-tribal flags', async () => {
+    // Generate with a persistently failing persona review: the page ships flagged with an OPEN
+    // flag while its MDX passes every deterministic verifier.
+    const failingReviewTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'audit-extract-claims') {
+        return {
+          ...baseTranscript(spec, fixtureSource),
+          observedReads: [],
+          turns: [],
+          result: { type: 'structured', value: { claims: [] } }
+        };
+      }
+      if (spec.kind === 'review-page') {
+        return {
+          ...baseTranscript(spec, fixtureSource),
+          observedReads: [],
+          turns: [],
+          result: {
+            type: 'structured',
+            value: {
+              persona: 'app-developer',
+              criteria: [{ criterion: 'audience-fit', outcome: 'not-met', reasoning: 'Assumes internal context.' }],
+              findings: [
+                {
+                  source: 'review',
+                  check: 'audience-fit',
+                  severity: 'error',
+                  message: 'The page assumes repository-internal context an app developer cannot have.'
+                }
+              ]
+            }
+          }
+        };
+      }
+      return {
+        ...baseTranscript(spec, fixtureSource),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: goodMdx }] }],
+        result: { type: 'mdx', mdx: goodMdx }
+      };
+    };
+    const generated = await runGenerate({
+      repoRoot,
+      runTask: failingReviewTask,
+      toolDescriptors: [],
+      maxAttemptsPerPage: 1
+    });
+    expect(generated.outcome).toBe('flagged');
+
+    // Refresh with nothing changed: the page is carried, not regenerated — but its standing open
+    // flag must keep the run flagged, or the auto-merge gate reads a defective site as clean.
+    const { runTask, writeCalls } = scriptedRunner([], fixtureSource);
+    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    expect(writeCalls).toHaveLength(0);
+    expect(summary.unchangedCount).toBe(1);
+    expect(summary.outcome).toBe('flagged');
+  }, 120_000);
+
   it('regenerates when a provenance source symbol hash disappears from the HEAD codemap', async () => {
     await generateFixtureDocs();
 

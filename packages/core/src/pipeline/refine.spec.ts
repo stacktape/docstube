@@ -2,10 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
+import type { AgentTaskSpec, PageShard, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
+import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate } from './generate.ts';
-import { runRefine } from './refine.ts';
+import { rankPagesForRefinement, runRefine } from './refine.ts';
 
 // refine picks the worst committed page (open flags first, lowest proven ratio next) and runs it
 // back through the full page loop; a healed page loses its stale system flag.
@@ -110,4 +111,67 @@ describe('runRefine', () => {
       /no generated page/u
     );
   }, 60_000);
+
+  it('a plan-usage freeze journals run-frozen with the estimated spend and surfaces it in the summary', async () => {
+    // Two pages so the freeze (checked only between candidates) can trip before candidate 2.
+    await writeFile(
+      join(repoRoot, 'ia.yml'),
+      'schemaVersion: 1\ntree:\n  - title: Getting started\n    slug: getting-started\n    brief: Greet.\n  - title: Usage\n    slug: usage\n    brief: Use it.\n'
+    );
+    const good = makeRunner(() => goodMdx);
+    await runGenerate({ repoRoot, runTask: good.runTask, toolDescriptors: [] });
+
+    // Subscription-style transport: tokens + plan usage, never a vendor-reported dollar. The plan
+    // governor (default cap 80%) freezes the run; the journal must carry the token-derived
+    // estimate, never spentUsd: 0.
+    const planTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      const base: Omit<Transcript, 'result'> = {
+        schemaVersion: 1,
+        taskId: spec.id,
+        cacheKey: 't',
+        transport: 'replay',
+        model: 's',
+        turns: [],
+        observedReads: [],
+        usage: { inputTokens: 10_000, outputTokens: 10_000, planUsedPercent: 90, cacheHit: false },
+        stopReason: 'complete'
+      };
+      if (spec.kind === 'review-page') {
+        return { ...base, result: { type: 'structured', value: { persona: 'dev', criteria: [], findings: [] } } };
+      }
+      if (spec.kind === 'audit-extract-claims') {
+        return { ...base, result: { type: 'structured', value: { claims: [] } } };
+      }
+      return { ...base, result: { type: 'mdx', mdx: goodMdx } };
+    };
+    const summary = await runRefine({ repoRoot, runTask: planTask, toolDescriptors: [] });
+
+    expect(summary.outcome).toBe('frozen');
+    expect(summary.refined).toHaveLength(1);
+    expect(summary.planUsedPercent).toBe(90);
+    expect(summary.estimatedUsd).toBeGreaterThan(0);
+    expect(summary.spentUsd).toBeUndefined();
+
+    const journal = await createRunJournal(repoRoot, summary.runId);
+    const events = await journal.readAll();
+    const runFrozen = events.find((event) => event.type === 'run-frozen');
+    expect(runFrozen).toMatchObject({ type: 'run-frozen', reason: expect.stringContaining('90%') });
+    expect(runFrozen && 'spentUsd' in runFrozen ? runFrozen.spentUsd : 0).toBeGreaterThan(0);
+  }, 60_000);
+});
+
+const tiedPage = (slug: string) => ({
+  slug,
+  shard: { generatedAt: '2026-01-01T00:00:00.000Z' } as PageShard,
+  openFlags: 0,
+  provenRatio: 0.5
+});
+
+describe('rankPagesForRefinement', () => {
+  it('breaks full ties on slug so the order is deterministic regardless of input order', () => {
+    const a = tiedPage('alpha');
+    const b = tiedPage('beta');
+    expect(rankPagesForRefinement([b, a]).map((entry) => entry.slug)).toEqual(['alpha', 'beta']);
+    expect(rankPagesForRefinement([a, b]).map((entry) => entry.slug)).toEqual(['alpha', 'beta']);
+  });
 });

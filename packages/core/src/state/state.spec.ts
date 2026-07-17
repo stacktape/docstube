@@ -1,7 +1,7 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildFixturePage, buildFixturePageShard } from '@docstube/contracts';
 import { createManifestStore } from './manifest-store.ts';
 import { createRunJournal, summarizeRun } from './run-journal.ts';
@@ -56,5 +56,44 @@ describe('run journal', () => {
     const summary = summarizeRun(events);
     expect(summary.outcome).toBe('passed');
     expect(summary.pageStatus.get('pg_00000000000000000000')).toBe('writing');
+  });
+
+  it('tolerates one truncated FINAL line (crash mid-write): warns, drops it, resumes cleanly', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const journal = await createRunJournal(repoRoot, 'run_00000000000000000001');
+      await journal.append({ type: 'run-started', mode: 'generate', commit: 'a'.repeat(40) });
+      const journalPath = join(repoRoot, '.docstube', 'runs', 'run_00000000000000000001', 'journal.jsonl');
+      await appendFile(journalPath, '{"type":"page-status","pageId":"pg_0', 'utf8');
+
+      expect(await journal.readAll()).toHaveLength(1);
+
+      const resumed = await createRunJournal(repoRoot, 'run_00000000000000000001');
+      const event = await resumed.append({ type: 'run-completed', outcome: 'passed' });
+      expect(event.seq).toBe(1);
+      // Resume rewrote the file without the truncated tail: a later read must not hit a stranded
+      // invalid line in the middle.
+      expect(await resumed.readAll()).toHaveLength(2);
+      expect((await readFile(journalPath, 'utf8')).includes('page-status')).toBe(false);
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('an invalid line in the MIDDLE stays a hard error — that is real corruption', async () => {
+    const journal = await createRunJournal(repoRoot, 'run_00000000000000000002');
+    await journal.append({ type: 'run-started', mode: 'generate', commit: 'a'.repeat(40) });
+    const journalPath = join(repoRoot, '.docstube', 'runs', 'run_00000000000000000002', 'journal.jsonl');
+    await appendFile(journalPath, 'not json at all\n', 'utf8');
+    await appendFile(
+      journalPath,
+      `${JSON.stringify({ type: 'run-completed', outcome: 'passed', runId: 'run_00000000000000000002', seq: 2, at: new Date().toISOString() })}\n`,
+      'utf8'
+    );
+    await expect(journal.readAll()).rejects.toThrow(/Unexpected token|not valid JSON/);
+    await expect(createRunJournal(repoRoot, 'run_00000000000000000002')).rejects.toThrow(
+      /Unexpected token|not valid JSON/
+    );
   });
 });

@@ -21,6 +21,13 @@ describe('repo paths', () => {
     expect(repoPathSchema.safeParse('C:/Projects/x.ts').success).toBe(false);
     expect(repoPathSchema.safeParse('src\\cli.ts').success).toBe(false);
   });
+
+  it('rejects traversal and self-referencing segments but keeps "." as the repo root', () => {
+    expect(repoPathSchema.safeParse('.').success).toBe(true);
+    for (const path of ['../x', 'src/../../y', './..', '..', './src/cli.ts', 'src//cli.ts', 'src/']) {
+      expect(repoPathSchema.safeParse(path).success).toBe(false);
+    }
+  });
 });
 
 describe('locale codes', () => {

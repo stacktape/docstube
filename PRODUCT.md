@@ -122,7 +122,7 @@ Cross-cutting semantics: long runs are **resumable** (journaled in `.docstube/ru
 
 ### 3.6 BYO-AI (retained)
 
-Official codex / claude / gemini CLIs, or direct API keys with provider presets and custom OpenAI-/Anthropic-compatible base URLs (this covers Ollama/local models — MUST be tested and documented, strong OSS demand). docstube servers never receive source, prompts, docs, paths, or project names. Non-interactive agent invocations, declared writable roots, cache by prompt+input hashes, record/replay in CI.
+Official codex / claude CLIs, or direct API keys with provider presets and custom OpenAI-/Anthropic-compatible base URLs (this covers Ollama/local models — MUST be tested and documented, strong OSS demand). Google's Antigravity CLI (gemini-cli's replacement) stays internal/experimental — an upstream bug drops subprocess stdout — so the public v1 transports are claude-cli, codex-cli, anthropic-api, and openai-compatible. docstube servers never receive source, prompts, docs, paths, or project names. Non-interactive agent invocations, declared writable roots, cache by prompt+input hashes, record/replay in CI.
 
 ### 3.7 Cloud ↔ client contract
 
@@ -271,7 +271,7 @@ World-class custom docs search (the assumed pillar; likely Stacktape-deployed, A
 
 ## 6 · Boundaries (out of scope, unchanged unless listed in §4)
 
-Screenshot capture (reserved config object only) · native UI screenshots · Mermaid (D2 only) · docstube-operated free hosting · marketing website work · agent adapters beyond codex/claude/gemini + compatible base URLs · hosted backend beyond registration/waitlist.
+Screenshot capture (reserved config object only) · native UI screenshots · Mermaid (D2 only) · docstube-operated free hosting · marketing website work · agent adapters beyond the built-in four (codex/claude CLIs + Anthropic-/OpenAI-compatible APIs) · hosted backend beyond registration/waitlist.
 
 *(Removed from boundaries by decision: versioned docs, i18n, migration-import-as-context — now v1.)*
 

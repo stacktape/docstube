@@ -8,7 +8,7 @@ import { localeCodeSchema, repoPathSchema, versionLabelSchema } from './primitiv
 export const docTypeSchema = z.enum(['internal', 'external-library', 'external-product']);
 export type DocType = z.infer<typeof docTypeSchema>;
 
-export const personaSchema = z.object({
+export const personaSchema = z.strictObject({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
   description: z.string().min(1)
 });
@@ -17,12 +17,12 @@ export type Persona = z.infer<typeof personaSchema>;
 // 'readme-com' is the ReadMe.com docs platform, not a repository README.md.
 export const importSourceKindSchema = z.enum(['mintlify', 'gitbook', 'readme-com', 'confluence']);
 
-export const sourcesConfigSchema = z.object({
+export const sourcesConfigSchema = z.strictObject({
   // OpenAPI/AsyncAPI specs are first-class truth sources next to code (PRODUCT §4.1).
   openapi: z.array(repoPathSchema).default([]),
   asyncapi: z.array(repoPathSchema).default([]),
   // Existing docs as reference context; imported claims are unverified until re-grounded.
-  imports: z.array(z.object({ kind: importSourceKindSchema, location: z.string().min(1) })).default([])
+  imports: z.array(z.strictObject({ kind: importSourceKindSchema, location: z.string().min(1) })).default([])
 });
 
 // The PUBLIC transport surface. 'google' (Antigravity CLI drops subprocess stdout) and 'replay'
@@ -31,12 +31,12 @@ export const sourcesConfigSchema = z.object({
 export const transportIdSchema = z.enum(['claude-cli', 'codex-cli', 'anthropic-api', 'openai-compatible']);
 export type TransportId = z.infer<typeof transportIdSchema>;
 
-export const agentRoleConfigSchema = z.object({
+export const agentRoleConfigSchema = z.strictObject({
   transport: transportIdSchema.optional(),
   model: z.string().optional()
 });
 
-export const agentsConfigSchema = z.object({
+export const agentsConfigSchema = z.strictObject({
   transport: transportIdSchema.default('claude-cli'),
   model: z.string().optional(),
   reviewModel: z
@@ -54,7 +54,7 @@ export const agentsConfigSchema = z.object({
     .optional(),
   // Per-role overrides; unset roles inherit the top-level transport/model.
   roles: z
-    .object({
+    .strictObject({
       writer: agentRoleConfigSchema.optional(),
       reviewer: agentRoleConfigSchema.optional(),
       translator: agentRoleConfigSchema.optional()
@@ -63,7 +63,7 @@ export const agentsConfigSchema = z.object({
   // Each default is written once at field level; `.prefault({})` parses the empty object through
   // the schema so nested field defaults apply (Zod 4 `.default()` would short-circuit).
   budgets: z
-    .object({
+    .strictObject({
       // Approximate caps — freeze with margin (PRODUCT §3.5).
       maxRunUsd: z
         .number()
@@ -87,24 +87,24 @@ export const agentsConfigSchema = z.object({
     .prefault({})
 });
 
-export const versionsConfigSchema = z.object({
+export const versionsConfigSchema = z.strictObject({
   current: versionLabelSchema.default('latest'),
   frozen: z.array(versionLabelSchema).default([])
 });
 
-export const localesConfigSchema = z.object({
+export const localesConfigSchema = z.strictObject({
   source: localeCodeSchema.default('en'),
   targets: z.array(localeCodeSchema).default([])
 });
 
-export const themeConfigSchema = z.object({
+export const themeConfigSchema = z.strictObject({
   // Design tokens (CSS custom-property values) applied to the emitted site.
   tokens: z.record(z.string(), z.string()).default({})
 });
 
 // logo/favicon are SITE metadata (PRODUCT §3.9.2 groups them with title/description) — a hand
 // editor looks for `favicon:` under `site:`, not `theme:`.
-export const siteConfigSchema = z.object({
+export const siteConfigSchema = z.strictObject({
   title: z.string().min(1),
   description: z.string().default(''),
   baseUrl: z.string().url().optional(),
@@ -116,16 +116,16 @@ export const siteConfigSchema = z.object({
 
 // Reserved v2 policy-engine surface (PRODUCT §4.2) — validated now, enforced later. v1 uses the
 // hardcoded exception rules regardless of what this says.
-export const autonomyConfigSchema = z.object({
+export const autonomyConfigSchema = z.strictObject({
   default: z
-    .object({
+    .strictObject({
       mode: z.enum(['auto-merge', 'review']).default('auto-merge'),
       guaranteeFloor: z.enum(['proven', 'scored', 'out-of-domain']).optional()
     })
     .prefault({}),
   rules: z
     .array(
-      z.object({
+      z.strictObject({
         glob: z.string().min(1),
         mode: z.enum(['auto-merge', 'review']),
         guaranteeFloor: z.enum(['proven', 'scored', 'out-of-domain']).optional()
@@ -134,7 +134,9 @@ export const autonomyConfigSchema = z.object({
     .default([])
 });
 
-export const docstubeConfigSchema = z.object({
+// The whole family is strict (z.strictObject): docstube.yml is human-edited, so an unknown key is
+// a hard error — a typo'd option (or a mistyped secret-looking key) must never be silently dropped.
+export const docstubeConfigSchema = z.strictObject({
   schemaVersion: z.literal(1),
   docType: docTypeSchema,
   // Short free-text: what the project is, who it's for. Extracted, never generated.
@@ -156,7 +158,7 @@ export const docstubeConfigSchema = z.object({
   coverage: z.enum(['on', 'off', 'auto']).default('auto'),
   autonomy: autonomyConfigSchema.optional(),
   outDir: repoPathSchema.default('docs-site'),
-  telemetry: z.object({ enabled: z.boolean().default(true) }).prefault({}),
+  telemetry: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
   // Reserved: screenshot capture is a declared TBD boundary (PRODUCT §6).
   screenshots: z.unknown().optional()
 });

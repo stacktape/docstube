@@ -42,6 +42,10 @@ export const buildTranslatePageTask = (input: {
     output: { type: 'mdx' }
   });
 
+// Block types with no translatable content: the translator must copy them byte-identically. An
+// altered code block is a broken command shipping under a locale path, never a "less proven" one.
+const UNTRANSLATABLE_BLOCK_TYPES = new Set(['code-example', 'thematic-break']);
+
 const alignBlocks = (
   sourceBlocks: PageEntity['preamble'],
   translatedBlocks: PageEntity['preamble'],
@@ -56,7 +60,16 @@ const alignBlocks = (
     if (translatedBlock === undefined || translatedBlock.blockType !== sourceBlock.blockType) {
       return `${where}[${index}]: block type ${translatedBlock?.blockType ?? 'missing'} != ${sourceBlock.blockType}`;
     }
-    // Untranslatable blocks (code) must be byte-identical → they keep the source guarantee.
+    // Untranslatable blocks (code) must be byte-identical. A mismatch there is a hard alignment
+    // error — retried, then flagged — exactly like a structure mismatch; downgrading it to
+    // 'scored' would ship an altered command.
+    if (
+      UNTRANSLATABLE_BLOCK_TYPES.has(sourceBlock.blockType) &&
+      translatedBlock.contentHash !== sourceBlock.contentHash
+    ) {
+      return `${where}[${index}]: ${sourceBlock.blockType} content was altered — untranslatable blocks must be byte-identical`;
+    }
+    // Translated prose no longer carries the source's verification, so it drops to 'scored'.
     const guarantee = translatedBlock.contentHash === sourceBlock.contentHash ? sourceBlock.guarantee : 'scored';
     aligned.push({
       ...translatedBlock,

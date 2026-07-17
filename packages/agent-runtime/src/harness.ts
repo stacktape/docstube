@@ -1,5 +1,7 @@
-import { computeTaskCacheKey, transcriptSchema } from '@docstube/contracts';
-import type { AgentTaskSpec, TaskResult, Transcript } from '@docstube/contracts';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { computeTaskCacheKey, contentHash, transcriptSchema } from '@docstube/contracts';
+import type { AgentTaskSpec, ObservedRead, TaskResult, Transcript } from '@docstube/contracts';
 import type { TranscriptCache } from './cache.ts';
 import { BudgetExceededError, ToolPolicyError, TransportError } from './errors.ts';
 import { checkJsonSchema } from './json-schema-check.ts';
@@ -294,6 +296,24 @@ const runVendorSession = async (
     : { turns, usage: outcome.usage, stopReason: 'error', error: parsed.error };
 };
 
+// A cached transcript is only replayable while every file the agent read back then still has the
+// same content on disk — task inputs alone cannot see source edits, so without this check a
+// maintain-triggered regeneration would re-ship stale MDX straight from the cache. Hashing matches
+// the observed-read recording in tools.ts (contentHash over the full utf8 content); a missing or
+// changed file makes the entry stale, and only the observed files are read.
+const observedReadsFresh = async (repoRoot: string, reads: readonly ObservedRead[]): Promise<boolean> => {
+  for (const read of reads) {
+    try {
+      if (contentHash(await readFile(join(repoRoot, read.file), 'utf8')) !== read.contentHash) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
+};
+
 export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOptions): Promise<Transcript> => {
   const cacheKey = computeTaskCacheKey(spec, {
     transport: options.transport.id,
@@ -302,7 +322,7 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
   });
 
   const cached = await options.cache?.get(cacheKey);
-  if (cached) {
+  if (cached && (await observedReadsFresh(options.repoRoot, cached.observedReads))) {
     return { ...cached, usage: { ...cached.usage, cacheHit: true } };
   }
 

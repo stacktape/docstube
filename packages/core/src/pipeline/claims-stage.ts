@@ -1,4 +1,4 @@
-import type { BlockEntity, ClaimEntity, Codemap, Finding, PageEntity } from '@docstube/contracts';
+import type { BlockEntity, ClaimAnchor, ClaimEntity, Codemap, Finding, PageEntity } from '@docstube/contracts';
 import { idPrefixes, mintId } from '@docstube/contracts';
 import type { PageArtifact } from '@docstube/plugin-sdk';
 import { buildExtractClaimsTask, claimsFromTranscript } from '../audit/extract-claims.ts';
@@ -21,6 +21,53 @@ const flattenBlocks = (page: PageEntity): BlockEntity[] => [
   ...page.preamble,
   ...page.sections.flatMap((section) => section.blocks)
 ];
+
+// Web-annotation-style anchoring: a short quote can occur several times; the prefix/suffix
+// context decides which occurrence the claim means. Score = matching context characters
+// (longest suffix of anchor.prefix before the quote + longest prefix of anchor.suffix after it);
+// ties keep the first occurrence.
+const anchorContextScore = (mdx: string, at: number, anchor: ClaimAnchor): number => {
+  let before = 0;
+  while (
+    before < anchor.prefix.length &&
+    at - before - 1 >= 0 &&
+    anchor.prefix[anchor.prefix.length - 1 - before] === mdx[at - before - 1]
+  ) {
+    before += 1;
+  }
+  const end = at + anchor.quote.length;
+  let after = 0;
+  while (after < anchor.suffix.length && end + after < mdx.length && anchor.suffix[after] === mdx[end + after]) {
+    after += 1;
+  }
+  return before + after;
+};
+
+export const resolveAnchorOffset = (mdx: string, anchor: ClaimAnchor): number => {
+  const occurrences: number[] = [];
+  let from = 0;
+  while (true) {
+    const at = mdx.indexOf(anchor.quote, from);
+    if (at === -1) {
+      break;
+    }
+    occurrences.push(at);
+    from = at + 1;
+  }
+  if (occurrences.length <= 1) {
+    return occurrences[0] ?? -1;
+  }
+  let best = occurrences[0]!;
+  let bestScore = anchorContextScore(mdx, best, anchor);
+  for (const at of occurrences.slice(1)) {
+    const score = anchorContextScore(mdx, at, anchor);
+    if (score > bestScore) {
+      best = at;
+      bestScore = score;
+    }
+  }
+  return best;
+};
 
 const claimToEntity = (claim: ExtractedClaim, guarantee: ClaimEntity['guarantee']): ClaimEntity => ({
   id: mintId(idPrefixes.claim),
@@ -70,7 +117,7 @@ export const attachExtractedClaims = async (input: {
   let unanchored = 0;
 
   for (const claim of claims) {
-    const offset = artifact.mdx.indexOf(claim.anchor.quote);
+    const offset = resolveAnchorOffset(artifact.mdx, claim.anchor);
     const blockIndex = offset === -1 ? -1 : ranges.findIndex(([start, end]) => offset >= start && offset < end);
     const block = blockIndex === -1 ? undefined : blocks[blockIndex];
     if (block === undefined) {

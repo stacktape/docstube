@@ -20,7 +20,7 @@ import { CoreError } from '../errors.ts';
 import { createPluginHost } from '../plugins/plugin-host.ts';
 import { loadConfiguredPlugins, registerBuiltinPlugins } from '../plugins/load-plugins.ts';
 import { createManifestStore } from '../state/manifest-store.ts';
-import { createRunJournal } from '../state/run-journal.ts';
+import { createRunJournal, journalRunFailure } from '../state/run-journal.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
 import { loadContextFiles } from './context-files.ts';
 import { generatePage } from './page-runner.ts';
@@ -147,6 +147,13 @@ const openFlag = (input: {
   createdAt: new Date().toISOString()
 });
 
+// A carried (not regenerated) shard can still be shipping open flags from previous runs; ignoring
+// them would let a no-op refresh report 'passed' over standing defects — and the auto-merge gate
+// reads that outcome. Tribal questions are excluded: they are a human queue, not a quality defect
+// (same rule as refine's ranking).
+const shardHasOpenFlags = (shard: PageShard): boolean =>
+  shard.flags.some((flag) => flag.status === 'open' && flag.kind !== 'tribal-knowledge');
+
 export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummary> => {
   const { repoRoot } = options;
   const family = await loadConfigFamily(repoRoot);
@@ -160,309 +167,320 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   const contextFiles = await loadContextFiles(repoRoot);
 
   const journal = await createRunJournal(repoRoot, options.runId ?? mintId(idPrefixes.run));
-  const commit = await resolveCommit(repoRoot);
-  await journal.append({ type: 'run-started', mode: 'refresh', commit });
+  // Any escaping error journals a terminal 'failed' outcome first — a crashed run must never
+  // read as still running (journalRunFailure rethrows).
+  try {
+    const commit = await resolveCommit(repoRoot);
+    await journal.append({ type: 'run-started', mode: 'refresh', commit });
 
-  await journal.append({ type: 'stage-started', stage: 'codemap' });
-  const codemapStarted = Date.now();
-  const codemap = await buildCodemap({
-    repoRoot,
-    commit,
-    packs: host.languagePacks().map((entry) => entry.definition)
-  });
-  await journal.append({
-    type: 'stage-completed',
-    stage: 'codemap',
-    inputHash: hashValue({ commit }),
-    durationMs: Date.now() - codemapStarted
-  });
+    await journal.append({ type: 'stage-started', stage: 'codemap' });
+    const codemapStarted = Date.now();
+    const codemap = await buildCodemap({
+      repoRoot,
+      commit,
+      packs: host.languagePacks().map((entry) => entry.definition)
+    });
+    await journal.append({
+      type: 'stage-completed',
+      stage: 'codemap',
+      inputHash: hashValue({ commit }),
+      durationMs: Date.now() - codemapStarted
+    });
 
-  const store = createManifestStore(repoRoot, version);
-  const previousIndex = await store.readIndex();
-  if (previousIndex === undefined) {
-    throw new CoreError(
-      'state-corrupt',
-      'no committed manifest found — run `docstube generate` before `docstube refresh`',
-      { repoRoot, version }
+    const store = createManifestStore(repoRoot, version);
+    const previousIndex = await store.readIndex();
+    if (previousIndex === undefined) {
+      throw new CoreError(
+        'state-corrupt',
+        'no committed manifest found — run `docstube generate` before `docstube refresh`',
+        { repoRoot, version }
+      );
+    }
+
+    // Tribal-knowledge lifecycle (same as generate): persist answered flags, then load answers and
+    // open-question keys for ask-once dedup during regeneration.
+    const refreshPageIds = previousIndex.pages.map((entry) => entry.id);
+    const refreshLocales = [locale, ...config.locales.targets];
+    await applyFlagAnswers({ repoRoot, store, locales: refreshLocales, pageIds: refreshPageIds });
+    const knowledge = await loadKnowledge(repoRoot);
+    const openQuestions = await collectOpenQuestions({
+      store,
+      locales: refreshLocales,
+      pageIds: refreshPageIds,
+      knowledge
+    });
+
+    const headSymbolHashes = new Set(codemap.symbols.map((symbol) => symbol.hash));
+    const nodesBySlug = new Map(
+      walkIaNodes(ia.tree)
+        .filter((node) => node.brief !== undefined)
+        .map((node) => [node.slug, node])
     );
-  }
 
-  // Tribal-knowledge lifecycle (same as generate): persist answered flags, then load answers and
-  // open-question keys for ask-once dedup during regeneration.
-  const refreshPageIds = previousIndex.pages.map((entry) => entry.id);
-  const refreshLocales = [locale, ...config.locales.targets];
-  await applyFlagAnswers({ repoRoot, store, locales: refreshLocales, pageIds: refreshPageIds });
-  const knowledge = await loadKnowledge(repoRoot);
-  const openQuestions = await collectOpenQuestions({
-    store,
-    locales: refreshLocales,
-    pageIds: refreshPageIds,
-    knowledge
-  });
+    const maxRunUsd = config.agents.budgets.maxRunUsd;
+    const costTracker = createRunCostTracker(maxRunUsd, config.agents.budgets.maxPlanUsagePercent);
 
-  const headSymbolHashes = new Set(codemap.symbols.map((symbol) => symbol.hash));
-  const nodesBySlug = new Map(
-    walkIaNodes(ia.tree)
-      .filter((node) => node.brief !== undefined)
-      .map((node) => [node.slug, node])
-  );
+    const ctx: PageRunContext = {
+      repoRoot,
+      host,
+      codemap,
+      journal,
+      options: {
+        runTask: options.runTask,
+        toolDescriptors: options.toolDescriptors,
+        maxAttemptsPerPage: options.maxAttemptsPerPage
+      },
+      config,
+      glossary,
+      criteria: contextFiles.criteria,
+      instructions: contextFiles.instructions,
+      knowledge,
+      openQuestions,
+      costTracker,
+      commit,
+      locale,
+      version
+    };
 
-  const maxRunUsd = config.agents.budgets.maxRunUsd;
-  const costTracker = createRunCostTracker(maxRunUsd, config.agents.budgets.maxPlanUsagePercent);
+    await journal.append({ type: 'stage-started', stage: 'maintain' });
+    const maintainStarted = Date.now();
+    const regenerated: string[] = [];
+    const artifacts: PageArtifact[] = [];
+    const indexEntries: ManifestIndex['pages'] = [];
+    const newSystemFlags: Flag[] = [];
+    const openFlagKinds: FlagKind[] = [];
+    let unchangedCount = 0;
+    let anyPageFlagged = false;
+    let carriedShardFlagged = false;
+    let frozen = false;
 
-  const ctx: PageRunContext = {
-    repoRoot,
-    host,
-    codemap,
-    journal,
-    options: {
-      runTask: options.runTask,
-      toolDescriptors: options.toolDescriptors,
-      maxAttemptsPerPage: options.maxAttemptsPerPage
-    },
-    config,
-    glossary,
-    criteria: contextFiles.criteria,
-    instructions: contextFiles.instructions,
-    knowledge,
-    openQuestions,
-    costTracker,
-    commit,
-    locale,
-    version
-  };
-
-  await journal.append({ type: 'stage-started', stage: 'maintain' });
-  const maintainStarted = Date.now();
-  const regenerated: string[] = [];
-  const artifacts: PageArtifact[] = [];
-  const indexEntries: ManifestIndex['pages'] = [];
-  const newSystemFlags: Flag[] = [];
-  const openFlagKinds: FlagKind[] = [];
-  let unchangedCount = 0;
-  let anyPageFlagged = false;
-  let frozen = false;
-
-  // System-flag conditions re-derive on every refresh, so an unfixed condition would stack an
-  // identical flag per run. raiseSystemFlag dedups against OPEN previous flags with the same
-  // kind + summary; raisedSystemFlagKeys records every condition observed this run (pre-dedup)
-  // so the stale-resolution pass below can tell healed conditions from persisting ones.
-  const raisedSystemFlagKeys = new Set<string>();
-  const raiseSystemFlag = async (flag: Flag) => {
-    raisedSystemFlagKeys.add(systemFlagKey(flag));
-    const alreadyOpen = previousIndex.systemFlags.some(
-      (previous) => previous.status === 'open' && systemFlagKey(previous) === systemFlagKey(flag)
-    );
-    if (alreadyOpen) {
-      return;
-    }
-    newSystemFlags.push(flag);
-    openFlagKinds.push(flag.kind);
-    await journal.append({ type: 'flag-raised', flag });
-  };
-
-  for (const entry of previousIndex.pages) {
-    const shard = await store.readPageShard({ locale, pageId: entry.id });
-    const mdx = await readOptionalFile(join(repoRoot, config.outDir, entry.path));
-    const node = nodesBySlug.get(entry.slug);
-
-    if (node === undefined) {
-      // The IA node vanished (or lost its brief): a structural change. Never delete on refresh —
-      // humans decide structure. Flag it and keep shipping the existing page untouched.
-      const flag = openFlag({
-        kind: 'structural-change',
-        summary: `page "${entry.slug}" is no longer in ia.yml`,
-        detail:
-          `the generated page "${entry.slug}" has no matching IA node with a brief — refresh kept it as-is. ` +
-          'Remove it from the manifest or restore the node in ia.yml to resolve.',
-        runId: journal.runId,
-        entity: { version, locale, pageId: entry.id }
-      });
-      await raiseSystemFlag(flag);
-      if (shard !== undefined && mdx !== undefined) {
-        artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
+    // System-flag conditions re-derive on every refresh, so an unfixed condition would stack an
+    // identical flag per run. raiseSystemFlag dedups against OPEN previous flags with the same
+    // kind + summary; raisedSystemFlagKeys records every condition observed this run (pre-dedup)
+    // so the stale-resolution pass below can tell healed conditions from persisting ones.
+    const raisedSystemFlagKeys = new Set<string>();
+    const raiseSystemFlag = async (flag: Flag) => {
+      raisedSystemFlagKeys.add(systemFlagKey(flag));
+      const alreadyOpen = previousIndex.systemFlags.some(
+        (previous) => previous.status === 'open' && systemFlagKey(previous) === systemFlagKey(flag)
+      );
+      if (alreadyOpen) {
+        return;
       }
-      indexEntries.push(entry);
-      continue;
-    }
-
-    const affected =
-      shard === undefined || mdx === undefined || (await isShardAffected({ repoRoot, shard, headSymbolHashes }));
-    if (!affected && shard !== undefined && mdx !== undefined) {
-      // Unaffected: reconstruct the artifact from disk — no agent calls.
-      unchangedCount += 1;
-      artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
-      indexEntries.push(entry);
-      continue;
-    }
-
-    // Cap-freeze (PRODUCT §3.5): checked only before starting an affected page's regeneration —
-    // never mid-page. Frozen pages keep their existing shipped state untouched (stale but whole);
-    // reconstructing unaffected pages costs nothing, so it is never gated.
-    if (frozen || costTracker.shouldFreeze()) {
-      frozen = true;
-      if (shard !== undefined && mdx !== undefined) {
-        artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
-      }
-      indexEntries.push(entry);
-      continue;
-    }
-
-    const { outcome, artifact, shard: newShard } = await generatePage(ctx, node, shard);
-    regenerated.push(node.slug);
-    artifacts.push(artifact);
-    anyPageFlagged = anyPageFlagged || outcome.status === 'flagged';
-
-    const mdxTarget = join(repoRoot, config.outDir, artifact.mdxPath);
-    await mkdir(dirname(mdxTarget), { recursive: true });
-    await writeFile(mdxTarget, artifact.mdx, 'utf8');
-    await store.writePageShard(newShard);
-    for (const flag of newShard.flags) {
+      newSystemFlags.push(flag);
+      openFlagKinds.push(flag.kind);
       await journal.append({ type: 'flag-raised', flag });
-      if (flag.status === 'open') {
+    };
+
+    for (const entry of previousIndex.pages) {
+      const shard = await store.readPageShard({ locale, pageId: entry.id });
+      const mdx = await readOptionalFile(join(repoRoot, config.outDir, entry.path));
+      const node = nodesBySlug.get(entry.slug);
+
+      if (node === undefined) {
+        // The IA node vanished (or lost its brief): a structural change. Never delete on refresh —
+        // humans decide structure. Flag it and keep shipping the existing page untouched.
+        const flag = openFlag({
+          kind: 'structural-change',
+          summary: `page "${entry.slug}" is no longer in ia.yml`,
+          detail:
+            `the generated page "${entry.slug}" has no matching IA node with a brief — refresh kept it as-is. ` +
+            'Remove it from the manifest or restore the node in ia.yml to resolve.',
+          runId: journal.runId,
+          entity: { version, locale, pageId: entry.id }
+        });
+        await raiseSystemFlag(flag);
+        if (shard !== undefined && mdx !== undefined) {
+          carriedShardFlagged = carriedShardFlagged || shardHasOpenFlags(shard);
+          artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
+        }
+        indexEntries.push(entry);
+        continue;
+      }
+
+      const affected =
+        shard === undefined || mdx === undefined || (await isShardAffected({ repoRoot, shard, headSymbolHashes }));
+      if (!affected && shard !== undefined && mdx !== undefined) {
+        // Unaffected: reconstruct the artifact from disk — no agent calls.
+        unchangedCount += 1;
+        carriedShardFlagged = carriedShardFlagged || shardHasOpenFlags(shard);
+        artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
+        indexEntries.push(entry);
+        continue;
+      }
+
+      // Cap-freeze (PRODUCT §3.5): checked only before starting an affected page's regeneration —
+      // never mid-page. Frozen pages keep their existing shipped state untouched (stale but whole);
+      // reconstructing unaffected pages costs nothing, so it is never gated.
+      if (frozen || costTracker.shouldFreeze()) {
+        frozen = true;
+        if (shard !== undefined && mdx !== undefined) {
+          artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
+        }
+        indexEntries.push(entry);
+        continue;
+      }
+
+      const { outcome, artifact, shard: newShard } = await generatePage(ctx, node, shard);
+      regenerated.push(node.slug);
+      artifacts.push(artifact);
+      anyPageFlagged = anyPageFlagged || outcome.status === 'flagged';
+
+      const mdxTarget = join(repoRoot, config.outDir, artifact.mdxPath);
+      await mkdir(dirname(mdxTarget), { recursive: true });
+      await writeFile(mdxTarget, artifact.mdx, 'utf8');
+      await store.writePageShard(newShard);
+      for (const flag of newShard.flags) {
+        await journal.append({ type: 'flag-raised', flag });
+        if (flag.status === 'open') {
+          openFlagKinds.push(flag.kind);
+        }
+      }
+      await journal.append({ type: 'page-status', pageId: outcome.pageId, status: outcome.status });
+      indexEntries.push({
+        id: artifact.page.id,
+        slug: artifact.page.slug,
+        title: artifact.page.title,
+        path: artifact.mdxPath
+      });
+    }
+    await journal.append({
+      type: 'stage-completed',
+      stage: 'maintain',
+      inputHash: hashValue({ commit, regenerated }),
+      durationMs: Date.now() - maintainStarted
+    });
+    // A plan-usage freeze can trip with no dollar cap configured, so the event is guarded on the
+    // freeze alone — never on maxRunUsd being set.
+    if (frozen) {
+      await journal.append({
+        type: 'run-frozen',
+        reason: freezeReason({
+          maxRunUsd,
+          maxPlanUsagePercent: config.agents.budgets.maxPlanUsagePercent,
+          planUsedPercent: costTracker.planUsedPercent()
+        }),
+        spentUsd: costTracker.spentUsd() + costTracker.estimatedUsd()
+      });
+    }
+
+    // IA nodes without a generated page are not refresh's job (generate owns new pages) — surface
+    // them instead of silently skipping.
+    const indexedSlugs = new Set(previousIndex.pages.map((entry) => entry.slug));
+    const newNodeWarnings = [...nodesBySlug.keys()]
+      .filter((slug) => !indexedSlugs.has(slug))
+      .map((slug) => `IA node "${slug}" has no generated page yet — run \`docstube generate\` to create it`);
+
+    // Topology pass: site-scope verifiers over ALL pages (regenerated + reconstructed) restore
+    // cross-page consistency after partial regeneration.
+    await journal.append({ type: 'stage-started', stage: 'verify' });
+    const siteResults = await runVerifiers({
+      repoRoot,
+      config,
+      codemap,
+      glossary,
+      host,
+      artifacts,
+      includeSiteScope: true
+    });
+    const siteFindings = errorFindings(siteResults);
+    if (siteFindings.length > 0) {
+      await journal.append({ type: 'findings', findings: siteFindings });
+      // Site-scope findings must also land on the named page's shard — otherwise `docstube status`
+      // (which reads shards) disagrees with the run summary.
+      for (const flag of await attachSiteFindingsToShards({ store, journal, siteFindings })) {
         openFlagKinds.push(flag.kind);
       }
     }
-    await journal.append({ type: 'page-status', pageId: outcome.pageId, status: outcome.status });
-    indexEntries.push({
-      id: artifact.page.id,
-      slug: artifact.page.slug,
-      title: artifact.page.title,
-      path: artifact.mdxPath
-    });
-  }
-  await journal.append({
-    type: 'stage-completed',
-    stage: 'maintain',
-    inputHash: hashValue({ commit, regenerated }),
-    durationMs: Date.now() - maintainStarted
-  });
-  if (frozen && maxRunUsd !== undefined) {
     await journal.append({
-      type: 'run-frozen',
-      reason: freezeReason({
-        maxRunUsd,
-        maxPlanUsagePercent: config.agents.budgets.maxPlanUsagePercent,
-        planUsedPercent: costTracker.planUsedPercent()
-      }),
-      spentUsd: costTracker.spentUsd() + costTracker.estimatedUsd()
+      type: 'stage-completed',
+      stage: 'verify',
+      inputHash: hashValue(artifacts.map((artifact) => artifact.page.id)),
+      durationMs: 0
     });
-  }
 
-  // IA nodes without a generated page are not refresh's job (generate owns new pages) — surface
-  // them instead of silently skipping.
-  const indexedSlugs = new Set(previousIndex.pages.map((entry) => entry.slug));
-  const newNodeWarnings = [...nodesBySlug.keys()]
-    .filter((slug) => !indexedSlugs.has(slug))
-    .map((slug) => `IA node "${slug}" has no generated page yet — run \`docstube generate\` to create it`);
-
-  // Topology pass: site-scope verifiers over ALL pages (regenerated + reconstructed) restore
-  // cross-page consistency after partial regeneration.
-  await journal.append({ type: 'stage-started', stage: 'verify' });
-  const siteResults = await runVerifiers({
-    repoRoot,
-    config,
-    codemap,
-    glossary,
-    host,
-    artifacts,
-    includeSiteScope: true
-  });
-  const siteFindings = errorFindings(siteResults);
-  if (siteFindings.length > 0) {
-    await journal.append({ type: 'findings', findings: siteFindings });
-    // Site-scope findings must also land on the named page's shard — otherwise `docstube status`
-    // (which reads shards) disagrees with the run summary.
-    for (const flag of await attachSiteFindingsToShards({ store, journal, siteFindings })) {
-      openFlagKinds.push(flag.kind);
+    // Coverage is doc-type-conditional: on for libraries/SDKs, off for apps/services.
+    const coverageEnabled =
+      config.coverage === 'on' || (config.coverage === 'auto' && config.docType === 'external-library');
+    let coverageStats: ManifestIndex['coverage'];
+    if (coverageEnabled) {
+      const documentedHashes = new Set(
+        artifacts
+          .flatMap((artifact) => pageProvenances(artifact.page))
+          .flatMap((provenance) => provenance.sources.map((source) => source.symbol))
+      );
+      const publicSymbols = codemap.symbols.filter((symbol) => symbol.visibility === 'public');
+      const undocumented = publicSymbols.filter((symbol) => !documentedHashes.has(symbol.hash));
+      coverageStats = {
+        publicSymbols: publicSymbols.length,
+        documentedSymbols: publicSymbols.length - undocumented.length
+      };
+      if (undocumented.length > 0) {
+        const samples = undocumented.slice(0, 5).map((symbol) => symbol.name);
+        const flag = openFlag({
+          kind: 'coverage',
+          summary: `${undocumented.length} public symbol(s) are not covered by any documented page`,
+          detail: `undocumented public symbols include: ${samples.join(', ')}`,
+          runId: journal.runId
+        });
+        await raiseSystemFlag(flag);
+      }
     }
-  }
-  await journal.append({
-    type: 'stage-completed',
-    stage: 'verify',
-    inputHash: hashValue(artifacts.map((artifact) => artifact.page.id)),
-    durationMs: 0
-  });
 
-  // Coverage is doc-type-conditional: on for libraries/SDKs, off for apps/services.
-  const coverageEnabled =
-    config.coverage === 'on' || (config.coverage === 'auto' && config.docType === 'external-library');
-  let coverageStats: ManifestIndex['coverage'];
-  if (coverageEnabled) {
-    const documentedHashes = new Set(
-      artifacts
-        .flatMap((artifact) => pageProvenances(artifact.page))
-        .flatMap((provenance) => provenance.sources.map((source) => source.symbol))
+    // Stale resolution: an open coverage/structural-change flag whose condition was NOT observed
+    // again this run has healed — mark it resolved. Skipped when frozen, because a frozen run did
+    // not re-evaluate everything, so the absence of a re-raise proves nothing. Other kinds stay
+    // open for humans to triage.
+    const resolvableKinds = new Set<FlagKind>(['coverage', 'structural-change']);
+    const carriedSystemFlags = previousIndex.systemFlags.map((flag) =>
+      !frozen &&
+      flag.status === 'open' &&
+      resolvableKinds.has(flag.kind) &&
+      !raisedSystemFlagKeys.has(systemFlagKey(flag))
+        ? { ...flag, status: 'resolved' as const }
+        : flag
     );
-    const publicSymbols = codemap.symbols.filter((symbol) => symbol.visibility === 'public');
-    const undocumented = publicSymbols.filter((symbol) => !documentedHashes.has(symbol.hash));
-    coverageStats = {
-      publicSymbols: publicSymbols.length,
-      documentedSymbols: publicSymbols.length - undocumented.length
+
+    const index: ManifestIndex = {
+      schemaVersion: 1,
+      docstubeVersion,
+      sourceLocale: locale,
+      locales: [locale, ...config.locales.targets],
+      versions: [
+        { label: version, status: 'current', commit },
+        ...config.versions.frozen.map((label) => ({ label, status: 'frozen' as const }))
+      ],
+      pages: indexEntries,
+      configHash: hashValue(family.raw.config),
+      iaHash: hashValue(family.raw.ia),
+      ...(coverageStats === undefined ? {} : { coverage: coverageStats }),
+      systemFlags: [...carriedSystemFlags, ...newSystemFlags]
     };
-    if (undocumented.length > 0) {
-      const samples = undocumented.slice(0, 5).map((symbol) => symbol.name);
-      const flag = openFlag({
-        kind: 'coverage',
-        summary: `${undocumented.length} public symbol(s) are not covered by any documented page`,
-        detail: `undocumented public symbols include: ${samples.join(', ')}`,
-        runId: journal.runId
-      });
-      await raiseSystemFlag(flag);
-    }
+    await store.writeIndex(index);
+    await store.pruneOrphanShards({
+      keepPageIds: index.pages.map((entry) => entry.id),
+      locales: [locale, ...config.locales.targets]
+    });
+
+    // A persisting condition whose flag was deduped still means the docs carry open system flags —
+    // the outcome reflects the shipped state, not just what this run newly raised.
+    const openSystemFlagCount = index.systemFlags.filter((flag) => flag.status === 'open').length;
+    const flagged = anyPageFlagged || carriedShardFlagged || siteFindings.length > 0 || openSystemFlagCount > 0;
+    const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
+    await journal.append({ type: 'run-completed', outcome });
+    return {
+      runId: journal.runId,
+      outcome,
+      regenerated,
+      unchangedCount,
+      siteFindings,
+      warnings: [...host.warnings(), ...newNodeWarnings],
+      openFlagKinds,
+      ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
+      ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
+      ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})
+    };
+  } catch (error) {
+    return journalRunFailure(journal, error);
   }
-
-  // Stale resolution: an open coverage/structural-change flag whose condition was NOT observed
-  // again this run has healed — mark it resolved. Skipped when frozen, because a frozen run did
-  // not re-evaluate everything, so the absence of a re-raise proves nothing. Other kinds stay
-  // open for humans to triage.
-  const resolvableKinds = new Set<FlagKind>(['coverage', 'structural-change']);
-  const carriedSystemFlags = previousIndex.systemFlags.map((flag) =>
-    !frozen &&
-    flag.status === 'open' &&
-    resolvableKinds.has(flag.kind) &&
-    !raisedSystemFlagKeys.has(systemFlagKey(flag))
-      ? { ...flag, status: 'resolved' as const }
-      : flag
-  );
-
-  const index: ManifestIndex = {
-    schemaVersion: 1,
-    docstubeVersion,
-    sourceLocale: locale,
-    locales: [locale, ...config.locales.targets],
-    versions: [
-      { label: version, status: 'current', commit },
-      ...config.versions.frozen.map((label) => ({ label, status: 'frozen' as const }))
-    ],
-    pages: indexEntries,
-    configHash: hashValue(family.raw.config),
-    iaHash: hashValue(family.raw.ia),
-    ...(coverageStats === undefined ? {} : { coverage: coverageStats }),
-    systemFlags: [...carriedSystemFlags, ...newSystemFlags]
-  };
-  await store.writeIndex(index);
-  await store.pruneOrphanShards({
-    keepPageIds: index.pages.map((entry) => entry.id),
-    locales: [locale, ...config.locales.targets]
-  });
-
-  // A persisting condition whose flag was deduped still means the docs carry open system flags —
-  // the outcome reflects the shipped state, not just what this run newly raised.
-  const openSystemFlagCount = index.systemFlags.filter((flag) => flag.status === 'open').length;
-  const flagged = anyPageFlagged || siteFindings.length > 0 || openSystemFlagCount > 0;
-  const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
-  await journal.append({ type: 'run-completed', outcome });
-  return {
-    runId: journal.runId,
-    outcome,
-    regenerated,
-    unchangedCount,
-    siteFindings,
-    warnings: [...host.warnings(), ...newNodeWarnings],
-    openFlagKinds,
-    ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
-    ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
-    ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})
-  };
 };

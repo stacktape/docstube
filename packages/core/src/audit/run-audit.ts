@@ -25,6 +25,9 @@ export type AuditReport = {
   claims: number;
   grounded: number;
   unverifiable: number;
+  // Extracted "claims" whose anchor quote does not appear in the page — extractor hallucinations,
+  // dropped before matching (a claim that is not in the docs can never be a published defect).
+  unanchoredClaims: number;
   defects: AuditDefect[];
   // Over ALL claims: grounded + unverifiable + defective. Unverifiable claims dilute the rate but
   // are never defects — the metric must not overclaim.
@@ -72,6 +75,7 @@ export const runAudit = async (options: RunAuditOptions): Promise<AuditReport> =
   let claims = 0;
   let grounded = 0;
   let unverifiable = 0;
+  let unanchoredClaims = 0;
   const defects: AuditDefect[] = [];
   for (const page of pages) {
     const transcript = await options.runTask(buildExtractClaimsTask(page));
@@ -80,6 +84,10 @@ export const runAudit = async (options: RunAuditOptions): Promise<AuditReport> =
       warnings.push(extraction.warning);
     }
     for (const claim of extraction.claims) {
+      if (!page.markdown.includes(claim.anchor.quote)) {
+        unanchoredClaims += 1;
+        continue;
+      }
       claims += 1;
       const match = matchClaim(claim, index);
       if (match.status === 'grounded') {
@@ -99,6 +107,18 @@ export const runAudit = async (options: RunAuditOptions): Promise<AuditReport> =
     }
   }
 
+  if (unanchoredClaims > 0) {
+    warnings.push(`${unanchoredClaims} extracted claim(s) had no anchor quote in their page and were dropped`);
+  }
   const defectsPer100Claims = claims === 0 ? 0 : Math.round((defects.length / claims) * 100 * 100) / 100;
-  return { pages: pages.length, claims, grounded, unverifiable, defects, defectsPer100Claims, warnings };
+  return {
+    pages: pages.length,
+    claims,
+    grounded,
+    unverifiable,
+    unanchoredClaims,
+    defects,
+    defectsPer100Claims,
+    warnings
+  };
 };

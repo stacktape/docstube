@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -6,6 +6,7 @@ import { agentTaskSpecSchema, computeTaskCacheKey, idPrefixes, mintId, transcrip
 import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
 import { createTranscriptCache } from './cache.ts';
 import { runAgentTask } from './harness.ts';
+import { standardToolDescriptors } from './tools.ts';
 import type { LoopTransport } from './transport.ts';
 
 let cacheDir: string;
@@ -99,6 +100,68 @@ describe('transcript cache', () => {
     });
     expect(second.usage.cacheHit).toBe(true);
     expect(second.result).toEqual({ type: 'text', text: 'hello' });
+  });
+
+  it('replays a cached transcript only while the observed-read files are unchanged on disk', async () => {
+    // The cache key covers task inputs, not source content: without the freshness check, maintain
+    // regenerating a page over an edited file would replay the STALE transcript from the cache.
+    const cache = createTranscriptCache(join(cacheDir, 'freshness'));
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-cache-freshness-'));
+    try {
+      await mkdir(join(repoRoot, 'src'), { recursive: true });
+      await writeFile(join(repoRoot, 'src', 'retry.ts'), 'export const retries = 3;\n', 'utf8');
+
+      const spec = agentTaskSpecSchema.parse({
+        id: mintId(idPrefixes.task),
+        kind: 'write-page',
+        systemPrompt: 'system',
+        userPrompt: 'user',
+        tools: standardToolDescriptors(),
+        workspace: { readRoots: ['.'], writableRoots: [] },
+        budget: { maxTurns: 4, maxToolCalls: 8 },
+        output: { type: 'text' }
+      });
+      const liveRuns: string[] = [];
+      const makeTransport = (answer: string): LoopTransport => ({
+        mode: 'loop',
+        id: 'fake-loop',
+        capabilities: { toolInjection: 'native', structuredOutput: true },
+        complete: async (input) => {
+          if (input.messages.length === 1) {
+            liveRuns.push(answer);
+            return {
+              blocks: [{ type: 'tool-call', toolCallId: 't1', name: 'read_file', args: { path: 'src/retry.ts' } }],
+              usage: { inputTokens: 1, outputTokens: 1 },
+              stopReason: 'tool-use'
+            };
+          }
+          return {
+            blocks: [{ type: 'text', text: answer }],
+            usage: { inputTokens: 1, outputTokens: 1 },
+            stopReason: 'end'
+          };
+        }
+      });
+
+      const first = await runAgentTask(spec, { transport: makeTransport('v1'), model: 'test-model', repoRoot, cache });
+      expect(first.usage.cacheHit).toBe(false);
+      expect(first.observedReads).toHaveLength(1);
+
+      // Unchanged file: the cache short-circuits the transport.
+      const second = await runAgentTask(spec, { transport: makeTransport('v2'), model: 'test-model', repoRoot, cache });
+      expect(second.usage.cacheHit).toBe(true);
+      expect(second.result).toEqual({ type: 'text', text: 'v1' });
+      expect(liveRuns).toEqual(['v1']);
+
+      // Edited observed file: the entry is stale — the task runs live again.
+      await writeFile(join(repoRoot, 'src', 'retry.ts'), 'export const retries = 5;\n', 'utf8');
+      const third = await runAgentTask(spec, { transport: makeTransport('v3'), model: 'test-model', repoRoot, cache });
+      expect(third.usage.cacheHit).toBe(false);
+      expect(third.result).toEqual({ type: 'text', text: 'v3' });
+      expect(liveRuns).toEqual(['v1', 'v3']);
+    } finally {
+      await rm(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it('does not cache a completed session whose every tool call errored (ran blind)', async () => {

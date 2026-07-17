@@ -37,6 +37,8 @@ export type ManifestStore = {
   writePageShard: (shard: PageShard) => Promise<void>;
   listShardPageIds: (locale: string) => Promise<string[]>;
   pruneOrphanShards: (input: { keepPageIds: string[]; locales: string[] }) => Promise<string[]>;
+  // Deletes every frozen shard of one version label (re-cutting replaces the whole snapshot).
+  removeVersionShards: (label: string) => Promise<void>;
 };
 
 export const createManifestStore = (repoRoot: string, currentVersion: string): ManifestStore => {
@@ -95,6 +97,9 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
         }
       }
       return pruned;
+    },
+    removeVersionShards: async (label) => {
+      await rm(join(manifestDir(repoRoot), 'versions', label, 'pages'), { recursive: true, force: true });
     }
   };
 };

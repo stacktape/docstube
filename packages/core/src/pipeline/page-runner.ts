@@ -87,8 +87,11 @@ export const generatePage = async (
   node: IaNode,
   previousShard: PageShard | undefined
 ): Promise<{ outcome: PageOutcome; artifact: PageArtifact; shard: PageShard }> => {
-  const maxAttempts = ctx.options.maxAttemptsPerPage ?? 3;
+  // Clamped to at least one attempt — a non-positive cap would skip the loop entirely and crash
+  // below with a misleading 'produced no artifact'.
+  const maxAttempts = Math.max(1, ctx.options.maxAttemptsPerPage ?? 3);
   let findings: Finding[] = [];
+  let priorDraft: string | undefined;
   let lastArtifact: PageArtifact | undefined;
   let lastTranscript: Transcript | undefined;
   let lastReviews: ReviewResult[] = [];
@@ -104,6 +107,7 @@ export const generatePage = async (
       codemap: ctx.codemap,
       node,
       priorFindings: findings,
+      priorDraft,
       enabledComponents: ctx.config.components,
       instructions: ctx.instructions,
       knowledge: ctx.knowledge,
@@ -121,6 +125,8 @@ export const generatePage = async (
       );
     }
     const mdx = unwrapMdxFence(transcript.result.mdx);
+    // On retry the writer edits THIS draft (with the findings attached), not a fresh rewrite.
+    priorDraft = mdx;
 
     let page = extractPageEntity({ mdx, slug: node.slug, fallbackTitle: node.title });
     if (previousShard) {
@@ -170,10 +176,19 @@ export const generatePage = async (
       criteria: ctx.criteria,
       artifact,
       runTask: ctx.options.runTask,
+      toolDescriptors: ctx.options.toolDescriptors,
       journal: ctx.journal,
       costTracker: ctx.costTracker
     });
     lastReviews = reviews;
+    // Review warnings never gate, but they must be visible: a skipped persona review (invalid
+    // reviewer output) surfaces only here — filtering errors alone would swallow it silently.
+    const reviewWarnings = reviews.flatMap((review) =>
+      review.findings.filter((finding) => finding.severity === 'warning')
+    );
+    if (reviewWarnings.length > 0) {
+      await ctx.journal.append({ type: 'findings', pageId: page.id, findings: reviewWarnings });
+    }
     findings = [
       ...errorFindings(results),
       ...reviews.flatMap((review) => review.findings.filter((finding) => finding.severity === 'error'))
@@ -195,14 +210,25 @@ export const generatePage = async (
         costTracker: ctx.costTracker
       });
       findings = claimsResult.findings;
+      const claimWarnings: Finding[] = [];
       if (claimsResult.warning !== undefined) {
-        await ctx.journal.append({
-          type: 'findings',
-          pageId: page.id,
-          findings: [
-            { source: 'verifier', check: 'claim-extraction', severity: 'warning', message: claimsResult.warning }
-          ]
+        claimWarnings.push({
+          source: 'verifier',
+          check: 'claim-extraction',
+          severity: 'warning',
+          message: claimsResult.warning
         });
+      }
+      if (claimsResult.unanchored > 0) {
+        claimWarnings.push({
+          source: 'verifier',
+          check: 'claim-anchoring',
+          severity: 'warning',
+          message: `${claimsResult.unanchored} extracted claim(s) could not be anchored to the page text and were dropped`
+        });
+      }
+      if (claimWarnings.length > 0) {
+        await ctx.journal.append({ type: 'findings', pageId: page.id, findings: claimWarnings });
       }
       if (findings.length === 0) {
         // Grounded claims lift their prose blocks to proven, then rolls-ups recompute — this must

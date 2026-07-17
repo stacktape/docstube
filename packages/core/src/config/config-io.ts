@@ -98,6 +98,12 @@ export const setYamlIn = (source: string, path: YamlPath, value: unknown): strin
     doc.setIn([...path], value);
   });
 
+const schemaByFileName: Record<(typeof configFileNames)[keyof typeof configFileNames], z.ZodType<unknown>> = {
+  [configFileNames.config]: docstubeConfigSchema,
+  [configFileNames.ia]: iaSchema,
+  [configFileNames.glossary]: glossarySchema
+};
+
 export const editConfigFile = async (
   repoRoot: string,
   fileName: (typeof configFileNames)[keyof typeof configFileNames],
@@ -105,5 +111,9 @@ export const editConfigFile = async (
 ): Promise<void> => {
   const path = join(repoRoot, fileName);
   const source = await readFile(path, 'utf8');
-  await writeFile(path, editYamlDocument(source, edit), 'utf8');
+  const next = editYamlDocument(source, edit);
+  // Validate the RESULT before anything touches disk — an edit that would corrupt the file (per
+  // the schema that owns it) rejects atomically, same contract as updateConfigValues.
+  parseWith(schemaByFileName[fileName], next, fileName);
+  await writeFile(path, next, 'utf8');
 };

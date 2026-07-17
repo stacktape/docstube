@@ -44,9 +44,12 @@ claims × codemap ──> match-claims (deterministic) ──> grounded | defect
    claim's truth depends on.
 3. **Match** — deterministic, no AI. Each identifier is checked against the codemap:
    exact symbol name, containerPath segment (module/class containers), or dotted path
-   matching a containerPath-tail + name suffix (`Greeter.send`). Every identifier found
-   → the claim is **grounded**. Any checkable identifier missing → a **defect** of kind
-   `stale-reference`. No identifiers → **unverifiable**.
+   matching a containerPath-tail + name suffix (`Greeter.send`). ANY checkable
+   identifier found → the claim is **grounded**; only a claim where EVERY checkable
+   identifier fails to ground is a **defect** of kind `stale-reference`. (Live
+   calibration: claims usually name their anchor symbol plus incidental
+   parameter/property tokens — `options.loud` — and any-missing-is-a-defect produced
+   false positives on those.) No identifiers → **unverifiable**.
 
 ## What v1 measures honestly — and the never-overclaim guards
 

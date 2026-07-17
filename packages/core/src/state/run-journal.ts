@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PageStatus, RunEvent } from '@docstube/contracts';
 import { runEventSchema } from '@docstube/contracts';
@@ -18,6 +18,27 @@ export type RunJournal = {
 
 export const runsDir = (repoRoot: string): string => join(repoRoot, '.docstube', 'runs');
 
+// A crash mid-append leaves exactly one truncated FINAL line — tolerated (warned, dropped) so the
+// run stays resumable. An invalid line anywhere in the MIDDLE is real corruption and stays fatal.
+const parseJournalText = (journalPath: string, text: string): { events: RunEvent[]; droppedTruncatedTail: boolean } => {
+  const lines = text.split('\n').filter((line) => line.length > 0);
+  const events: RunEvent[] = [];
+  for (const [index, line] of lines.entries()) {
+    let event: RunEvent | undefined;
+    try {
+      event = runEventSchema.parse(JSON.parse(line)) as RunEvent;
+    } catch (error) {
+      if (index === lines.length - 1) {
+        console.warn(`dropping truncated trailing journal line in ${journalPath} (crash mid-write)`);
+        return { events, droppedTruncatedTail: true };
+      }
+      throw error;
+    }
+    events.push(event);
+  }
+  return { events, droppedTruncatedTail: false };
+};
+
 export const createRunJournal = async (repoRoot: string, runId: string): Promise<RunJournal> => {
   const dir = join(runsDir(repoRoot), runId);
   await mkdir(dir, { recursive: true });
@@ -27,8 +48,14 @@ export const createRunJournal = async (repoRoot: string, runId: string): Promise
   // Continue the sequence when resuming an existing run.
   try {
     const existing = await readFile(journalPath, 'utf8');
-    const lines = existing.split('\n').filter((line) => line.length > 0);
-    seq = lines.length;
+    const { events, droppedTruncatedTail } = parseJournalText(journalPath, existing);
+    if (droppedTruncatedTail) {
+      // Rewrite without the truncated tail so future appends produce a clean file (an invalid
+      // line stranded in the middle would be indistinguishable from real corruption).
+      await writeFile(journalPath, events.map((event) => `${JSON.stringify(event)}\n`).join(''), 'utf8');
+    }
+    const last = events.at(-1);
+    seq = last === undefined ? 0 : last.seq + 1;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       throw error;
@@ -51,10 +78,7 @@ export const createRunJournal = async (repoRoot: string, runId: string): Promise
     readAll: async () => {
       try {
         const text = await readFile(journalPath, 'utf8');
-        return text
-          .split('\n')
-          .filter((line) => line.length > 0)
-          .map((line) => runEventSchema.parse(JSON.parse(line)) as RunEvent);
+        return parseJournalText(journalPath, text).events;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
           return [];
@@ -63,6 +87,17 @@ export const createRunJournal = async (repoRoot: string, runId: string): Promise
       }
     }
   };
+};
+
+// A pipeline that escapes with a thrown error must not leave the journal claiming the run is
+// still running: journal the terminal failure (best-effort) and rethrow the original error.
+export const journalRunFailure = async (journal: RunJournal, error: unknown): Promise<never> => {
+  try {
+    await journal.append({ type: 'run-completed', outcome: 'failed', error: (error as Error).message });
+  } catch {
+    // The original error is what must surface; a failed terminal append never masks it.
+  }
+  throw error;
 };
 
 export type RunStatusSummary = {

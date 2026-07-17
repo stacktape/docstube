@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { docstubeConfigSchema } from '@docstube/contracts';
 import type { WizardIaNode, WizardState } from './wizard-state.ts';
 import {
   applyIaOp,
@@ -119,6 +120,21 @@ describe('validation and reducer', () => {
     expect(config).not.toHaveProperty('sources');
     expect(config).not.toHaveProperty('theme');
     expect(buildIa(filledState()).schemaVersion).toBe(1);
+  });
+
+  it('scaffolds logo and favicon under site — the strict theme schema is tokens-only', () => {
+    let state = filledState();
+    state = wizardReducer(state, { type: 'set-site-field', field: 'logo', value: 'assets/logo.svg' });
+    state = wizardReducer(state, { type: 'set-site-field', field: 'favicon', value: 'assets/favicon.ico' });
+    const config = buildConfigInput(state);
+    // No tokens were set, so no theme group at all — logo/favicon are site metadata.
+    expect(config).not.toHaveProperty('theme');
+    expect(config.site).toMatchObject({ logo: 'assets/logo.svg', favicon: 'assets/favicon.ico' });
+    // The scaffolded config must survive the strict schema, or `docstube wizard` writes a file
+    // every later command rejects.
+    const parsed = docstubeConfigSchema.safeParse(config);
+    expect(parsed.error?.message ?? '').toBe('');
+    expect(parsed.success).toBe(true);
   });
 });
 

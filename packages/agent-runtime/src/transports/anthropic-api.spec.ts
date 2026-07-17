@@ -97,6 +97,28 @@ describe('mapAnthropicResponse', () => {
     expect(turn.blocks).toEqual([{ type: 'text', text: 'done' }]);
     expect(turn.stopReason).toBe('end');
   });
+
+  it('maps refusal, pause_turn, and unknown stop reasons to error turns — never a finished answer', () => {
+    const refusal = mapAnthropicResponse({
+      content: [{ type: 'text', text: 'I cannot help.' }],
+      stop_reason: 'refusal'
+    });
+    expect(refusal.stopReason).toBe('error');
+    expect(refusal.errorMessage).toContain('refused');
+
+    const paused = mapAnthropicResponse({ content: [{ type: 'text', text: 'partial' }], stop_reason: 'pause_turn' });
+    expect(paused.stopReason).toBe('error');
+    expect(paused.errorMessage).toContain('pause_turn');
+
+    const unknown = mapAnthropicResponse({ content: [], stop_reason: 'mystery' });
+    expect(unknown.stopReason).toBe('error');
+    expect(unknown.errorMessage).toContain('mystery');
+  });
+
+  it('treats an absent stop reason as a finished answer', () => {
+    const turn = mapAnthropicResponse({ content: [{ type: 'text', text: 'done' }], stop_reason: null });
+    expect(turn.stopReason).toBe('end');
+  });
 });
 
 describe('createAnthropicApiTransport', () => {

@@ -148,10 +148,28 @@ describe('runAudit', () => {
       claims: 0,
       grounded: 0,
       unverifiable: 0,
+      unanchoredClaims: 0,
       defects: [],
       defectsPer100Claims: 0,
       warnings: []
     });
+  }, 60_000);
+
+  it('drops claims whose anchor quote is not in the page — a hallucinated claim is never a defect', async () => {
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> =>
+      structuredTranscript(spec, {
+        claims: [
+          anchoredClaim('phantomFn resets everything.', 'this quote appears nowhere in any page', 'api-shape', [
+            'phantomFn'
+          ])
+        ]
+      });
+    const report = await runAudit({ repoRoot, docsDir: join(repoRoot, 'docs'), runTask });
+
+    expect(report.defects).toEqual([]);
+    expect(report.claims).toBe(0);
+    expect(report.unanchoredClaims).toBe(2);
+    expect(report.warnings.some((warning) => warning.includes('no anchor quote'))).toBe(true);
   }, 60_000);
 });
 

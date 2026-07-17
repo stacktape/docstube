@@ -76,6 +76,19 @@ describe('docstube.yml schema', () => {
     expect(docstubeConfigSchema.safeParse(withValue).success).toBe(false);
   });
 
+  it('hard-errors on unknown keys at the root and in hand-edited nested blocks', () => {
+    expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, projektContext: 'typo' }).success).toBe(false);
+    expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, agents: { transprot: 'claude-cli' } }).success).toBe(
+      false
+    );
+    expect(
+      docstubeConfigSchema.safeParse({ ...fixtureConfigInput, agents: { budgets: { maxRunUSD: 5 } } }).success
+    ).toBe(false);
+    expect(
+      docstubeConfigSchema.safeParse({ ...fixtureConfigInput, site: { title: 'x', favicom: 'a.png' } }).success
+    ).toBe(false);
+  });
+
   it('accepts the reserved autonomy block without requiring it', () => {
     const config = docstubeConfigSchema.parse({
       ...fixtureConfigInput,

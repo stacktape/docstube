@@ -120,10 +120,20 @@ export const mapOpenAiResponse = (payload: unknown, transportId = 'openai-compat
       errorMessage: `output truncated at ${usage.outputTokens} tokens (finish_reason length)`
     };
   }
+  if (choice?.finish_reason === 'tool_calls') {
+    return { blocks, usage, stopReason: 'tool-use' };
+  }
+  // Allowlist: only 'stop' (or an endpoint reporting no finish reason at all) is a finished
+  // answer. 'content_filter' and any unknown value mean filtered or partial output — an error
+  // turn, never a shipped page.
+  if (choice?.finish_reason === 'stop' || choice?.finish_reason === undefined || choice?.finish_reason === null) {
+    return { blocks, usage, stopReason: 'end' };
+  }
   return {
     blocks,
     usage,
-    stopReason: choice?.finish_reason === 'tool_calls' ? 'tool-use' : 'end'
+    stopReason: 'error',
+    errorMessage: `response ended with finish_reason "${choice?.finish_reason}" — filtered or incomplete output`
   };
 };
 
