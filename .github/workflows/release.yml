@@ -116,7 +116,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json apps/*/package.json packages/*/package.json packages/core/src/core.ts
+          git add package.json apps/*/package.json packages/*/package.json packages/core/src/core.ts \
+            apps/cli/src/cli.ts apps/cli/src/runtime-telemetry.ts \
+            apps/github-action/action.yml apps/github-action/src/github-action.ts
           git commit -m "release: v${{ inputs.version }}"
           git push
       - name: Publish npm package

@@ -105,6 +105,8 @@ export type GitHubActionReporter = {
   appendSummary: (markdown: string) => Promise<void> | void;
   error: (message: string) => void;
   info: (message: string) => void;
+  // GitHub Actions notice annotation (non-failing, surfaced on the run page).
+  notice: (message: string) => void;
   setOutput: (name: string, value: string) => Promise<void> | void;
   warn: (message: string) => void;
 };
@@ -117,6 +119,12 @@ export type GitHubActionDeps = {
   readWorkspaceFile: WorkspaceFileReader;
   reporter: GitHubActionReporter;
   runDocstube: (input: { mode: GitHubActionMode; workspaceDir: string }) => Promise<DocstubeCliRunResult>;
+  // Ambient environment used for the model-credential precondition and secret redaction;
+  // defaults to process.env.
+  env?: NodeJS.ProcessEnv;
+  // Latest published docstube version, or undefined when unavailable; failures must never fail
+  // the action. Defaults to a short-timeout npm registry lookup.
+  checkLatestDocstubeVersion?: () => Promise<string | undefined>;
 };
 
 export type GitHubActionAutoMergeState = 'enabled' | 'blocked' | 'unavailable' | 'skipped';
@@ -151,7 +159,8 @@ export const actionPackageName = '@docstube/action';
 
 const execFileAsync = promisify(execFile);
 const defaultBranchPrefix = 'docstube/docs';
-const defaultDocstubePackage = 'docstube@latest';
+// Pinned to the version this action shipped with; kept in sync by scripts/release/set-version.ts.
+const defaultDocstubePackage = 'docstube@0.0.2';
 
 const stripRefPrefix = (value: string): string => value.replace(/^refs\/heads\//, '');
 
@@ -174,6 +183,116 @@ const redactSecrets = (value: string, secrets: readonly string[]): string => {
     }
   }
   return redacted;
+};
+
+// Values of env vars whose NAME looks credential-shaped are scrubbed from anything the action
+// logs or summarizes, in addition to the explicit github-token input.
+const envSecretValues = (env: NodeJS.ProcessEnv): string[] =>
+  Object.entries(env)
+    .filter((entry): entry is [string, string] => {
+      const [name, value] = entry;
+      return /(KEY|TOKEN|SECRET)/.test(name) && typeof value === 'string' && value.length >= 4;
+    })
+    .map(([, value]) => value);
+
+const commonCredentialEnvVars = [
+  'ANTHROPIC_API_KEY',
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'OPENAI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GEMINI_API_KEY'
+];
+
+// Env var names the repo's docstube.yml points at via `apiKeyEnv:`; a cheap regex scan rather
+// than a YAML parse — a miss only widens the check to the common credential names.
+const configuredApiKeyEnvVars = (configText: string | undefined): string[] =>
+  configText === undefined
+    ? []
+    : [...configText.matchAll(/apiKeyEnv:\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?/g)]
+        .map((match) => match[1])
+        .filter((name): name is string => name !== undefined);
+
+export type CredentialCheckResult = { ok: true } | { ok: false; message: string };
+
+// Fail fast with an actionable message when no plausible model credential is present, instead of
+// letting the docstube CLI fail opaquely deep inside a transport.
+export const checkModelCredential = async (input: {
+  env: NodeJS.ProcessEnv;
+  readWorkspaceFile: WorkspaceFileReader;
+}): Promise<CredentialCheckResult> => {
+  let configText: string | undefined;
+  try {
+    configText = await input.readWorkspaceFile('docstube.yml');
+  } catch {
+    configText = undefined;
+  }
+  const configured = configuredApiKeyEnvVars(configText);
+  const candidates = configured.length > 0 ? configured : commonCredentialEnvVars;
+  if (candidates.some((name) => (input.env[name] ?? '').length > 0)) {
+    return { ok: true };
+  }
+  const source = configured.length > 0 ? 'docstube.yml names' : 'checked the common credential variables';
+  return {
+    ok: false,
+    message:
+      `No model credential found in the environment (${source}: ${candidates.join(', ')}). ` +
+      'Pass the API key your docstube.yml agents need to this workflow step via `env:` (from a repository secret).'
+  };
+};
+
+const pinnedVersionOf = (docstubePackage: string): string | undefined =>
+  /^docstube@(\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?)$/.exec(docstubePackage)?.[1];
+
+const parseVersionParts = (version: string): number[] => (version.split('-')[0] ?? '').split('.').map(Number);
+
+const isVersionBehind = (pinned: string, latest: string): boolean => {
+  const [pinnedParts, latestParts] = [parseVersionParts(pinned), parseVersionParts(latest)];
+  for (let index = 0; index < 3; index += 1) {
+    if ((pinnedParts[index] ?? 0) < (latestParts[index] ?? 0)) {
+      return true;
+    }
+    if ((pinnedParts[index] ?? 0) > (latestParts[index] ?? 0)) {
+      return false;
+    }
+  }
+  return false;
+};
+
+// Registry lookup with a short timeout; any failure returns undefined — never fails the action.
+const fetchLatestDocstubeVersion = async (): Promise<string | undefined> => {
+  try {
+    const response = await fetch('https://registry.npmjs.org/docstube/latest', {
+      signal: AbortSignal.timeout(5_000)
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const payload = (await response.json()) as { version?: unknown };
+    return typeof payload.version === 'string' && /^\d+\.\d+\.\d+/.test(payload.version) ? payload.version : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const noticeWhenBehindLatest = async (input: {
+  docstubePackage: string;
+  checkLatest: () => Promise<string | undefined>;
+  reporter: GitHubActionReporter;
+}): Promise<void> => {
+  const pinned = pinnedVersionOf(input.docstubePackage);
+  if (pinned === undefined) {
+    return;
+  }
+  try {
+    const latest = await input.checkLatest();
+    if (latest !== undefined && isVersionBehind(pinned, latest)) {
+      input.reporter.notice(
+        `docstube ${latest} is available (this run used the pinned ${pinned}). Update the action or set the docstube-package input.`
+      );
+    }
+  } catch {
+    // Version awareness is best-effort only.
+  }
 };
 
 export const createDocstubeActionBranchName = (input: { baseBranch?: string; branchPrefix?: string }): string => {
@@ -256,9 +375,14 @@ export const runGitHubAction = async (
     refName: inputs.refName ?? baseBranch,
     workflowName: inputs.workflowName
   });
-  const secrets = [inputs.githubToken].filter(
-    (secret): secret is string => typeof secret === 'string' && secret.length > 0
-  );
+  const env = deps.env ?? process.env;
+  const secrets = [
+    ...new Set(
+      [inputs.githubToken, ...envSecretValues(env)].filter(
+        (secret): secret is string => typeof secret === 'string' && secret.length > 0
+      )
+    )
+  ];
 
   const emptyResult = (overrides: Partial<GitHubActionResult>): GitHubActionResult => ({
     autoMerge: 'skipped',
@@ -274,6 +398,27 @@ export const runGitHubAction = async (
   });
 
   deps.reporter.info(`Starting docstube ${mode}.`);
+
+  const credential = await checkModelCredential({ env, readWorkspaceFile: deps.readWorkspaceFile });
+  if (!credential.ok) {
+    deps.reporter.error(credential.message);
+    return completeAction(
+      emptyResult({
+        exitCode: 1,
+        summary: buildJobSummary({
+          autoMerge: 'skipped',
+          committedPaths: [],
+          decision: undefined,
+          delta: undefined,
+          failureOutput: credential.message,
+          mode,
+          status: 'failed'
+        })
+      }),
+      deps.reporter,
+      secrets
+    );
+  }
 
   await deps.git.checkoutBase({ baseBranch, workspaceDir: inputs.workspaceDir });
   await deps.git.createBranch({ branchName, workspaceDir: inputs.workspaceDir });
@@ -297,6 +442,13 @@ export const runGitHubAction = async (
       secrets
     );
   }
+
+  // The CLI succeeded: nudge (never fail) when a newer docstube exists than the pinned default.
+  await noticeWhenBehindLatest({
+    docstubePackage: inputs.docstubePackage ?? defaultDocstubePackage,
+    checkLatest: deps.checkLatestDocstubeVersion ?? fetchLatestDocstubeVersion,
+    reporter: deps.reporter
+  });
 
   const changedFiles = (await deps.git.changedFiles({ workspaceDir: inputs.workspaceDir })).toSorted();
   const committedPaths = selectCommitPaths(changedFiles);
@@ -696,6 +848,7 @@ const createReporter = (env: NodeJS.ProcessEnv = process.env): GitHubActionRepor
   },
   error: (message) => console.error(message),
   info: (message) => console.info(message),
+  notice: (message) => console.info(`::notice::${message}`),
   setOutput: async (name, value) => {
     if (!env.GITHUB_OUTPUT) {
       return;

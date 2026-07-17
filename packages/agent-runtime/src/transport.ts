@@ -24,7 +24,10 @@ export type LoopMessage =
 export type AssistantTurn = {
   blocks: TranscriptBlock[];
   usage: TokenUsage;
-  stopReason?: 'end' | 'tool-use';
+  // 'error' marks a turn the harness must not treat as a finished answer (e.g. output truncated
+  // at the max-output-token limit); errorMessage says why.
+  stopReason?: 'end' | 'tool-use' | 'error';
+  errorMessage?: string;
 };
 
 export type CompleteInput = {

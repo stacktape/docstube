@@ -1,9 +1,14 @@
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeDeclaration } from '@docstube/codemap';
 import type { SymbolRecord } from '@docstube/contracts';
 import type { LanguagePackContext } from '@docstube/plugin-sdk';
 import { z } from 'zod';
+import { pythonInspectorSource } from './python-inspector-source.ts';
 import { requirePythonInterpreter, runProcess } from './python-interpreter.ts';
 
 // Python symbol extraction via Python's own `ast` module, run as a subprocess
@@ -59,14 +64,32 @@ const inspectorOutputSchema = z.object({ files: z.array(inspectorFileSchema) });
 // src/python-inspector.py relative to dist/ (see package.json "files").
 const inspectorCandidates = ['python-inspector.py', '../src/python-inspector.py'];
 
-const resolveInspectorPath = (): string => {
-  for (const candidate of inspectorCandidates) {
-    const path = fileURLToPath(new URL(candidate, import.meta.url));
-    if (existsSync(path)) {
-      return path;
+// pkg snapshots cannot expose a loose .py file to a real python process, so the embedded source
+// is materialized once into a content-addressed cache path (write-once: the hash pins the exact
+// script version, and a concurrent writer produces identical bytes anyway).
+export const materializeEmbeddedInspector = async (): Promise<string> => {
+  const hash = createHash('sha256').update(pythonInspectorSource, 'utf8').digest('hex').slice(0, 16);
+  const path = join(tmpdir(), `docstube-python-inspector-${hash}.py`);
+  if (!existsSync(path)) {
+    await writeFile(path, pythonInspectorSource, 'utf8');
+  }
+  return path;
+};
+
+export const resolveInspectorPath = async (): Promise<string> => {
+  // Inside a pkg binary the candidates may exist on the VIRTUAL snapshot filesystem, which a real
+  // python process cannot read — go straight to the embedded copy there.
+  const inPkgSnapshot = (process as { pkg?: unknown }).pkg !== undefined;
+  if (!inPkgSnapshot) {
+    for (const candidate of inspectorCandidates) {
+      const path = fileURLToPath(new URL(candidate, import.meta.url));
+      if (existsSync(path)) {
+        return path;
+      }
     }
   }
-  throw new PythonInspectorError('python-inspector.py asset not found next to the module or under src/');
+  // No readable file asset next to the module: fall back to the embedded copy in the OS temp dir.
+  return materializeEmbeddedInspector();
 };
 
 const chunksOf = <T>(items: T[], size: number): T[][] => {
@@ -134,7 +157,7 @@ export const extractSymbols = async (ctx: LanguagePackContext): Promise<SymbolRe
     return [];
   }
   const interpreter = await requirePythonInterpreter();
-  const inspectorPath = resolveInspectorPath();
+  const inspectorPath = await resolveInspectorPath();
   const records: SymbolRecord[] = [];
   // Chunked so argv stays bounded on large repos.
   for (const chunk of chunksOf(ctx.files, chunkSize)) {

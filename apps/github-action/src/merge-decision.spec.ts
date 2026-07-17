@@ -22,13 +22,15 @@ describe('auto-merge decision (hardcoded v1 rules)', () => {
     }
   );
 
-  it('covers every non-blocking kind explicitly: only coverage is non-blocking in v1', () => {
+  it('covers every non-blocking kind explicitly: only tribal-knowledge is non-blocking in v1', () => {
+    // Open questions ship visibly and are answered on a future run (PRODUCT §4.1); they never
+    // hold a merge.
     const nonBlocking = flagKindSchema.options.filter((kind) => !autoMergeBlockingFlagKinds.includes(kind));
-    expect(nonBlocking).toEqual(['coverage']);
+    expect(nonBlocking).toEqual(['tribal-knowledge']);
   });
 
-  it('an open coverage flag alone does NOT block auto-merge but stays visible', () => {
-    const decision = decideAutoMerge([buildFixtureFlag({ kind: 'coverage' })]);
+  it('an open tribal-knowledge flag alone does NOT block auto-merge but stays visible', () => {
+    const decision = decideAutoMerge([buildFixtureFlag({ kind: 'tribal-knowledge' })]);
     expect(decision.autoMerge).toBe(true);
     expect(decision.openFlags).toHaveLength(1);
   });
@@ -45,7 +47,7 @@ describe('auto-merge decision (hardcoded v1 rules)', () => {
 
   it('one blocking flag among non-blocking ones blocks the whole PR', () => {
     const decision = decideAutoMerge([
-      buildFixtureFlag({ kind: 'coverage' }),
+      buildFixtureFlag({ kind: 'tribal-knowledge' }),
       buildFixtureFlag({ kind: 'structural-change' })
     ]);
     expect(decision.autoMerge).toBe(false);

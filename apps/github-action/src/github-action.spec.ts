@@ -29,11 +29,14 @@ type HarnessOptions = {
   changedFiles?: readonly string[];
   cliResult?: DocstubeCliRunResult;
   enableAutoMergeError?: Error;
+  env?: NodeJS.ProcessEnv;
   existingComments?: readonly IssueComment[];
   existingDigestIssue?: { number: number };
   existingPullRequest?: GitHubPullRequest;
+  latestVersion?: string;
   shardFlags?: readonly Flag[];
   systemFlags?: readonly Flag[];
+  workspaceFiles?: Record<string, string>;
 };
 
 type Harness = {
@@ -52,6 +55,9 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
   const shard = buildFixtureShardWithFlags(options.shardFlags ?? []);
   const shardPath = shardRelativePath(shard);
   const workspace = buildFixtureWorkspace({ shards: [shard], systemFlags: options.systemFlags });
+  for (const [path, content] of Object.entries(options.workspaceFiles ?? {})) {
+    workspace.files.set(path, content);
+  }
   const changedFiles = options.changedFiles ?? [
     'docs-site/content/en/getting-started/installation.mdx',
     '.docstube/manifest/manifest.yml',
@@ -136,6 +142,8 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
       mergeControl,
       pullRequest,
       readWorkspaceFile: workspace.readWorkspaceFile,
+      env: options.env ?? { ANTHROPIC_API_KEY: 'test-anthropic-key-123456' },
+      checkLatestDocstubeVersion: async () => options.latestVersion,
       reporter: {
         appendSummary: (markdown) => {
           summaries.push(markdown);
@@ -145,6 +153,9 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
         },
         info: (message) => {
           operations.push(`info:${message}`);
+        },
+        notice: (message) => {
+          operations.push(`notice:${message}`);
         },
         setOutput: (name, value) => {
           outputs[name] = value;
@@ -248,8 +259,8 @@ describe('GitHub Action orchestration', () => {
     expect(harness.operations.some((op) => op.startsWith('create-issue'))).toBe(false);
   });
 
-  it('a non-blocking coverage flag still gets the PR comment but auto-merge proceeds', async () => {
-    const harness = createHarness({ shardFlags: [buildFixtureFlag({ kind: 'coverage' })] });
+  it('a non-blocking tribal-knowledge flag still gets the PR comment but auto-merge proceeds', async () => {
+    const harness = createHarness({ shardFlags: [buildFixtureFlag({ kind: 'tribal-knowledge' })] });
 
     const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
 
@@ -288,6 +299,79 @@ describe('GitHub Action orchestration', () => {
     expect(result.autoMerge).toBe('skipped');
     expect(harness.operations.some((op) => op.startsWith('commit:') || op.startsWith('push:'))).toBe(false);
     expect(harness.summaries.join('\n')).toContain('left no documentation changes');
+  });
+
+  it('fails fast with a clear message when no model credential is present', async () => {
+    const harness = createHarness({ env: { PATH: '/usr/bin' } });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.changed).toBe(false);
+    // Fails before any git mutation or CLI run.
+    expect(harness.operations.some((op) => op.startsWith('checkout:') || op.startsWith('cli:'))).toBe(false);
+    expect(harness.summaries.join('\n')).toContain('No model credential found');
+    expect(harness.summaries.join('\n')).toContain('ANTHROPIC_API_KEY');
+  });
+
+  it('honors the apiKeyEnv names from docstube.yml for the credential precondition', async () => {
+    const config = 'agents:\n  writer:\n    apiKeyEnv: MY_CUSTOM_MODEL_CREDENTIAL\n';
+    const withCustom = createHarness({
+      env: { MY_CUSTOM_MODEL_CREDENTIAL: 'present-value-1234' },
+      workspaceFiles: { 'docstube.yml': config }
+    });
+    const ok = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, withCustom.deps);
+    expect(ok.exitCode).toBe(0);
+    expect(withCustom.operations).toContain('cli:refresh:/repo');
+
+    // The common names do not satisfy a config that names its own env var.
+    const withWrong = createHarness({
+      env: { ANTHROPIC_API_KEY: 'present-but-not-what-config-names' },
+      workspaceFiles: { 'docstube.yml': config }
+    });
+    const failed = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, withWrong.deps);
+    expect(failed.exitCode).toBe(1);
+    expect(withWrong.summaries.join('\n')).toContain('MY_CUSTOM_MODEL_CREDENTIAL');
+  });
+
+  it('scrubs values of KEY/TOKEN/SECRET-named env vars from logged output', async () => {
+    const harness = createHarness({
+      cliResult: { exitCode: 1, output: 'transport error: bearer sk-live-anthropic-abcdef used by NODE_ENV=ci' },
+      env: { ANTHROPIC_API_KEY: 'sk-live-anthropic-abcdef', NODE_ENV: 'ci' }
+    });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.exitCode).toBe(1);
+    const summary = harness.summaries.join('\n');
+    expect(summary).toContain('[redacted]');
+    expect(summary).not.toContain('sk-live-anthropic-abcdef');
+    // Non-credential env values are left alone.
+    expect(summary).toContain('NODE_ENV=ci');
+  });
+
+  it('emits a notice when the pinned docstube version is behind the registry, and stays quiet otherwise', async () => {
+    const behind = createHarness({ latestVersion: '9.9.9' });
+    await runGitHubAction(
+      { baseBranch: 'main', docstubePackage: 'docstube@1.0.0', workspaceDir: '/repo' },
+      behind.deps
+    );
+    expect(behind.operations.some((op) => op.startsWith('notice:') && op.includes('9.9.9'))).toBe(true);
+
+    const current = createHarness({ latestVersion: '1.0.0' });
+    await runGitHubAction(
+      { baseBranch: 'main', docstubePackage: 'docstube@1.0.0', workspaceDir: '/repo' },
+      current.deps
+    );
+    expect(current.operations.some((op) => op.startsWith('notice:'))).toBe(false);
+
+    // Unpinned specs (a tag like @latest) and registry failures are silently skipped.
+    const unpinned = createHarness({ latestVersion: '9.9.9' });
+    await runGitHubAction(
+      { baseBranch: 'main', docstubePackage: 'docstube@latest', workspaceDir: '/repo' },
+      unpinned.deps
+    );
+    expect(unpinned.operations.some((op) => op.startsWith('notice:'))).toBe(false);
   });
 
   it('does not push or open a PR when the docstube CLI fails, and redacts secrets', async () => {

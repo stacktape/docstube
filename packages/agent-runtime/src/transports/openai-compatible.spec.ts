@@ -76,6 +76,16 @@ describe('mapOpenAiResponse', () => {
     expect(turn.stopReason).toBe('tool-use');
   });
 
+  it('maps a length finish reason to an error turn instead of a finished answer', () => {
+    const turn = mapOpenAiResponse({
+      choices: [{ message: { content: 'This page covers retr' }, finish_reason: 'length' }],
+      usage: { prompt_tokens: 50, completion_tokens: 4096 }
+    });
+    expect(turn.stopReason).toBe('error');
+    expect(turn.errorMessage).toContain('output truncated at 4096 tokens');
+    expect(turn.blocks).toEqual([{ type: 'text', text: 'This page covers retr' }]);
+  });
+
   it('keeps unparseable tool arguments as the raw string and maps stop to end', () => {
     const turn = mapOpenAiResponse({
       choices: [

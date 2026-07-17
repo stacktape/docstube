@@ -34,6 +34,15 @@ describe('emitSite', () => {
     expect(packageJson.scripts.build).toBe('astro build');
   });
 
+  it('pins every generated-site dependency to an exact version', async () => {
+    const packageJson = JSON.parse(await readFile(join(siteRoot, 'package.json'), 'utf8')) as {
+      dependencies: Record<string, string>;
+    };
+    for (const [name, version] of Object.entries(packageJson.dependencies)) {
+      expect(version, `${name} must be an exact pin`).toMatch(/^\d+\.\d+\.\d+$/);
+    }
+  });
+
   it('wires pagefind as an emitted-site dependency with a postbuild index step', async () => {
     const packageJson = JSON.parse(await readFile(join(siteRoot, 'package.json'), 'utf8')) as {
       dependencies: Record<string, string>;

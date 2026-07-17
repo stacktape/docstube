@@ -7,7 +7,9 @@ import type { AssistantTurn, CompleteInput, LoopMessage, LoopTransport } from '.
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com';
 const ANTHROPIC_VERSION = '2023-06-01';
-const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+// Generous by default: full documentation pages regularly exceed 8K output tokens, and a
+// max_tokens stop is surfaced as an error rather than shipped as a silently cut-off page.
+const DEFAULT_MAX_OUTPUT_TOKENS = 32_000;
 
 const stringifyToolResult = (result: unknown): string =>
   typeof result === 'string' ? result : JSON.stringify(result ?? null);
@@ -89,12 +91,23 @@ export const mapAnthropicResponse = (payload: unknown): AssistantTurn => {
     }
     // Other block kinds (thinking, redacted_thinking) are transport detail, not transcript content.
   }
+  const usage = {
+    inputTokens: parsed.data.usage?.input_tokens ?? 0,
+    outputTokens: parsed.data.usage?.output_tokens ?? 0
+  };
+  // max_tokens means the response was cut off mid-thought — never a finished answer. Mapping it
+  // to 'end' would ship a truncated page as if it were complete.
+  if (parsed.data.stop_reason === 'max_tokens') {
+    return {
+      blocks,
+      usage,
+      stopReason: 'error',
+      errorMessage: `output truncated at ${usage.outputTokens} tokens (stop_reason max_tokens); raise maxOutputTokens`
+    };
+  }
   return {
     blocks,
-    usage: {
-      inputTokens: parsed.data.usage?.input_tokens ?? 0,
-      outputTokens: parsed.data.usage?.output_tokens ?? 0
-    },
+    usage,
     stopReason: parsed.data.stop_reason === 'tool_use' ? 'tool-use' : 'end'
   };
 };

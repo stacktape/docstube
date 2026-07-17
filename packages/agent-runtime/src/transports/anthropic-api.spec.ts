@@ -70,6 +70,22 @@ describe('mapAnthropicResponse', () => {
     expect(turn.stopReason).toBe('tool-use');
   });
 
+  it('maps a max_tokens stop to an error turn instead of a finished answer', () => {
+    const turn = mapAnthropicResponse({
+      content: [{ type: 'text', text: 'This page covers retr' }],
+      stop_reason: 'max_tokens',
+      usage: { input_tokens: 100, output_tokens: 32_000 }
+    });
+    expect(turn.stopReason).toBe('error');
+    expect(turn.errorMessage).toContain('output truncated at 32000 tokens');
+    expect(turn.blocks).toEqual([{ type: 'text', text: 'This page covers retr' }]);
+  });
+
+  it('defaults max_tokens to 32000 in the request body', () => {
+    const body = buildAnthropicRequestBody(input);
+    expect(body.max_tokens).toBe(32_000);
+  });
+
   it('treats end_turn as end and skips unknown block kinds', () => {
     const turn = mapAnthropicResponse({
       content: [

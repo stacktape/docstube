@@ -127,10 +127,16 @@ describe('parseCodexJsonEvents', () => {
     const failed = parseCodexJsonEvents(['{"type":"turn.failed","error":{"message":"model unavailable"}}']);
     expect(failed.stopReason).toBe('error');
     expect(failed.errorMessage).toBe('model unavailable');
+    expect(failed.sawCompletion).toBe(true);
 
     const streamError = parseCodexJsonEvents(['{"type":"error","message":"stream disconnected"}']);
     expect(streamError.stopReason).toBe('error');
     expect(streamError.errorMessage).toBe('stream disconnected');
+    expect(streamError.sawCompletion).toBe(true);
+  });
+
+  it('marks completed streams as sawCompletion', () => {
+    expect(parseCodexJsonEvents(successLines).sawCompletion).toBe(true);
   });
 
   it('reports an error when no turn completes, and ignores garbage and unknown event types', () => {
@@ -142,6 +148,7 @@ describe('parseCodexJsonEvents', () => {
     ]);
     expect(parsed.stopReason).toBe('error');
     expect(parsed.errorMessage).toContain('no turn completion');
+    expect(parsed.sawCompletion).toBe(false);
     expect(parsed.turns).toEqual([]);
   });
 });
@@ -217,6 +224,22 @@ describe('createCodexCliTransport runSession', () => {
     expect(request?.args).toContain('mcp_servers.docstube.env.DOCSTUBE_MCP_REPO_ROOT="C:\\\\repo"');
     // the scratch dir and sink file are cleaned up afterwards
     await expect(readFile(sinkFileFromArgs(requests[0]?.args ?? []), 'utf8')).rejects.toThrow(/ENOENT/);
+  });
+
+  it('returns the parsed outcome when the process exits non-zero after a concluded stream', async () => {
+    // Mirror of claude-cli's sawResult behavior: a fully-parsed session must never be discarded
+    // over the exit code — the harness decides what a turn.failed conclusion means.
+    const lines = [...successLines, '{"type":"turn.failed","error":{"message":"model unavailable"}}'];
+    const transport = createCodexCliTransport({
+      mcpServerPath: 'server.ts',
+      runner: async () => ({ stdout: lines.join('\n'), stderr: 'exited 1', exitCode: 1, timedOut: false })
+    });
+    const turns: SessionTurn[] = [];
+    const outcome = await transport.runSession(runInput(buildSpec()), { onTurn: (turn) => turns.push(turn) });
+    expect(outcome.stopReason).toBe('error');
+    expect(outcome.errorMessage).toBe('model unavailable');
+    expect(outcome.usage).toEqual({ inputTokens: 120, outputTokens: 45 });
+    expect(turns.length).toBeGreaterThan(0);
   });
 
   it('maps non-zero exits to a non-retryable TransportError', async () => {

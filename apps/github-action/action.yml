@@ -19,9 +19,9 @@ inputs:
     description: Commit message for the single atomic docs + manifest commit.
     required: false
   docstube-package:
-    description: npm package spec used by npx to run docstube.
+    description: npm package spec used by npx to run docstube. Defaults to the exact version this action shipped with (kept in sync by the release workflow).
     required: false
-    default: docstube@latest
+    default: docstube@0.0.2
   workspace:
     description: Checked-out repository path.
     required: false

@@ -21,6 +21,26 @@ const stderrTailLineCount = 10;
 // destructive commands, snippets needing credentials or a running service.
 const hasNoExecMeta = (fence: MdxCodeBlock): boolean => /(^|\s)no-exec(\s|$)/u.test(fence.meta);
 
+// Fences opting back into full host-environment inheritance (`allow-env` in the fence meta):
+// samples that legitimately read configuration from the environment.
+const hasAllowEnvMeta = (fence: MdxCodeBlock): boolean => /(^|\s)allow-env(\s|$)/u.test(fence.meta);
+
+// Snippets run with a scrubbed environment by default: PATH plus the platform essentials and
+// nothing else, so API keys and tokens in the host env cannot leak into documentation samples.
+const minimalSnippetEnv = (): Record<string, string> => {
+  const keys =
+    process.platform === 'win32' ? ['PATH', 'SYSTEMROOT', 'SYSTEMDRIVE', 'COMSPEC', 'TEMP', 'TMP'] : ['PATH', 'HOME'];
+  const env: Record<string, string> = {};
+  for (const key of keys) {
+    // process.env lookups are case-insensitive on win32 regardless of the stored casing.
+    const value = process.env[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  return env;
+};
+
 // Snippets legitimately import the documented package, which is not installed in the sandbox —
 // the same reality code-typecheck-ts handles by skipping module-resolution diagnostics. A
 // module-not-found failure means "unprovable here", never "wrong": the block is left uncovered
@@ -43,24 +63,31 @@ const stderrTail = (stderr: string): string => {
 };
 
 // Sandbox limits, honestly: each snippet runs in a fresh temp directory so it cannot litter the
-// repo, with a hard timeout, and only through ctx.exec (restricted to the plugin's declared
-// permissions.exec: bash/node). The child still inherits the host environment and has full
-// network access — TODO: env clearing and network isolation once PluginExec exposes them.
+// repo, with a hard timeout, a scrubbed environment (unless the fence opts back in with
+// `allow-env`), and only through ctx.exec (restricted to the plugin's declared permissions.exec:
+// bash/node). The child still has full network access — TODO: network isolation is a separate
+// research track and is not attempted here.
 const runSnippet = async (
   ctx: VerifierContext,
   language: string,
   code: string,
-  cwd: string
+  cwd: string,
+  allowEnv: boolean
 ): Promise<{ exitCode: number; stderr: string }> => {
+  const envOption = allowEnv ? {} : { env: minimalSnippetEnv() };
   if (bashLanguages.has(language)) {
-    return ctx.exec('bash', ['-euo', 'pipefail', '-c', code], { cwd, timeoutMs: executionTimeoutMs });
+    return ctx.exec('bash', ['-euo', 'pipefail', '-c', code], { cwd, timeoutMs: executionTimeoutMs, ...envOption });
   }
   const source = tsLanguages.has(language)
     ? ts.transpileModule(code, {
         compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
       }).outputText
     : code;
-  return ctx.exec('node', ['--input-type=module', '-e', source], { cwd, timeoutMs: executionTimeoutMs });
+  return ctx.exec('node', ['--input-type=module', '-e', source], {
+    cwd,
+    timeoutMs: executionTimeoutMs,
+    ...envOption
+  });
 };
 
 const executionFailureFinding = (
@@ -131,7 +158,7 @@ export const snippetExecVerifier: VerifierDefinition = {
 
           const cwd = await mkdtemp(join(tmpdir(), 'docstube-snippet-'));
           try {
-            const run = await runSnippet(ctx, language, fence.code, cwd);
+            const run = await runSnippet(ctx, language, fence.code, cwd, hasAllowEnvMeta(fence));
             executedCount += 1;
             if (run.exitCode === 0) {
               coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));

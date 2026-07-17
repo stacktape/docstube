@@ -13,7 +13,7 @@ const realExec: PluginExec = (command, args, options) =>
     const child = execFile(
       command,
       args,
-      { cwd: options?.cwd, timeout: options?.timeoutMs, encoding: 'utf8' },
+      { cwd: options?.cwd, timeout: options?.timeoutMs, encoding: 'utf8', env: options?.env },
       (error, stdout, stderr) => {
         if (error && child.exitCode === null) {
           reject(error);
@@ -198,6 +198,58 @@ describe('snippet-exec', () => {
     expect(result.status).toBe('pass');
     expect(result.findings[0]?.severity).toBe('warning');
     expect(result.coveredEntityIds).toEqual([]);
+  });
+});
+
+describe('snippet-exec environment scrubbing', () => {
+  it('passes a minimal env by default so host secrets never reach snippets', async () => {
+    const code = 'console.log("hi");';
+    const { page } = pageWithBlock(code, 'js');
+    const seenEnvs: (Record<string, string> | undefined)[] = [];
+    const exec: PluginExec = async (_command, _args, options) => {
+      seenEnvs.push(options?.env);
+      return { exitCode: 0, stdout: '', stderr: '' };
+    };
+    process.env.DOCSTUBE_TEST_FAKE_API_KEY = 'super-secret';
+    try {
+      await snippetExecVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('js', code))]);
+    } finally {
+      delete process.env.DOCSTUBE_TEST_FAKE_API_KEY;
+    }
+    expect(seenEnvs).toHaveLength(1);
+    const env = seenEnvs[0];
+    expect(env).toBeDefined();
+    expect(Object.keys(env ?? {})).toContain('PATH');
+    expect(env).not.toHaveProperty('DOCSTUBE_TEST_FAKE_API_KEY');
+  });
+
+  it('restores full inheritance for fences marked allow-env', async () => {
+    const code = 'console.log(process.env.HOME);';
+    const { page } = pageWithBlock(code, 'js');
+    const seenEnvs: (Record<string, string> | undefined)[] = [];
+    const exec: PluginExec = async (_command, _args, options) => {
+      seenEnvs.push(options?.env);
+      return { exitCode: 0, stdout: '', stderr: '' };
+    };
+
+    await snippetExecVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('js allow-env', code))]);
+
+    expect(seenEnvs).toEqual([undefined]);
+  });
+
+  it('really hides host env vars from a scrubbed subprocess while keeping node runnable', async () => {
+    const code = 'if (process.env.DOCSTUBE_TEST_FAKE_API_KEY !== undefined) { process.exit(1); }';
+    const { block, page } = pageWithBlock(code, 'js');
+    process.env.DOCSTUBE_TEST_FAKE_API_KEY = 'super-secret';
+    try {
+      const result = await snippetExecVerifier.verify(withExec(realExec), [
+        makeArtifact(page, mdxWithFence('js', code))
+      ]);
+      expect(result.status).toBe('pass');
+      expect(result.coveredEntityIds).toContain(block.id);
+    } finally {
+      delete process.env.DOCSTUBE_TEST_FAKE_API_KEY;
+    }
   });
 });
 

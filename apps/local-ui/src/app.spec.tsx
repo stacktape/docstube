@@ -5,7 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { App } from './app.tsx';
 import { readSessionFromUrl } from './trpc-client.ts';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+  window.history.replaceState(null, '', '/');
+});
 
 const renderApp = () =>
   render(
@@ -32,11 +36,27 @@ describe('control plane shell', () => {
 });
 
 describe('readSessionFromUrl', () => {
-  it('reads the session token and API base from query params', () => {
-    window.history.replaceState(null, '', '/?session=abc123&api=http%3A%2F%2F127.0.0.1%3A4242');
+  it('reads the session token and API base from the URL fragment', () => {
+    window.history.replaceState(null, '', '/#session=abc123&api=http%3A%2F%2F127.0.0.1%3A4242');
     expect(readSessionFromUrl()).toEqual({ sessionToken: 'abc123', apiBaseUrl: 'http://127.0.0.1:4242' });
-    window.history.replaceState(null, '', '/?session=abc123');
+    window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/#session=abc123');
     expect(readSessionFromUrl()).toEqual({ sessionToken: 'abc123', apiBaseUrl: window.location.origin });
+  });
+
+  it('moves the token into sessionStorage and scrubs it from the address bar', () => {
+    window.history.replaceState(null, '', '/#session=abc123&api=http%3A%2F%2F127.0.0.1%3A4242');
+    const session = readSessionFromUrl();
+    expect(session?.sessionToken).toBe('abc123');
+    expect(window.location.hash).toBe('');
+    expect(window.location.href).not.toContain('abc123');
+    // Subsequent loads (reloads, in-app navigation) restore the session from storage.
+    expect(readSessionFromUrl()).toEqual({ sessionToken: 'abc123', apiBaseUrl: 'http://127.0.0.1:4242' });
+  });
+
+  it('ignores query params and returns undefined without a fragment or stored session', () => {
+    window.history.replaceState(null, '', '/?session=abc123');
+    expect(readSessionFromUrl()).toBeUndefined();
     window.history.replaceState(null, '', '/');
     expect(readSessionFromUrl()).toBeUndefined();
   });

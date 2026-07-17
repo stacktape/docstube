@@ -48,14 +48,16 @@ export const defaultThemeTokens: Record<string, string> = {
   'font-family': 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif'
 };
 
+// Exact pins (no ranges): a generated site must build identically whenever it is rebuilt, and a
+// docstube release is only ever validated against these versions. `docstube refresh` updates them.
 const generatedSiteDependencies = {
-  '@astrojs/mdx': '^6.0.3',
-  '@astrojs/react': '^5.0.7',
-  astro: '^6.4.6',
+  '@astrojs/mdx': '6.0.3',
+  '@astrojs/react': '5.0.7',
+  astro: '6.4.6',
   // Baseline static search (PRODUCT §4.1); indexes dist/ in the postbuild step.
-  pagefind: '^1.4.0',
-  react: '^19.2.7',
-  'react-dom': '^19.2.7'
+  pagefind: '1.4.0',
+  react: '19.2.7',
+  'react-dom': '19.2.7'
 } as const;
 
 type NavEntry = { label: string; href: string };

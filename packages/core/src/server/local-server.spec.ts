@@ -19,17 +19,15 @@ describe('session guard', () => {
     const app = createLocalApp({ repoRoot: await makeRepoRoot(), sessionToken: token });
     const viaHeader = await app.request('/api/health', { headers: { 'x-docstube-session': 'wrong' } });
     expect(viaHeader.status).toBe(401);
-    const viaQuery = await app.request('/api/health?session=wrong');
-    expect(viaQuery.status).toBe(401);
   });
 
-  it('accepts the token via header or query param', async () => {
+  it('accepts the token via header only — query params leak into logs and history', async () => {
     const app = createLocalApp({ repoRoot: await makeRepoRoot(), sessionToken: token });
     const viaHeader = await app.request('/api/health', { headers: { 'x-docstube-session': token } });
     expect(viaHeader.status).toBe(200);
     expect(await viaHeader.json()).toEqual({ ok: true });
     const viaQuery = await app.request(`/api/health?session=${token}`);
-    expect(viaQuery.status).toBe(200);
+    expect(viaQuery.status).toBe(401);
   });
 
   it('guards the tRPC endpoint with the same token', async () => {
@@ -112,7 +110,8 @@ describe('startLocalServer', () => {
     try {
       expect(server.port).toBeGreaterThan(0);
       expect(server.apiBaseUrl).toBe(`http://127.0.0.1:${server.port}`);
-      expect(server.url).toBe(`${server.apiBaseUrl}/?session=${server.sessionToken}`);
+      // The token rides in the fragment so it never appears in request lines or server logs.
+      expect(server.url).toBe(`${server.apiBaseUrl}/#session=${server.sessionToken}`);
       const denied = await fetch(`${server.apiBaseUrl}/api/health`);
       expect(denied.status).toBe(401);
       const allowed = await fetch(`${server.apiBaseUrl}/api/health`, {
@@ -131,7 +130,7 @@ describe('startLocalServer', () => {
     });
     try {
       expect(server.url).toBe(
-        `http://127.0.0.1:5173/?session=${server.sessionToken}&api=${encodeURIComponent(server.apiBaseUrl)}`
+        `http://127.0.0.1:5173/#session=${server.sessionToken}&api=${encodeURIComponent(server.apiBaseUrl)}`
       );
     } finally {
       await server.close();

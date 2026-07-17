@@ -41,10 +41,12 @@ export type PluginFs = {
 };
 
 // Spawn helper limited to the executables the plugin declared in `permissions.exec`.
+// `env` replaces the child environment entirely when provided (it is not merged with the host
+// env) — callers that need scrubbing pass an explicit minimal set; omitting it inherits the host.
 export type PluginExec = (
   command: string,
   args: string[],
-  options?: { cwd?: string; input?: string; timeoutMs?: number }
+  options?: { cwd?: string; input?: string; timeoutMs?: number; env?: Record<string, string> }
 ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
 export type VerifierContext = {
@@ -137,7 +139,7 @@ export type ImportedReferenceContext = {
 // UNVERIFIED until re-grounded against source — importers never produce shippable content.
 export type ImporterDefinition = {
   id: string;
-  kind: 'mintlify' | 'gitbook' | 'readme' | 'confluence' | (string & {});
+  kind: 'mintlify' | 'gitbook' | 'readme-com' | 'confluence' | (string & {});
   importContext: (ctx: { logger: PluginLogger }, location: string) => Promise<ImportedReferenceContext>;
 };
 

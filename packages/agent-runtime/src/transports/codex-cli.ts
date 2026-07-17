@@ -115,6 +115,10 @@ export type CodexJsonParseResult = {
   usage: TokenUsage;
   stopReason: 'complete' | 'error';
   errorMessage?: string;
+  // True when the stream reached a conclusion (turn.completed, turn.failed, or error event): the
+  // CLI ran the session to an end even if the process then exited non-zero — mirrors claude-cli's
+  // sawResult so a fully-parsed session is never thrown away over the exit code.
+  sawCompletion: boolean;
 };
 
 // Maps the `--json` JSONL stream (event shapes verified from codex-rs/exec/src/exec_events.rs):
@@ -198,7 +202,7 @@ export const parseCodexJsonEvents = (lines: readonly string[]): CodexJsonParseRe
   }
 
   if (errorMessage !== undefined) {
-    return { turns, finalText, usage, stopReason: 'error', errorMessage };
+    return { turns, finalText, usage, stopReason: 'error', errorMessage, sawCompletion: true };
   }
   if (!sawTurnCompleted) {
     return {
@@ -206,10 +210,11 @@ export const parseCodexJsonEvents = (lines: readonly string[]): CodexJsonParseRe
       finalText,
       usage,
       stopReason: 'error',
-      errorMessage: 'codex CLI produced no turn completion event'
+      errorMessage: 'codex CLI produced no turn completion event',
+      sawCompletion: false
     };
   }
-  return { turns, finalText, usage, stopReason: 'complete' };
+  return { turns, finalText, usage, stopReason: 'complete', sawCompletion: true };
 };
 
 export type CodexCliTransportOptions = {
@@ -279,14 +284,17 @@ export const createCodexCliTransport = (options: CodexCliTransportOptions = {}):
             rateLimited: true
           });
         }
-        if (result.exitCode !== 0) {
+        const parsed = parseCodexJsonEvents(result.stdout.split(/\r?\n/));
+        // The stream is parsed FIRST: if it reached a conclusion (turn.completed / turn.failed /
+        // error event), the session ran to an end and the parsed outcome is returned even when the
+        // process exited non-zero — only a stream with no conclusion is a real transport failure.
+        if (result.exitCode !== 0 && !parsed.sawCompletion) {
           throw new TransportError({
             transport: 'codex-cli',
             message: `codex CLI exited with ${result.exitCode}: ${result.stderr.slice(0, 400)}`,
             retryable: false
           });
         }
-        const parsed = parseCodexJsonEvents(result.stdout.split(/\r?\n/));
         for (const turn of parsed.turns) {
           hooks.onTurn(turn);
         }

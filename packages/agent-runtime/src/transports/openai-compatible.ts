@@ -106,12 +106,23 @@ export const mapOpenAiResponse = (payload: unknown, transportId = 'openai-compat
       args: parseToolArguments(toolCall.function.arguments)
     });
   }
+  const usage = {
+    inputTokens: parsed.data.usage?.prompt_tokens ?? 0,
+    outputTokens: parsed.data.usage?.completion_tokens ?? 0
+  };
+  // finish_reason 'length' means the response hit the output-token limit — a cut-off answer, not
+  // a finished one.
+  if (choice?.finish_reason === 'length') {
+    return {
+      blocks,
+      usage,
+      stopReason: 'error',
+      errorMessage: `output truncated at ${usage.outputTokens} tokens (finish_reason length)`
+    };
+  }
   return {
     blocks,
-    usage: {
-      inputTokens: parsed.data.usage?.prompt_tokens ?? 0,
-      outputTokens: parsed.data.usage?.completion_tokens ?? 0
-    },
+    usage,
     stopReason: choice?.finish_reason === 'tool_calls' ? 'tool-use' : 'end'
   };
 };

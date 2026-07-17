@@ -101,6 +101,14 @@ export const unwrapMdxResponse = (finalText: string): string => {
   return trimmed;
 };
 
+const addUsage = (target: TokenUsage, delta: TokenUsage): void => {
+  target.inputTokens += delta.inputTokens;
+  target.outputTokens += delta.outputTokens;
+  if (delta.costUsd !== undefined) {
+    target.costUsd = (target.costUsd ?? 0) + delta.costUsd;
+  }
+};
+
 const buildTextResult = (spec: AgentTaskSpec, finalText: string): TaskResult =>
   spec.output.type === 'mdx' ? { type: 'mdx', mdx: unwrapMdxResponse(finalText) } : { type: 'text', text: finalText };
 
@@ -161,12 +169,14 @@ const runLoopSession = async (
   spec: AgentTaskSpec,
   transport: LoopTransport,
   model: string,
-  tools: Map<string, ToolImplementation>
+  tools: Map<string, ToolImplementation>,
+  // Written to as usage accrues so a mid-session transport failure still surfaces what the
+  // attempt cost (the caller folds failed attempts into the final transcript usage).
+  usage: TokenUsage
 ): Promise<SessionState> => {
   const systemPrompt = effectiveSystemPrompt(spec);
   const messages: LoopMessage[] = [{ role: 'user', text: spec.userPrompt }];
   const turns: SessionTurn[] = [];
-  const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
   let toolCallsUsed = 0;
   let turnsUsed = 0;
   let repairAttempted = false;
@@ -192,6 +202,12 @@ const runLoopSession = async (
     }
     turns.push({ role: 'assistant', blocks: assistant.blocks });
     messages.push({ role: 'assistant', blocks: assistant.blocks });
+
+    // A transport-flagged error turn (e.g. output truncated at the max-output-token limit) is
+    // never a finished answer — surface it instead of shipping a cut-off page.
+    if (assistant.stopReason === 'error') {
+      return { turns, usage, stopReason: 'error', error: assistant.errorMessage ?? 'transport reported an error turn' };
+    }
 
     const toolCalls = assistant.blocks.filter((block): block is ToolCallBlock => block.type === 'tool-call');
     if (toolCalls.length === 0) {
@@ -299,10 +315,21 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
   // exhausted retries still throw — the orchestrator surfaces them honestly.
   const loopTransport = options.transport.mode === 'loop' ? options.transport : undefined;
   const sessionTransport = options.transport.mode === 'session' ? options.transport : undefined;
-  const runOnce = () =>
-    loopTransport !== undefined
-      ? runLoopSession(spec, loopTransport, options.model, tools)
-      : runVendorSession(spec, sessionTransport!, options.model, tools, observedReads, options.repoRoot);
+  // Tokens spent by attempts that later failed were still billed: they are folded into the final
+  // transcript usage so cost accounting never undercounts retried sessions. Vendor sessions
+  // report usage only in their outcome, so a thrown vendor attempt has nothing to fold.
+  const failedAttemptsUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+  const runOnce = async (): Promise<SessionState> => {
+    const attemptUsage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+    try {
+      return loopTransport !== undefined
+        ? await runLoopSession(spec, loopTransport, options.model, tools, attemptUsage)
+        : await runVendorSession(spec, sessionTransport!, options.model, tools, observedReads, options.repoRoot);
+    } catch (error) {
+      addUsage(failedAttemptsUsage, attemptUsage);
+      throw error;
+    }
+  };
   const delays = options.retryDelaysMs ?? [20_000, 60_000];
   let state: Awaited<ReturnType<typeof runOnce>> | undefined;
   for (let attempt = 0; state === undefined; attempt += 1) {
@@ -316,6 +343,8 @@ export const runAgentTask = async (spec: AgentTaskSpec, options: RunAgentTaskOpt
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
   }
+
+  addUsage(state.usage, failedAttemptsUsage);
 
   // Cost seam: transports stay pure — they surface a vendor-authoritative cost when one exists
   // (claude CLI's total_cost_usd) and nothing else. The harness is the single point every

@@ -1,5 +1,5 @@
-import { glob as fsGlob, readdir, readFile } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { glob as fsGlob, open, readdir, readFile, realpath, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { contentHash } from '@docstube/contracts';
 import type { ObservedRead, ToolDescriptor } from '@docstube/contracts';
@@ -10,6 +10,8 @@ import { ToolPolicyError } from './errors.ts';
 // every successful read_file records { file, contentHash } into the per-task collector.
 
 const READ_FILE_MAX_CHARS = 200_000;
+// Same policy as GREP_MAX_FILE_BYTES: read_file never loads more than this into memory.
+const READ_FILE_MAX_BYTES = 1_000_000;
 const GLOB_MAX_MATCHES = 500;
 const GREP_MAX_MATCHES = 200;
 const GREP_MAX_FILE_BYTES = 1_000_000;
@@ -56,28 +58,60 @@ const assertRepoRelative = (tool: string, rawPath: string): void => {
   }
 };
 
+const isWithin = (target: string, root: string): boolean =>
+  target === root || target.startsWith(root.endsWith(sep) ? root : `${root}${sep}`);
+
+// Real path of `absPath` with symlinks resolved. When the path (or a suffix of it) does not exist
+// yet, the nearest existing ancestor is resolved and the missing tail re-appended lexically.
+const realResolve = async (absPath: string): Promise<string> => {
+  let current = absPath;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = await realpath(current);
+      return tail.length === 0 ? real : join(real, ...tail.toReversed());
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) {
+        return absPath;
+      }
+      tail.push(basename(current));
+      current = parent;
+    }
+  }
+};
+
 // Resolves a repo-relative POSIX path and enforces workspace.readRoots — rejects absolute paths,
 // backslashes, and any resolution (including ".." traversal) that escapes every declared root.
-const resolveReadPath = (
+// Containment is checked both lexically and on real paths: a symlink inside a read root that
+// points outside every root is rejected even though its lexical path looks contained.
+const resolveReadPath = async (
   tool: string,
   options: StandardToolsOptions,
   rawPath: string
-): { absPath: string; repoRelative: string } => {
+): Promise<{ absPath: string; repoRelative: string }> => {
   assertRepoRelative(tool, rawPath);
   const absPath = resolve(options.repoRoot, rawPath);
   const fromRepoRoot = relative(options.repoRoot, absPath);
   if (fromRepoRoot.startsWith('..') || isAbsolute(fromRepoRoot)) {
     throw new ToolPolicyError({ tool, message: `path "${rawPath}" escapes the repository root` });
   }
-  const allowed = options.readRoots.some((root) => {
-    const rootAbs = comparable(resolve(options.repoRoot, root));
-    const target = comparable(absPath);
-    return target === rootAbs || target.startsWith(rootAbs.endsWith(sep) ? rootAbs : `${rootAbs}${sep}`);
-  });
+  const rootsAbs = options.readRoots.map((root) => resolve(options.repoRoot, root));
+  const allowed = rootsAbs.some((rootAbs) => isWithin(comparable(absPath), comparable(rootAbs)));
   if (!allowed) {
     throw new ToolPolicyError({
       tool,
       message: `path "${rawPath}" is outside the declared read roots [${options.readRoots.join(', ')}]`
+    });
+  }
+  // Roots are realpath'd too so a repo root that itself sits behind a symlink (macOS /tmp) still
+  // contains its own files.
+  const realTarget = comparable(await realResolve(absPath));
+  const realRoots = await Promise.all(rootsAbs.map((rootAbs) => realResolve(rootAbs)));
+  if (!realRoots.some((realRoot) => isWithin(realTarget, comparable(realRoot)))) {
+    throw new ToolPolicyError({
+      tool,
+      message: `path "${rawPath}" resolves outside the declared read roots (symlink escape)`
     });
   }
   return { absPath, repoRelative: toPosix(fromRepoRoot) };
@@ -180,7 +214,37 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
     descriptor: readFileDescriptor,
     handler: async (args) => {
       const params = parseArgs(readFileParamsSchema, 'read_file', args);
-      const { absPath, repoRelative } = resolveReadPath('read_file', options, params.path);
+      const { absPath, repoRelative } = await resolveReadPath('read_file', options, params.path);
+      // Stat before reading so a multi-gigabyte file never lands in memory; oversized files get a
+      // bounded prefix. No observed read is recorded for a partial read: staleness checks compare
+      // against the FULL file hash, and a prefix hash would mark the page permanently stale.
+      const stats = await stat(absPath);
+      if (stats.size > READ_FILE_MAX_BYTES) {
+        const handle = await open(absPath, 'r');
+        let prefix: string;
+        try {
+          const buffer = Buffer.alloc(READ_FILE_MAX_BYTES);
+          const { bytesRead } = await handle.read(buffer, 0, READ_FILE_MAX_BYTES, 0);
+          prefix = buffer.subarray(0, bytesRead).toString('utf8');
+        } finally {
+          await handle.close();
+        }
+        const lines = prefix.split(/\r?\n/);
+        const startLine = Math.min(params.startLine ?? 1, lines.length);
+        const endLine = Math.min(params.endLine ?? lines.length, lines.length);
+        const content = lines
+          .slice(startLine - 1, endLine)
+          .join('\n')
+          .slice(0, READ_FILE_MAX_CHARS);
+        return {
+          path: repoRelative,
+          content,
+          startLine,
+          endLine,
+          truncated: true,
+          note: `file too large (${stats.size} bytes), showing the first ${READ_FILE_MAX_BYTES} bytes only`
+        };
+      }
       const raw = await readFile(absPath, 'utf8');
       options.observedReads.record({ file: repoRelative, contentHash: contentHash(raw) });
       const lines = raw.split(/\r?\n/);
@@ -200,7 +264,7 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
     descriptor: listDirDescriptor,
     handler: async (args) => {
       const params = parseArgs(listDirParamsSchema, 'list_dir', args);
-      const { absPath } = resolveReadPath('list_dir', options, params.path);
+      const { absPath } = await resolveReadPath('list_dir', options, params.path);
       const dirents = await readdir(absPath, { withFileTypes: true });
       const entries = dirents
         .map((entry) => ({ name: entry.name, type: entry.isDirectory() ? ('dir' as const) : ('file' as const) }))
@@ -217,7 +281,7 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
       if (params.pattern.split('/').includes('..')) {
         throw new ToolPolicyError({ tool: 'glob', message: 'glob patterns must not contain ".." segments' });
       }
-      const { absPath } = resolveReadPath('glob', options, params.path);
+      const { absPath } = await resolveReadPath('glob', options, params.path);
       const rootRelative = relative(options.repoRoot, absPath);
       const matches: string[] = [];
       let truncated = false;
@@ -249,7 +313,7 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
           message: `invalid regular expression: ${error instanceof Error ? error.message : String(error)}`
         });
       }
-      const { absPath } = resolveReadPath('grep', options, params.path);
+      const { absPath } = await resolveReadPath('grep', options, params.path);
       const dirents = await readdir(absPath, { recursive: true, withFileTypes: true });
       const matches: { file: string; line: number; text: string }[] = [];
       let truncated = false;

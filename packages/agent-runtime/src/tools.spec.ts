@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -90,6 +90,50 @@ describe('read_file', () => {
   it('rejects invalid arguments', async () => {
     const { get } = buildTools();
     await expect(get('read_file').handler({})).rejects.toThrow(ToolPolicyError);
+  });
+
+  it('returns a bounded prefix for oversized files without recording an observed read', async () => {
+    const { observedReads, get } = buildTools();
+    // Just over the 1MB stat cap; the file is never fully loaded.
+    await writeFile(join(repoRoot, 'src', 'huge.txt'), `first line\n${'x'.repeat(1_100_000)}`, 'utf8');
+    try {
+      const result = (await get('read_file').handler({ path: 'src/huge.txt' })) as {
+        content: string;
+        truncated: boolean;
+        note?: string;
+      };
+      expect(result.truncated).toBe(true);
+      expect(result.note).toContain('file too large');
+      expect(result.content.startsWith('first line')).toBe(true);
+      expect(result.content.length).toBeLessThanOrEqual(1_000_000);
+      // A prefix hash would never match the full-file hash staleness checks compare against.
+      expect(observedReads.list()).toEqual([]);
+    } finally {
+      await rm(join(repoRoot, 'src', 'huge.txt'), { force: true });
+    }
+  });
+
+  it('rejects a symlink inside a read root that points outside every root', async () => {
+    // Windows needs a privilege (or Developer Mode) to create symlinks; skip gracefully there.
+    let created = false;
+    try {
+      await symlink(join(repoRoot, 'secrets', 'token.txt'), join(repoRoot, 'src', 'sneaky.txt'), 'file');
+      created = true;
+    } catch {
+      return;
+    }
+    try {
+      const { get } = buildTools(['src']);
+      await expect(get('read_file').handler({ path: 'src/sneaky.txt' })).rejects.toThrow(/symlink escape/);
+      // The same link is fine when the read roots cover its target.
+      const wide = buildTools(['.']);
+      const result = (await wide.get('read_file').handler({ path: 'src/sneaky.txt' })) as { content: string };
+      expect(result.content).toContain('not-a-real-secret');
+    } finally {
+      if (created) {
+        await rm(join(repoRoot, 'src', 'sneaky.txt'), { force: true });
+      }
+    }
   });
 });
 

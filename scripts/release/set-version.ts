@@ -42,6 +42,14 @@ const updateSourceVersion = async (version: string) => {
   await updateSourceVersionFile(resolve('apps/cli/src/runtime-telemetry.ts'), [
     [/const docstubeVersion = '[^']+';/, `const docstubeVersion = '${version}';`]
   ]);
+  // The Action pins the exact docstube version it runs (never @latest); both the action.yml
+  // input default and the TS fallback constant track the release version.
+  await updateSourceVersionFile(resolve('apps/github-action/action.yml'), [
+    [/default: docstube@\S+/, `default: docstube@${version}`]
+  ]);
+  await updateSourceVersionFile(resolve('apps/github-action/src/github-action.ts'), [
+    [/const defaultDocstubePackage = 'docstube@[^']+';/, `const defaultDocstubePackage = 'docstube@${version}';`]
+  ]);
 };
 
 const main = async () => {

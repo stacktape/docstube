@@ -272,7 +272,62 @@ describe('cli session transports', () => {
   });
 });
 
+describe('transport error turns', () => {
+  it('surfaces a truncated (error stop-reason) turn as a task error, never a finished page', async () => {
+    const spec = buildSpec();
+    const transport = scriptedTransport([
+      {
+        blocks: [{ type: 'text', text: '# Retry\n\nThis page covers retr' }],
+        usage: { inputTokens: 10, outputTokens: 32_000 },
+        stopReason: 'error',
+        errorMessage: 'output truncated at 32000 tokens (stop_reason max_tokens)'
+      }
+    ]);
+
+    const transcript = await runAgentTask(spec, { transport, model: 'test-model', repoRoot });
+
+    expect(transcript.stopReason).toBe('error');
+    expect(transcript.result).toBeUndefined();
+    expect(transcript.error).toContain('output truncated at 32000 tokens');
+    expect(transcript.usage).toMatchObject({ inputTokens: 10, outputTokens: 32_000 });
+  });
+});
+
 describe('transport retry with backoff', () => {
+  it('accumulates usage from failed attempts into the final transcript', async () => {
+    const { TransportError } = await import('./errors.ts');
+    let calls = 0;
+    const flaky: Transport = {
+      mode: 'loop',
+      id: 'flaky-usage',
+      capabilities: { toolInjection: 'native', structuredOutput: false },
+      complete: async () => {
+        calls += 1;
+        if (calls === 2) {
+          // First attempt: one successful tool turn, then a mid-session failure.
+          throw new TransportError({ transport: 'flaky-usage', message: 'timeout', retryable: true });
+        }
+        if (calls === 1 || calls === 3) {
+          return calls === 1
+            ? toolCallTurn('read_file', { path: 'src/retry.ts' })
+            : toolCallTurn('read_file', { path: 'src/retry.ts' });
+        }
+        return textTurn('# Retry');
+      }
+    };
+
+    const transcript = await runAgentTask(buildSpec(), {
+      transport: flaky,
+      model: 'test-model',
+      repoRoot,
+      retryDelaysMs: [1, 1]
+    });
+
+    expect(transcript.stopReason).toBe('complete');
+    // Attempt 1 burned 10/5 before failing; attempt 2 spent 20/10 — all of it is accounted.
+    expect(transcript.usage).toMatchObject({ inputTokens: 30, outputTokens: 15 });
+  });
+
   it('retries a retryable transport error and succeeds, but rethrows non-retryable ones', async () => {
     const { TransportError } = await import('./errors.ts');
     let calls = 0;

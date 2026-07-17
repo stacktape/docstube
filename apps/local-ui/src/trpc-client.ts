@@ -16,15 +16,37 @@ export type SessionInfo = {
   apiBaseUrl: string;
 };
 
-// The tokened URL the control plane prints carries the session + API base as query params
-// (?session=…&api=… in dev behind Vite; ?session=… when the server static-serves the built UI).
+const sessionStorageKey = 'docstube-session';
+
+// The tokened URL the control plane prints carries the session + API base in the URL FRAGMENT
+// (#session=…&api=… in dev behind Vite; #session=… when the server static-serves the built UI).
+// Fragments never reach servers or access logs; on load the token moves to sessionStorage and the
+// fragment is scrubbed from the address bar, so reloads and in-app navigation keep working.
 export const readSessionFromUrl = (): SessionInfo | undefined => {
-  const params = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const sessionToken = params.get('session');
-  if (sessionToken === null || sessionToken.length === 0) {
-    return undefined;
+  if (sessionToken !== null && sessionToken.length > 0) {
+    const session: SessionInfo = { sessionToken, apiBaseUrl: params.get('api') ?? window.location.origin };
+    try {
+      window.sessionStorage.setItem(sessionStorageKey, JSON.stringify(session));
+    } catch {
+      // Storage may be unavailable (private mode quirks); the in-memory value still works.
+    }
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    return session;
   }
-  return { sessionToken, apiBaseUrl: params.get('api') ?? window.location.origin };
+  try {
+    const stored = window.sessionStorage.getItem(sessionStorageKey);
+    if (stored !== null) {
+      const parsed = JSON.parse(stored) as Partial<SessionInfo>;
+      if (typeof parsed.sessionToken === 'string' && parsed.sessionToken.length > 0) {
+        return { sessionToken: parsed.sessionToken, apiBaseUrl: parsed.apiBaseUrl ?? window.location.origin };
+      }
+    }
+  } catch {
+    // Corrupt or unavailable storage falls through to "no session".
+  }
+  return undefined;
 };
 
 export const createControlPlaneClient = (session: SessionInfo) =>

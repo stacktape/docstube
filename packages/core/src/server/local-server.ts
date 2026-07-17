@@ -67,8 +67,9 @@ export const createLocalApp = (options: LocalAppOptions): Hono => {
     })
   );
 
+  // Header-only: query params land in logs and browser history, so ?session= is not accepted.
   app.use('/api/*', async (c, next) => {
-    const provided = c.req.header(SESSION_HEADER) ?? c.req.query('session');
+    const provided = c.req.header(SESSION_HEADER);
     if (provided === undefined || provided.length === 0 || !tokensMatch(provided, options.sessionToken)) {
       return c.json({ error: 'missing or invalid session token' }, 401);
     }
@@ -119,7 +120,7 @@ export type LocalServerOptions = {
   port?: number;
   uiDistDir?: string;
   // When the CLI dev loop runs the UI through Vite (DOCSTUBE_UI_DEV_SERVER_URL), the browser URL
-  // points at Vite and carries the API base as a query param; the control plane serves /api only.
+  // points at Vite and carries the API base in the fragment; the control plane serves /api only.
   uiDevServerUrl?: string;
   // Override for tests; production always mints a fresh random token.
   sessionToken?: string;
@@ -155,10 +156,12 @@ export const startLocalServer = async (options: LocalServerOptions): Promise<Loc
   );
 
   const apiBaseUrl = `http://127.0.0.1:${port}`;
+  // The token rides in the URL FRAGMENT, never a query param: fragments are not sent to servers,
+  // so they cannot land in access logs, and the client moves the token to sessionStorage on load.
   const url =
     options.uiDevServerUrl !== undefined
-      ? `${options.uiDevServerUrl.replace(/\/+$/, '')}/?session=${sessionToken}&api=${encodeURIComponent(apiBaseUrl)}`
-      : `${apiBaseUrl}/?session=${sessionToken}`;
+      ? `${options.uiDevServerUrl.replace(/\/+$/, '')}/#session=${sessionToken}&api=${encodeURIComponent(apiBaseUrl)}`
+      : `${apiBaseUrl}/#session=${sessionToken}`;
 
   return {
     port,

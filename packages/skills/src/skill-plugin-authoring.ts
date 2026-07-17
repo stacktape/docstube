@@ -226,7 +226,7 @@ export const pluginAuthoringSkillBody: readonly string[] = [
   '```ts',
   'type ImporterDefinition = {',
   '  id: string;',
-  "  kind: 'mintlify' | 'gitbook' | 'readme' | 'confluence' | string;",
+  "  kind: 'mintlify' | 'gitbook' | 'readme-com' | 'confluence' | string;",
   '  importContext: (ctx: { logger: PluginLogger }, location: string) => Promise<ImportedReferenceContext>;',
   '};',
   '```',
