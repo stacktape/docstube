@@ -57,6 +57,25 @@ const generate = defineCommand({
   }
 });
 
+const preview = defineCommand({
+  meta: { description: 'Build (when stale) and serve the generated docs site locally.', name: 'preview' },
+  args: {
+    port: { type: 'string', description: 'Port to serve on (default: random free port).' },
+    build: { type: 'boolean', description: 'Force a rebuild even when the site looks fresh.' }
+  },
+  async run({ args }) {
+    await runCliCommand('preview', async () => {
+      const port = typeof args.port === 'string' ? Number(args.port) : undefined;
+      if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
+        output.error(`Invalid --port value: ${args.port}`);
+        return { exitCode: 1 };
+      }
+      const { runPreviewCommand } = await import('./commands/preview-command.ts');
+      return runPreviewCommand({ workspaceDir: process.cwd(), port, build: args.build === true }, output);
+    });
+  }
+});
+
 const wizard = defineCommand({
   meta: { description: 'Open the local setup wizard and control plane.', name: 'wizard' },
   args: {
@@ -313,6 +332,7 @@ const main = defineCommand({
     generate,
     refresh,
     refine,
+    preview,
     audit,
     answer,
     plugin,
