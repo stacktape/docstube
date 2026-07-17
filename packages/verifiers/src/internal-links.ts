@@ -39,7 +39,10 @@ export const internalLinksVerifier: VerifierDefinition = {
     'Every internal link target must resolve to a page slug in the artifact set; same-page #anchors must match a section anchor. Cross-page anchors are not validated in v1.',
   scope: 'site',
   localeScope: 'per-locale',
-  proves: true,
+  // Site-scope results run after per-page guarantee assignment, so this verifier's coverage never
+  // upgrades anything — claiming proves:true would overstate what passing links contribute.
+  // Broken links still gate (error findings flag the run).
+  proves: false,
   verify: (_ctx, pages) =>
     runVerifier(verifierId, async () => {
       const slugs = new Set(pages.map((artifact) => artifact.page.slug));

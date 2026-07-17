@@ -38,7 +38,7 @@ describe('guarantee roll-up', () => {
     expect(rollUpGuarantee(['proven', 'proven'])).toBe('proven');
   });
 
-  it('treats an empty entity as out-of-domain, never silently proven', () => {
-    expect(rollUpGuarantee([])).toBe('out-of-domain');
+  it('treats an entity with nothing provable as scored, never silently proven', () => {
+    expect(rollUpGuarantee([])).toBe('scored');
   });
 });

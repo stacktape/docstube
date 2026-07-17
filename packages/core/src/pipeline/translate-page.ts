@@ -5,7 +5,7 @@ import { extractPageEntity } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
 import type { PageRunContext } from './page-runner.ts';
 import { contentRelativePath, unwrapMdxFence } from './page-runner.ts';
-import { errorFindings, runVerifiers } from './verify-page.ts';
+import { errorFindings, recomputeRollups, runVerifiers } from './verify-page.ts';
 
 // The i18n path (PRODUCT §4.1): declared locale list, source locale is truth, locale is an
 // address dimension — a translated entity keeps the SAME id as its source entity (§3.3), so the
@@ -99,8 +99,11 @@ export const alignTranslatedEntities = (
     }
     sections.push({ ...translatedSection, id: sourceSection.id, blocks, guarantee: sourceSection.guarantee });
   }
+  // Roll-ups recompute from the ALIGNED blocks: translated prose was downgraded to 'scored' above,
+  // so copying the source page/section levels would advertise a guarantee the translation's own
+  // blocks no longer support.
   return {
-    page: {
+    page: recomputeRollups({
       ...translated,
       id: source.id,
       slug: source.slug,
@@ -108,7 +111,7 @@ export const alignTranslatedEntities = (
       sections,
       guarantee: source.guarantee,
       provenance: source.provenance
-    }
+    })
   };
 };
 

@@ -51,7 +51,9 @@ const createPluginExec =
       );
     }
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, { cwd: options?.cwd, shell: false });
+      // env passthrough is the snippet-exec scrub seam: when a verifier supplies an explicit env,
+      // the child sees ONLY that (secrets stay out of model-authored snippets by default).
+      const child = spawn(command, args, { cwd: options?.cwd, shell: false, env: options?.env ?? process.env });
       let stdout = '';
       let stderr = '';
       const timeout = options?.timeoutMs
@@ -200,18 +202,49 @@ export const assignGuarantees = (page: PageEntity, results: VerifierRunResult[],
     };
   };
 
-  const preamble = page.preamble.map(upgradeBlock);
-  const sections = page.sections.map((section) => {
-    const blocks = section.blocks.map(upgradeBlock);
-    return { ...section, blocks, guarantee: rollUpGuarantee(blocks.map((block) => block.guarantee)) };
+  return recomputeRollups({
+    ...page,
+    preamble: page.preamble.map(upgradeBlock),
+    sections: page.sections.map((section) => ({ ...section, blocks: section.blocks.map(upgradeBlock) }))
   });
+};
+
+// Provable entities: code fences (verifier domain) and claim-bearing prose (grounding domain).
+// Claimless narrative and declared out-of-domain blocks are excluded from the roll-up, so a
+// parent's "proven" means "everything provable underneath is proven" — the honest reading of the
+// badge (founder decision 2026-07-17). ODD stays visible per-block and through flags.
+const isProvable = (block: BlockEntity): boolean => block.blockType === 'code-example' || block.claims.length > 0;
+
+const provableLevels = (blocks: readonly BlockEntity[]): GuaranteeLevel[] =>
+  blocks.filter((block) => isProvable(block) && block.guarantee !== 'out-of-domain').map((block) => block.guarantee);
+
+export const recomputeRollups = (page: PageEntity): PageEntity => {
+  const sections = page.sections.map((section) => ({
+    ...section,
+    guarantee: rollUpGuarantee(provableLevels(section.blocks))
+  }));
   return {
     ...page,
-    preamble,
     sections,
     guarantee: rollUpGuarantee([
-      ...preamble.map((block) => block.guarantee),
-      ...sections.map((section) => section.guarantee)
+      ...provableLevels(page.preamble),
+      // Sections with nothing provable are transparent to the page level.
+      ...sections.filter((section) => provableLevels(section.blocks).length > 0).map((section) => section.guarantee)
     ])
   };
 };
+
+const liftBlock = (block: BlockEntity): BlockEntity =>
+  block.guarantee === 'scored' && block.claims.length > 0 && block.claims.every((claim) => claim.guarantee === 'proven')
+    ? { ...block, guarantee: 'proven' }
+    : block;
+
+// After the claims stage grounds a page's claims, a prose block whose EVERY claim grounded
+// becomes proven itself (grounding = proven, the deterministic lane). Callers invoke this only on
+// the clean path — no error findings exist, so no demotion cross-check is needed here.
+export const liftClaimGroundedBlocks = (page: PageEntity): PageEntity =>
+  recomputeRollups({
+    ...page,
+    preamble: page.preamble.map(liftBlock),
+    sections: page.sections.map((section) => ({ ...section, blocks: section.blocks.map(liftBlock) }))
+  });

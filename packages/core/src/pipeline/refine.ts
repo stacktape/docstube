@@ -55,8 +55,12 @@ export type RefineSummary = {
   spentUsd?: number;
 };
 
+// Rank on PROVABLE blocks only (code fences, claim-bearing prose): claimless narrative can never
+// become proven, so counting it would make refine chase prose-heavy pages it cannot improve.
 const countBlocks = (shard: PageShard): { total: number; proven: number } => {
-  const blocks = [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)];
+  const blocks = [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)].filter(
+    (block) => block.blockType === 'code-example' || block.claims.length > 0
+  );
   return { total: blocks.length, proven: blocks.filter((block) => block.guarantee === 'proven').length };
 };
 
@@ -116,7 +120,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   const locales = [locale, ...config.locales.targets];
   await applyFlagAnswers({ repoRoot, store, locales, pageIds });
   const knowledge = await loadKnowledge(repoRoot);
-  const openQuestions = await collectOpenQuestions({ store, locales, pageIds });
+  const openQuestions = await collectOpenQuestions({ store, locales, pageIds, knowledge });
 
   // Rank every indexed page from committed state.
   const ranked: RankedPage[] = [];
@@ -131,7 +135,8 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       shard,
       // Tribal questions are not a quality defect — rewriting the page will not answer them.
       openFlags: shard.flags.filter((flag) => flag.status === 'open' && flag.kind !== 'tribal-knowledge').length,
-      provenRatio: total === 0 ? 0 : proven / total
+      // Nothing provable ⇒ ratio 1: refine has no proving work to chase on that page.
+      provenRatio: total === 0 ? 1 : proven / total
     });
   }
 

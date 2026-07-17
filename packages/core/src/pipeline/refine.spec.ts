@@ -94,7 +94,9 @@ describe('runRefine', () => {
     const index = await store.readIndex();
     const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
     expect(shard?.flags).toEqual([]);
-    expect(shard?.page.guarantee).toBe('scored');
+    // Provable-only roll-up: with every code block passing its provers, the page badge reads
+    // proven — claimless narrative no longer drags it to scored.
+    expect(shard?.page.guarantee).toBe('proven');
   }, 60_000);
 
   it('respects --failed when nothing is flagged and rejects unknown targets', async () => {

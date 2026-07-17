@@ -8,7 +8,7 @@ import { extractPageEntity } from '../entities/extract-entities.ts';
 import { matchEntityIds } from '../entities/match-entities.ts';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import type { RunJournal } from '../state/run-journal.ts';
-import { assignGuarantees, errorFindings, runVerifiers } from './verify-page.ts';
+import { assignGuarantees, errorFindings, liftClaimGroundedBlocks, runVerifiers } from './verify-page.ts';
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
 import { attachExtractedClaims } from './claims-stage.ts';
@@ -195,7 +195,9 @@ export const generatePage = async (
         });
       }
       if (findings.length === 0) {
-        lastArtifact = { ...artifact, page: claimsResult.page };
+        // Grounded claims lift their prose blocks to proven, then rolls-ups recompute — this must
+        // run AFTER the claims stage (assignGuarantees ran before claims existed).
+        lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(claimsResult.page) };
         break;
       }
       await ctx.journal.append({ type: 'findings', pageId: page.id, findings });

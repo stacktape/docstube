@@ -50,7 +50,8 @@ describe('@docstube/verifiers plugin', () => {
     const byId = new Map(registered.map((definition) => [definition.id, definition]));
 
     expect(byId.get('mdx-compile')).toMatchObject({ scope: 'page', localeScope: 'per-locale', proves: false });
-    expect(byId.get('internal-links')).toMatchObject({ scope: 'site', localeScope: 'per-locale', proves: true });
+    // Site-scope coverage runs after guarantee assignment, so links gate but never prove.
+    expect(byId.get('internal-links')).toMatchObject({ scope: 'site', localeScope: 'per-locale', proves: false });
     expect(byId.get('code-typecheck-ts')).toMatchObject({
       scope: 'block',
       localeScope: 'source-only',

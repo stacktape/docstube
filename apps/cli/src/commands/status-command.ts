@@ -1,5 +1,15 @@
 import { createManifestStore, loadConfigFamily, CoreError } from '@docstube/core';
+import type { PageShard } from '@docstube/contracts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+
+// The page badge answers "is everything provable here proven?"; the block distribution answers
+// "how much IS provable?" — both matter, so status shows badge + distribution.
+const blockDistribution = (shard: PageShard): string => {
+  const blocks = [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)];
+  const provable = blocks.filter((block) => block.blockType === 'code-example' || block.claims.length > 0);
+  const proven = provable.filter((block) => block.guarantee === 'proven').length;
+  return provable.length === 0 ? 'nothing provable' : `${proven}/${provable.length} provable blocks proven`;
+};
 
 export type StatusCommandInput = {
   workspaceDir: string;
@@ -39,7 +49,7 @@ export const runStatusCommand = async (input: StatusCommandInput, output: CliOut
     openFlags += shard.flags.filter((flag) => flag.status === 'open').length;
     guaranteeCounts[shard.page.guarantee] += 1;
     output.info(
-      `  ${entry.slug} — ${shard.page.guarantee}${shard.flags.length > 0 ? ` · ${shard.flags.length} flag(s)` : ''}`
+      `  ${entry.slug} — ${shard.page.guarantee} · ${blockDistribution(shard)}${shard.flags.length > 0 ? ` · ${shard.flags.length} flag(s)` : ''}`
     );
   }
   output.info(
