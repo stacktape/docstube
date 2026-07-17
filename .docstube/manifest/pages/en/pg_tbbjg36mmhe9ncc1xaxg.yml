@@ -1,19 +1,19 @@
 schemaVersion: 1
 locale: en
 version: latest
-sourceCommit: b3ef381e3e5d4b7db878a5523147870b47a03523
-generatedAt: 2026-07-16T20:39:42.923Z
+sourceCommit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+generatedAt: 2026-07-17T02:29:24.217Z
 page:
   id: pg_tbbjg36mmhe9ncc1xaxg
   kind: page
   slug: getting-started
   title: Getting started
-  description: Install docstube, open the setup wizard, and generate your first verified docs site.
+  description: Install docstube, open the setup wizard, and generate the first documentation site.
   preamble:
     - id: bl_j1g5sreb7r7289m8bp66
       kind: block
       blockType: paragraph
-      contentHash: 30fdc43f53f8803876926e312bd90187a95afdede3bf79a14b29e1285e6ef17c
+      contentHash: d10b64b03e171cfca26a2051419e8a3385c91d138f64513335f8f1ebbf654240
       variants: []
       claims: []
       guarantee: scored
@@ -22,10 +22,11 @@ page:
         seedContext: []
         observedReads: []
         verifications: []
-    - id: bl_zn1e2xgb1620hd9g5xqv
+    - id: bl_hrf6jjhh5w27fmcmp4rq
       kind: block
-      blockType: list
-      contentHash: f4f0df72072ca564c7cf2da9507686131f27852556ee4dbe6ae187daba1d304c
+      blockType: code-example
+      contentHash: 026467a21bc1bef8fae62a5cff115014e408abbec3d85e8313bc2deb39e91d50
+      language: text
       variants: []
       claims: []
       guarantee: scored
@@ -37,52 +38,7 @@ page:
     - id: bl_kczs87b87rwzcp17kjra
       kind: block
       blockType: paragraph
-      contentHash: 808a8341210a4ccd64108898e56e2e8210866cb3402325892b31bded8fb672bf
-      variants: []
-      claims:
-        - id: cl_8a6vc4cs6188g4fra1vj
-          kind: claim
-          text: The package can be installed as a development dependency with `npm install --save-dev docstube`.
-          anchor:
-            quote: npm install --save-dev docstube
-            prefix: |-
-              1. Install the npm package:
-
-              `
-            suffix: "`"
-          claimClass: configuration
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_xf9d7nv63585mjezpz2z
-      kind: block
-      blockType: paragraph
-      contentHash: 9a2b1a230993a700740c71eaaa916de566e3bf152c435de1e1e3a6f5b78639df
-      variants: []
-      claims:
-        - id: cl_j1jnfaqh7v9zv8fggjd1
-          kind: claim
-          text: A standalone binary installer is available from `https://installs.docstube.dev/`.
-          anchor:
-            quote: use the installer for your platform from `https://installs.docstube.dev/`
-            prefix: "For a standalone binary instead of an npm install, "
-            suffix: .
-          claimClass: factual
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_adv3mrtjcm1c03gdn2dw
-      kind: block
-      blockType: list
-      contentHash: cbe0182a2cf9ecf5737ded5e1f994003fb8ef5f40a8f1a8a91b547c07f750790
+      contentHash: 9793d7eb2f52bd2395d63e19ec6bff943b1400150f74ed686e19deea1681b1a3
       variants: []
       claims: []
       guarantee: scored
@@ -91,406 +47,264 @@ page:
         seedContext: []
         observedReads: []
         verifications: []
-    - id: bl_ba5aq0km3zama78w2n15
-      kind: block
-      blockType: paragraph
-      contentHash: 85c2af77704d28265ce67e00b057634529131151f14d162d544cfeef484a52ff
-      variants: []
-      claims:
-        - id: cl_2qc6z1zqmbffzk9anne2
-          kind: claim
-          text: The setup wizard is opened with `npx docstube wizard`.
-          anchor:
-            quote: npx docstube wizard
-            prefix: |-
-              2. Open the local setup wizard:
-
-              `
-            suffix: "`"
-          claimClass: api-shape
+  sections:
+    - id: sc_1jjc1q5f9hnesqzbhe65
+      kind: section
+      title: Open the wizard
+      level: 2
+      anchor: open-the-wizard
+      blocks:
+        - id: bl_ejqe6hxqm9x80tpnvc5x
+          kind: block
+          blockType: paragraph
+          contentHash: 7de744d3f3d75655a180dfee2c2fa34a8d50bb1be9ebf4191e68a097a682e0d0
+          variants: []
+          claims: []
           guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_kzgg1amrbvd0pceajx1q
+          kind: block
+          blockType: code-example
+          contentHash: f4d81b0d7f97234bbd9a8d9eb7ceba6ef8b269c8b6feaf6fa73af7720b896f14
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_gzk19hmdgjy2zd7nv7c1
+          kind: block
+          blockType: paragraph
+          contentHash: 61bc701d4b744638e508b252c6ba041d686371213461fa646c392c0dd471534a
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_x14m2xht35y6f7t7d19v
+          kind: block
+          blockType: code-example
+          contentHash: 0d41f66db93617aa3bb43f089626ed205b4f30d29ea8d3ff3932d6fb51cd1ddd
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_cn2a5zxy3794ys5kne1h
+          kind: block
+          blockType: paragraph
+          contentHash: d47b65fe7c0792798bfbbc6a3a2dcc4a69c3de05620dfa8054a91e3780317230
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
       guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_50kx79chqrj702ecq8qa
-      kind: block
-      blockType: paragraph
-      contentHash: f38a7bdc097a17b9f5e4745bd00fc405e00ab251f8c550dcb77fd3b11751889b
-      variants: []
-      claims:
-        - id: cl_cfmw3ghvzg56zx7aq0ej
-          kind: claim
-          text: The wizard command starts the local control plane.
-          anchor:
-            quote: The wizard command starts the local control plane
-            prefix: ""
-            suffix: " and prints its local URL."
-          claimClass: behavioral
+    - id: sc_btst6t5gkvs40h4j557p
+      kind: section
+      title: Generate the site
+      level: 2
+      anchor: generate-the-site
+      blocks:
+        - id: bl_jxyd87e6c0ah8xc7zvmh
+          kind: block
+          blockType: paragraph
+          contentHash: f6eecb2d34091054659dd4b69ea543b702e280e9921d6d665934def0478cf131
+          variants: []
+          claims: []
           guarantee: scored
-        - id: cl_f51tzzv9eb71sfy4xgkh
-          kind: claim
-          text: The wizard command prints its local URL.
-          anchor:
-            quote: prints its local URL
-            prefix: "The wizard command starts the local control plane and "
-            suffix: .
-          claimClass: behavioral
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_qhfy6ys0dzn897x9gg3r
+          kind: block
+          blockType: code-example
+          contentHash: 4271e053f712d55581f6213b8dd21d09614b35330ca061377253aad86ce0ff3b
+          language: text
+          variants: []
+          claims: []
           guarantee: scored
-        - id: cl_jcedm16gzjz8wwhvps3f
-          kind: claim
-          text: The wizard command accepts an optional `--port` flag.
-          anchor:
-            quote: It accepts an optional port
-            prefix: "The wizard command starts the local control plane and prints its local URL. "
-            suffix: |-
-              :
-
-              `npx docstube wizard --port 4321`
-          claimClass: api-shape
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_7eqthtnjd03kqmjwtw4z
+          kind: block
+          blockType: paragraph
+          contentHash: d7659238793f32dabb8960c8e0da949163d484c8fd667472e0bc516d170134b0
+          variants: []
+          claims: []
           guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_5bey2em4tbde883wad7m
+          kind: block
+          blockType: paragraph
+          contentHash: 86dda8654549e068fad26dc3abbdf0d514e2d8442a3560331ccc7eff6cb231e5
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_pzdsj4xxxrw0sd6vqcz8
+          kind: block
+          blockType: code-example
+          contentHash: 4cf00fec95240f59b398f18680e6143491ac2afed36ddf52cdfbe8ab83f9ba3a
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_hrnhczmy6dwbtd3spvnb
+          kind: block
+          blockType: paragraph
+          contentHash: 549e5b05fc7690278f9e382b548d3d8574130dabc6d485a0b33c0c1c1c403d70
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_p1fh3qcrbh8nwazgrdyr
+          kind: block
+          blockType: code-example
+          contentHash: 91e5f57b9c9f240edf3503e9212270166b2a4588c5e32fd798428cb56c0d35ec
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_4j0h2pg972f5ke70b6qy
+          kind: block
+          blockType: paragraph
+          contentHash: d7420592b322a57dd06352c7043426993679d452868a5cb7f48c00a68d357e33
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_2mhv7tzb0cfh5avfnmre
+          kind: block
+          blockType: code-example
+          contentHash: a61421fba11bf43892532a2423f68ec284d96288419fab25fd15929f40da89f2
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_xcqn4pkscysf8qt509cf
+          kind: block
+          blockType: paragraph
+          contentHash: 1decf774594155797f214138eb705e6f88a9338f6306d262cacccfbad8e587bf
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
       guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_90h9dd7jzbv4rp3wtes9
-      kind: block
-      blockType: paragraph
-      contentHash: 08f19752aacf1988e77b03af2a04c783f812c8a30eeb05f8503ea25fd5e53c6f
-      variants: []
-      claims: []
+    - id: sc_1q5x03qe4w3sq95x77r2
+      kind: section
+      title: Check the result
+      level: 2
+      anchor: check-the-result
+      blocks:
+        - id: bl_sdfzrpa2zpvd1j2fzsp1
+          kind: block
+          blockType: paragraph
+          contentHash: 90fbf2eabe62570439140b1bc67e2cefc13bc1db92ad6be0826b8e6ea24cb35d
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_3q6pwca9ambcxccc88vv
+          kind: block
+          blockType: code-example
+          contentHash: 85e0727ac7ff52dffa1ad2b679dff7b429576605c77603df4307bc96ad5e650e
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_fzjp3x3zhw6ex37j29ar
+          kind: block
+          blockType: paragraph
+          contentHash: 1af730807f794028fd7a5d7d04fbdaef3619c98185459c125a5211e2ddc098ce
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
+        - id: bl_r82pt1e4k2bh3wrfdyx9
+          kind: block
+          blockType: code-example
+          contentHash: cbd765de97eb8b1539f98a6f6a20a7e4043864527729a6e141534ae90ab2fd4f
+          language: text
+          variants: []
+          claims: []
+          guarantee: scored
+          provenance:
+            sources: []
+            seedContext: []
+            observedReads: []
+            verifications: []
       guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_1af749p76x0g064a4yqc
-      kind: block
-      blockType: list
-      contentHash: 0448bf6d21879dc8ce47bebaa258f5c7c74a4be6e75df0eb666e08dc599ad086
-      variants: []
-      claims: []
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_hvbmshxrg29t05y42jyz
-      kind: block
-      blockType: paragraph
-      contentHash: 1ba7a489485a0310a287623e1d7e756323293879fd8f853e5da393dd4aa06d4f
-      variants: []
-      claims:
-        - id: cl_rk3z7d08zbda2cyp47as
-          kind: claim
-          text: The generate command is run with `npx docstube generate`.
-          anchor:
-            quote: npx docstube generate
-            prefix: |-
-              3. Generate the first docs site:
-
-              `
-            suffix: "`"
-          claimClass: api-shape
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_y1veka8e6mhg0p6vg05j
-      kind: block
-      blockType: paragraph
-      contentHash: b7338baabde6fad58f3422f9547cd76c7474f1b368a7f97e6e7cd0bf68794ba2
-      variants: []
-      claims:
-        - id: cl_jxktkk68e6dj17n87ske
-          kind: claim
-          text: The `generate` command loads the docstube config from the current workspace.
-          anchor:
-            quote: "`generate` loads the docstube config from the current workspace"
-            prefix: ""
-            suffix: ", runs the configured agent transport, writes generated MDX pages, writes manifest state, and emits the site."
-          claimClass: behavioral
-          guarantee: scored
-        - id: cl_3x3ndetwezsdsv5zbjf8
-          kind: claim
-          text: The `generate` command runs the configured agent transport.
-          anchor:
-            quote: runs the configured agent transport
-            prefix: "`generate` loads the docstube config from the current workspace, "
-            suffix: ", writes generated MDX pages, writes manifest state, and emits the site."
-          claimClass: behavioral
-          guarantee: scored
-        - id: cl_3a12g8fn4qv2pr1pphb1
-          kind: claim
-          text: The `generate` command writes generated MDX pages.
-          anchor:
-            quote: writes generated MDX pages
-            prefix: "`generate` loads the docstube config from the current workspace, runs the configured agent transport, "
-            suffix: ", writes manifest state, and emits the site."
-          claimClass: behavioral
-          guarantee: scored
-        - id: cl_eq7b0cz3t1n50434htwn
-          kind: claim
-          text: The `generate` command writes manifest state.
-          anchor:
-            quote: writes manifest state
-            prefix: "`generate` loads the docstube config from the current workspace, runs the configured agent transport, writes generated MDX pages, "
-            suffix: ", and emits the site."
-          claimClass: behavioral
-          guarantee: scored
-        - id: cl_11p1bd8teyezvfm1hpvz
-          kind: claim
-          text: The `generate` command emits the site.
-          anchor:
-            quote: emits the site
-            prefix: "`generate` loads the docstube config from the current workspace, runs the configured agent transport, writes generated MDX pages, writes manifest state, and "
-            suffix: .
-          claimClass: behavioral
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_396bxn3ty5dpxs4wz350
-      kind: block
-      blockType: paragraph
-      contentHash: 083b0b5d5bbeef82f81ae1ca407d206bc8a7c09400bc2de2b5aa361468e786c4
-      variants: []
-      claims:
-        - id: cl_b7srrddr8hx3bxy94e6s
-          kind: claim
-          text: After the first successful run, the default output directory is `docs-site/`.
-          anchor:
-            quote: After the first successful run, the default output directory is
-            prefix: ""
-            suffix: |-
-              :
-
-              `docs-site/`
-          claimClass: configuration
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_47g67kj3qnjn7eetes1p
-      kind: block
-      blockType: paragraph
-      contentHash: 0b90f361eb6383c3b2db7632bc1e1350d0750dd6102ceb799ffebcfb02de78a0
-      variants: []
-      claims: []
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_vnb5xy9k3ddx4p3465bp
-      kind: block
-      blockType: paragraph
-      contentHash: 589f8f32773c76db49918faf74dd1274cb21a04ec7b822bc25a1f2010625d2f0
-      variants: []
-      claims:
-        - id: cl_hnevpfh973c35xax1pxt
-          kind: claim
-          text: Committed manifest state is written under `.docstube/manifest/`.
-          anchor:
-            quote: The committed manifest state is written under
-            prefix: ""
-            suffix: |-
-              :
-
-              `.docstube/manifest/`
-          claimClass: behavioral
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_ev5snaqma1aq0kh4pye0
-      kind: block
-      blockType: paragraph
-      contentHash: 418beb9ed9eb406e2ec6bfe1dcda722b02523decdc899fc5214e773c0fc9df80
-      variants: []
-      claims: []
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_1pszadpt90hxg1h5e2zx
-      kind: block
-      blockType: paragraph
-      contentHash: 90a69b71b7c61a7be35fb3a75334531874677701411c18912be3e506e03a21b9
-      variants: []
-      claims:
-        - id: cl_wsdpe04405jdn3nykyxx
-          kind: claim
-          text: The manifest includes `.docstube/manifest/manifest.yml`.
-          anchor:
-            quote: That manifest includes `.docstube/manifest/manifest.yml`
-            prefix: ""
-            suffix: " and page shards under `.docstube/manifest/pages/<locale>/`."
-          claimClass: structural
-          guarantee: scored
-        - id: cl_dpstg3z22est5hbet3rq
-          kind: claim
-          text: The manifest includes page shards under `.docstube/manifest/pages/<locale>/`.
-          anchor:
-            quote: page shards under `.docstube/manifest/pages/<locale>/`
-            prefix: "That manifest includes `.docstube/manifest/manifest.yml` and "
-            suffix: .
-          claimClass: structural
-          guarantee: scored
-        - id: cl_xfz0xtb48gg61225786d
-          kind: claim
-          text: The generated site uses the configured output directory.
-          anchor:
-            quote: The generated site uses the configured output directory
-            prefix: ""
-            suffix: ; by default that is `docs-site`.
-          claimClass: behavioral
-          guarantee: scored
-        - id: cl_ahtxhtn81hjw44f0y281
-          kind: claim
-          text: The default configured output directory is `docs-site`.
-          anchor:
-            quote: by default that is `docs-site`
-            prefix: "The generated site uses the configured output directory; "
-            suffix: .
-          claimClass: configuration
-          guarantee: scored
-        - id: cl_p2txybf4da97jjwpxx1m
-          kind: claim
-          text: When the site is emitted, the CLI prints the output directory.
-          anchor:
-            quote: When the site is emitted, the CLI prints that directory
-            prefix: ""
-            suffix: " and the build command:"
-          claimClass: behavioral
-          guarantee: scored
-        - id: cl_g54dh40d043emb5dwwym
-          kind: claim
-          text: When the site is emitted, the CLI prints the build command `npm install && npm run build`.
-          anchor:
-            quote: |-
-              the build command:
-
-              `npm install && npm run build`
-            prefix: "When the site is emitted, the CLI prints that directory and "
-            suffix: |-
-              
-
-              If a run finishes with open flags
-          claimClass: behavioral
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_65q1nbbzxbtyg9a9gez4
-      kind: block
-      blockType: paragraph
-      contentHash: d470fe62d04e96e162133e2b712c52cf00e7c4ca4c86935869a318fd8735bbe0
-      variants: []
-      claims: []
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_yy8gj441zyjdnxampcvb
-      kind: block
-      blockType: paragraph
-      contentHash: f98b52caecc57680a109f7d2b21217e0e124e9ff5a0582fd82ce4fde316931e6
-      variants: []
-      claims:
-        - id: cl_rj8ya5pkg21vjg05k7ej
-          kind: claim
-          text: If a run finishes with open flags, the CLI tells the user to review them with `npx docstube status`.
-          anchor:
-            quote: If a run finishes with open flags, the CLI tells you to review them with
-            prefix: ""
-            suffix: |-
-              :
-
-              `npx docstube status`
-          claimClass: behavioral
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_wfjymf6cctdmg81yrbhf
-      kind: block
-      blockType: paragraph
-      contentHash: ef3ac320279f72bde41317e29af52df80b5a0feee28aee03111757fa8e3421cf
-      variants: []
-      claims: []
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_4znb3tdjympy64cxv5qb
-      kind: block
-      blockType: paragraph
-      contentHash: 3d45f2ff5dd26adc5fd4dacb2e455773e090801924b053491e5b2d35be696fa6
-      variants: []
-      claims:
-        - id: cl_95gf40qyw384e0tnr24d
-          kind: claim
-          text: The `generate` command accepts a per-page retry budget flag `--max-attempts`.
-          anchor:
-            quote: The `generate` command also accepts a per-page retry budget
-            prefix: ""
-            suffix: |-
-              :
-
-              `npx docstube generate --max-attempts 3`
-          claimClass: api-shape
-          guarantee: scored
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-    - id: bl_he0pxs27wfz925b508t8
-      kind: block
-      blockType: paragraph
-      contentHash: ed5fe27394d8296599783339faf2d5555d32a963d237344d93f78f9ea086ec7c
-      variants: []
-      claims: []
-      guarantee: scored
-      provenance:
-        sources: []
-        seedContext: []
-        observedReads: []
-        verifications: []
-  sections: []
   guarantee: scored
   provenance:
     sources:
@@ -499,264 +313,606 @@ page:
         span:
           - 1
           - 19
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:5868005cf8aa74e793cf079e65b3fcc4a69b35f1bc9c0886cfa4128a94e00bd2
         file: apps/cli/src/cli-help.ts
         span:
           - 21
           - 40
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:72fdf16222c23c7cc23bdf5d5348ef9907ebe3dc80cdfd42482733171bb1e423
         file: apps/cli/src/cli-help.ts
         span:
           - 42
           - 47
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:7e9545cdfe1e96700d39b8f4c60f77a0aac3b1af343d866ada6269baf0dcaa98
+        file: apps/cli/src/commands/emit-current-site.ts
+        span:
+          - 15
+          - 30
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:01e0bb2afcd3101c750572145b83b5b04484c824d9bab622c5559719dfbcc0c6
+        file: apps/cli/src/commands/emit-current-site.ts
+        span:
+          - 32
+          - 78
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:68259358e90fec4f600afdaec9832161cee1bfd2c4c2c0ddb3530a6b922298da
         file: apps/cli/src/commands/generate-command.ts
         span:
-          - 11
-          - 14
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:3d945790571a3fc3a758723a6a65cd57dfd0380bae2a84238f3361a104c9d292
+          - 13
+          - 16
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:f664385a7d629d91b3a542742a49cd9707ea780276cf7dd5dbfcb4e118520ae2
         file: apps/cli/src/commands/generate-command.ts
         span:
+          - 18
+          - 79
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:549adf56de24739e6e435a7b5781aa1ddd8b8c650a6370c1eb4e859c446d9855
+        file: apps/cli/src/commands/status-command.ts
+        span:
+          - 14
           - 16
-          - 69
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:2f847c0a75b535bb4d06a96204efd69152ca9ddf1c1d1bad6a78f2315be9e915
+        file: apps/cli/src/commands/status-command.ts
+        span:
+          - 18
+          - 59
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:e67da136d4fd74470de32a11ed06ded46422df11859e0511b5ebe694d5eb21af
         file: apps/cli/src/commands/wizard-command.ts
         span:
           - 26
           - 32
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:812f92dcf3202562b47421026c029b3c496ef290fce50d58edc1e6d1d5653509
         file: apps/cli/src/commands/wizard-command.ts
         span:
           - 44
           - 111
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:3a4e05b592e236c2f5377403bc75c5671a17ce6c34b171e61645c112b81ded7c
-        file: apps/install-events/src/install-events.ts
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:34371960d2e5b7e9e4d6863422e06018e3e8ca6163c622bb9c5e61c597e9f072
+        file: apps/github-action/src/github-action.ts
         span:
-          - 135
-          - 172
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 26
+          - 26
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:e1b2637acc1c3426c849f00f3c1f7e222deaec879d48808733aac2a6a15c2bda
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 28
+          - 39
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:24490b091e803442606d62429cd6d8e38fecfe826300cca87f09e5a29f89983c
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 41
+          - 44
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:81e5591d3ab43b4eb98fac52622ff3a4b8acbc9e9caf6fd0be5b1fad3707f9b4
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 46
+          - 49
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:df5e8dc3c94f38f1371f7bff9a73a70670f66b9f66e4a9f0ea7527cd68367575
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 51
+          - 54
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:4f5a18566c0f5f3e2fb4cdf0fa07f926f1519b8313f8e02790e9b432c7121c3a
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 56
+          - 59
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:1bf9412c8f987ad262af5b5c879e128b2a32fa8927e39e02dff33ae7f59f0470
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 61
+          - 65
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:e41350484f0740038926e9447783c69ea4f4387cf979315377b8665f3fcc92cd
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 67
+          - 73
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:0cd5576b7535d4360a9671dc62e0a94d959690f508824999bbd69dfb3eb45e6a
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 75
+          - 81
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:136ab757671ffdaf5db4a809307db5595ced10b5bef249a8d1fa65ff6b4e60f1
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 83
+          - 87
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:fcf2c62a59b850edac6006a8ee183fc13b73bd40da2a28e3f0b084eaf7509ad5
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 89
+          - 96
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:664102f82e7394c517dcabdde22ad4eea42efb4a097c453223fbb2332fa64b8b
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 98
+          - 102
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:39f0da87df8b83fa2d90d2665bc839244f5192596bf86cf59ce2216161e06bf4
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 104
+          - 112
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:7272f38c2e7f913b06dae76000654031b7c70a76fb8f4a441f3a37bde56a08a0
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 114
+          - 128
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:2b772afe1bf62e94f728d422c6c717d6922b4b28dc65a9e73ed9f625a4bc0be6
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 130
+          - 130
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:10ed59de915a280ae272ab81cd1a74b90a5b7e37e2b518a9087006c0abfa735e
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 132
+          - 144
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:6d36d8eba27815bceb3f2081a9ba1994257d3f70ca0079d9a3ad6c298690c2ca
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 152
+          - 156
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:950d487cde85e4e5b56ab3fb2134422d1eb18385cedfa732f4bb07f5d1b2147d
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 158
+          - 158
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:0335431b8d27897b1ea395f4b8adac445117430d1d99d60c3a2c3003d6140c26
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 215
+          - 215
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:cf4408754ed5f646c1b1b189d5120221a6a1c0a14cceccab5f794f2b66f8f219
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 219
+          - 241
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:abea8c89d84cea48e71c1e7c2fd76506b621e75594dc9399b436f561dc91e8e3
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 298
+          - 302
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:eb118ea165d0173a24c71e0a713276138ecfe6df5eea4b1bfca24c13278f3ef2
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 304
+          - 308
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:bbf1f27be8633a873ae75af23670efd77e7a1dc913030a0e85bf101ca74f72f7
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 367
+          - 560
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:e1f43e755b09c1edc5dc6f0dac9d0074d83aed568b8f79feb72cb0451c6e4909
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 824
+          - 828
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:acac5ce6d0473b544b2e5199c0caab8e1109af2def7e2da042f182698e0e4bab
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 830
+          - 839
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:22e5ee4ea665f2d17e119b2e7e9b95c68c77c780aac8077df742678a6c7ed91a
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 875
+          - 892
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:dc771216b475b56fe8df56043fc2c7f0a7331a7ed74d091d0668ad922acc82da
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 917
+          - 933
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:5c6bd6e9a08cf7c5dde526901fb37c0e6e234e9581661d0c3c450f381f4251b8
+        file: apps/github-action/src/github-action.ts
+        span:
+          - 935
+          - 944
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:d0d1c2f9b2408b958159362d47f76093317b3158709ecb6e3327b2d87d9a88ad
+        file: apps/local-ui/src/app.tsx
+        span:
+          - 20
+          - 69
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:2ca5d560f29b28d3e9b259af514d21cb5df4f3d8c1837e096b9870f267785797
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 14
+          - 27
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:fb9519405fa4b102b14cfbd63b4e1fb477bc6f10e87f7dfe1b895177d3e37426
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 28
+          - 28
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:52644e1686c5e73c7bed0c60ad491098ba376a78df6f74231e9ce5191db66143
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 31
+          - 44
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:61b69204cc4a52f37f33a048f58fd3bc9fb2e2cf5054be8b3a9bc80cfd708de6
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 47
+          - 47
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:ab4fa0d60c0e163242d008f6f661e54e76c2d95b6f41fc17e14ee1bc596ef5f7
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 48
+          - 48
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:3d7cea7a7a97669014d6540ed2af6386e84618416b534725ccfc15a4f9f34626
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 49
+          - 49
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:4a6c4180aab4d8c82fa30ff4479936390929e851c4bb5d7a3b3a4e39467fa576
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 51
+          - 51
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:3526deaab94fd007a8ddd9214dba49d97d7a79d8e8dcf91d0d254665b7e38b77
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 52
+          - 52
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:19922e0bf008f55d0afac5753142d8dd0cdcee36982798abc73a22bdf89cf19e
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 56
+          - 64
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:f5da6ba86b46255345ebbc9a76379c0beaed3acbdc681b69b341f7bc6a07a732
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 67
+          - 70
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:9084612508569ba6cbb7e4eca448e8019e58fc6515fee7d8792838162c1f1bb1
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 72
+          - 78
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:813099b5e5ff1e7e69a3e1dfd0864aed4a78fc9165f6f19364997969222d71a5
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 80
+          - 89
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:ac55b0f415bace1552444215091c16beec71e3408c21974d4570ebc7f42cb974
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 91
+          - 99
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:be432939811bd95c696fc9218b48464b780fb4027e896633f610b49e9c475b5d
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 101
+          - 112
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:bd12851fc64b78ea2ab4f97e88edd30ea7a1fffcc9446f43bd4195a97e70c8f1
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 114
+          - 115
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:5c2a198337b9ddd6cb21856c68374e4132b21a3c6674b03257ed291f4ce0c1d0
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 117
+          - 127
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:25a956f5a7053b42a9d574896b5cc198e7b599bb1df9234af63d4fc1cd35be70
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 174
+          - 211
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:3ecdc18a99015af6b3234fb65bb6baeab39d409df5161dc2142fc4c783459b3c
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 213
+          - 213
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:1c7ad19905a17d0b8c89bddeb972567681a5cf6f87a4f8ceb5f4bc8699ca03a8
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 215
+          - 226
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:964f4ee8007a9a282ce3446e63e6c409b7a4b44f38521ea660f534a286b67b7f
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 227
+          - 227
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:218ab3e1c879a413217c848f9aeb2f95712c38cfac945747350418dea845169e
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 229
+          - 240
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:17f3d5e025babe6f87eff4b325c6a009c839f30fbfa6df271eb7ac16cae96f5a
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 242
+          - 271
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:88fec9c1c1fc6bd6c81909765db02b4ccbddfd9674d9140c2bfec919bcaf7a15
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 275
+          - 303
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:6e9a8664e7fc42e83edf77b3559209806ba8d5f121a104699b4c81e5cec5c7d3
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 305
+          - 308
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:3baae786760b0899b165dfb554e997a81501fae6002fd2a4d111e051fb684070
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 310
+          - 329
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:d949c67e904134ae861fc7b342264bbd6d79fd682daab4a53fd15a351acc3830
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 338
+          - 354
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:5dcab8ae9b7e4e933408a128476b20291cf2bee647289e50d8af5b5ebcf854c6
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 359
+          - 360
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:1e38ef788c4e3aa4577da2494ee642e903bae5ebb96d802b93ba9353fdd3c32c
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 362
+          - 366
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:c17ad1b8482087f7735c998f28c613ce3aa56cc83980ec83876732eddf0f8abb
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 368
+          - 368
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:da245e5c497f325086dafc1d4e50c76a869e4c2a5018ed1106f23226ec44720c
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 372
+          - 399
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:9f78dd7cb251e91f1bb37cee9e1df494d9e4f5265d507bfdf6e6693f512ec5e4
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 425
+          - 483
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:9d70cc2fcbd4796d422539a9cf0db74c4509e9675d71933c4d83c08847cd2ae3
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 485
+          - 486
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:e7f560d7b89a071a6683ff5134c7b2bf656476e3720374e7198073b31f836e2e
+        file: apps/local-ui/src/wizard-state.ts
+        span:
+          - 533
+          - 597
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:3687b68eed051cde7aa8f25410a91c86831349ae54b164d060a6437b1047727e
+        file: apps/local-ui/src/wizard-step-start.tsx
+        span:
+          - 33
+          - 197
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:7c8a2b1c26e7c7905dcbff315f8782eff59f0eff4d835dbfd09b30c32ed9804f
+        file: apps/local-ui/src/wizard.tsx
+        span:
+          - 37
+          - 155
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:112273393da502b1634d12d72d40ed4256a5cf3342d7c0877f4fda3e2dacf41c
         file: packages/contracts/src/config-schema.ts
         span:
           - 8
           - 8
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:8da3371ab18820c65a21216b574e04441b17b993b1d5c0941dbc2468d0105d80
         file: packages/contracts/src/config-schema.ts
         span:
           - 9
           - 9
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:129eaca3ddc917aa1a595bed043eb307e0fcfb75fec786330edb82f80c56dd65
         file: packages/contracts/src/config-schema.ts
         span:
           - 11
           - 14
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:a4109f5654bec1cc00c8afe2c514428332390774e4f266db6da8f939c71619e2
         file: packages/contracts/src/config-schema.ts
         span:
           - 15
           - 15
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:0787732c1433259457e8893a2f859676875cf19765dea597b0355daf1f22e4f2
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:7dd88e3c4a43b1f0cbd916eb348791f740230db0fe087394aed13df2471aec99
         file: packages/contracts/src/config-schema.ts
         span:
-          - 17
-          - 17
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 18
+          - 18
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:61a84b0a6cdfd76e9834af64a1f4fcfc9d51a69db46529bd58a52f970dec0e3c
         file: packages/contracts/src/config-schema.ts
         span:
-          - 19
-          - 25
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:20815b225c45c882c011959124dc4699ec284e81087a55409425695c1c0b6a32
+          - 20
+          - 26
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:7f95e9eb292e8dd0e2b9598e13e087b8a3463414a6cdc74fd9a8151f98887176
         file: packages/contracts/src/config-schema.ts
         span:
-          - 27
-          - 34
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 31
+          - 31
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:f03aea589822bca4cc82f58c9c5b312c656b6c7efb927ec51dd57083cc4cc722
         file: packages/contracts/src/config-schema.ts
         span:
-          - 35
-          - 35
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 32
+          - 32
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:e8b5ba42860e13fa94c2413b3576937fad1d1e7725d20344aba0377edf2abb22
         file: packages/contracts/src/config-schema.ts
         span:
+          - 34
           - 37
-          - 40
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:e24682a7ce319d2c297f73f51c1e05b320db0b706b6f52a94b48286d37ed17a3
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:a91b6816a6e6df8025eb76ed0152195f8f53a106650b0c7d8ad58b0475cbf752
         file: packages/contracts/src/config-schema.ts
         span:
-          - 42
-          - 68
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 39
+          - 79
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:347c83c15d221c429cddb03e4a6eeacc301ce890e4c81c5f2263f721ae292b12
         file: packages/contracts/src/config-schema.ts
         span:
-          - 70
-          - 73
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 81
+          - 84
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:4ac6a04a105111630037d1099cf641fffffcd2308c192d9683471c056497f45e
         file: packages/contracts/src/config-schema.ts
         span:
-          - 75
-          - 78
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 86
+          - 89
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:1cbc6c1d38bb7f2951ef44d8950821291039e36df25c60ac9d6e1cbdff584802
         file: packages/contracts/src/config-schema.ts
         span:
-          - 80
-          - 85
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 91
+          - 96
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:b52027feb4fecff6e0e4226e2e82dfb98771a4ae5e7696bde14fce382d88bda0
         file: packages/contracts/src/config-schema.ts
         span:
-          - 87
-          - 93
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:7dafa2aceed1ab2323f5f94fd7a194c5b9691392e4dbdd30fe40bd4f630afe56
+          - 98
+          - 104
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:e72c0c21742e7802cad8db673fea39b80da751ebe2bd54aeb57f2de0cc82b8b0
         file: packages/contracts/src/config-schema.ts
         span:
-          - 97
-          - 113
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:08d250a5993078dea1c9326302ed4f905529c4aee96ca4569695dc9573d6086c
+          - 108
+          - 124
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
+      - symbol: ts:df2fecff2f90713cde8d2b663f0a389e410426df707a9e682a11ab436922b240
         file: packages/contracts/src/config-schema.ts
         span:
-          - 115
-          - 141
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 126
+          - 151
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:3bfb68a6ec7e6659a7e62c8c7a81d007d5124451d453f724bc023afbc06a39bd
         file: packages/contracts/src/config-schema.ts
         span:
-          - 142
-          - 142
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 152
+          - 152
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:1646d59477db130ea09a0cd1166278636902c13137be14fbb133d4af50163630
         file: packages/contracts/src/config-schema.ts
         span:
-          - 143
-          - 143
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:76f5351de69feee4865678bc60033804f91d55ad0da4c03a4f2d74234997968d
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 19
-          - 25
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:2b6c4d282eeaeb4e96e46fb7e1878c04e553fc0d5022889bb5d607fceb19c937
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 27
-          - 36
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:c6f609195d261509d45445408071b302b260fb630e485b8aa262efec84e1e314
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 38
-          - 41
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:991d62da3147e0efa3c8307817f7f81c38472c473de62c8ee2e658e6bc481890
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 43
-          - 57
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:e664dfc1cfc86c47a6b8c50b1f7595e3acc1fc721a2a5c7a47b25736f5ff0c72
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 58
-          - 58
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:200eda744d2999ac33f8ddf7f7378b023547bf579597bb09d7d6d7e9e6ebba9d
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 62
-          - 72
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:af56fc04c6c5e0d88e3e943b0c576fe49bfc9a9747e7c391bab865742dc8cfc9
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 73
-          - 73
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:4e011816835593c37b54f0118b0d7fdb81552184e34eb2e250a028952aba64fd
-        file: packages/contracts/src/manifest-schema.ts
-        span:
-          - 75
-          - 84
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:01d349acf6a11f11ae6bc0525e859f149001df35f15f9d904bd47472ddfdbccc
-        file: packages/core/src/pipeline/generate.ts
-        span:
-          - 35
-          - 41
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:cc6f516e1c332941a51160c97d8ebb10ede33b3f7daa8b9be1a1429c877da466
-        file: packages/core/src/pipeline/generate.ts
-        span:
-          - 43
-          - 52
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:873962b7223a7264bcd27a2765eb06ed2634be609be7899dd4bc347529fc747f
-        file: packages/core/src/pipeline/generate.ts
-        span:
-          - 54
-          - 61
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
-      - symbol: ts:1cbfbf4077e6c4ccb85a491b068a2d1b78000377c0f97948e6609686e855ae37
-        file: packages/core/src/pipeline/generate.ts
-        span:
-          - 65
-          - 248
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+          - 153
+          - 153
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:18b80fb936be32e13da665151094823602dd768503d23436817b2556bc97bb3f
         file: packages/core/src/state/manifest-store.ts
         span:
           - 33
           - 40
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
       - symbol: ts:d73bce5973622de8d0bdc08e0a8cf873a127920dbbbd8046fa90ce0330fc1c7b
         file: packages/core/src/state/manifest-store.ts
         span:
           - 42
           - 100
-        commit: b3ef381e3e5d4b7db878a5523147870b47a03523
+        commit: 9a487923a5a706c08bf849f3c049250b4357e5e8
     seedContext:
-      - ctx:codemap:eb5314ed39433347d28bd10bcd0bd60d663bcc9e59a613a87e9d27c4e0e73a86
+      - ctx:codemap:2e5d4135fcfa205189a80f06f9afbe3435f20041a39d068ad426fb8180184bb8
       - ctx:brief:2e63ed6a9b3d6ad78f7a49e2fb6bbfdced67f1428b30a3d7e5f8d1277d2223c4
     observedReads:
       - file: apps/cli/src/cli-help.ts
         contentHash: e229c6ec329806d0769a14afb634d1dce8e18601450dcdc396990a95a0726839
+      - file: apps/cli/src/cli.ts
+        contentHash: 38097e8bf2e18a8d87338be5f1a0d7a9474292597b2f4fd3c6611563d96e825c
       - file: apps/cli/src/commands/wizard-command.ts
         contentHash: 596a3c4b7c8089a81502c7d6d3de6c75cc4758bfe653fa5f5c11bb8fd4773b68
       - file: apps/cli/src/commands/generate-command.ts
-        contentHash: 4cad80178ce4d2ce0f0cd8317bbe7d865c9a6faf220a607040db24d5f2452ed7
-      - file: apps/cli/src/cli.ts
-        contentHash: e9137cdf57f81b3e3f5795835d047e3a3d9a6e1846f299f2c29c8743fc0f9eb9
+        contentHash: 3fd1b7a46fc40cfcd5e078a5abd9bd802df652b243c9a344c5cfe7299daac863
+      - file: apps/cli/src/commands/emit-current-site.ts
+        contentHash: 1e3711af057e9680ee43d899d90bc3b5e6c81d289b0380cc9d72b0b84846c772
+      - file: apps/cli/src/commands/status-command.ts
+        contentHash: 973d959fb47d1d7df14214e7b631b9f141af997e704c63964da86bbb362388a3
+      - file: apps/local-ui/src/wizard-state.ts
+        contentHash: 0725e23a6353f3fdd2ab1327f4db59ae384bc6e3b529b3827aafde8970f7ebcd
+      - file: apps/github-action/src/github-action.ts
+        contentHash: 08fb9b278e663ca46ec8148294f8d5c102f3692e762db29f7488dc347378598c
+      - file: docs-site/content/en/getting-started.mdx
+        contentHash: ee0ab29976b31c9dec4f774712ac237c222d4ee07e4c20f078bb59dcf4f4079b
       - file: apps/cli/package.json
         contentHash: 390e362f0fe4b7a4e8e7f599ff8e63e5f741673d2c7f9072beb713216c20cad9
-      - file: apps/install-events/src/install-events.ts
-        contentHash: 04bf726ddc8d045b2638ed008918a88c370e51c6f84b9f1c79554e00b097b2e2
+      - file: README.md
+        contentHash: 1b483d7750ecefb24f88997e7867d8373a09d7ad758bdd407e2ab87572779bb9
+      - file: packages/contracts/src/config-schema.ts
+        contentHash: ebbaac68c26bbccb2da733ffd3f90caf43cd32ee2392276de56971890a803cfe
       - file: packages/core/src/state/manifest-store.ts
         contentHash: 64e53da2d68c32ba7df2f2e68fe37b7c287480e97d9ab5728be8aedead01d4a5
-      - file: packages/contracts/src/config-schema.ts
-        contentHash: 4e9a3313266870085f80cf8474bdd20212798e8a4f006c54354515c228336495
-      - file: packages/contracts/src/manifest-schema.ts
-        contentHash: dfe894ae762cb336062199d0ef789d5d567c90e18bd8f38b2cd9403534dbf756
-      - file: packages/core/src/pipeline/generate.ts
-        contentHash: 77c76eb302107e1eec449f9e83ab525800e7fe71029db9a6349c09e7339bf6a7
+      - file: apps/local-ui/src/app.tsx
+        contentHash: ab92a3a03b0b63b740a6ebadbb84d0871d4ca615bb39fa3d9622ad9dc7d59a15
+      - file: apps/local-ui/src/wizard.tsx
+        contentHash: 0f44a6330780e87695530b431a92a2fa26a73c9aed63d23d98b94f33b8550860
+      - file: apps/local-ui/src/wizard-step-start.tsx
+        contentHash: 1c78620abbdcf1a8c2017cee6f93609d22fc8678fea914079c382dd927492b06
     verifications: []
 flags: []

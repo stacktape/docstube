@@ -1,31 +1,27 @@
 ---
 title: "CLI reference"
-description: "Command reference for the docstube CLI, including generation, refresh, verification, status, plugin, and upgrade commands."
+description: "Command reference for the docstube CLI."
 ---
 
 # CLI reference
 
-The CLI command surface includes `wizard`, `generate`, `refresh`, `refine`, `audit`, `answer`, `validate`, `check`, `status`, `doctor`, `plugin`, `upgrade`, `version`, and `help`.
+Use `docstube help [command]` to print command usage.
+
+```bash
+docstube help generate
+```
 
 ## `wizard`
 
-Opens the local setup wizard and control plane.
-
-Key flag:
-
-- `--port <n>` sets the local control-plane port. The parser accepts integers from `0` through `65535`.
+Opens the local setup wizard and control plane. The `--port <n>` flag sets the local control-plane port; without it, the server chooses a port.
 
 ```bash
-docstube wizard --port 4317
+docstube wizard --port 3001
 ```
 
 ## `generate`
 
-Generates docs from the existing config, then emits the site to the configured output directory.
-
-Key flag:
-
-- `--max-attempts <n>` sets the maximum write attempts per page. The parser requires a positive integer.
+Generates docs from the existing config. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
 
 ```bash
 docstube generate --max-attempts 3
@@ -33,11 +29,7 @@ docstube generate --max-attempts 3
 
 ## `refresh`
 
-Regenerates entities affected by code changes since the committed manifest, then emits the site to the configured output directory.
-
-Key flag:
-
-- `--max-attempts <n>` sets the maximum write attempts per page. The parser requires a positive integer.
+Regenerates only entities affected by code changes. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
 
 ```bash
 docstube refresh --max-attempts 2
@@ -45,30 +37,21 @@ docstube refresh --max-attempts 2
 
 ## `refine`
 
-Improves generated pages by running rewrite rounds through the configured task runner.
+Improves generated pages. Pass a page slug to target one page, or use `--failed` to consider only pages with open flags.
 
-Key arguments and flags:
+Budget flags:
 
-- `[page]` targets one page slug.
-- `--failed` limits selection to pages with open flags.
-- `--max-pages <n>` limits how many pages are refined in the run.
-- `--max-rounds-per-page <n>` limits rewrite rounds for each selected page.
+- `--max-pages <n>` limits how many pages are refined.
+- `--max-rounds-per-page <n>` limits rewrite rounds for each page.
 - `--total-rounds <n>` sets a global rewrite-round budget for the run.
 
-Each refine budget flag must be a positive integer.
-
 ```bash
-docstube refine getting-started --failed --max-pages 1 --max-rounds-per-page 2 --total-rounds 2
+docstube refine cli-reference --failed --max-pages 1 --max-rounds-per-page 2 --total-rounds 2
 ```
 
 ## `audit`
 
-Audits an existing docs directory by extracting claims and verifying them against the codebase. The command exits with code `1` when the report contains verified defects.
-
-Key argument and flag:
-
-- `<docs-dir>` is the docs directory to audit.
-- `--json` prints the audit report as formatted JSON.
+Measures verified defects in an existing docs directory. The required `<docs-dir>` argument points at Markdown or MDX docs. The `--json` flag emits the report as JSON.
 
 ```bash
 docstube audit docs --json
@@ -76,37 +59,19 @@ docstube audit docs --json
 
 ## `answer`
 
-Lists open maintainer questions or answers one question by ID prefix. When an answer is accepted, the command writes it into `.docstube/knowledge/` for future runs.
-
-Arguments:
-
-- `<id>` is an open question ID prefix from `docstube answer`.
-- `"your answer"` is the answer text.
+Lists open maintainer questions, or records an answer for one question id. When answering, pass the id and the answer text.
 
 ```bash
 docstube answer
 ```
 
 ```bash
-docstube answer abc12345 "This behavior is intentionally kept for compatibility."
-```
-
-## `validate`
-
-Validates the docstube config family and reports the loaded doc type, persona count, top-level IA node count, and glossary term count.
-
-```bash
-docstube validate
+docstube answer abc12345 "This behavior is intentional because the parser owns command shape."
 ```
 
 ## `check`
 
-Runs deterministic checks over generated docs. Check kinds are not a fixed CLI enum: the command builds a plugin host, registers built-in plugins, loads configured plugins, and derives available verifier IDs from that host.
-
-Key argument and flag:
-
-- `[kind]` runs only one verifier ID.
-- `--list` prints the verifier IDs registered for the project.
+Runs deterministic checks over generated docs. Check kinds come from registered verifier plugins, so use `--list` to see the checks available in the current project. Passing `[kind]` runs only that verifier.
 
 ```bash
 docstube check --list
@@ -118,7 +83,7 @@ docstube check claim-grounding
 
 ## `status`
 
-Shows the current docs version, locales, pages, per-page guarantee status, flag counts, and aggregate guarantee counts. If no manifest exists yet, it prints a message telling the user to run generation first.
+Shows the generated manifest state, page guarantee levels, provable-block distribution, and open flag count.
 
 ```bash
 docstube status
@@ -126,7 +91,7 @@ docstube status
 
 ## `doctor`
 
-Checks local runtime and project setup. The command checks Node version, Git availability, project detection, config-family loading, and the configured agent transport requirements.
+Checks local runtime and project setup. It checks Node, Git, project detection, config loading, and the configured agent runtime for the project.
 
 ```bash
 docstube doctor
@@ -134,24 +99,23 @@ docstube doctor
 
 ## `plugin scaffold`
 
-Scaffolds a plugin source file and test file under `plugins/`, then materializes the `plugin-authoring` skill under `.docstube/skills/`.
-
-Argument:
-
-- `<name>` is normalized to lowercase, strips a leading `docstube-plugin-`, replaces non-alphanumeric separators with `-`, and is used for `plugins/<name>.ts` and `plugins/<name>.spec.ts`.
+Scaffolds a docstube plugin under `plugins/`, writes a matching spec file, and materializes the plugin-authoring skill under `.docstube/skills/plugin-authoring/SKILL.md`.
 
 ```bash
-docstube plugin scaffold linkstats
+docstube plugin scaffold wordcount
+```
+
+## `validate`
+
+Validates the docstube config family and reports the loaded doc type, persona count, IA top-level node count, and glossary term count.
+
+```bash
+docstube validate
 ```
 
 ## `upgrade`
 
-Upgrades the docstube tool or reports upgrade instructions for install sources that the command should not modify directly.
-
-Key flags:
-
-- `--check` prints the current version, latest or target version, and whether an upgrade is available.
-- `--to <version>` selects a target version instead of the fetched latest version.
+Upgrades the docstube tool itself. Use `--check` to compare the current version with the target version without installing. Use `--to <version>` to target a specific version; otherwise the command targets the latest version it resolves.
 
 ```bash
 docstube upgrade --check
@@ -163,7 +127,7 @@ docstube upgrade --to 0.0.3
 
 ## `version`
 
-Prints the CLI version.
+Prints the docstube version.
 
 ```bash
 docstube version

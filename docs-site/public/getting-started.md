@@ -1,48 +1,80 @@
 ---
 title: "Getting started"
-description: "Install docstube, open the setup wizard, and generate your first verified docs site."
+description: "Install docstube, open the setup wizard, and generate the first documentation site."
 ---
 
 # Getting started
 
-Install docstube in the repository you want to document, then run the wizard and generate the site from the saved configuration.
+The npm package is named `docstube` and exposes a `docstube` binary. For projects that already use Node tooling, the first-run path can be run through `npx`:
 
-1. Install the npm package:
+```text
+npx docstube wizard
+npx docstube generate
+npx docstube status
+```
 
-`npm install --save-dev docstube`
+For a standalone binary, use the install scripts hosted at `installs.docstube.dev`. The project README names `https://installs.docstube.dev/linux.sh` for Linux and `https://installs.docstube.dev/windows.ps1` for Windows. After installing the standalone binary, use the same commands without the `npx` prefix.
 
-For a standalone binary instead of an npm install, use the installer for your platform from `https://installs.docstube.dev/`.
+## Open the wizard
 
-2. Open the local setup wizard:
+`docstube wizard` starts the local control plane. The command accepts an optional port:
 
-`npx docstube wizard`
+```text
+npx docstube wizard --port 4317
+```
 
-The wizard command starts the local control plane and prints its local URL. It accepts an optional port:
+When the server starts, the CLI prints:
 
-`npx docstube wizard --port 4321`
+```text
+docstube control plane running at:
 
-3. Generate the first docs site:
+  <local URL>
 
-`npx docstube generate`
+Press Ctrl+C to stop.
+```
 
-`generate` loads the docstube config from the current workspace, runs the configured agent transport, writes generated MDX pages, writes manifest state, and emits the site.
+Open the printed URL. The local UI includes a Wizard tab. On a first run, the wizard uses scaffold mode; its final step writes the config family and starts a `generate` run.
 
-After the first successful run, the default output directory is:
+## Generate the site
 
-`docs-site/`
+If you start generation from the terminal, run:
 
-The committed manifest state is written under:
+```text
+npx docstube generate
+```
 
-`.docstube/manifest/`
+The `generate` command loads the config, creates the task runner from that config, and runs the documentation pipeline. During the run, it prints one line per generated page or translation, using `ok` for passed output and `FLAG` for output with open flags.
 
-That manifest includes `.docstube/manifest/manifest.yml` and page shards under `.docstube/manifest/pages/<locale>/`. The generated site uses the configured output directory; by default that is `docs-site`. When the site is emitted, the CLI prints that directory and the build command:
+The generated site is emitted to the configured `outDir`. The config schema defaults that directory to:
 
-`npm install && npm run build`
+```text
+docs-site/
+```
 
-If a run finishes with open flags, the CLI tells you to review them with:
+After emission, the CLI prints the site directory and the build hint:
 
-`npx docstube status`
+```text
+site emitted to docs-site/ — build it with: npm install && npm run build
+```
 
-The `generate` command also accepts a per-page retry budget:
+docstube also writes verified run state under:
 
-`npx docstube generate --max-attempts 3`
+```text
+.docstube/manifest/
+```
+
+That manifest directory contains `manifest.yml` and page shard files under `pages/<locale>/`.
+
+## Check the result
+
+Run status after the first generation:
+
+```text
+npx docstube status
+```
+
+When a manifest exists, `status` reports the docs version, locales, page count, each page guarantee state, and the open flag count. If no manifest exists yet, it prints:
+
+```text
+No manifest yet — run `docstube generate` first.
+```

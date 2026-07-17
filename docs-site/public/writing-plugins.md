@@ -3,126 +3,99 @@ title: "Writing plugins"
 description: "Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold."
 ---
 
-# Writing Plugins
+# Writing plugins
 
-`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. The SDK also re-exports the contract schemas and types plugin authors need, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
+`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. It also re-exports plugin contract schemas and types, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
 
-A plugin module is loaded only when its default export is created by `definePlugin`. The loader checks that with `isDocstubePlugin`.
+A plugin module must default-export the value returned by `definePlugin`. The loader rejects a module whose default export was not created with `definePlugin`.
 
 ```ts
 import { definePlugin } from '@docstube/plugin-sdk';
-import type {
-  Finding,
-  PageArtifact,
-  VerifierContext,
-  VerifierDefinition,
-  VerifierRunResult
-} from '@docstube/plugin-sdk';
-
-const verifierId = 'wordcount';
-const softLimit = 1500;
-const hardLimit = 3000;
-
-const countWords = (mdx: string): number =>
-  mdx
-    .replace(/```[\s\S]*?```/gu, ' ')
-    .split(/\s+/u)
-    .filter((word) => word.length > 0).length;
-
-const verify = async (_ctx: VerifierContext, pages: PageArtifact[]): Promise<VerifierRunResult> => {
-  const findings: Finding[] = [];
-  for (const artifact of pages) {
-    const words = countWords(artifact.mdx);
-    if (words <= softLimit) {
-      continue;
-    }
-    findings.push({
-      source: 'verifier',
-      check: verifierId,
-      severity: words > hardLimit ? 'error' : 'warning',
-      message: `page "${artifact.page.slug}" is ${words} words`,
-      entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
-      file: artifact.mdxPath,
-      suggestion: 'Split the page or tighten its longest sections.',
-      data: { words, softLimit, hardLimit }
-    });
-  }
-  return {
-    verifier: verifierId,
-    plugin: 'docstube-plugin-wordcount',
-    status: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass',
-    findings,
-    coveredEntityIds: pages.map((artifact) => artifact.page.id)
-  };
-};
-
-export const wordcountVerifier: VerifierDefinition = {
-  id: verifierId,
-  title: 'Page word budget',
-  description: 'Pages over 1500 words get a warning; pages over 3000 words fail the gate.',
-  scope: 'page',
-  localeScope: 'per-locale',
-  proves: false,
-  verify
-};
 
 export default definePlugin({
   apiVersion: 1,
   name: 'docstube-plugin-wordcount',
   version: '0.1.0',
-  description: 'Verifier: warns on pages over the word budget and fails the gate past the hard limit.',
   permissions: { network: false, exec: [], writableRoots: [] },
-  capabilities: [{ kind: 'verifier', ids: [verifierId] }],
+  capabilities: [{ kind: 'verifier', ids: ['wordcount'] }],
   register: (host) => {
-    host.verifier(wordcountVerifier);
+    host.verifier({
+      id: 'wordcount',
+      title: 'Page word budget',
+      scope: 'page',
+      localeScope: 'per-locale',
+      proves: false,
+      verify: async (_ctx, pages) => ({
+        verifier: 'wordcount',
+        plugin: 'docstube-plugin-wordcount',
+        status: 'pass',
+        findings: [],
+        coveredEntityIds: pages.map((artifact) => artifact.page.id)
+      })
+    });
   }
 });
 ```
 
-## Manifest Validation
+## Manifest validation
 
-`definePlugin` accepts `DefinePluginInput`, parses the manifest portion with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
+`definePlugin` accepts the manifest fields plus `register`, parses the manifest fields with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
 
-`pluginManifestSchema` uses `pluginApiVersion`, `pluginPermissionsSchema`, and `pluginCapabilityKindSchema`. The capability kind schema contains seven values:
+`pluginManifestSchema` requires `apiVersion: 1`, a valid plugin package name, a semver `version`, and at least one capability declaration. `description` is optional.
+
+`pluginPermissionsSchema` has three fields: `network`, `exec`, and `writableRoots`. The schema defaults are `network: false`, `exec: []`, and `writableRoots: []`.
 
 ```ts
-import { pluginCapabilityKindSchema } from '@docstube/plugin-sdk';
+import { pluginPermissionsSchema } from '@docstube/plugin-sdk';
 
-const hookKinds = pluginCapabilityKindSchema.options;
-console.log(hookKinds);
+const permissions = pluginPermissionsSchema.parse({
+  network: false,
+  exec: [],
+  writableRoots: []
+});
+
+console.log(permissions);
 ```
 
-`pluginPermissionsSchema` includes `network`, `exec`, and `writableRoots`. In the schema, `network` defaults to `false`, while `exec` and `writableRoots` default to empty arrays.
+## Registration hooks
 
-## Registration Hooks
-
-`PluginRegistrationHost` is the registration surface passed to the plugin `register` function. It has seven methods, each accepting one exported definition type:
+`register(host)` receives a `PluginRegistrationHost`. The host has seven registration methods:
 
 | Method | Definition type |
 | --- | --- |
-| `verifier` | `VerifierDefinition` |
-| `languagePack` | `LanguagePackDefinition` |
-| `contentSource` | `ContentSourceDefinition` |
-| `importer` | `ImporterDefinition` |
-| `deployTarget` | `DeployTargetDefinition` |
-| `searchProvider` | `SearchProviderDefinition` |
-| `component` | `ComponentDefinition` |
+| `host.verifier(...)` | `VerifierDefinition` |
+| `host.languagePack(...)` | `LanguagePackDefinition` |
+| `host.contentSource(...)` | `ContentSourceDefinition` |
+| `host.importer(...)` | `ImporterDefinition` |
+| `host.deployTarget(...)` | `DeployTargetDefinition` |
+| `host.searchProvider(...)` | `SearchProviderDefinition` |
+| `host.component(...)` | `ComponentDefinition` |
 
-`createPluginHost` records registrations for the same seven groups. During registration, it checks each registered id or component name against the plugin manifest capabilities. An undeclared registration is rejected, a duplicate id is rejected, and a declared capability that was not registered is recorded as a warning.
+The matching capability kinds are `verifier`, `language-pack`, `content-source`, `importer`, `deploy-target`, `search-provider`, and `component`.
 
-## Verifier Shape
+During registration, docstube checks each registered id or component name against the plugin manifest capabilities. Registering an undeclared capability is an error. Declaring a capability without registering it is recorded as a warning.
 
-`VerifierDefinition` has `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
+## Verifier shape
+
+A verifier definition contains `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
 
 `scope` is typed as `'block' | 'page' | 'site'`. `localeScope` is typed as `'source-only' | 'per-locale'`. `verify` receives a `VerifierContext` and an array of `PageArtifact` values, then returns a `VerifierRunResult`.
 
-`VerifierContext` includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, and `timeoutMs`.
+A verifier context includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, `timeoutMs`, and `env`.
 
-## Loading Plugins
+## Permissions
+
+`permissions.network` declares whether the plugin intends to make network calls.
+
+`permissions.exec` lists executables the plugin may spawn through the host-provided `ctx.exec` helper. The `PluginExec` type takes a command, argument list, and optional execution options.
+
+`permissions.writableRoots` lists repo-relative roots the plugin may write through `ctx.fs.writeFile`. An empty list means the plugin declares no writable roots.
+
+## Loading plugins
 
 `loadConfiguredPlugins` loads every specifier in `config.plugins`.
 
-Local plugins are specifiers that start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
+Local plugin specifiers start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
 
 After import, the loader reads the module default export and rejects it unless `isDocstubePlugin` returns true. Loaded plugins are registered with source `"local"` or `"npm"`.
 
@@ -134,7 +107,7 @@ plugins:
 
 ## Scaffolding
 
-The CLI `plugin` command is implemented by `runPluginCommand`. The supported action is `scaffold`.
+The CLI `plugin` command supports the `scaffold` action.
 
 `docstube plugin scaffold <name>` writes `plugins/<name>.ts` and `plugins/<name>.spec.ts` from the plugin-authoring example source, then materializes `.docstube/skills/plugin-authoring/SKILL.md`.
 

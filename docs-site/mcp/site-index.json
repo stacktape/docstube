@@ -7,7 +7,7 @@
       "title": "CLI reference",
       "slug": "cli-reference",
       "url": "/cli-reference/",
-      "description": "Command reference for the docstube CLI, including generation, refresh, verification, status, plugin, and upgrade commands."
+      "description": "Command reference for the docstube CLI."
     },
     {
       "title": "Configuration",
@@ -19,7 +19,7 @@
       "title": "Getting started",
       "slug": "getting-started",
       "url": "/getting-started/",
-      "description": "Install docstube, open the setup wizard, and generate your first verified docs site."
+      "description": "Install docstube, open the setup wizard, and generate the first documentation site."
     },
     {
       "title": "CI and the GitHub Action",
@@ -31,7 +31,7 @@
       "title": "How verification works",
       "slug": "how-verification-works",
       "url": "/how-verification-works/",
-      "description": "How docstube assigns guarantee levels, runs built-in verifier checks, grounds claims, retries failed drafts, and keeps unresolved risk visible as flags."
+      "description": "How docstube assigns proof levels, runs built-in verifiers, grounds claims, and ships visible flags instead of silent errors."
     },
     {
       "title": "Writing plugins",

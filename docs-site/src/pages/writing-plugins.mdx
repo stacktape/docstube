@@ -4,135 +4,108 @@ description: "Build docstube plugins with @docstube/plugin-sdk, registration hoo
 layout: "../layouts/DocLayout.astro"
 docstubeLocale: "en"
 docstubeGuarantee: "scored"
-docstubeBlocksProven: 4
-docstubeBlocksTotal: 21
-docstubeSources: [{"file":"apps/cli/src/commands/plugin-command.ts","line":11,"endLine":15,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"apps/cli/src/commands/plugin-command.ts","line":26,"endLine":67,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"dist-dogfood/workspace/plugins/wordstats.ts","line":49,"endLine":57,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":8,"endLine":8,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":10,"endLine":16,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":17,"endLine":17,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":19,"endLine":27,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":28,"endLine":28,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":30,"endLine":34,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":36,"endLine":44,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":45,"endLine":45,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/core/src/plugins/load-plugins.ts","line":12,"endLine":21,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/core/src/plugins/load-plugins.ts","line":35,"endLine":57,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/core/src/plugins/plugin-host.ts","line":20,"endLine":20,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/core/src/plugins/plugin-host.ts","line":22,"endLine":26,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/core/src/plugins/plugin-host.ts","line":30,"endLine":41,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/core/src/plugins/plugin-host.ts","line":50,"endLine":157,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":6,"endLine":6,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":8,"endLine":12,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":14,"endLine":17,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":21,"endLine":28,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":30,"endLine":31,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":17,"endLine":23,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":25,"endLine":28,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":30,"endLine":33,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":37,"endLine":41,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":44,"endLine":48,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":50,"endLine":59,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":61,"endLine":66,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":68,"endLine":82,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":84,"endLine":93,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":95,"endLine":100,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":102,"endLine":115,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":117,"endLine":122,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":126,"endLine":130,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":132,"endLine":134,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":138,"endLine":142,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":144,"endLine":148,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":150,"endLine":154,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":159,"endLine":165,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":167,"endLine":175,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":9,"endLine":16,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":21,"endLine":34,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":40,"endLine":105,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":107,"endLine":170,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":172,"endLine":194,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"},{"file":"packages/skills/src/skill-plugin-authoring.ts","line":9,"endLine":334,"commit":"b3ef381e3e5d4b7db878a5523147870b47a03523"}]
-docstubeSections: [{"anchor":"manifest-validation","title":"Manifest Validation","guarantee":"scored"},{"anchor":"registration-hooks","title":"Registration Hooks","guarantee":"scored"},{"anchor":"verifier-shape","title":"Verifier Shape","guarantee":"scored"},{"anchor":"loading-plugins","title":"Loading Plugins","guarantee":"scored"},{"anchor":"scaffolding","title":"Scaffolding","guarantee":"scored"}]
+docstubeBlocksProven: 14
+docstubeBlocksTotal: 25
+docstubeSources: [{"file":"apps/cli/src/commands/plugin-command.ts","line":11,"endLine":15,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/plugin-command.ts","line":26,"endLine":67,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":8,"endLine":8,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":10,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":17,"endLine":17,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":19,"endLine":27,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":28,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":30,"endLine":34,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":36,"endLine":44,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":45,"endLine":45,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/load-plugins.ts","line":12,"endLine":21,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/load-plugins.ts","line":35,"endLine":57,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":20,"endLine":20,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":22,"endLine":26,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":30,"endLine":41,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":50,"endLine":157,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":6,"endLine":6,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":8,"endLine":12,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":14,"endLine":17,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":21,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":30,"endLine":31,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":17,"endLine":23,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":25,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":30,"endLine":33,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":37,"endLine":41,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":46,"endLine":50,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":52,"endLine":61,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":63,"endLine":68,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":70,"endLine":84,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":86,"endLine":95,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":97,"endLine":102,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":104,"endLine":117,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":119,"endLine":124,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":128,"endLine":132,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":134,"endLine":136,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":140,"endLine":144,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":146,"endLine":150,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":152,"endLine":156,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":161,"endLine":167,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":169,"endLine":177,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":9,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":21,"endLine":34,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":40,"endLine":105,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":107,"endLine":170,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":172,"endLine":194,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/skill-plugin-authoring.ts","line":9,"endLine":334,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"}]
+docstubeSections: [{"anchor":"manifest-validation","title":"Manifest validation","guarantee":"proven"},{"anchor":"registration-hooks","title":"Registration hooks","guarantee":"scored"},{"anchor":"verifier-shape","title":"Verifier shape","guarantee":"proven"},{"anchor":"permissions","title":"Permissions","guarantee":"scored"},{"anchor":"loading-plugins","title":"Loading plugins","guarantee":"proven"},{"anchor":"scaffolding","title":"Scaffolding","guarantee":"proven"}]
 ---
 
 import { Callout, CodeBlock, CodeGroup, Terminal, Card, CardGrid, Steps, Tabs, FileTree, Badge, ParamTable, ComparisonTable } from '../components/theme-components.tsx';
 
 
-# Writing Plugins
+# Writing plugins
 
-`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. The SDK also re-exports the contract schemas and types plugin authors need, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
+`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. It also re-exports plugin contract schemas and types, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
 
-A plugin module is loaded only when its default export is created by `definePlugin`. The loader checks that with `isDocstubePlugin`.
+A plugin module must default-export the value returned by `definePlugin`. The loader rejects a module whose default export was not created with `definePlugin`.
 
 ```ts
 import { definePlugin } from '@docstube/plugin-sdk';
-import type {
-  Finding,
-  PageArtifact,
-  VerifierContext,
-  VerifierDefinition,
-  VerifierRunResult
-} from '@docstube/plugin-sdk';
-
-const verifierId = 'wordcount';
-const softLimit = 1500;
-const hardLimit = 3000;
-
-const countWords = (mdx: string): number =>
-  mdx
-    .replace(/```[\s\S]*?```/gu, ' ')
-    .split(/\s+/u)
-    .filter((word) => word.length > 0).length;
-
-const verify = async (_ctx: VerifierContext, pages: PageArtifact[]): Promise<VerifierRunResult> => {
-  const findings: Finding[] = [];
-  for (const artifact of pages) {
-    const words = countWords(artifact.mdx);
-    if (words <= softLimit) {
-      continue;
-    }
-    findings.push({
-      source: 'verifier',
-      check: verifierId,
-      severity: words > hardLimit ? 'error' : 'warning',
-      message: `page "${artifact.page.slug}" is ${words} words`,
-      entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
-      file: artifact.mdxPath,
-      suggestion: 'Split the page or tighten its longest sections.',
-      data: { words, softLimit, hardLimit }
-    });
-  }
-  return {
-    verifier: verifierId,
-    plugin: 'docstube-plugin-wordcount',
-    status: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass',
-    findings,
-    coveredEntityIds: pages.map((artifact) => artifact.page.id)
-  };
-};
-
-export const wordcountVerifier: VerifierDefinition = {
-  id: verifierId,
-  title: 'Page word budget',
-  description: 'Pages over 1500 words get a warning; pages over 3000 words fail the gate.',
-  scope: 'page',
-  localeScope: 'per-locale',
-  proves: false,
-  verify
-};
 
 export default definePlugin({
   apiVersion: 1,
   name: 'docstube-plugin-wordcount',
   version: '0.1.0',
-  description: 'Verifier: warns on pages over the word budget and fails the gate past the hard limit.',
   permissions: { network: false, exec: [], writableRoots: [] },
-  capabilities: [{ kind: 'verifier', ids: [verifierId] }],
+  capabilities: [{ kind: 'verifier', ids: ['wordcount'] }],
   register: (host) => {
-    host.verifier(wordcountVerifier);
+    host.verifier({
+      id: 'wordcount',
+      title: 'Page word budget',
+      scope: 'page',
+      localeScope: 'per-locale',
+      proves: false,
+      verify: async (_ctx, pages) => ({
+        verifier: 'wordcount',
+        plugin: 'docstube-plugin-wordcount',
+        status: 'pass',
+        findings: [],
+        coveredEntityIds: pages.map((artifact) => artifact.page.id)
+      })
+    });
   }
 });
 ```
 
-## Manifest Validation
+## Manifest validation
 
-`definePlugin` accepts `DefinePluginInput`, parses the manifest portion with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
+`definePlugin` accepts the manifest fields plus `register`, parses the manifest fields with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
 
-`pluginManifestSchema` uses `pluginApiVersion`, `pluginPermissionsSchema`, and `pluginCapabilityKindSchema`. The capability kind schema contains seven values:
+`pluginManifestSchema` requires `apiVersion: 1`, a valid plugin package name, a semver `version`, and at least one capability declaration. `description` is optional.
+
+`pluginPermissionsSchema` has three fields: `network`, `exec`, and `writableRoots`. The schema defaults are `network: false`, `exec: []`, and `writableRoots: []`.
 
 ```ts
-import { pluginCapabilityKindSchema } from '@docstube/plugin-sdk';
+import { pluginPermissionsSchema } from '@docstube/plugin-sdk';
 
-const hookKinds = pluginCapabilityKindSchema.options;
-console.log(hookKinds);
+const permissions = pluginPermissionsSchema.parse({
+  network: false,
+  exec: [],
+  writableRoots: []
+});
+
+console.log(permissions);
 ```
 
-`pluginPermissionsSchema` includes `network`, `exec`, and `writableRoots`. In the schema, `network` defaults to `false`, while `exec` and `writableRoots` default to empty arrays.
+## Registration hooks
 
-## Registration Hooks
-
-`PluginRegistrationHost` is the registration surface passed to the plugin `register` function. It has seven methods, each accepting one exported definition type:
+`register(host)` receives a `PluginRegistrationHost`. The host has seven registration methods:
 
 | Method | Definition type |
 | --- | --- |
-| `verifier` | `VerifierDefinition` |
-| `languagePack` | `LanguagePackDefinition` |
-| `contentSource` | `ContentSourceDefinition` |
-| `importer` | `ImporterDefinition` |
-| `deployTarget` | `DeployTargetDefinition` |
-| `searchProvider` | `SearchProviderDefinition` |
-| `component` | `ComponentDefinition` |
+| `host.verifier(...)` | `VerifierDefinition` |
+| `host.languagePack(...)` | `LanguagePackDefinition` |
+| `host.contentSource(...)` | `ContentSourceDefinition` |
+| `host.importer(...)` | `ImporterDefinition` |
+| `host.deployTarget(...)` | `DeployTargetDefinition` |
+| `host.searchProvider(...)` | `SearchProviderDefinition` |
+| `host.component(...)` | `ComponentDefinition` |
 
-`createPluginHost` records registrations for the same seven groups. During registration, it checks each registered id or component name against the plugin manifest capabilities. An undeclared registration is rejected, a duplicate id is rejected, and a declared capability that was not registered is recorded as a warning.
+The matching capability kinds are `verifier`, `language-pack`, `content-source`, `importer`, `deploy-target`, `search-provider`, and `component`.
 
-## Verifier Shape
+During registration, docstube checks each registered id or component name against the plugin manifest capabilities. Registering an undeclared capability is an error. Declaring a capability without registering it is recorded as a warning.
 
-`VerifierDefinition` has `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
+## Verifier shape
+
+A verifier definition contains `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
 
 `scope` is typed as `'block' | 'page' | 'site'`. `localeScope` is typed as `'source-only' | 'per-locale'`. `verify` receives a `VerifierContext` and an array of `PageArtifact` values, then returns a `VerifierRunResult`.
 
-`VerifierContext` includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, and `timeoutMs`.
+A verifier context includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, `timeoutMs`, and `env`.
 
-## Loading Plugins
+## Permissions
+
+`permissions.network` declares whether the plugin intends to make network calls.
+
+`permissions.exec` lists executables the plugin may spawn through the host-provided `ctx.exec` helper. The `PluginExec` type takes a command, argument list, and optional execution options.
+
+`permissions.writableRoots` lists repo-relative roots the plugin may write through `ctx.fs.writeFile`. An empty list means the plugin declares no writable roots.
+
+## Loading plugins
 
 `loadConfiguredPlugins` loads every specifier in `config.plugins`.
 
-Local plugins are specifiers that start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
+Local plugin specifiers start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
 
 After import, the loader reads the module default export and rejects it unless `isDocstubePlugin` returns true. Loaded plugins are registered with source `"local"` or `"npm"`.
 
@@ -144,7 +117,7 @@ plugins:
 
 ## Scaffolding
 
-The CLI `plugin` command is implemented by `runPluginCommand`. The supported action is `scaffold`.
+The CLI `plugin` command supports the `scaffold` action.
 
 `docstube plugin scaffold <name>` writes `plugins/<name>.ts` and `plugins/<name>.spec.ts` from the plugin-authoring example source, then materializes `.docstube/skills/plugin-authoring/SKILL.md`.
 
