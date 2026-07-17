@@ -239,6 +239,30 @@ describe('runGenerate under a run cost cap', () => {
     );
   }, 60_000);
 
+  it('a freeze never deletes pages a previous run finished — their index entries and shards survive', async () => {
+    // Live regression: the first real cap-freeze wrote an index with only the reached pages, and
+    // orphan pruning then deleted three committed shards.
+    await writeFile(join(repoRoot, 'docstube.yml'), configYaml());
+    const full = scriptedRunner();
+    await runGenerate({ repoRoot, runTask: full.runTask, toolDescriptors: [] });
+
+    await writeFile(join(repoRoot, 'docstube.yml'), configYaml(0.9));
+    const frozen = scriptedRunner();
+    const summary = await runGenerate({ repoRoot, runTask: frozen.runTask, toolDescriptors: [] });
+    expect(summary.outcome).toBe('frozen');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    expect(index?.pages.map((entry) => entry.slug).toSorted()).toEqual([
+      'configuration',
+      'getting-started',
+      'troubleshooting'
+    ]);
+    for (const entry of index?.pages ?? []) {
+      expect(await store.readPageShard({ locale: 'en', pageId: entry.id })).toBeDefined();
+    }
+  }, 60_000);
+
   // budgets.maxRunUsd defaults to 20, so an unconfigured run has real headroom but never runs uncapped.
   it('stays far under the default $20 cap and reports the total spend', async () => {
     await writeFile(join(repoRoot, 'docstube.yml'), configYaml());

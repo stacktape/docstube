@@ -13,6 +13,10 @@ personas:
 agents:
   transport: codex-cli
   model: gpt-5.5
+  budgets:
+    # Subscription transport: codex reports tokens but no dollars, so spend here is the harness's
+    # deliberately-conservative token estimate — the default $20 froze a full self-regen midway.
+    maxRunUsd: 100
 site:
   title: docstube
   description: Verified docs, generated from your code.
