@@ -146,6 +146,9 @@ export type {
   Transcript
 } from './agent-task-schema.ts';
 
+export { failureModeCodes, toFailureModeCode } from './failure-modes.ts';
+export type { FailureModeCode } from './failure-modes.ts';
+
 export { pipelineStageSchema, pageStatusSchema, runModeSchema, runEventSchema } from './run-events-schema.ts';
 export type { PipelineStage, PageStatus, RunEvent } from './run-events-schema.ts';
 

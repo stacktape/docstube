@@ -44,10 +44,11 @@ export const semverSchema = z
 
 export const isoTimestampSchema = z.iso.datetime({ offset: true });
 
-// BCP-47 subset we support: "en", "de", "pt-BR".
+// BCP-47 subset we support: language, optional script subtag, optional region —
+// "en", "pt-BR", "zh-Hans", "zh-Hans-CN".
 export const localeCodeSchema = z
   .string()
-  .regex(/^[a-z]{2,3}(-[A-Z]{2})?$/, 'expected a locale code like "en" or "pt-BR"');
+  .regex(/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/, 'expected a locale code like "en", "pt-BR", or "zh-Hans"');
 
 // Docs version labels are user-declared, path-safe strings: "1.x", "v2", "2026-06".
 export const versionLabelSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);

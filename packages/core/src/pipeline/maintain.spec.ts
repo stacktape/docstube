@@ -247,6 +247,48 @@ tree:
     expect(summary.warnings.some((warning) => warning.includes('overview'))).toBe(true);
   }, 120_000);
 
+  it('never stacks duplicate system flags across refreshes and resolves them once the condition heals', async () => {
+    await generateFixtureDocs();
+
+    const missingNodeIa = `schemaVersion: 1
+tree:
+  - title: Overview
+    slug: overview
+    brief: What the library does.
+`;
+    await writeFile(join(repoRoot, 'ia.yml'), missingNodeIa);
+
+    // First refresh: the indexed page lost its IA node — one open structural-change flag.
+    await runRefresh({ repoRoot, runTask: scriptedRunner([], fixtureSource).runTask, toolDescriptors: [] });
+    const store = createManifestStore(repoRoot, 'latest');
+    let index = await store.readIndex();
+    expect(index?.systemFlags.filter((flag) => flag.kind === 'structural-change')).toHaveLength(1);
+
+    // Second refresh with the SAME condition: the open flag is not duplicated, and the run stays
+    // flagged because the docs still carry it.
+    const second = await runRefresh({
+      repoRoot,
+      runTask: scriptedRunner([], fixtureSource).runTask,
+      toolDescriptors: []
+    });
+    index = await store.readIndex();
+    expect(index?.systemFlags.filter((flag) => flag.kind === 'structural-change')).toHaveLength(1);
+    expect(index?.systemFlags[0]?.status).toBe('open');
+    expect(second.outcome).toBe('flagged');
+
+    // The IA node returns: the condition no longer holds, so the flag resolves and the run passes.
+    await writeFile(join(repoRoot, 'ia.yml'), iaYaml);
+    const third = await runRefresh({
+      repoRoot,
+      runTask: scriptedRunner([], fixtureSource).runTask,
+      toolDescriptors: []
+    });
+    index = await store.readIndex();
+    expect(index?.systemFlags.filter((flag) => flag.kind === 'structural-change')).toHaveLength(1);
+    expect(index?.systemFlags[0]?.status).toBe('resolved');
+    expect(third.outcome).toBe('passed');
+  }, 180_000);
+
   it('regenerates when a provenance source symbol hash disappears from the HEAD codemap', async () => {
     await generateFixtureDocs();
 

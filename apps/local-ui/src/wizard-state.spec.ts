@@ -130,7 +130,10 @@ describe('buildConfigUpdates', () => {
       projectContext: 'A toolkit.',
       personas: [{ id: 'app-developer', description: 'Integrates the library.' }],
       sources: { openapi: [], asyncapi: [], imports: [] },
-      agents: { transport: 'claude-cli' as const, budgets: { maxTurnsPerTask: 24, maxToolCallsPerTask: 64 } },
+      agents: {
+        transport: 'claude-cli' as const,
+        budgets: { maxRunUsd: 20, maxTurnsPerTask: 24, maxToolCallsPerTask: 64 }
+      },
       versions: { current: 'latest', frozen: [] },
       locales: { source: 'en', targets: [] },
       theme: { tokens: {} },

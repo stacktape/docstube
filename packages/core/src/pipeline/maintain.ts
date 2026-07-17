@@ -5,6 +5,7 @@ import type {
   BlockEntity,
   Finding,
   Flag,
+  FlagKind,
   ManifestIndex,
   PageEntity,
   PageShard,
@@ -25,7 +26,7 @@ import { loadContextFiles } from './context-files.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
-import { resolveCommit } from './generate.ts';
+import { attachSiteFindingsToShards, resolveCommit } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
 // The maintain/refresh stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
@@ -54,6 +55,11 @@ export type RefreshSummary = {
   warnings: string[];
   // Total task cost reported this run; present whenever any task carried a costUsd.
   spentUsd?: number;
+  // Conservative token-derived spend for tasks that carried no costUsd; present when any task's
+  // spend had to be estimated. Display totals as "(partly estimated)" when set.
+  estimatedUsd?: number;
+  // Kinds of the open flags raised this run — telemetry input (coarse failure modes).
+  openFlagKinds: FlagKind[];
 };
 
 const readOptionalFile = async (path: string): Promise<string | undefined> => {
@@ -117,6 +123,10 @@ const isShardAffected = async (input: {
   }
   return false;
 };
+
+// Identity of a system-flag CONDITION (not a flag instance): duplicate suppression and stale
+// resolution both compare on it.
+const systemFlagKey = (flag: Pick<Flag, 'kind' | 'summary'>): string => `${flag.kind} ${flag.summary}`;
 
 const openFlag = (input: {
   kind: Flag['kind'];
@@ -184,7 +194,8 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   const openQuestions = await collectOpenQuestions({
     store,
     locales: refreshLocales,
-    pageIds: refreshPageIds
+    pageIds: refreshPageIds,
+    knowledge
   });
 
   const headSymbolHashes = new Set(codemap.symbols.map((symbol) => symbol.hash));
@@ -225,9 +236,28 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   const artifacts: PageArtifact[] = [];
   const indexEntries: ManifestIndex['pages'] = [];
   const newSystemFlags: Flag[] = [];
+  const openFlagKinds: FlagKind[] = [];
   let unchangedCount = 0;
   let anyPageFlagged = false;
   let frozen = false;
+
+  // System-flag conditions re-derive on every refresh, so an unfixed condition would stack an
+  // identical flag per run. raiseSystemFlag dedups against OPEN previous flags with the same
+  // kind + summary; raisedSystemFlagKeys records every condition observed this run (pre-dedup)
+  // so the stale-resolution pass below can tell healed conditions from persisting ones.
+  const raisedSystemFlagKeys = new Set<string>();
+  const raiseSystemFlag = async (flag: Flag) => {
+    raisedSystemFlagKeys.add(systemFlagKey(flag));
+    const alreadyOpen = previousIndex.systemFlags.some(
+      (previous) => previous.status === 'open' && systemFlagKey(previous) === systemFlagKey(flag)
+    );
+    if (alreadyOpen) {
+      return;
+    }
+    newSystemFlags.push(flag);
+    openFlagKinds.push(flag.kind);
+    await journal.append({ type: 'flag-raised', flag });
+  };
 
   for (const entry of previousIndex.pages) {
     const shard = await store.readPageShard({ locale, pageId: entry.id });
@@ -246,8 +276,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
         runId: journal.runId,
         entity: { version, locale, pageId: entry.id }
       });
-      newSystemFlags.push(flag);
-      await journal.append({ type: 'flag-raised', flag });
+      await raiseSystemFlag(flag);
       if (shard !== undefined && mdx !== undefined) {
         artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
       }
@@ -288,6 +317,9 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     await store.writePageShard(newShard);
     for (const flag of newShard.flags) {
       await journal.append({ type: 'flag-raised', flag });
+      if (flag.status === 'open') {
+        openFlagKinds.push(flag.kind);
+      }
     }
     await journal.append({ type: 'page-status', pageId: outcome.pageId, status: outcome.status });
     indexEntries.push({
@@ -304,7 +336,11 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     durationMs: Date.now() - maintainStarted
   });
   if (frozen && maxRunUsd !== undefined) {
-    await journal.append({ type: 'run-frozen', reason: freezeReason(maxRunUsd), spentUsd: costTracker.spentUsd() });
+    await journal.append({
+      type: 'run-frozen',
+      reason: freezeReason(maxRunUsd),
+      spentUsd: costTracker.spentUsd() + costTracker.estimatedUsd()
+    });
   }
 
   // IA nodes without a generated page are not refresh's job (generate owns new pages) — surface
@@ -329,6 +365,11 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   const siteFindings = errorFindings(siteResults);
   if (siteFindings.length > 0) {
     await journal.append({ type: 'findings', findings: siteFindings });
+    // Site-scope findings must also land on the named page's shard — otherwise `docstube status`
+    // (which reads shards) disagrees with the run summary.
+    for (const flag of await attachSiteFindingsToShards({ store, journal, siteFindings })) {
+      openFlagKinds.push(flag.kind);
+    }
   }
   await journal.append({
     type: 'stage-completed',
@@ -361,10 +402,23 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
         detail: `undocumented public symbols include: ${samples.join(', ')}`,
         runId: journal.runId
       });
-      newSystemFlags.push(flag);
-      await journal.append({ type: 'flag-raised', flag });
+      await raiseSystemFlag(flag);
     }
   }
+
+  // Stale resolution: an open coverage/structural-change flag whose condition was NOT observed
+  // again this run has healed — mark it resolved. Skipped when frozen, because a frozen run did
+  // not re-evaluate everything, so the absence of a re-raise proves nothing. Other kinds stay
+  // open for humans to triage.
+  const resolvableKinds = new Set<FlagKind>(['coverage', 'structural-change']);
+  const carriedSystemFlags = previousIndex.systemFlags.map((flag) =>
+    !frozen &&
+    flag.status === 'open' &&
+    resolvableKinds.has(flag.kind) &&
+    !raisedSystemFlagKeys.has(systemFlagKey(flag))
+      ? { ...flag, status: 'resolved' as const }
+      : flag
+  );
 
   const index: ManifestIndex = {
     schemaVersion: 1,
@@ -379,7 +433,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     configHash: hashValue(family.raw.config),
     iaHash: hashValue(family.raw.ia),
     ...(coverageStats === undefined ? {} : { coverage: coverageStats }),
-    systemFlags: [...previousIndex.systemFlags, ...newSystemFlags]
+    systemFlags: [...carriedSystemFlags, ...newSystemFlags]
   };
   await store.writeIndex(index);
   await store.pruneOrphanShards({
@@ -387,7 +441,10 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     locales: [locale, ...config.locales.targets]
   });
 
-  const flagged = anyPageFlagged || siteFindings.length > 0 || newSystemFlags.length > 0;
+  // A persisting condition whose flag was deduped still means the docs carry open system flags —
+  // the outcome reflects the shipped state, not just what this run newly raised.
+  const openSystemFlagCount = index.systemFlags.filter((flag) => flag.status === 'open').length;
+  const flagged = anyPageFlagged || siteFindings.length > 0 || openSystemFlagCount > 0;
   const outcome = frozen ? 'frozen' : flagged ? 'flagged' : 'passed';
   await journal.append({ type: 'run-completed', outcome });
   return {
@@ -397,6 +454,8 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     unchangedCount,
     siteFindings,
     warnings: [...host.warnings(), ...newNodeWarnings],
-    ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {})
+    openFlagKinds,
+    ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
+    ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {})
   };
 };

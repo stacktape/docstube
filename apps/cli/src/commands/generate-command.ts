@@ -7,6 +7,8 @@ import {
 } from '@docstube/core';
 import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+import { countRunFailureModes } from '../runtime-telemetry.ts';
+import { reportRunSpend } from './run-spend.ts';
 
 export type GenerateCommandInput = {
   workspaceDir: string;
@@ -54,11 +56,19 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
         'run FROZE at the configured budget cap (agents.budgets.maxRunUsd) — rerun to continue; finished pages are cached'
       );
     }
-    if (summary.spentUsd !== undefined) {
-      output.info(`agent spend this run: ~$${summary.spentUsd.toFixed(4)}`);
-    }
+    reportRunSpend(output, summary);
     output.info(`run ${summary.runId}: ${summary.outcome}`);
-    return { exitCode: summary.outcome === 'failed' ? 1 : 0 };
+    return {
+      exitCode: summary.outcome === 'failed' ? 1 : 0,
+      failureModes: countRunFailureModes({
+        findingChecks: [
+          ...summary.pages.flatMap((page) => page.findings.map((finding) => finding.check)),
+          ...summary.siteFindings.map((finding) => finding.check)
+        ],
+        openFlagKinds: summary.openFlagKinds,
+        frozen: summary.outcome === 'frozen'
+      })
+    };
   } catch (error) {
     if (error instanceof CoreError) {
       output.error(error.message);

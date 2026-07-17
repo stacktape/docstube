@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { defineCommand, runMain } from 'citty';
 import { getCommandHelp } from './cli-help.ts';
 import { defaultOutput } from './cli-output.ts';
+import type { CliCommandResult } from './cli-output.ts';
 
 const docstubeVersion = '0.0.2';
 
@@ -25,7 +26,7 @@ const printHelp = (command?: string): void => {
 
 const runCliCommand = async (
   command: string,
-  run: () => Promise<{ exitCode: number }> | { exitCode: number }
+  run: () => Promise<CliCommandResult> | CliCommandResult
 ): Promise<void> => {
   const { runCliCommandWithTelemetry } = await import('./runtime-telemetry.ts');
   const result = await runCliCommandWithTelemetry({

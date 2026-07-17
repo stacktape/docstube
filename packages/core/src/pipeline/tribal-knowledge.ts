@@ -38,6 +38,12 @@ export const questionsSimilar = (a: string, b: string): boolean => {
   if (smaller === 0) {
     return false;
   }
+  // Containment over-merges very short questions (2 content tokens sharing 1 already scores 0.5),
+  // so it only applies when the smaller side has enough tokens to be meaningful; below that,
+  // only the exact normalized hash counts as "the same question".
+  if (smaller < 4) {
+    return questionKey(a) === questionKey(b);
+  }
   let intersection = 0;
   for (const token of tokensA) {
     if (tokensB.has(token)) {
@@ -151,15 +157,20 @@ export const applyFlagAnswers = async (input: {
   return applied;
 };
 
+// `texts` seeds the paraphrase dedup in questionsToFlags: it carries every open question AND —
+// when the caller passes the knowledge store — every already-ANSWERED question, so a reworded
+// version of an answered question never re-enters the queue.
 export type OpenQuestions = { keys: Set<string>; texts: string[] };
 
 export const collectOpenQuestions = async (input: {
   store: ManifestStore;
   locales: string[];
   pageIds: string[];
+  // Answered knowledge entries; their question texts join the paraphrase-dedup corpus.
+  knowledge?: readonly KnowledgeEntry[] | undefined;
 }): Promise<OpenQuestions> => {
   const keys = new Set<string>();
-  const texts: string[] = [];
+  const texts: string[] = (input.knowledge ?? []).map((entry) => entry.question);
   for (const locale of input.locales) {
     for (const pageId of input.pageIds) {
       const shard = await input.store.readPageShard({ locale, pageId });
@@ -243,7 +254,8 @@ export const resolveSubjectSymbol = (codemap: Codemap, subject: string | undefin
 
 // Merge captured questions into a page shard's flags, ask-once: skip anything already answered
 // (knowledge) or already open anywhere (openQuestions covers every shard, not just this page),
-// exactly or as a paraphrase.
+// exactly or as a paraphrase — openQuestions.texts includes answered-question texts when the
+// caller threads the knowledge store through collectOpenQuestions.
 export const questionsToFlags = (input: {
   questions: CapturedQuestion[];
   codemap: Codemap;

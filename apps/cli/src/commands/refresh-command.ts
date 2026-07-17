@@ -7,6 +7,8 @@ import {
 } from '@docstube/core';
 import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+import { countRunFailureModes } from '../runtime-telemetry.ts';
+import { reportRunSpend } from './run-spend.ts';
 
 export type RefreshCommandInput = {
   workspaceDir: string;
@@ -41,8 +43,16 @@ export const runRefreshCommand = async (input: RefreshCommandInput, output: CliO
     if (summary.outcome === 'flagged') {
       output.info('refresh finished with open flags — review them with `docstube status`');
     }
+    reportRunSpend(output, summary);
     output.info(`run ${summary.runId}: ${summary.outcome}`);
-    return { exitCode: 0 };
+    return {
+      exitCode: 0,
+      failureModes: countRunFailureModes({
+        findingChecks: summary.siteFindings.map((finding) => finding.check),
+        openFlagKinds: summary.openFlagKinds,
+        frozen: summary.outcome === 'frozen'
+      })
+    };
   } catch (error) {
     if (error instanceof CoreError) {
       output.error(error.message);

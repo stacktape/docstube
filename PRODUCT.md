@@ -87,7 +87,7 @@ Entity IDs carry **version** and **locale** dimensions (versioned docs + i18n ar
 ### 3.3 Verification gate & autonomy defaults
 
 - **Auto-merge by default.** All deterministic gates green + no flags + no guarantee downgrades → the refresh PR merges without a human. This is the product's honest L4 posture.
-- v1 ships **hardcoded safe exception rules** (any flag present; guarantee downgrade on an existing entity; structural/IA changes). The configurable **policy engine is v2** (§4.3).
+- v1 ships **hardcoded safe exception rules** — an open flag of kind out-of-domain, coverage, guarantee-downgrade, structural-change, or system blocks auto-merge. Tribal-knowledge flags are **non-blocking by design** (§4.1): docs ship with visible open questions and the answer arrives on a future run. The configurable **policy engine is v2** (§4.3).
 - **Flag queue** — the triage surface for out-of-domain exceptions only. Distinct from the **review UI**, which is the interactive feedback surface (production-rendered preview; click any entity to leave feedback; categorizer routes feedback into criteria / writing instructions / glossary / config).
 - Feedback learning is durable and shared by construction: categorizer writes to `.docstube/instructions/` and `.docstube/criteria/`, which the writer agent reads on every future generation.
 

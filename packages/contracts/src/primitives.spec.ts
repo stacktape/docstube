@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalJson, contentHash, hashValue } from './hashing.ts';
-import { idPrefixes, mintId, pageIdSchema, repoPathSchema } from './primitives.ts';
+import { idPrefixes, localeCodeSchema, mintId, pageIdSchema, repoPathSchema } from './primitives.ts';
 
 describe('id minting', () => {
   it('mints ids that validate against their own schema', () => {
@@ -20,6 +20,20 @@ describe('repo paths', () => {
     expect(repoPathSchema.safeParse('/etc/passwd').success).toBe(false);
     expect(repoPathSchema.safeParse('C:/Projects/x.ts').success).toBe(false);
     expect(repoPathSchema.safeParse('src\\cli.ts').success).toBe(false);
+  });
+});
+
+describe('locale codes', () => {
+  it('accepts language, script, and region subtags', () => {
+    for (const locale of ['en', 'de', 'pt-BR', 'zh-Hans', 'zh-Hant', 'zh-Hans-CN', 'sr-Latn-RS']) {
+      expect(localeCodeSchema.safeParse(locale).success).toBe(true);
+    }
+  });
+
+  it('rejects malformed locale codes', () => {
+    for (const locale of ['EN', 'pt-br', 'zh-hans', 'zh-Hans-cn', 'english', 'en_US', '']) {
+      expect(localeCodeSchema.safeParse(locale).success).toBe(false);
+    }
   });
 });
 

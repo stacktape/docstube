@@ -333,6 +333,32 @@ describe('runGenerate', () => {
     expect(summary.translations[0]?.findings[0]?.check).toBe('translation-structure');
   }, 60_000);
 
+  it('site-scope findings land as open system flags on the named page shard, deduped across runs', async () => {
+    // A dead internal link passes per-page verification (internal-links is site-scope only) but
+    // fails the topology pass — the shard must carry the flag or `docstube status` lies.
+    const deadLinkMdx = `${goodMdx}\nSee [the missing page](/does-not-exist) for more.\n`;
+    const first = await runGenerate({ repoRoot, toolDescriptors: [], runTask: scriptedRunner([deadLinkMdx]).runTask });
+
+    expect(first.outcome).toBe('flagged');
+    expect(first.siteFindings.some((finding) => finding.check === 'internal-links')).toBe(true);
+    expect(first.openFlagKinds).toContain('system');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const pageId = index?.pages[0]?.id ?? '';
+    const shard = await store.readPageShard({ locale: 'en', pageId });
+    const siteFlags = shard?.flags.filter((flag) => flag.kind === 'system' && flag.status === 'open') ?? [];
+    expect(siteFlags).toHaveLength(1);
+    expect(siteFlags[0]?.summary).toContain('internal-links');
+    expect(siteFlags[0]?.entity?.pageId).toBe(pageId);
+
+    // Second run with the same defect: the identical open flag is not stacked. The page id is
+    // stable across runs (entity matching), so the shard-level dedup can hold.
+    await runGenerate({ repoRoot, toolDescriptors: [], runTask: scriptedRunner([deadLinkMdx]).runTask });
+    const shardAfter = await store.readPageShard({ locale: 'en', pageId });
+    expect(shardAfter?.flags.filter((flag) => flag.kind === 'system' && flag.status === 'open')).toHaveLength(1);
+  }, 60_000);
+
   it('flags the page instead of shipping silently when defects persist', async () => {
     const { runTask } = scriptedRunner([badMdx, badMdx]);
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });

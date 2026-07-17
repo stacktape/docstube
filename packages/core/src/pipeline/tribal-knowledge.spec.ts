@@ -26,7 +26,7 @@ description: Greet.
 The \`greet\` function greets people.
 `;
 
-const runWith = async (onWritePrompt?: (spec: AgentTaskSpec) => void) => {
+const runWith = async (onWritePrompt?: (spec: AgentTaskSpec) => void, question: string = theQuestion) => {
   const runTask = async (spec: AgentTaskSpec, extraTools?: TaskToolImplementation[]): Promise<Transcript> => {
     const base: Omit<Transcript, 'result'> = {
       schemaVersion: 1,
@@ -57,7 +57,7 @@ const runWith = async (onWritePrompt?: (spec: AgentTaskSpec) => void) => {
     const flagQuestion = extraTools?.find((tool) => tool.descriptor.name === 'flag_question');
     expect(spec.tools.some((tool) => tool.name === 'flag_question')).toBe(true);
     if (flagQuestion) {
-      const response = (await flagQuestion.handler({ question: theQuestion, subject: 'greet' })) as {
+      const response = (await flagQuestion.handler({ question, subject: 'greet' })) as {
         recorded: boolean;
       };
       expect(response.recorded).toBe(true);
@@ -114,6 +114,14 @@ describe('questionsSimilar', () => {
     const other = 'Why was the loud option deprecated in favor of the volume enum in the greeting renderer?';
     expect(questionsSimilar(q1, other)).toBe(false);
     expect(questionsSimilar(q2, other)).toBe(false);
+  });
+
+  it('never containment-merges very short questions — only the exact hash counts below 4 tokens', () => {
+    // 2 content tokens each, sharing 1 ("greet"): containment would score 0.5 and over-merge.
+    expect(questionsSimilar('Why greet?', 'Deprecate greet?')).toBe(false);
+    expect(questionsSimilar('Why greet loud?', 'Why shout instead?')).toBe(false);
+    // Exact same short question (normalized) still dedups.
+    expect(questionsSimilar('Why greet?', 'why   GREET?')).toBe(true);
   });
 });
 
@@ -178,5 +186,36 @@ describe('tribal-knowledge lifecycle', () => {
     expect(finalTribal[0]?.status).toBe('resolved');
     // Answered knowledge means the run is clean again.
     expect(third.outcome).toBe('passed');
+  }, 60_000);
+
+  it('a reworded version of an already-ANSWERED question never re-enters the queue', async () => {
+    await runWith();
+    const store = createManifestStore(repoRoot, 'latest');
+    const shard = await readShard();
+    const flag = shard?.flags.find((candidate) => candidate.kind === 'tribal-knowledge');
+    await store.writePageShard({
+      ...shard!,
+      flags: shard!.flags.map((candidate) =>
+        candidate.id === flag!.id
+          ? {
+              ...candidate,
+              status: 'answered' as const,
+              answer: { text: 'loud is a presentation concern.', answeredAt: new Date().toISOString() }
+            }
+          : candidate
+      )
+    });
+
+    // The writer rewords the same fact gap — a paraphrase, not the exact question.
+    const reworded =
+      'What was the reason the loud option was added to greet rather than creating a separate shout function?';
+    const summary = await runWith(undefined, reworded);
+
+    const finalShard = await readShard();
+    const tribal = finalShard?.flags.filter((candidate) => candidate.kind === 'tribal-knowledge') ?? [];
+    // Only the original (now resolved) flag survives; the paraphrase raised nothing new.
+    expect(tribal).toHaveLength(1);
+    expect(tribal[0]?.status).toBe('resolved');
+    expect(summary.outcome).toBe('passed');
   }, 60_000);
 });

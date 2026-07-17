@@ -7,6 +7,8 @@ import {
 } from '@docstube/core';
 import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+import { countRunFailureModes } from '../runtime-telemetry.ts';
+import { reportRunSpend } from './run-spend.ts';
 
 export type RefineCommandInput = {
   workspaceDir: string;
@@ -45,8 +47,14 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
 
     const store = createManifestStore(input.workspaceDir, family.config.versions.current);
     await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
+    reportRunSpend(output, summary);
     output.info(`run ${summary.runId}: ${summary.outcome}`);
-    return { exitCode: 0 };
+    // RefineSummary carries no findings or flag kinds (owned by another workstream); only the
+    // budget freeze is observable here.
+    return {
+      exitCode: 0,
+      failureModes: countRunFailureModes({ frozen: summary.outcome === 'frozen' })
+    };
   } catch (error) {
     if (error instanceof CoreError) {
       output.error(error.message);

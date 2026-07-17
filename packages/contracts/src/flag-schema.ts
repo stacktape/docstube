@@ -47,10 +47,12 @@ export const flagSchema = z.object({
 export type Flag = z.infer<typeof flagSchema>;
 
 // Hardcoded v1 auto-merge exception rules (PRODUCT §3.3); the v2 policy engine replaces this
-// table, not the gate. Any open flag of these kinds blocks auto-merge.
+// table, not the gate. Any open flag of these kinds blocks auto-merge. tribal-knowledge is
+// deliberately absent: docs ship with visible open questions and the answer arrives on a future
+// run (PRODUCT §4.1 — non-blocking by design), so an open question must never hold a merge.
 export const autoMergeBlockingFlagKinds: readonly FlagKind[] = [
   'out-of-domain',
-  'tribal-knowledge',
+  'coverage',
   'guarantee-downgrade',
   'structural-change',
   'system'

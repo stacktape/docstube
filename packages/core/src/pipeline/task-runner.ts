@@ -31,7 +31,37 @@ const resolveMcpServerPath = (): { path: string; nodeArgs: string[] } => {
   };
 };
 
-const defaultModels: Partial<Record<DocstubeConfig['agents']['transport'], string>> = {
+// The public config enum stops at four transports; 'google' (experimental, Antigravity CLI drops
+// subprocess stdout) and 'replay' (record/replay test transport) stay reachable only through the
+// DOCSTUBE_TRANSPORT_OVERRIDE env var — internal escape hatch, never a docstube.yml value.
+type InternalTransportId = DocstubeConfig['agents']['transport'] | 'google' | 'replay';
+
+const internalTransportIds: readonly InternalTransportId[] = [
+  'claude-cli',
+  'codex-cli',
+  'anthropic-api',
+  'openai-compatible',
+  'google',
+  'replay'
+];
+
+export const resolveTransportId = (
+  config: DocstubeConfig,
+  env: NodeJS.ProcessEnv = process.env
+): InternalTransportId => {
+  const override = env.DOCSTUBE_TRANSPORT_OVERRIDE;
+  if (override === undefined || override === '') {
+    return config.agents.transport;
+  }
+  if (!internalTransportIds.includes(override as InternalTransportId)) {
+    throw configError(
+      `DOCSTUBE_TRANSPORT_OVERRIDE "${override}" is not a known transport (${internalTransportIds.join(', ')})`
+    );
+  }
+  return override as InternalTransportId;
+};
+
+const defaultModels: Partial<Record<InternalTransportId, string>> = {
   'claude-cli': 'sonnet',
   'anthropic-api': 'claude-sonnet-5',
   replay: 'replay'
@@ -39,14 +69,16 @@ const defaultModels: Partial<Record<DocstubeConfig['agents']['transport'], strin
 
 export const createTransportFromConfig = (
   config: DocstubeConfig,
-  repoRoot: string
+  repoRoot: string,
+  env: NodeJS.ProcessEnv = process.env
 ): { transport: Transport; model: string } => {
   const agents = config.agents;
-  const model = agents.model ?? defaultModels[agents.transport];
+  const transportId = resolveTransportId(config, env);
+  const model = agents.model ?? defaultModels[transportId];
   if (model === undefined) {
-    throw configError(`agents.transport "${agents.transport}" requires an explicit agents.model in docstube.yml`);
+    throw configError(`agents.transport "${transportId}" requires an explicit agents.model in docstube.yml`);
   }
-  switch (agents.transport) {
+  switch (transportId) {
     case 'claude-cli': {
       const mcp = resolveMcpServerPath();
       return { transport: createClaudeCliTransport({ mcpServerPath: mcp.path, nodeArgs: mcp.nodeArgs }), model };
@@ -76,24 +108,50 @@ export const createTransportFromConfig = (
   }
 };
 
+// Review tasks may run on a cheaper model (agents.reviewModel); every other kind uses the primary
+// model. Exported so the routing rule itself is spec-testable.
+export const taskModelFor = (input: { kind: string; model: string; reviewModel?: string | undefined }): string =>
+  input.kind === 'review-page' ? (input.reviewModel ?? input.model) : input.model;
+
 export type ConfiguredTaskRunner = {
   runTask: TaskRunner;
   toolDescriptors: ToolDescriptor[];
   transportId: string;
   model: string;
+  // The model review-page tasks actually run on (equals `model` unless agents.reviewModel is set).
+  reviewModel: string;
+  // The exact per-kind routing runTask applies — cache keys and transcripts carry this model.
+  modelForTaskKind: (kind: string) => string;
 };
 
-export const createTaskRunnerFromConfig = (config: DocstubeConfig, repoRoot: string): ConfiguredTaskRunner => {
-  const { transport, model } = createTransportFromConfig(config, repoRoot);
+export const createTaskRunnerFromConfig = (
+  config: DocstubeConfig,
+  repoRoot: string,
+  env: NodeJS.ProcessEnv = process.env
+): ConfiguredTaskRunner => {
+  const { transport, model } = createTransportFromConfig(config, repoRoot, env);
+  const reviewModel = config.agents.reviewModel ?? model;
+  const modelForTaskKind = (kind: string): string =>
+    taskModelFor({ kind, model, reviewModel: config.agents.reviewModel });
   const cache = createTranscriptCache(join(repoRoot, '.docstube', 'cache', 'transcripts'));
   return {
     // extraTools reach the model natively on loop transports and via forwarded record-style MCP
     // tools on session transports (agent-runtime/src/transports/forwarded-tools.ts): the child
     // acks calls and the parent replays them through the real handlers post-session.
+    // The model is resolved per task kind, so review tasks bill, cache, and transcribe under the
+    // model they actually ran on.
     runTask: (spec, extraTools) =>
-      runAgentTask(spec, { transport, model, repoRoot, cache, ...(extraTools === undefined ? {} : { extraTools }) }),
+      runAgentTask(spec, {
+        transport,
+        model: modelForTaskKind(spec.kind),
+        repoRoot,
+        cache,
+        ...(extraTools === undefined ? {} : { extraTools })
+      }),
     toolDescriptors: standardToolDescriptors(),
     transportId: transport.id,
-    model
+    model,
+    reviewModel,
+    modelForTaskKind
   };
 };

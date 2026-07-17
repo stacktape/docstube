@@ -6,7 +6,12 @@ import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate } from './generate.ts';
-import { createRunCostTracker, FREEZE_MARGIN_RATIO } from './run-cost.ts';
+import {
+  createRunCostTracker,
+  ESTIMATE_USD_PER_1M_INPUT_TOKENS,
+  ESTIMATE_USD_PER_1M_OUTPUT_TOKENS,
+  FREEZE_MARGIN_RATIO
+} from './run-cost.ts';
 
 // Cap-freeze behavior (PRODUCT §3.5): usage caps are approximate — the run freezes with margin
 // at 85% of agents.budgets.maxRunUsd, between pages only. Scripted task costs make the freeze
@@ -29,7 +34,7 @@ describe('createRunCostTracker', () => {
     expect(tracker.shouldFreeze()).toBe(true);
   });
 
-  it('never freezes without a cap and ignores usage that reported no cost', () => {
+  it('never freezes without a cap and ignores usage carrying neither cost nor tokens', () => {
     const tracker = createRunCostTracker();
     tracker.add({ costUsd: 1000 });
     expect(tracker.shouldFreeze()).toBe(false);
@@ -40,7 +45,38 @@ describe('createRunCostTracker', () => {
     costless.add({ costUsd: undefined });
     expect(costless.spentUsd()).toBe(0);
     expect(costless.hasReportedCost()).toBe(false);
+    expect(costless.hasEstimates()).toBe(false);
     expect(costless.shouldFreeze()).toBe(false);
+  });
+
+  it('estimates spend from tokens when a transport reports no costUsd, so the cap never no-ops', () => {
+    const tracker = createRunCostTracker(10);
+    tracker.add({ inputTokens: 1_000_000, outputTokens: 200_000 });
+    expect(tracker.spentUsd()).toBe(0);
+    expect(tracker.hasReportedCost()).toBe(false);
+    expect(tracker.hasEstimates()).toBe(true);
+    expect(tracker.estimatedUsd()).toBeCloseTo(
+      ESTIMATE_USD_PER_1M_INPUT_TOKENS + 0.2 * ESTIMATE_USD_PER_1M_OUTPUT_TOKENS,
+      10
+    );
+  });
+
+  it('freezes on reported + estimated spend combined', () => {
+    const tracker = createRunCostTracker(10);
+    tracker.add({ costUsd: 5 });
+    // $5 reported + $4 estimated (500k in = $2.5, 100k out = $1.5) = $9 >= $8.5 (10 * 0.85).
+    tracker.add({ inputTokens: 500_000, outputTokens: 100_000 });
+    expect(tracker.shouldFreeze()).toBe(true);
+    expect(tracker.spentUsd()).toBe(5);
+    expect(tracker.estimatedUsd()).toBeCloseTo(4, 10);
+  });
+
+  it('a reported costUsd is never double-counted as an estimate, even with tokens present', () => {
+    const tracker = createRunCostTracker(10);
+    tracker.add({ costUsd: 1, inputTokens: 1_000_000, outputTokens: 1_000_000 });
+    expect(tracker.spentUsd()).toBe(1);
+    expect(tracker.estimatedUsd()).toBe(0);
+    expect(tracker.hasEstimates()).toBe(false);
   });
 });
 
@@ -203,7 +239,8 @@ describe('runGenerate under a run cost cap', () => {
     );
   }, 60_000);
 
-  it('without a cap it never freezes and reports the total spend', async () => {
+  // budgets.maxRunUsd defaults to 20, so an unconfigured run has real headroom but never runs uncapped.
+  it('stays far under the default $20 cap and reports the total spend', async () => {
     await writeFile(join(repoRoot, 'docstube.yml'), configYaml());
     const { runTask, writeCalls } = scriptedRunner();
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });

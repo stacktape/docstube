@@ -43,8 +43,9 @@ export const registryComponents: Array<{ name: string; description: string }> = 
   { name: 'ComparisonTable', description: 'Feature or behavior comparison matrix.' }
 ];
 
-export type ImportSourceKind = 'mintlify' | 'gitbook' | 'readme' | 'confluence';
-export const importSourceKinds: ImportSourceKind[] = ['mintlify', 'gitbook', 'readme', 'confluence'];
+// 'readme-com' is the ReadMe.com docs platform (mirrors importSourceKindSchema in contracts).
+export type ImportSourceKind = 'mintlify' | 'gitbook' | 'readme-com' | 'confluence';
+export const importSourceKinds: ImportSourceKind[] = ['mintlify', 'gitbook', 'readme-com', 'confluence'];
 export type ImportSource = { kind: ImportSourceKind; location: string };
 
 export type DepthBudget = 'overview' | 'standard' | 'deep';
@@ -400,7 +401,8 @@ export const buildConfigInput = (state: WizardState): Record<string, unknown> =>
 const personaIdPattern = /^[a-z][a-z0-9-]*$/;
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const versionLabelPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-const localePattern = /^[a-z]{2,3}(-[A-Z]{2})?$/;
+// Mirrors localeCodeSchema in contracts: language, optional script subtag, optional region.
+const localePattern = /^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/;
 
 const isRepoRelativePath = (value: string): boolean =>
   value.length > 0 && !value.includes('\\') && !value.startsWith('/') && !/^[A-Za-z]:/.test(value);

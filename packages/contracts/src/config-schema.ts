@@ -14,7 +14,8 @@ export const personaSchema = z.object({
 });
 export type Persona = z.infer<typeof personaSchema>;
 
-export const importSourceKindSchema = z.enum(['mintlify', 'gitbook', 'readme', 'confluence']);
+// 'readme-com' is the ReadMe.com docs platform, not a repository README.md.
+export const importSourceKindSchema = z.enum(['mintlify', 'gitbook', 'readme-com', 'confluence']);
 
 export const sourcesConfigSchema = z.object({
   // OpenAPI/AsyncAPI specs are first-class truth sources next to code (PRODUCT §4.1).
@@ -24,14 +25,10 @@ export const sourcesConfigSchema = z.object({
   imports: z.array(z.object({ kind: importSourceKindSchema, location: z.string().min(1) })).default([])
 });
 
-export const transportIdSchema = z.enum([
-  'claude-cli',
-  'codex-cli',
-  'google',
-  'anthropic-api',
-  'openai-compatible',
-  'replay'
-]);
+// The PUBLIC transport surface. 'google' (Antigravity CLI drops subprocess stdout) and 'replay'
+// (internal test transport) exist in agent-runtime but are internal/experimental — reachable only
+// through DOCSTUBE_TRANSPORT_OVERRIDE, never through docstube.yml.
+export const transportIdSchema = z.enum(['claude-cli', 'codex-cli', 'anthropic-api', 'openai-compatible']);
 export type TransportId = z.infer<typeof transportIdSchema>;
 
 export const agentRoleConfigSchema = z.object({
@@ -42,6 +39,12 @@ export const agentRoleConfigSchema = z.object({
 export const agentsConfigSchema = z.object({
   transport: transportIdSchema.default('claude-cli'),
   model: z.string().optional(),
+  reviewModel: z
+    .string()
+    .optional()
+    .describe(
+      'Model used for review tasks; defaults to agents.model. Pointing it at a different (cheaper) model breaks self-review correlation.'
+    ),
   // For openai-compatible: preset base URLs cover OpenAI/Ollama/anything compatible (§3.6).
   baseUrl: z.string().url().optional(),
   // Name of the env var holding the credential — never the credential itself.
@@ -57,14 +60,22 @@ export const agentsConfigSchema = z.object({
       translator: agentRoleConfigSchema.optional()
     })
     .optional(),
+  // Each default is written once at field level; `.prefault({})` parses the empty object through
+  // the schema so nested field defaults apply (Zod 4 `.default()` would short-circuit).
   budgets: z
     .object({
       // Approximate caps — freeze with margin (PRODUCT §3.5).
-      maxRunUsd: z.number().positive().optional(),
+      maxRunUsd: z
+        .number()
+        .positive()
+        .default(20)
+        .describe(
+          'Approximate per-run USD cap. Cap-freeze stops the run between pages at 85% of this value so in-flight work stays under the cap.'
+        ),
       maxTurnsPerTask: z.number().int().positive().default(24),
       maxToolCallsPerTask: z.number().int().positive().default(64)
     })
-    .default({ maxTurnsPerTask: 24, maxToolCallsPerTask: 64 })
+    .prefault({})
 });
 
 export const versionsConfigSchema = z.object({
@@ -100,7 +111,7 @@ export const autonomyConfigSchema = z.object({
       mode: z.enum(['auto-merge', 'review']).default('auto-merge'),
       guaranteeFloor: z.enum(['proven', 'scored', 'out-of-domain']).optional()
     })
-    .default({ mode: 'auto-merge' }),
+    .prefault({}),
   rules: z
     .array(
       z.object({
@@ -118,14 +129,13 @@ export const docstubeConfigSchema = z.object({
   // Short free-text: what the project is, who it's for. Extracted, never generated.
   projectContext: z.string().default(''),
   personas: z.array(personaSchema).min(1),
-  sources: sourcesConfigSchema.default({ openapi: [], asyncapi: [], imports: [] }),
-  agents: agentsConfigSchema.default({
-    transport: 'claude-cli',
-    budgets: { maxTurnsPerTask: 24, maxToolCallsPerTask: 64 }
-  }),
-  versions: versionsConfigSchema.default({ current: 'latest', frozen: [] }),
-  locales: localesConfigSchema.default({ source: 'en', targets: [] }),
-  theme: themeConfigSchema.default({ tokens: {} }),
+  // `.prefault({})` (not `.default({})`) so each nested default is written exactly once at field
+  // level and still applies when the whole block is omitted.
+  sources: sourcesConfigSchema.prefault({}),
+  agents: agentsConfigSchema.prefault({}),
+  versions: versionsConfigSchema.prefault({}),
+  locales: localesConfigSchema.prefault({}),
+  theme: themeConfigSchema.prefault({}),
   site: siteConfigSchema,
   // Enabled MDX components; must exist in the block-type registry (open enum, §3.1/§3.4).
   components: z.array(z.string().min(1)).default([]),
@@ -135,7 +145,7 @@ export const docstubeConfigSchema = z.object({
   coverage: z.enum(['on', 'off', 'auto']).default('auto'),
   autonomy: autonomyConfigSchema.optional(),
   outDir: repoPathSchema.default('docs-site'),
-  telemetry: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
+  telemetry: z.object({ enabled: z.boolean().default(true) }).prefault({}),
   // Reserved: screenshot capture is a declared TBD boundary (PRODUCT §6).
   screenshots: z.unknown().optional()
 });
