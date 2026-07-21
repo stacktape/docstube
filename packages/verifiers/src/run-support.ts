@@ -1,11 +1,4 @@
-import type {
-  BlockEntity,
-  ClaimExecutionRecord,
-  Finding,
-  PageEntity,
-  SectionEntity,
-  VerifierRunResult
-} from '@docstube/contracts';
+import type { BlockEntity, Finding, PageEntity, SectionEntity, VerifierRunResult } from '@docstube/contracts';
 import type { PageArtifact } from '@docstube/plugin-sdk';
 
 export const verifiersPluginName = '@docstube/verifiers';
@@ -13,9 +6,6 @@ export const verifiersPluginName = '@docstube/verifiers';
 export type VerifyOutcome = {
   findings: Finding[];
   coveredEntityIds: string[];
-  // Structured per-claim execution results (snippet-exec only) — the sole channel that can
-  // decide behavior claims.
-  claimExecutions?: ClaimExecutionRecord[];
 };
 
 // Shared result assembly: 'pass' when no error-severity findings (warnings alone still pass),
@@ -26,14 +16,13 @@ export const runVerifier = async (
 ): Promise<VerifierRunResult> => {
   const startedAt = performance.now();
   try {
-    const { findings, coveredEntityIds, claimExecutions } = await body();
+    const { findings, coveredEntityIds } = await body();
     return {
       verifier: verifierId,
       plugin: verifiersPluginName,
       status: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass',
       findings,
       coveredEntityIds,
-      ...(claimExecutions === undefined ? {} : { claimExecutions }),
       durationMs: performance.now() - startedAt
     };
   } catch (error) {

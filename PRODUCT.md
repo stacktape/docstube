@@ -149,9 +149,12 @@ surface as orphans for re-attachment or dismissal.
     mismatch → `contradicted` (a caught lie). This makes the full badge honestly achievable at
     launch instead of rare.
   - *Behavior claims*: grounding confers only `source-linked` (subject real, assertion
-    unchecked); they count as **checked** when snippet execution exercises the behavior or, from
-    v1.x, when richer predicate verifiers pass (execution assertions, schema validation).
-    Grounding failures (missing identifiers) are hard defects for every class.
+    unchecked). In 0.1.0 behavior prose claims are **honestly unchecked, always** — correctness
+    `unchecked`, disposition `no-checker-available`; they start counting as **checked** in v1.x
+    when the richer predicate verifiers land (execution assertions, schema validation). Snippet
+    execution proves that code **examples** run (block-level evidence), never that a behavior
+    prose claim is true. Grounding failures (missing identifiers) are hard defects for every
+    class.
   - *Intent/history claims*: a recorded maintainer answer (**owner-attested**, with authorship +
     timestamp in the evidence record) is legitimate evidence and counts toward 100%; the UI
     distinguishes attestation from mechanical checks.

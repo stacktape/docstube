@@ -12,14 +12,12 @@ export {
   createSubmitPageTool,
   evaluateSubmitPageCall,
   scanClaimMarkers,
-  scanFenceCoverage,
   submitPageDescriptor,
   validateSubmission
 } from './submit-page.ts';
 export type {
   AcceptedSubmission,
   ClaimMarker,
-  FenceCoverage,
   MarkerScan,
   MarkerScanError,
   MarkerScanErrorCode,

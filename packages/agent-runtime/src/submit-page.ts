@@ -194,50 +194,6 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
   return { markers, errors };
 };
 
-// Execution-coverage declarations on code fences (impl-06 finding 2): a fence meta token
-// `covers=<markerId>(,<markerId>)*` names the behavior claims this snippet exercises. Coverage is
-// EXPLICIT — a passing snippet checks exactly the claims it declared; proximity mints nothing.
-const COVERS_TOKEN = /(?:^|\s)covers=([^\s]+)/gu;
-const NO_EXEC_TOKEN = /(?:^|\s)no-exec(?:\s|$)/u;
-
-export type FenceCoverage = {
-  // Marker ids declared by this fence's covers= token(s).
-  markerIds: string[];
-  meta: string;
-  noExec: boolean;
-};
-
-// Collects covers= declarations from every fenced code block, using the same parser as the marker
-// scan. Returns one entry per fence that declares coverage.
-export const scanFenceCoverage = (mdx: string): FenceCoverage[] => {
-  let tree: Root;
-  try {
-    tree = markerProcessor.parse(mdx) as Root;
-  } catch {
-    return [];
-  }
-  const coverage: FenceCoverage[] = [];
-  const visit = (node: ScanNode): void => {
-    if (node.type === 'code') {
-      const meta = typeof (node as { meta?: unknown }).meta === 'string' ? (node as { meta: string }).meta : '';
-      const markerIds = [...meta.matchAll(COVERS_TOKEN)].flatMap((match) =>
-        (match[1] ?? '').split(',').filter((token) => token !== '')
-      );
-      if (markerIds.length > 0) {
-        coverage.push({ markerIds, meta, noExec: NO_EXEC_TOKEN.test(meta) });
-      }
-      return;
-    }
-    for (const child of node.children ?? []) {
-      visit(child as ScanNode);
-    }
-  };
-  for (const node of tree.children) {
-    visit(node as ScanNode);
-  }
-  return coverage;
-};
-
 const submitPageArgsSchema = z.object({
   mdx: z.string().min(1, 'mdx must be the complete non-empty page source'),
   ledger: z.unknown()
@@ -376,41 +332,9 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
         }
       }
     }
-    // EXECUTION-COVERAGE declarations (in-session covers= validation): every declared marker must
-    // be a real behavior claim on an executable fence — a typo'd or misdirected covers= would
-    // otherwise silently cover nothing.
-    const claimByMarkerId = new Map(ledgerParse.data.claims.map((claim) => [claim.markerId, claim]));
-    for (const fence of scanFenceCoverage(shape.data.mdx)) {
-      if (fence.noExec) {
-        errors.push(
-          `a code fence declares covers=${fence.markerIds.join(',')} together with no-exec — a snippet that never ` +
-            'executes can cover nothing; drop the covers= declaration or make the snippet executable'
-        );
-      }
-      for (const markerId of fence.markerIds) {
-        if (!claimMarkerIdSchema.safeParse(markerId).success) {
-          errors.push(
-            `code fence covers= names "${markerId}", which is not a valid marker id — use comma-separated marker ` +
-              'ids with no spaces: covers=c3,c5'
-          );
-          continue;
-        }
-        const covered = claimByMarkerId.get(markerId);
-        if (covered === undefined) {
-          errors.push(
-            `code fence covers= names "${markerId}", but no ledger claim has that markerId — declare only markers ` +
-              'that exist in this page'
-          );
-          continue;
-        }
-        if (covered.class !== 'behavior') {
-          errors.push(
-            `code fence covers= names "${markerId}" (class "${covered.class}") — covers= declares which BEHAVIOR ` +
-              'claims the snippet exercises; other classes have their own checkers'
-          );
-        }
-      }
-    }
+    // NOTE: the covers= fence-meta grammar (behavior execution coverage) was REMOVED with the
+    // wave 2b scope correction — behavior claims stay honestly unchecked until the v1.x predicate
+    // verifiers (trust-model-v2 decision 3); snippet execution proves code EXAMPLES run.
   }
   if (errors.length > 0 || !ledgerParse.success) {
     return { accepted: undefined, errors };

@@ -302,8 +302,8 @@ export const generatePage = async (
       await ctx.journal.append({ type: 'findings', pageId: page.id, findings: matchingWarnings });
     }
 
-    // Deterministic verifiers and persona review both gate the draft. They run AFTER anchoring:
-    // snippet execution results carry the covers= marker ids claim verification consumes.
+    // Deterministic verifiers and persona review both gate the draft (snippet execution is
+    // block-level evidence that code examples run — it never decides claims).
     const results = await runVerifiers({
       repoRoot: ctx.repoRoot,
       config: ctx.config,
@@ -346,14 +346,12 @@ export const generatePage = async (
     const verified = await verifyClaims({
       ledger: matched.ledger,
       anchored: matched.anchored,
-      page,
       anchorEvidence: anchoredLedger.evidence,
       rejectedProposals: anchoredLedger.rejectedProposals,
       codemap: ctx.codemap,
       packs: ctx.host.languagePacks().map((entry) => entry.definition),
       repoRoot: ctx.repoRoot,
       fingerprints: ctx.fingerprints,
-      verifierResults: results,
       commit: ctx.commit
     });
     if (verified.warnings.length > 0) {

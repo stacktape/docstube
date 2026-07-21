@@ -49,8 +49,6 @@ export type {
 
 export { sha256Hex, canonicalJson, canonicalStateJson, hashValue, contentHash } from './hashing.ts';
 
-export { detectFailureCapableAssertion, snippetRuntimeOf } from './assertion-detection.ts';
-
 export {
   normalizeCitedValue,
   citedValueOccursInText,
@@ -121,12 +119,11 @@ export type { FlagKind, Flag } from './flag-schema.ts';
 export {
   findingSourceSchema,
   findingSchema,
-  claimExecutionRecordSchema,
   verifierRunResultSchema,
   criterionResultSchema,
   reviewResultSchema
 } from './findings-schema.ts';
-export type { Finding, ClaimExecutionRecord, VerifierRunResult, ReviewResult } from './findings-schema.ts';
+export type { Finding, VerifierRunResult, ReviewResult } from './findings-schema.ts';
 
 export {
   manifestPageIndexEntrySchema,

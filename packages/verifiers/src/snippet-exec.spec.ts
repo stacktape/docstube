@@ -100,8 +100,22 @@ describe('snippet-exec', () => {
     expect(message).not.toContain('line-15\n');
   });
 
-  it('passes a node script through a real subprocess and covers the block plus DECLARED covers= markers', async () => {
+  it('passes a node script through a real subprocess and covers ONLY the executed block', async () => {
     const code = 'const total = [1, 2, 3].reduce((sum, n) => sum + n, 0);\nif (total !== 6) { process.exit(1); }';
+    const { block, page } = pageWithBlock(code, 'js');
+
+    const result = await snippetExecVerifier.verify(withExec(realExec), [makeArtifact(page, mdxWithFence('js', code))]);
+
+    expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
+    // Block-level evidence that the code EXAMPLE runs — never per-claim behavior coverage. The
+    // covers= grammar and claim-execution records are gone (wave 2b scope correction).
+    expect(result.coveredEntityIds).toEqual([block.id]);
+    expect(result).not.toHaveProperty('claimExecutions');
+  });
+
+  it('a stale covers= token in fence meta is inert: nothing beyond the block is covered', async () => {
+    const code = "console.log('ok');";
     const { block, page } = pageWithBlock(code, 'js');
 
     const result = await snippetExecVerifier.verify(withExec(realExec), [
@@ -109,70 +123,21 @@ describe('snippet-exec', () => {
     ]);
 
     expect(result.status).toBe('pass');
-    expect(result.findings).toEqual([]);
-    expect(result.coveredEntityIds).toContain(block.id);
-    // Declared coverage rides along verbatim — the kernel checks exactly these marker ids.
-    expect(result.coveredEntityIds).toContain('b1');
-    expect(result.coveredEntityIds).toContain('b2');
-    // Structured claim-execution results carry snippet identity + the deterministic assertion
-    // detection (this snippet has a process.exit(1) path, so it is failure-capable).
-    expect(result.claimExecutions).toHaveLength(2);
-    expect(result.claimExecutions?.map((record) => record.markerId).toSorted()).toEqual(['b1', 'b2']);
-    expect(result.claimExecutions?.[0]).toMatchObject({
-      blockId: block.id,
-      contentHash: block.contentHash,
-      language: 'js',
-      runtime: 'node',
-      exitCode: 0,
-      assertionBearing: true,
-      source: code
-    });
+    expect(result.coveredEntityIds).toEqual([block.id]);
+    expect(result.coveredEntityIds).not.toContain('b1');
+    expect(result).not.toHaveProperty('claimExecutions');
   });
 
-  it('marks a console.log-only covers= snippet assertionBearing: false — the kernel then mints nothing', async () => {
-    const code = "console.log('ok');";
-    const { block, page } = pageWithBlock(code, 'js');
-
-    const result = await snippetExecVerifier.verify(withExec(realExec), [
-      makeArtifact(page, mdxWithFence('js covers=b1', code))
-    ]);
-
-    expect(result.status).toBe('pass');
-    expect(result.claimExecutions).toHaveLength(1);
-    expect(result.claimExecutions?.[0]).toMatchObject({
-      markerId: 'b1',
-      blockId: block.id,
-      assertionBearing: false
-    });
-  });
-
-  it('records bash as the ACTUAL runtime for bash covers= snippets, never node', async () => {
+  it('a passing bash block is covered as a block, nothing more', async () => {
     const code = '[ 1 -eq 1 ]';
     const { block, page } = pageWithBlock(code, 'bash');
 
     const result = await snippetExecVerifier.verify(withExec(bashPassExec), [
-      makeArtifact(page, mdxWithFence('bash covers=b1', code))
+      makeArtifact(page, mdxWithFence('bash', code))
     ]);
 
     expect(result.status).toBe('pass');
-    expect(result.claimExecutions?.[0]).toMatchObject({
-      markerId: 'b1',
-      blockId: block.id,
-      language: 'bash',
-      runtime: 'bash',
-      assertionBearing: true
-    });
-  });
-
-  it('covers ONLY the executed block when the fence declares no covers= — proximity mints nothing', async () => {
-    const code = "console.log('ok');";
-    const { block, claim, page } = pageWithBlock(code, 'js');
-
-    const result = await snippetExecVerifier.verify(withExec(realExec), [makeArtifact(page, mdxWithFence('js', code))]);
-
-    expect(result.status).toBe('pass');
     expect(result.coveredEntityIds).toEqual([block.id]);
-    expect(result.coveredEntityIds).not.toContain(claim.id);
   });
 
   it('transpiles and executes a TypeScript snippet', async () => {

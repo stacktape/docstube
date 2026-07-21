@@ -89,20 +89,15 @@ export const evidenceRefSchema = z.discriminatedUnion('kind', [
     assertedValue: z.string(),
     extractedValue: z.string()
   }),
+  // Execution evidence is RESERVED for the v1.x predicate verifiers (trust-model-v2 decision 3):
+  // nothing mints it in 0.1.0 — behavior claims stay unchecked/no-checker-available at launch.
+  // The kind (and the behavior→execution authority row) is kept so v1.x extends without a schema
+  // break; snippet execution itself is block-level evidence that code EXAMPLES run, never
+  // per-claim behavior evidence.
   z.object({
     kind: z.literal('execution'),
     check: z.string().min(1),
-    environment: executionEnvironmentSchema,
-    // Snippet identity (impl-07 finding 2): WHICH executed sample decided this — the page block,
-    // the exact source bytes (content hash), and the actual runtime (bash records bash, not
-    // node). Absent only for non-snippet execution checks.
-    snippet: z
-      .object({
-        blockId: blockIdSchema,
-        contentHash: contentHashSchema,
-        runtime: z.enum(['node', 'bash'])
-      })
-      .optional()
+    environment: executionEnvironmentSchema
   }),
   z.object({ kind: z.literal('schema-check'), check: z.string().min(1) }),
   z.object({ kind: z.literal('owner-attestation'), author: z.string().min(1), at: isoTimestampSchema }),

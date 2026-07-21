@@ -242,51 +242,39 @@ describe('validateSubmission', () => {
     expect(conflicted.errors[0]).toContain('ONE unambiguous value');
   });
 
-  it('accepts covers= declarations naming existing behavior claims (the coverage grammar)', () => {
+  it("TYPED binding, Sol's impl-08 probe: numeric 3 must NOT bind prose stating the string \"3\"", () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
     const outcome = validateSubmission({
-      mdx: mdxWith(
-        '<Claim id="c1">`retry` retries the call.</Claim> <Claim id="c2">`retry` throws on timeout.</Claim>\n\n' +
-          "```ts covers=c1,c2\nawait retry(() => fetch('x'));\n```"
-      ),
+      mdx: mdxWith('<Claim id="c1">`mode` defaults to "3" (a string).</Claim>'),
       ledger: ledgerWith([
-        claim('c1', { class: 'behavior', predicate: 'retry retries the call' }),
-        claim('c2', { class: 'behavior', predicate: 'retry throws on timeout' })
+        claim('c1', {
+          predicate: 'the mode option defaults to 3',
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'mode.default', citedValue: '3' }]
+        })
       ])
     });
-    expect(outcome.errors).toEqual([]);
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors.some((error) => error.includes('visible marked prose'))).toBe(true);
   });
 
-  it('rejects covers= naming an unknown marker, a non-behavior claim, or riding a no-exec fence', () => {
-    const behaviorLedger = ledgerWith([
-      claim('c1', { class: 'behavior', predicate: 'retry retries the call' }),
-      claim('c2', { class: 'value', predicate: 'retries defaults to 3' })
-    ]);
-    const unknown = validateSubmission({
-      mdx: mdxWith(
-        '<Claim id="c1">`retry` retries.</Claim> <Claim id="c2">`retries` defaults to 3.</Claim>\n\n' +
-          '```ts covers=c9\nretry();\n```'
-      ),
-      ledger: behaviorLedger
-    });
-    expect(unknown.errors.some((error) => error.includes('"c9"') && error.includes('no ledger claim'))).toBe(true);
-
-    const wrongClass = validateSubmission({
-      mdx: mdxWith(
-        '<Claim id="c1">`retry` retries.</Claim> <Claim id="c2">`retries` defaults to 3.</Claim>\n\n' +
-          '```ts covers=c2\nretry();\n```'
-      ),
-      ledger: behaviorLedger
-    });
-    expect(wrongClass.errors.some((error) => error.includes('class "value"'))).toBe(true);
-
-    const onNoExec = validateSubmission({
-      mdx: mdxWith(
-        '<Claim id="c1">`retry` retries.</Claim> <Claim id="c2">`retries` defaults to 3.</Claim>\n\n' +
-          '```ts no-exec covers=c1\nretry();\n```'
-      ),
-      ledger: behaviorLedger
-    });
-    expect(onNoExec.errors.some((error) => error.includes('no-exec'))).toBe(true);
+  it('TYPED binding, vice versa: the string "3" binds quoted prose but never a bare numeric token', () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const withProse = (prose: string, predicate: string) =>
+      validateSubmission({
+        mdx: mdxWith(`<Claim id="c1">${prose}</Claim>`),
+        ledger: ledgerWith([
+          claim('c1', {
+            predicate,
+            proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'mode.default', citedValue: '"3"' }]
+          })
+        ])
+      });
+    expect(
+      withProse('`mode` defaults to "3" (a string).', 'the mode option defaults to the string "3"').errors
+    ).toEqual([]);
+    const bare = withProse('`mode` defaults to 3.', 'the mode option defaults to 3');
+    expect(bare.accepted).toBeUndefined();
+    expect(bare.errors).toHaveLength(2);
   });
 
   it('rejects a ledger claim whose marker is missing from the MDX', () => {

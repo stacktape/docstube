@@ -2,8 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { detectFailureCapableAssertion, snippetRuntimeOf } from '@docstube/contracts';
-import type { ClaimExecutionRecord, Finding } from '@docstube/contracts';
+import type { Finding } from '@docstube/contracts';
 import type { PageArtifact, VerifierContext, VerifierDefinition } from '@docstube/plugin-sdk';
 import { mapFencesByHash } from './code-typecheck-ts.ts';
 import type { MdxCodeBlock } from './code-typecheck-ts.ts';
@@ -25,15 +24,6 @@ const hasNoExecMeta = (fence: MdxCodeBlock): boolean => /(^|\s)no-exec(\s|$)/u.t
 // Fences opting back into full host-environment inheritance (`allow-env` in the fence meta):
 // samples that legitimately read configuration from the environment.
 const hasAllowEnvMeta = (fence: MdxCodeBlock): boolean => /(^|\s)allow-env(\s|$)/u.test(fence.meta);
-
-// Explicit execution coverage (`covers=c3,c5` in the fence meta): the marker ids of the behavior
-// claims this snippet exercises. A PASSING execution covers exactly these claims — the kernel's
-// claim verification checks a behavior claim ONLY when a passing snippet declared it; proximity
-// (same section, same page) mints nothing. submit_page validates the declarations in-session.
-const coveredMarkerIds = (fence: MdxCodeBlock): string[] =>
-  [...fence.meta.matchAll(/(?:^|\s)covers=([^\s]+)/gu)].flatMap((match) =>
-    (match[1] ?? '').split(',').filter((token) => token !== '')
-  );
 
 // Snippets run with a scrubbed environment by default: PATH plus the platform essentials and
 // nothing else, so API keys and tokens in the host env cannot leak into documentation samples.
@@ -103,7 +93,6 @@ const runSnippet = async (
 const executionFailureFinding = (
   artifact: PageArtifact,
   blockId: string,
-  claimIds: string[],
   fence: MdxCodeBlock,
   detail: string
 ): Finding => ({
@@ -113,8 +102,7 @@ const executionFailureFinding = (
   message: `code sample failed to execute: ${detail}`,
   entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id, entityId: blockId },
   file: artifact.mdxPath,
-  span: [fence.line, fence.line],
-  data: { claimIds }
+  span: [fence.line, fence.line]
 });
 
 export const snippetExecVerifier: VerifierDefinition = {
@@ -147,7 +135,6 @@ export const snippetExecVerifier: VerifierDefinition = {
     const result = await runVerifier(verifierId, async () => {
       const findings: Finding[] = [];
       const coveredEntityIds: string[] = [];
-      const claimExecutions: ClaimExecutionRecord[] = [];
 
       for (const artifact of pages) {
         const fencesByHash = mapFencesByHash(artifact.mdx);
@@ -172,25 +159,10 @@ export const snippetExecVerifier: VerifierDefinition = {
             const run = await runSnippet(ctx, language, fence.code, cwd, hasAllowEnvMeta(fence));
             executedCount += 1;
             if (run.exitCode === 0) {
-              // The covered set is the block itself plus EXACTLY the declared covers= marker ids.
-              coveredEntityIds.push(block.id, ...coveredMarkerIds(fence));
-              // Structured claim-execution results (impl-07 finding 2): snippet identity, the
-              // ACTUAL runtime, and the deterministic assertion detection over the executed
-              // source. The kernel re-verifies from `source`; a zero-exit run of an
-              // assertion-free snippet decides nothing regardless of covers=.
-              const assertionBearing = detectFailureCapableAssertion(language, fence.code);
-              for (const markerId of coveredMarkerIds(fence)) {
-                claimExecutions.push({
-                  markerId,
-                  blockId: block.id,
-                  contentHash: block.contentHash,
-                  language,
-                  runtime: snippetRuntimeOf(language),
-                  exitCode: run.exitCode,
-                  assertionBearing,
-                  source: fence.code
-                });
-              }
+              // The covered set is the executed BLOCK — snippet execution proves code examples
+              // run (block-level evidence). It never covers claims: behavior claims stay
+              // unchecked until the v1.x predicate verifiers (trust-model-v2 decision 3).
+              coveredEntityIds.push(block.id);
             } else if (!bashLanguages.has(language) && isModuleNotFound(run.stderr)) {
               // Unresolvable import in the sandbox: not proven, not failed.
             } else if (bashLanguages.has(language) && isCommandNotFound(run.exitCode, run.stderr)) {
@@ -198,13 +170,7 @@ export const snippetExecVerifier: VerifierDefinition = {
             } else {
               const tail = stderrTail(run.stderr);
               findings.push(
-                executionFailureFinding(
-                  artifact,
-                  block.id,
-                  coveredMarkerIds(fence),
-                  fence,
-                  `exit code ${run.exitCode}${tail === '' ? '' : `\n${tail}`}`
-                )
+                executionFailureFinding(artifact, block.id, fence, `exit code ${run.exitCode}${tail === '' ? '' : `\n${tail}`}`)
               );
             }
           } catch (error) {
@@ -214,7 +180,6 @@ export const snippetExecVerifier: VerifierDefinition = {
               executionFailureFinding(
                 artifact,
                 block.id,
-                coveredMarkerIds(fence),
                 fence,
                 `${error instanceof Error ? error.message : String(error)} (timeout ${executionTimeoutMs}ms)`
               )
@@ -225,7 +190,7 @@ export const snippetExecVerifier: VerifierDefinition = {
         }
       }
 
-      return { findings, coveredEntityIds, claimExecutions };
+      return { findings, coveredEntityIds };
     });
 
     // Every matching block was a bash block and bash is unavailable: the run proved nothing, and
