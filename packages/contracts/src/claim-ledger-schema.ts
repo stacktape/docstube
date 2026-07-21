@@ -35,6 +35,10 @@ export type ExecutionEnvironment = z.infer<typeof executionEnvironmentSchema>;
 export const evidenceKindSchema = z.enum([
   'codemap-grounding',
   'source-linked',
+  // The 0.1.0 minimal value-predicate verifier (PRODUCT.md §3.2): the claim's asserted value
+  // compared against the fingerprint ladder's extracted value — match → checked, mismatch →
+  // contradicted.
+  'value-predicate',
   'execution',
   'schema-check',
   'owner-attestation',
@@ -61,6 +65,13 @@ export const evidenceRefSchema = z.discriminatedUnion('kind', [
     file: repoPathSchema.optional(),
     span: lineSpanSchema.optional(),
     commit: gitShaSchema.optional()
+  }),
+  z.object({
+    kind: z.literal('value-predicate'),
+    symbol: sourceKeySchema,
+    valueName: z.string().min(1),
+    assertedValue: z.string(),
+    extractedValue: z.string()
   }),
   z.object({ kind: z.literal('execution'), check: z.string().min(1), environment: executionEnvironmentSchema }),
   z.object({ kind: z.literal('schema-check'), check: z.string().min(1) }),

@@ -25,6 +25,7 @@ describe('evidence refs', () => {
     const refs = [
       { kind: 'codemap-grounding', symbol, file: 'src/retry.ts', span: [1, 4], commit },
       { kind: 'source-linked', symbol },
+      { kind: 'value-predicate', symbol, valueName: 'retries.default', assertedValue: '3', extractedValue: '3' },
       { kind: 'execution', check: 'snippet-exec', environment: { os: 'linux' } },
       { kind: 'schema-check', check: 'openapi-response-shape' },
       { kind: 'owner-attestation', author: 'github:someuser', at: '2026-07-12T00:00:00.000Z' },
@@ -46,6 +47,17 @@ describe('evidence refs', () => {
     expect(evidenceRefSchema.safeParse({ kind: 'vibes' }).success).toBe(false);
     // owner-attestation requires authorship — an unattributed attestation is not evidence.
     expect(evidenceRefSchema.safeParse({ kind: 'owner-attestation' }).success).toBe(false);
+    // value-predicate without the compared values is not a comparison.
+    expect(evidenceRefSchema.safeParse({ kind: 'value-predicate', symbol }).success).toBe(false);
+  });
+
+  it('carries a contradicted value-predicate mismatch as deciding evidence', () => {
+    const result = claimDispositionSchema.safeParse({
+      status: 'contradicted',
+      evidence: { kind: 'value-predicate', symbol, valueName: 'retries.default', assertedValue: '3', extractedValue: '5' },
+      detail: 'docs assert 3, source says 5'
+    });
+    expect(result.success).toBe(true);
   });
 });
 
