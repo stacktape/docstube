@@ -122,6 +122,61 @@ describe('validateSubmission', () => {
     });
   });
 
+  it('rejects value laundering IN-SESSION: citedValue absent from both the marked prose and the predicate', () => {
+    // The impl-06 finding-1 probe: prose asserts "is totally-wrong", the ledger smuggles the
+    // correct source value. The deterministic binding rejects it while the model can still repair.
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">`retries` is totally-wrong.</Claim>'),
+      ledger: ledgerWith([
+        claim('c1', {
+          predicate: 'retries is totally-wrong',
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'retries.default', citedValue: '3' }]
+        })
+      ])
+    });
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors).toHaveLength(1);
+    expect(outcome.errors[0]).toContain('c1');
+    expect(outcome.errors[0]).toContain('appears in NEITHER');
+    expect(outcome.errors[0]).toContain('retries.default');
+  });
+
+  it('binds cited values through the shared normalization: bare, quoted, and numeric spellings agree', () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const withValue = (prose: string, citedValue: string) =>
+      validateSubmission({
+        mdx: mdxWith(`<Claim id="c1">${prose}</Claim>`),
+        ledger: ledgerWith([
+          claim('c1', {
+            predicate: 'the backoff mode has a default',
+            proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'mode', citedValue }]
+          })
+        ])
+      });
+    // Bare semantic string in prose, JSON-quoted citedValue (and vice versa): both bind.
+    expect(withValue('backoff defaults to `linear`.', '"linear"').errors).toEqual([]);
+    expect(withValue('backoff defaults to "linear".', 'linear').errors).toEqual([]);
+    // Numeric spellings normalize through Number().
+    expect(withValue('the cap is 1_000 ms.', '1000').errors).toEqual([]);
+    // A substring is never a binding.
+    expect(withValue('backoff is nonlinear.', 'linear').errors).toHaveLength(1);
+  });
+
+  it('accepts a citedValue stated only in the predicate (prose paraphrases, predicate is exact)', () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">`retries` defaults to 3.</Claim>'),
+      ledger: ledgerWith([
+        claim('c1', {
+          predicate: 'retries defaults to 3',
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'retries.default', citedValue: '3' }]
+        })
+      ])
+    });
+    expect(outcome.errors).toEqual([]);
+  });
+
   it('rejects a ledger claim whose marker is missing from the MDX', () => {
     const outcome = validateSubmission({ mdx: mdxWith('No markers here.'), ledger: ledgerWith([claim('c1')]) });
     expect(outcome.accepted).toBeUndefined();

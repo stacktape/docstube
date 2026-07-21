@@ -26,7 +26,7 @@ import type { ScoredReview } from './review-page.ts';
 import { assembleProvenanceV2 } from './assemble-provenance.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import { matchClaimIds } from './match-claims.ts';
-import { verifyClaims } from './verify-claims.ts';
+import { CLAIM_VERIFICATION_CHECK, verifyClaims } from './verify-claims.ts';
 import { attachLedgerClaims } from './ledger-bridge.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
 import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
@@ -315,10 +315,23 @@ export const generatePage = async (
         codemap: ctx.codemap,
         packs: ctx.host.languagePacks().map((entry) => entry.definition),
         repoRoot: ctx.repoRoot,
+        fingerprints: ctx.fingerprints,
         verifierResults: results,
         page: verifiedPage,
         commit: ctx.commit
       });
+      if (verified.warnings.length > 0) {
+        await ctx.journal.append({
+          type: 'findings',
+          pageId: page.id,
+          findings: verified.warnings.map((warning) => ({
+            source: 'verifier' as const,
+            check: CLAIM_VERIFICATION_CHECK,
+            severity: 'warning' as const,
+            message: warning
+          }))
+        });
+      }
       if (verified.findings.length > 0) {
         findings = verified.findings;
         await ctx.journal.append({ type: 'findings', pageId: page.id, findings });

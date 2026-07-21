@@ -6,7 +6,7 @@ import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { z } from 'zod';
-import { claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import { citedValueBindsToTexts, claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
 import type { ToolDescriptor, WriterClaimLedger } from '@docstube/contracts';
 import type { ToolImplementation } from './tools.ts';
 
@@ -278,6 +278,31 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
         errors.push(
           `marker "${markerId}" has no ledger entry — add a claim with markerId "${markerId}" or remove the marker`
         );
+      }
+    }
+    // VALUE ASSERTION BINDING (deterministic, in-session — impl-06 finding 1): a value claim's
+    // asserted citedValue must be provably present in the VISIBLE marked prose or in the claim's
+    // own predicate. Without this, a writer could wrap wrong prose while smuggling the correct
+    // value through the ledger and the value verifier would launder it into 'checked'. Both sides
+    // normalize through the ONE shared helper, so bare vs JSON-quoted string spellings agree.
+    const markerTextById = new Map(scan.markers.map((marker) => [marker.markerId, marker.innerMdx]));
+    for (const claim of ledgerParse.data.claims) {
+      const markerText = markerTextById.get(claim.markerId);
+      if (markerText === undefined) {
+        continue; // already reported as a missing marker above
+      }
+      for (const subscription of claim.proposedSubscriptions) {
+        if (subscription.kind !== 'cited-value') {
+          continue;
+        }
+        if (!citedValueBindsToTexts(subscription.citedValue, [markerText, claim.predicate])) {
+          errors.push(
+            `claim "${claim.markerId}": the asserted value ${subscription.citedValue} (cited-value ` +
+              `"${subscription.valueName}") appears in NEITHER the prose the marker wraps nor the predicate — ` +
+              'the visible sentence must state the exact value the ledger asserts. Fix the wrapped prose ' +
+              '(or the citedValue, if the prose is right) so they agree, and resubmit'
+          );
+        }
       }
     }
   }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { typescriptLanguagePack } from '@docstube/lang-typescript';
-import { codemapSchema, fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import { codemapSchema, fingerprintSnapshotSchema, sha256Hex, writerClaimLedgerSchema } from '@docstube/contracts';
 import type { Codemap, FingerprintSnapshot, ObservedRead, VerifierRunResult } from '@docstube/contracts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
@@ -16,9 +16,11 @@ const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
 const PRINT = '3'.repeat(64);
 const READ_HASH = '5'.repeat(64);
 
-// The snapshot advertises GONE as a cited value so its subscription anchors, but the source on
-// disk does not define it — the exact snapshot/disk drift the verifier must treat as
-// "unresolvable at verify time", never as a guess.
+// Value prints are sha256 of the normalized cited-value string (extract-fingerprints contract) —
+// the snapshot must vouch for the exact bytes verification re-extracts, or the claim stays
+// unchecked. GONE is advertised so its subscription anchors, but the source on disk does not
+// define it — the exact snapshot/disk drift the verifier must treat as "unresolvable at verify
+// time", never as a guess.
 const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
   schemaVersion: 1,
   commit: COMMIT,
@@ -26,7 +28,7 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
     {
       symbolHash: KNOWN_SYMBOL,
       signaturePrint: PRINT,
-      valuePrints: { DEFAULT_RETRIES: PRINT, GONE: PRINT },
+      valuePrints: { DEFAULT_RETRIES: sha256Hex('3'), MODE: sha256Hex('"linear"'), GONE: PRINT },
       bodyPrint: PRINT
     }
   ],
@@ -69,7 +71,10 @@ let repoRoot: string;
 beforeAll(async () => {
   repoRoot = await mkdtemp(join(tmpdir(), 'docstube-verify-claims-'));
   await mkdir(join(repoRoot, 'src'), { recursive: true });
-  await writeFile(join(repoRoot, 'src', 'retry.ts'), 'export const DEFAULT_RETRIES = 3;\n');
+  await writeFile(
+    join(repoRoot, 'src', 'retry.ts'),
+    "export const DEFAULT_RETRIES = 3;\nexport const MODE = 'linear';\n"
+  );
 });
 
 afterAll(async () => {
@@ -82,7 +87,8 @@ const anchorFixture = (
   claims: Array<{ markerId: string } & Record<string, unknown>>,
   // Anchoring and verification must see the SAME extracted page — block ids are minted per
   // extraction, and execution-coverage containment is keyed on them.
-  page: ReturnType<typeof extractPageEntity> = extractPageEntity({ mdx, slug: 'retry' })
+  page: ReturnType<typeof extractPageEntity> = extractPageEntity({ mdx, slug: 'retry' }),
+  snapshot: FingerprintSnapshot = fingerprints
 ): Extract<AnchorLedgerResult, { ok: true }> => {
   // Anchoring enforces exact marker/ledger cardinality: pad the markers a test does not exercise
   // with inert intent-history entries (the test's claim stays first, so [0] addresses it).
@@ -98,7 +104,7 @@ const anchorFixture = (
     mdx,
     writerLedger: writerClaimLedgerSchema.parse({ schemaVersion: 1, claims: padded }),
     page,
-    fingerprints,
+    fingerprints: snapshot,
     codemap,
     observedReads,
     commit: COMMIT
@@ -132,7 +138,8 @@ const snippetPass = (coveredEntityIds: string[]): VerifierRunResult => ({
 const verify = (
   anchoredResult: Extract<AnchorLedgerResult, { ok: true }>,
   page: ReturnType<typeof pageOf>,
-  verifierResults: VerifierRunResult[] = []
+  verifierResults: VerifierRunResult[] = [],
+  snapshot: FingerprintSnapshot = fingerprints
 ) =>
   verifyClaims({
     ledger: anchoredResult.ledger,
@@ -142,6 +149,7 @@ const verify = (
     codemap,
     packs: [typescriptLanguagePack],
     repoRoot,
+    fingerprints: snapshot,
     verifierResults,
     page,
     commit: COMMIT
@@ -203,6 +211,91 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     // No value-predicate record is fabricated for an unresolvable name.
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('REJECTS value laundering: correct citedValue over prose asserting something else (impl-06 probe)', async () => {
+    // The prose (marker v1 wraps "`DEFAULT_RETRIES` is 3.") is fine, but a laundering writer would
+    // pair wrong prose with the right ledger value. Simulate it with a predicate + citedValue pair
+    // whose value never appears in EITHER text: citedValue 7 vs "is 3." prose and an off-value
+    // predicate — the binding must fail closed with a blocking finding, and 'checked' must not
+    // mint even though nothing contradicts either.
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'v1',
+          class: 'value',
+          predicate: 'DEFAULT_RETRIES is totally-wrong',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [
+            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'DEFAULT_RETRIES', citedValue: '7' }
+          ]
+        }
+      ]),
+      page
+    );
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.severity).toBe('error');
+    expect(result.findings[0]?.message).toContain('appears in NEITHER');
+    expect(result.findings[0]?.message).toContain('v1');
+    expect(result.findings[0]?.message).toContain('7');
+    expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
+    // No value-predicate comparison ran on an unbound value.
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('does NOT falsely contradict a bare semantic string against its JSON-quoted extraction (asymmetry fix)', async () => {
+    // Source: export const MODE = 'linear' — extraction yields '"linear"'. The writer asserts the
+    // bare spelling 'linear'; one shared normalization makes them byte-equal → checked.
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'v1',
+          class: 'value',
+          predicate: 'MODE defaults to linear',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [
+            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'MODE', citedValue: 'linear' }
+          ]
+        }
+      ]),
+      page
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({
+      kind: 'value-predicate',
+      assertedValue: '"linear"',
+      extractedValue: '"linear"'
+    });
+  });
+
+  it('stays unchecked with a warning when the re-extracted value drifted from the snapshot valuePrint (finding 7)', async () => {
+    // The snapshot vouches for different bytes than the working tree now holds: never mint
+    // evidence the snapshot never saw — unchecked + warning, not checked, not contradicted.
+    const stale = fingerprintSnapshotSchema.parse({
+      schemaVersion: 1,
+      commit: COMMIT,
+      symbols: [
+        {
+          symbolHash: KNOWN_SYMBOL,
+          signaturePrint: PRINT,
+          valuePrints: { DEFAULT_RETRIES: 'a'.repeat(64) },
+          bodyPrint: PRINT
+        }
+      ],
+      unparsedFiles: []
+    });
+    const page = pageOf();
+    const result = await verify(anchorFixture([valueDraft('3')], page, stale), page, [], stale);
+    expect(result.findings).toEqual([]);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('moved mid-run');
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 });

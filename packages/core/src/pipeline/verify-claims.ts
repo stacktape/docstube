@@ -6,18 +6,22 @@ import type {
   Codemap,
   EvidenceRecord,
   Finding,
+  FingerprintSnapshot,
   LedgerClaim,
   PageEntity,
   SymbolRecord,
   VerifierRunResult
 } from '@docstube/contracts';
 import {
+  citedValueBindsToTexts,
   claimEvidenceSchema,
   claimLedgerSchema,
   evidenceRecordSchema,
   gitCommitSchema,
   idPrefixes,
   mintId,
+  normalizeCitedValue,
+  sha256Hex,
   symbolSourceKeySchema
 } from '@docstube/contracts';
 import type { LanguagePackDefinition } from '@docstube/plugin-sdk';
@@ -69,6 +73,9 @@ export type VerifyClaimsInput = {
   codemap: Codemap;
   packs: LanguagePackDefinition[];
   repoRoot: string;
+  // The typed-fingerprint snapshot the run was planned against: value re-extraction is validated
+  // against its valuePrints — evidence is never minted from bytes the snapshot never saw.
+  fingerprints: FingerprintSnapshot;
   // Deterministic verifier results from the verify stage of THIS attempt (execution coverage).
   verifierResults: VerifierRunResult[];
   // The extracted page — locates the claim's section for conservative execution coverage.
@@ -81,8 +88,12 @@ export type VerifyClaimsResult = {
   anchored: AnchoredClaim[];
   // The canonical per-claim trust projection (provenance-v2) — the ONLY reader-facing record.
   claimEvidence: ClaimEvidence[];
-  // Blocking error findings: contradictions and grounding failures. Non-empty ⇒ the page fails.
+  // Blocking error findings: contradictions, grounding failures, value-binding violations.
+  // Non-empty ⇒ the page fails.
   findings: Finding[];
+  // Non-blocking observations (e.g. the source moved mid-run so a value stayed unchecked) —
+  // journaled by the caller, never gating.
+  warnings: string[];
 };
 
 const citedValueExtractorFor = (packs: LanguagePackDefinition[], file: string): CitedValueExtractor | undefined => {
@@ -116,9 +127,13 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
   const now = new Date().toISOString();
   const commit = gitCommitSchema.parse(input.commit);
   const findings: Finding[] = [];
+  const warnings: string[] = [];
   const claimEvidence: ClaimEvidence[] = [];
   const symbolByHash = new Map<string, SymbolRecord>(input.codemap.symbols.map((symbol) => [symbol.hash, symbol]));
   const anchorEvidenceById = new Map(input.anchorEvidence.map((record) => [record.evidenceId, record]));
+  const snapshotValuePrints = new Map(
+    input.fingerprints.symbols.map((symbol) => [symbol.symbolHash as string, symbol.valuePrints])
+  );
 
   // Grounding failures are hard defects for EVERY class (trust-model-v2 decision 3): a claim that
   // referenced a symbol absent from the snapshot cited an identifier the code does not have.
@@ -204,12 +219,44 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
     } else if (claim.class === 'value') {
       // The minimal value-predicate verifier. A value claim is checked only when EVERY cited-value
       // subscription resolved and passed; ANY mismatch contradicts; anything unresolvable at
-      // verify time leaves the claim unchecked — the kernel never guesses.
+      // verify time leaves the claim unchecked — the kernel never guesses. Two deterministic
+      // preconditions guard every comparison:
+      //   1. VALUE BINDING (defense in depth behind submit_page): the asserted value must appear
+      //      in the visible marked prose or the predicate — otherwise the ledger asserts a value
+      //      the reader never sees and 'checked' would launder wrong prose. Blocking finding.
+      //   2. SNAPSHOT AGREEMENT (impl-06 finding 7): the re-extracted value's hash must equal the
+      //      fingerprint snapshot's valuePrint. A mismatch means the working tree moved mid-run —
+      //      the claim stays unchecked with a warning; evidence is NEVER minted from bytes the
+      //      snapshot never saw.
       const citedSubscriptions = claim.subscriptions.filter((sub) => sub.kind === 'cited-value');
       let unresolvable = citedSubscriptions.length === 0;
+      let bindingViolated = false;
       let firstPass: EvidenceRecord | undefined;
       let firstFail: EvidenceRecord | undefined;
       for (const subscription of citedSubscriptions) {
+        // Both sides of the comparison go through the ONE shared normalization (bare, quoted, and
+        // numeric spellings agree) — the committed subscription is already canonical from
+        // anchoring; re-normalizing keeps replayed/legacy ledgers honest too.
+        const asserted = normalizeCitedValue(subscription.citedValue).canonical;
+        if (!citedValueBindsToTexts(subscription.citedValue, [claim.quote, claim.predicate])) {
+          bindingViolated = true;
+          findings.push({
+            source: 'verifier',
+            check: CLAIM_VERIFICATION_CHECK,
+            severity: 'error',
+            message:
+              `claim "${entry.markerId}": the asserted value ${asserted} (cited-value "${subscription.valueName}") ` +
+              `appears in NEITHER the marked prose ("${claim.quote}") nor the predicate — the visible sentence must ` +
+              'state the exact value the ledger asserts. Fix the prose or the citedValue so they agree',
+            data: {
+              markerId: entry.markerId,
+              kind: 'value-binding',
+              valueName: subscription.valueName,
+              assertedValue: asserted
+            }
+          });
+          continue;
+        }
         const symbol = symbolByHash.get(subscription.symbolHash as string);
         const content = symbol === undefined ? undefined : await readRepoFile(symbol.file);
         const extractor = symbol === undefined ? undefined : citedValueExtractorFor(input.packs, symbol.file);
@@ -225,23 +272,35 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           unresolvable = true;
           continue;
         }
+        const snapshotPrint = snapshotValuePrints.get(subscription.symbolHash as string)?.[subscription.valueName];
+        if (snapshotPrint === undefined || sha256Hex(extractedValue) !== snapshotPrint) {
+          // The bytes on disk are not the bytes the run snapshot fingerprinted (dirty worktree or
+          // a mid-run edit). Unchecked + warning — never evidence the snapshot cannot vouch for.
+          unresolvable = true;
+          warnings.push(
+            `claim "${entry.markerId}": the source value "${subscription.valueName}" in ${symbol.file} no longer ` +
+              'matches the fingerprint snapshot this run was planned against (the working tree moved mid-run) — ' +
+              'the claim stays unchecked; rerun generate against a settled tree'
+          );
+          continue;
+        }
         // Byte-wise comparison of two strings normalized by the same cited-value grammar.
-        const matches = extractedValue === subscription.citedValue;
+        const matches = extractedValue === asserted;
         const record = evidenceRecordSchema.parse({
           evidenceId: mintId(idPrefixes.evidence),
           ref: {
             kind: 'value-predicate',
             symbol: subscription.symbolHash,
             valueName: subscription.valueName,
-            assertedValue: subscription.citedValue,
+            assertedValue: asserted,
             extractedValue
           },
           checkedAt: now,
           sourceRevision: commit,
           outcome: matches ? 'pass' : 'fail',
           detail: matches
-            ? `docs assert ${subscription.citedValue} for ${subscription.valueName}; source agrees`
-            : `docs assert ${subscription.citedValue} for ${subscription.valueName}, source says ${extractedValue}`
+            ? `docs assert ${asserted} for ${subscription.valueName}; source agrees`
+            : `docs assert ${asserted} for ${subscription.valueName}, source says ${extractedValue}`
         });
         minted.push(record);
         if (matches) {
@@ -254,14 +313,14 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             severity: 'error',
             message:
               `claim "${entry.markerId}" is CONTRADICTED by the source — predicate: "${claim.predicate}"; ` +
-              `${subscription.valueName} is asserted as ${subscription.citedValue} but the code extracts ${extractedValue} ` +
+              `${subscription.valueName} is asserted as ${asserted} but the code extracts ${extractedValue} ` +
               `(${symbol.file}). Correct the documented value to match the source, or fix the subscription if it names the wrong value`,
             file: symbol.file,
             data: {
               markerId: entry.markerId,
               kind: 'contradiction',
               valueName: subscription.valueName,
-              assertedValue: subscription.citedValue,
+              assertedValue: asserted,
               extractedValue
             }
           });
@@ -272,7 +331,7 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         correctness = 'contradicted';
         disposition = null;
         decidingEvidenceId = firstFail.evidenceId;
-      } else if (firstPass !== undefined && !unresolvable) {
+      } else if (firstPass !== undefined && !unresolvable && !bindingViolated) {
         correctness = 'checked';
         disposition = null;
         decidingEvidenceId = firstPass.evidenceId;
@@ -338,5 +397,5 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
     ...input.ledger,
     claims: verifiedAnchored.map((entry) => entry.claim)
   });
-  return { ledger, anchored: verifiedAnchored, claimEvidence, findings };
+  return { ledger, anchored: verifiedAnchored, claimEvidence, findings, warnings };
 };

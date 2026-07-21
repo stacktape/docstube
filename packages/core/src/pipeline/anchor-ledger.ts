@@ -23,6 +23,7 @@ import {
   gitCommitSchema,
   idPrefixes,
   mintId,
+  normalizeCitedValue,
   symbolSourceKeySchema
 } from '@docstube/contracts';
 import { blockSourceRanges } from '../entities/extract-entities.ts';
@@ -206,11 +207,18 @@ const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): Depend
       reject('missing-facet', `body subscription — symbol ${subscription.symbolHash} has no body print`);
       continue;
     }
-    if (subscription.kind === 'cited-value' && symbol.valuePrints[subscription.valueName] === undefined) {
-      reject(
-        'unknown-value',
-        `cited-value subscription — symbol ${subscription.symbolHash} has no value named "${subscription.valueName}"`
-      );
+    if (subscription.kind === 'cited-value') {
+      if (symbol.valuePrints[subscription.valueName] === undefined) {
+        reject(
+          'unknown-value',
+          `cited-value subscription — symbol ${subscription.symbolHash} has no value named "${subscription.valueName}"`
+        );
+        continue;
+      }
+      // The committed subscription carries the KERNEL-CANONICAL asserted value (the shared
+      // normalization): bare, quoted, and numeric spellings all land on the byte form the
+      // cited-value extraction grammar produces, so verification compares like with like.
+      resolved.push({ ...subscription, citedValue: normalizeCitedValue(subscription.citedValue).canonical });
       continue;
     }
     resolved.push(subscription);
