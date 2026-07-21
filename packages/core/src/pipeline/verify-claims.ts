@@ -2,12 +2,14 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   ClaimEvidence,
+  ClaimExecutionRecord,
   ClaimLedger,
   Codemap,
   EvidenceRecord,
   Finding,
   FingerprintSnapshot,
   LedgerClaim,
+  PageEntity,
   SymbolRecord,
   VerifierRunResult
 } from '@docstube/contracts';
@@ -15,6 +17,8 @@ import {
   bindCitedValue,
   claimEvidenceSchema,
   claimLedgerSchema,
+  contentHash,
+  detectFailureCapableAssertion,
   evidenceRecordSchema,
   gitCommitSchema,
   idPrefixes,
@@ -39,10 +43,14 @@ import type { AnchoredClaim, RejectedProposal } from './anchor-ledger.ts';
 //                   the claim's symbol — both sides normalized by the SAME value-name grammar the
 //                   valuePrints facet hashes. Match → checked; mismatch → CONTRADICTED (a caught
 //                   lie, gating); unresolvable at verify time → stays unchecked (never guess).
-//   behavior        checked ONLY when a PASSING snippet explicitly declared the claim via its
-//                   fence meta (```ts covers=c3,c5 — validated by submit_page, returned by the
-//                   snippet-exec verifier as covered marker ids). Containment (same section, same
-//                   page) narrows nothing and mints nothing — coverage is always declared.
+//   behavior        checked ONLY when a PASSING, ASSERTION-BEARING snippet explicitly declared
+//                   the claim via its fence meta (```ts covers=c3 — validated by submit_page,
+//                   returned by snippet-exec as structured ClaimExecutionRecords). The kernel
+//                   re-verifies from the executed source that the snippet contains at least one
+//                   failure-capable assertion construct (contracts assertion-detection.ts) and
+//                   that the source hash binds to the declared page block — a zero-exit
+//                   console.log next to covers= decides NOTHING (impl-07 finding 2). Containment
+//                   (same section, same page) narrows nothing and mints nothing.
 //   intent-history  stays unchecked / maintainer-input-needed in this slice — owner-attestation
 //                   evidence arrives with the KnowledgeFact wiring in a later wave.
 //   (unknown class) unchecked / no-checker-available until a promoted project-defined verifier
@@ -65,6 +73,9 @@ type CitedValueExtractor = (input: { file: string; content: string; symbol?: str
 export type VerifyClaimsInput = {
   ledger: ClaimLedger;
   anchored: AnchoredClaim[];
+  // The extracted page of THIS attempt: execution evidence binds snippet identity to real page
+  // blocks (block id + content hash), never to verifier say-so alone.
+  page: PageEntity;
   // Canonical evidence minted during anchoring (source-linked grounding) — claims reference them
   // by id; this stage folds them into the per-claim ClaimEvidence records.
   anchorEvidence: EvidenceRecord[];
@@ -134,15 +145,58 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
     });
   }
 
-  // Explicit execution coverage (impl-06 finding 2): a PASSING snippet-exec run returns the
-  // marker ids its fences declared via covers= (alongside the executed block ids). A behavior
-  // claim is checked ONLY when its own marker id appears here — declared coverage, never
-  // proximity. (A failing snippet already failed the page before this stage.)
-  const executionCoveredMarkerIds = new Set(
-    input.verifierResults
-      .filter((result) => result.verifier === SNIPPET_EXEC_CHECK && result.status === 'pass')
-      .flatMap((result) => result.coveredEntityIds)
-  );
+  // Explicit execution coverage (impl-07 finding 2): a PASSING snippet-exec run returns
+  // STRUCTURED ClaimExecutionRecords for the marker ids its fences declared via covers=. The
+  // kernel accepts a record only after re-proving, deterministically, that
+  //   1. it executed with exit 0,
+  //   2. the executed source contains at least one failure-capable assertion construct — the
+  //      kernel recomputes this from the record's source via the shared contracts detector and
+  //      also requires the verifier's own flag to agree (disagreement = drop, never trust),
+  //   3. the source hash matches the record's content hash AND that hash identifies a real
+  //      code-example block on THIS page (identity binding).
+  // Bare coveredEntityIds mint nothing; proximity mints nothing; console.log proves nothing.
+  const pageBlocks = [...input.page.preamble, ...input.page.sections.flatMap((section) => section.blocks)];
+  const blockHashById = new Map(pageBlocks.map((block) => [block.id, block.contentHash]));
+  const sourceMatchesHash = (source: string, hash: string): boolean =>
+    contentHash(source) === hash || contentHash(`${source}\n`) === hash || contentHash(source.replace(/\n$/u, '')) === hash;
+  const acceptedExecutionsByMarker = new Map<string, ClaimExecutionRecord[]>();
+  for (const result of input.verifierResults) {
+    if (result.verifier !== SNIPPET_EXEC_CHECK || result.status !== 'pass') {
+      continue;
+    }
+    for (const execution of result.claimExecutions ?? []) {
+      if (execution.exitCode !== 0) {
+        continue;
+      }
+      const kernelAssertionBearing = detectFailureCapableAssertion(execution.language, execution.source);
+      if (!kernelAssertionBearing) {
+        // Assertion-free (or undetectable) snippet: no behavior evidence, silently uncovered —
+        // conservative by design (when detection is unsure, no evidence).
+        continue;
+      }
+      if (execution.assertionBearing !== true) {
+        warnings.push(
+          `execution record for claim "${execution.markerId}" disagrees with the kernel's assertion detection — dropped`
+        );
+        continue;
+      }
+      if (!sourceMatchesHash(execution.source, execution.contentHash)) {
+        warnings.push(
+          `execution record for claim "${execution.markerId}" carries a source that does not hash to its declared content hash — dropped`
+        );
+        continue;
+      }
+      if (blockHashById.get(execution.blockId) !== execution.contentHash) {
+        warnings.push(
+          `execution record for claim "${execution.markerId}" names block ${execution.blockId}, which is not a block of this page with that content hash — dropped`
+        );
+        continue;
+      }
+      const list = acceptedExecutionsByMarker.get(execution.markerId) ?? [];
+      list.push(execution);
+      acceptedExecutionsByMarker.set(execution.markerId, list);
+    }
+  }
 
   const fileContentCache = new Map<string, string | undefined>();
   const readRepoFile = async (file: string): Promise<string | undefined> => {
@@ -329,10 +383,12 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         decidingEvidenceId = firstPass.evidenceId;
       }
     } else if (claim.class === 'behavior') {
-      // Explicit execution coverage only: a passing snippet DECLARED this claim via covers=.
-      // Same-section containment mints nothing; an undeclared console.log next door proves
-      // nothing about "retry retries the call".
-      if (executionCoveredMarkerIds.has(entry.markerId)) {
+      // Kernel-verified execution coverage only: a passing, ASSERTION-BEARING snippet DECLARED
+      // this claim via covers= and its identity binds to a real page block. Same-section
+      // containment mints nothing; an undeclared (or assertion-free) console.log proves nothing
+      // about "retry retries the call".
+      const execution = acceptedExecutionsByMarker.get(entry.markerId)?.[0];
+      if (execution !== undefined) {
         const record = evidenceRecordSchema.parse({
           evidenceId: mintId(idPrefixes.evidence),
           ref: {
@@ -340,14 +396,23 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             check: SNIPPET_EXEC_CHECK,
             environment: {
               os: process.platform,
-              runtimeVersions: { node: process.versions.node },
+              // The ACTUAL runtime the snippet ran under — bash records bash, never node.
+              runtimeVersions:
+                execution.runtime === 'node' ? { node: process.versions.node } : { bash: 'system' },
               sandbox: 'none'
+            },
+            snippet: {
+              blockId: execution.blockId,
+              contentHash: execution.contentHash,
+              runtime: execution.runtime
             }
           },
           checkedAt: now,
           sourceRevision: commit,
           outcome: 'pass',
-          detail: `a code sample declaring covers=${entry.markerId} executed successfully via ${SNIPPET_EXEC_CHECK}`
+          detail:
+            `an assertion-bearing ${execution.language} sample (block ${execution.blockId}) declaring ` +
+            `covers=${entry.markerId} executed successfully via ${SNIPPET_EXEC_CHECK} (${execution.runtime})`
         });
         minted.push(record);
         correctness = 'checked';

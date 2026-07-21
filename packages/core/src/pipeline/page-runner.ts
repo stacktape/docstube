@@ -327,6 +327,7 @@ export const generatePage = async (
     const verified = await verifyClaims({
       ledger: matched.ledger,
       anchored: matched.anchored,
+      page,
       anchorEvidence: anchoredLedger.evidence,
       rejectedProposals: anchoredLedger.rejectedProposals,
       codemap: ctx.codemap,

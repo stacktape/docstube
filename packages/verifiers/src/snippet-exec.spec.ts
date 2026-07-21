@@ -111,6 +111,56 @@ describe('snippet-exec', () => {
     // Declared coverage rides along verbatim — the kernel checks exactly these marker ids.
     expect(result.coveredEntityIds).toContain('b1');
     expect(result.coveredEntityIds).toContain('b2');
+    // Structured claim-execution results carry snippet identity + the deterministic assertion
+    // detection (this snippet has a process.exit(1) path, so it is failure-capable).
+    expect(result.claimExecutions).toHaveLength(2);
+    expect(result.claimExecutions?.map((record) => record.markerId).toSorted()).toEqual(['b1', 'b2']);
+    expect(result.claimExecutions?.[0]).toMatchObject({
+      blockId: block.id,
+      contentHash: block.contentHash,
+      language: 'js',
+      runtime: 'node',
+      exitCode: 0,
+      assertionBearing: true,
+      source: code
+    });
+  });
+
+  it("marks a console.log-only covers= snippet assertionBearing: false — the kernel then mints nothing", async () => {
+    const code = "console.log('ok');";
+    const { block, page } = pageWithBlock(code, 'js');
+
+    const result = await snippetExecVerifier.verify(withExec(realExec), [
+      makeArtifact(page, mdxWithFence('js covers=b1', code))
+    ]);
+
+    expect(result.status).toBe('pass');
+    expect(result.claimExecutions).toHaveLength(1);
+    expect(result.claimExecutions?.[0]).toMatchObject({
+      markerId: 'b1',
+      blockId: block.id,
+      assertionBearing: false
+    });
+  });
+
+  it('records bash as the ACTUAL runtime for bash covers= snippets, never node', async () => {
+    const code = '[ 1 -eq 1 ]';
+    const { block, page } = pageWithBlock(code, 'bash');
+    const exec: PluginExec = async (_command, args) =>
+      args[0] === '--version' ? { exitCode: 0, stdout: 'GNU bash', stderr: '' } : { exitCode: 0, stdout: '', stderr: '' };
+
+    const result = await snippetExecVerifier.verify(withExec(exec), [
+      makeArtifact(page, mdxWithFence('bash covers=b1', code))
+    ]);
+
+    expect(result.status).toBe('pass');
+    expect(result.claimExecutions?.[0]).toMatchObject({
+      markerId: 'b1',
+      blockId: block.id,
+      language: 'bash',
+      runtime: 'bash',
+      assertionBearing: true
+    });
   });
 
   it('covers ONLY the executed block when the fence declares no covers= — proximity mints nothing', async () => {

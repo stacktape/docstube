@@ -89,7 +89,21 @@ export const evidenceRefSchema = z.discriminatedUnion('kind', [
     assertedValue: z.string(),
     extractedValue: z.string()
   }),
-  z.object({ kind: z.literal('execution'), check: z.string().min(1), environment: executionEnvironmentSchema }),
+  z.object({
+    kind: z.literal('execution'),
+    check: z.string().min(1),
+    environment: executionEnvironmentSchema,
+    // Snippet identity (impl-07 finding 2): WHICH executed sample decided this — the page block,
+    // the exact source bytes (content hash), and the actual runtime (bash records bash, not
+    // node). Absent only for non-snippet execution checks.
+    snippet: z
+      .object({
+        blockId: blockIdSchema,
+        contentHash: contentHashSchema,
+        runtime: z.enum(['node', 'bash'])
+      })
+      .optional()
+  }),
   z.object({ kind: z.literal('schema-check'), check: z.string().min(1) }),
   z.object({ kind: z.literal('owner-attestation'), author: z.string().min(1), at: isoTimestampSchema }),
   // A cited external fact (platform limit, upstream default…). factId links back to the knowledge

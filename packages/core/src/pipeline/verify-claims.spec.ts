@@ -4,7 +4,13 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { typescriptLanguagePack } from '@docstube/lang-typescript';
 import { codemapSchema, fingerprintSnapshotSchema, sha256Hex, writerClaimLedgerSchema } from '@docstube/contracts';
-import type { Codemap, FingerprintSnapshot, ObservedRead, VerifierRunResult } from '@docstube/contracts';
+import type {
+  ClaimExecutionRecord,
+  Codemap,
+  FingerprintSnapshot,
+  ObservedRead,
+  VerifierRunResult
+} from '@docstube/contracts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import type { AnchorLedgerResult } from './anchor-ledger.ts';
@@ -45,6 +51,12 @@ const codemap: Codemap = codemapSchema.parse({
 
 const observedReads: ObservedRead[] = [{ file: 'src/retry.ts', contentHash: READ_HASH }];
 
+// Fence sources are constants so tests can construct execution records whose source hashes to
+// the real block content hash (the kernel's identity binding).
+const ASSERTIVE_SNIPPET = "assert(typeof retry === 'function');";
+const LOG_ONLY_SNIPPET = "console.log('ok');";
+const BASH_SNIPPET = '[ 1 -eq 1 ]';
+
 const mdx = `---
 title: "Retry"
 ---
@@ -62,7 +74,15 @@ title: "Retry"
 Prose first. <Claim id="b1">\`retry\` retries the call.</Claim>
 
 \`\`\`ts
-console.log('ok');
+${ASSERTIVE_SNIPPET}
+\`\`\`
+
+\`\`\`ts
+${LOG_ONLY_SNIPPET}
+\`\`\`
+
+\`\`\`bash
+${BASH_SNIPPET}
 \`\`\`
 
 ## Other
@@ -121,33 +141,55 @@ const anchorFixture = (
 
 const pageOf = () => extractPageEntity({ mdx, slug: 'retry' });
 
-const codeBlockIdOf = (page: ReturnType<typeof pageOf>): string => {
-  const block = page.sections
-    .flatMap((section) => section.blocks)
-    .find((candidate) => candidate.blockType === 'code-example');
-  if (block === undefined) {
-    throw new Error('fixture has no code block');
-  }
-  return block.id;
-};
+// Code blocks in document order: [0] assertive ts, [1] console.log-only ts, [2] bash.
+const codeBlocksOf = (page: ReturnType<typeof pageOf>) =>
+  page.sections.flatMap((section) => section.blocks).filter((candidate) => candidate.blockType === 'code-example');
 
-const snippetPass = (coveredEntityIds: string[]): VerifierRunResult => ({
+const snippetPass = (coveredEntityIds: string[], claimExecutions?: ClaimExecutionRecord[]): VerifierRunResult => ({
   verifier: 'snippet-exec',
   plugin: '@docstube/verifiers',
   status: 'pass',
   findings: [],
-  coveredEntityIds
+  coveredEntityIds,
+  ...(claimExecutions === undefined ? {} : { claimExecutions })
 });
+
+// A structured claim-execution record bound to a REAL fixture block (the kernel re-proves the
+// source hash and block identity, so tests must use the true source and hash).
+const executionOf = (
+  page: ReturnType<typeof pageOf>,
+  markerId: string,
+  blockIndex: number,
+  source: string,
+  overrides: Partial<ClaimExecutionRecord> = {}
+): ClaimExecutionRecord => {
+  const block = codeBlocksOf(page)[blockIndex];
+  if (block === undefined) {
+    throw new Error('fixture block index out of range');
+  }
+  return {
+    markerId,
+    blockId: block.id,
+    contentHash: block.contentHash,
+    language: block.language ?? 'ts',
+    runtime: (block.language ?? 'ts') === 'bash' ? 'bash' : 'node',
+    exitCode: 0,
+    assertionBearing: true,
+    source,
+    ...overrides
+  };
+};
 
 const verify = (
   anchoredResult: Extract<AnchorLedgerResult, { ok: true }>,
-  _page: ReturnType<typeof pageOf>,
+  page: ReturnType<typeof pageOf>,
   verifierResults: VerifierRunResult[] = [],
   snapshot: FingerprintSnapshot = fingerprints
 ) =>
   verifyClaims({
     ledger: anchoredResult.ledger,
     anchored: anchoredResult.anchored,
+    page,
     anchorEvidence: anchoredResult.evidence,
     rejectedProposals: anchoredResult.rejectedProposals,
     codemap,
@@ -381,7 +423,7 @@ describe('verifyClaims — code-structure and grounding', () => {
   });
 });
 
-describe('verifyClaims — behavior (declared execution coverage only)', () => {
+describe('verifyClaims — behavior (assertion-bearing, kernel-verified execution only)', () => {
   const behaviorDraft = (markerId: string) => ({
     markerId,
     class: 'behavior',
@@ -390,34 +432,95 @@ describe('verifyClaims — behavior (declared execution coverage only)', () => {
     proposedSubscriptions: [{ kind: 'body', symbolHash: KNOWN_SYMBOL }]
   });
 
-  it('checks a behavior claim ONLY when a passing snippet declared it via covers=', async () => {
-    // The snippet-exec result carries the fence's covers= marker ids alongside the block id.
+  it('checks a behavior claim when a passing ASSERTION-BEARING snippet declared it — evidence carries snippet identity', async () => {
     const page = pageOf();
+    const blocks = codeBlocksOf(page);
     const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
-      snippetPass([codeBlockIdOf(page), 'b1'])
+      snippetPass([blocks[0]!.id, 'b1'], [executionOf(page, 'b1', 0, ASSERTIVE_SNIPPET)])
     ]);
 
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
     const evidence = result.claimEvidence[0];
     const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
-    expect(deciding?.ref).toMatchObject({ kind: 'execution', check: 'snippet-exec' });
+    expect(deciding?.ref).toMatchObject({
+      kind: 'execution',
+      check: 'snippet-exec',
+      snippet: { blockId: blocks[0]!.id, contentHash: blocks[0]!.contentHash, runtime: 'node' }
+    });
     expect(deciding?.detail).toContain('covers=b1');
+    expect(deciding?.detail).toContain('assertion-bearing');
   });
 
-  it('the committed console.log case is NEGATIVE: same-section execution without covers= mints nothing', async () => {
-    // The impl-06 probe: a passing `console.log('ok')` block in the claim's own section. Without
-    // an explicit covers=b1 declaration it proves nothing about "retry retries the call".
+  it("the Sol probe is NEGATIVE: a zero-exit console.log('ok') with covers=b1 mints NOTHING", async () => {
+    // The impl-07 direct probe: a passing but trivially assertion-free snippet declares the
+    // claim. The kernel recomputes assertion detection over the source and refuses evidence.
     const page = pageOf();
-    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [snippetPass([codeBlockIdOf(page)])]);
+    const blocks = codeBlocksOf(page);
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
+      snippetPass(
+        [blocks[1]!.id, 'b1'],
+        [executionOf(page, 'b1', 1, LOG_ONLY_SNIPPET, { assertionBearing: false })]
+      )
+    ]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'execution')).toBe(true);
+  });
+
+  it('a LYING assertionBearing flag on an assertion-free source is still rejected — the kernel recomputes', async () => {
+    const page = pageOf();
+    const blocks = codeBlocksOf(page);
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
+      snippetPass([blocks[1]!.id, 'b1'], [executionOf(page, 'b1', 1, LOG_ONLY_SNIPPET, { assertionBearing: true })])
+    ]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+
+  it('bare covers= marker ids in coveredEntityIds mint nothing without a structured execution record', async () => {
+    // Declared coverage without the structured record (the pre-round-2 channel) decides nothing.
+    const page = pageOf();
+    const blocks = codeBlocksOf(page);
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
+      snippetPass([blocks[0]!.id, 'b1'])
+    ]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'execution')).toBe(true);
+  });
+
+  it('a bash snippet records bash as the actual runtime, never node', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
+      snippetPass(['b1'], [executionOf(page, 'b1', 2, BASH_SNIPPET)])
+    ]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'execution', snippet: { runtime: 'bash' } });
+    if (deciding?.ref.kind === 'execution') {
+      expect(Object.keys(deciding.ref.environment.runtimeVersions)).toEqual(['bash']);
+    }
+  });
+
+  it('rejects an execution record whose source does not hash to its declared block (identity binding)', async () => {
+    const page = pageOf();
+    const tampered = executionOf(page, 'b1', 0, `${ASSERTIVE_SNIPPET}\nprocess.exit(1);`);
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [snippetPass(['b1'], [tampered])]);
+    expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
+    expect(result.warnings.some((warning) => warning.includes('does not hash'))).toBe(true);
+  });
+
+  it('rejects an execution record naming a block that is not on this page', async () => {
+    const page = pageOf();
+    const foreign = executionOf(page, 'b1', 0, ASSERTIVE_SNIPPET, { blockId: `bl_${'0'.repeat(20)}` });
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [snippetPass(['b1'], [foreign])]);
+    expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
+    expect(result.warnings.some((warning) => warning.includes('not a block of this page'))).toBe(true);
   });
 
   it('a declared claim in ANOTHER section is still covered — coverage is the declaration, not proximity', async () => {
     // b2 sits in "Other"; the executed snippet lives in "Usage" but explicitly declares covers=b2.
     const page = pageOf();
     const result = await verify(anchorFixture([behaviorDraft('b2')], page), page, [
-      snippetPass([codeBlockIdOf(page), 'b2'])
+      snippetPass(['b2'], [executionOf(page, 'b2', 0, ASSERTIVE_SNIPPET)])
     ]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
   });
@@ -435,7 +538,8 @@ describe('verifyClaims — behavior (declared execution coverage only)', () => {
       plugin: '@docstube/verifiers',
       status: 'fail',
       findings: [],
-      coveredEntityIds: [codeBlockIdOf(page), 'b1']
+      coveredEntityIds: ['b1'],
+      claimExecutions: [executionOf(page, 'b1', 0, ASSERTIVE_SNIPPET)]
     };
     const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [failed]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });

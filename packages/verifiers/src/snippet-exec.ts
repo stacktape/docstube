@@ -2,7 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ts from 'typescript';
-import type { Finding } from '@docstube/contracts';
+import { detectFailureCapableAssertion, snippetRuntimeOf } from '@docstube/contracts';
+import type { ClaimExecutionRecord, Finding } from '@docstube/contracts';
 import type { PageArtifact, VerifierContext, VerifierDefinition } from '@docstube/plugin-sdk';
 import { mapFencesByHash } from './code-typecheck-ts.ts';
 import type { MdxCodeBlock } from './code-typecheck-ts.ts';
@@ -146,6 +147,7 @@ export const snippetExecVerifier: VerifierDefinition = {
     const result = await runVerifier(verifierId, async () => {
       const findings: Finding[] = [];
       const coveredEntityIds: string[] = [];
+      const claimExecutions: ClaimExecutionRecord[] = [];
 
       for (const artifact of pages) {
         const fencesByHash = mapFencesByHash(artifact.mdx);
@@ -172,6 +174,23 @@ export const snippetExecVerifier: VerifierDefinition = {
             if (run.exitCode === 0) {
               // The covered set is the block itself plus EXACTLY the declared covers= marker ids.
               coveredEntityIds.push(block.id, ...coveredMarkerIds(fence));
+              // Structured claim-execution results (impl-07 finding 2): snippet identity, the
+              // ACTUAL runtime, and the deterministic assertion detection over the executed
+              // source. The kernel re-verifies from `source`; a zero-exit run of an
+              // assertion-free snippet decides nothing regardless of covers=.
+              const assertionBearing = detectFailureCapableAssertion(language, fence.code);
+              for (const markerId of coveredMarkerIds(fence)) {
+                claimExecutions.push({
+                  markerId,
+                  blockId: block.id,
+                  contentHash: block.contentHash,
+                  language,
+                  runtime: snippetRuntimeOf(language),
+                  exitCode: run.exitCode,
+                  assertionBearing,
+                  source: fence.code
+                });
+              }
             } else if (!bashLanguages.has(language) && isModuleNotFound(run.stderr)) {
               // Unresolvable import in the sandbox: not proven, not failed.
             } else if (bashLanguages.has(language) && isCommandNotFound(run.exitCode, run.stderr)) {
@@ -206,7 +225,7 @@ export const snippetExecVerifier: VerifierDefinition = {
         }
       }
 
-      return { findings, coveredEntityIds };
+      return { findings, coveredEntityIds, claimExecutions };
     });
 
     // Every matching block was a bash block and bash is unavailable: the run proved nothing, and
