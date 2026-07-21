@@ -16,13 +16,17 @@ describe('symbol fingerprints', () => {
     expect(result.data?.valuePrints['attempts']).toBe(print);
   });
 
-  it('defaults valuePrints to empty and keeps the codemap sourceKey format for symbolHash', () => {
-    const parsed = symbolFingerprintSchema.parse({ symbolHash, signaturePrint: print, bodyPrint: print });
-    expect(parsed.valuePrints).toEqual({});
+  it('treats every print as optional-where-unavailable — a .d.ts symbol is signature-only', () => {
+    const signatureOnly = symbolFingerprintSchema.parse({ symbolHash, signaturePrint: print });
+    expect(signatureOnly.bodyPrint).toBeUndefined();
+    expect(signatureOnly.valuePrints).toEqual({});
+    // A symbol with no extractable facets still fingerprints (whole-file fallback covers change detection).
+    expect(symbolFingerprintSchema.safeParse({ symbolHash }).success).toBe(true);
+  });
+
+  it('keeps the codemap sourceKey format for symbolHash', () => {
     // Not a bare sha — must be the namespaced `<lang>:<sha256>` codemap key.
-    expect(
-      symbolFingerprintSchema.safeParse({ symbolHash: print, signaturePrint: print, bodyPrint: print }).success
-    ).toBe(false);
+    expect(symbolFingerprintSchema.safeParse({ symbolHash: print, signaturePrint: print }).success).toBe(false);
   });
 });
 

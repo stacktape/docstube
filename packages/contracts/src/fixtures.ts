@@ -1,7 +1,14 @@
 import type { z } from 'zod';
 import { contentHash } from './hashing.ts';
-import { mintId, idPrefixes } from './primitives.ts';
-import type { ClaimLedger } from './claim-ledger-schema.ts';
+import {
+  contentHashSchema,
+  entityRevisionSchema,
+  gitCommitSchema,
+  idPrefixes,
+  mintId,
+  symbolSourceKeySchema
+} from './primitives.ts';
+import type { ClaimLedger, WriterClaimLedger } from './claim-ledger-schema.ts';
 import type { docstubeConfigSchema } from './config-schema.ts';
 import type { PageEntity } from './entity-schema.ts';
 import type { KnowledgeFact, KnowledgeNeed } from './knowledge-schema.ts';
@@ -12,7 +19,7 @@ import type { StructuralFinding } from './structural-finding-schema.ts';
 // Shared test fixtures. Deterministic where determinism matters (hashes), minted where it does
 // not (ids). Used by contracts tests and by downstream packages' tests.
 
-const commit = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
+const commit = gitCommitSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678');
 const now = '2026-07-12T00:00:00.000Z';
 
 export const buildFixturePage = (): PageEntity => ({
@@ -106,10 +113,39 @@ export const fixtureConfigInput: z.input<typeof docstubeConfigSchema> = {
   site: { title: 'Fixture Docs' }
 };
 
-const fixtureSymbolHash = `ts:${'2'.repeat(64)}`;
+const fixtureSymbolHash = symbolSourceKeySchema.parse(`ts:${'2'.repeat(64)}`);
+const fixtureEntityRevision = entityRevisionSchema.parse('5'.repeat(64));
+const fixtureContentHash = contentHashSchema.parse('3'.repeat(64));
 
+// The writer-side artifact: proposed claims keyed by marker id only — nothing kernel-minted.
+export const buildFixtureWriterClaimLedger = (): WriterClaimLedger => ({
+  schemaVersion: 1,
+  claims: [
+    {
+      markerId: 'c1',
+      class: 'code-structure',
+      predicate: 'there is a function retry(options)',
+      proposedEvidence: [{ kind: 'symbol', symbol: fixtureSymbolHash, file: 'src/retry.ts' }],
+      proposedSubscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }]
+    },
+    {
+      markerId: 'c2',
+      class: 'value',
+      predicate: 'retry attempts default to 3',
+      proposedEvidence: [{ kind: 'symbol', symbol: fixtureSymbolHash, file: 'src/retry.ts' }],
+      proposedSubscriptions: [
+        { kind: 'cited-value', symbolHash: fixtureSymbolHash, valueName: 'attempts', citedValue: '3' }
+      ]
+    }
+  ]
+});
+
+// The kernel-side committed ledger: minted ids, anchors, computed correctness×disposition, and
+// evidence handles referencing the canonical evidence records in provenance.
 export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)): ClaimLedger => {
   const blockId = mintId(idPrefixes.block);
+  const groundingEvidenceId = mintId(idPrefixes.evidence);
+  const sourceLinkEvidenceId = mintId(idPrefixes.evidence);
   return {
     schemaVersion: 1,
     pageId,
@@ -117,26 +153,26 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
     claims: [
       {
         claimId: mintId(idPrefixes.claim),
-        class: 'shape',
+        class: 'code-structure',
         predicate: 'there is a function retry(options)',
         anchor: { blockId, markerId: 'c1' },
-        scope: { entityId: blockId, revision: commit },
+        scope: { entityId: blockId, revision: fixtureEntityRevision },
         subscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }],
-        evidence: [{ kind: 'codemap-grounding', symbol: fixtureSymbolHash, file: 'src/retry.ts', commit }],
-        disposition: {
-          status: 'checked',
-          evidence: { kind: 'codemap-grounding', symbol: fixtureSymbolHash, file: 'src/retry.ts', commit }
-        }
+        evidence: [{ evidenceId: groundingEvidenceId, kind: 'codemap-grounding' }],
+        correctness: 'checked',
+        disposition: null,
+        decidingEvidenceId: groundingEvidenceId
       },
       {
         claimId: mintId(idPrefixes.claim),
         class: 'value',
         predicate: 'retry attempts default to 3',
         anchor: { blockId, markerId: 'c2' },
-        scope: { entityId: blockId, revision: commit },
-        subscriptions: [{ kind: 'value', symbolHash: fixtureSymbolHash, valueName: 'attempts', citedValue: '3' }],
-        evidence: [{ kind: 'source-linked', symbol: fixtureSymbolHash, file: 'src/retry.ts', commit }],
-        disposition: { status: 'unchecked', reason: 'no-checker-available' }
+        scope: { entityId: blockId, revision: fixtureEntityRevision },
+        subscriptions: [{ kind: 'cited-value', symbolHash: fixtureSymbolHash, valueName: 'attempts', citedValue: '3' }],
+        evidence: [{ evidenceId: sourceLinkEvidenceId, kind: 'source-linked' }],
+        correctness: 'unchecked',
+        disposition: 'no-checker-available'
       }
     ],
     coverageLint: { uncovered: [] }
@@ -144,40 +180,53 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
 };
 
 export const buildFixtureKnowledgeNeed = (): KnowledgeNeed => ({
+  schemaVersion: 1,
   needId: mintId(idPrefixes.knowledgeNeed),
   kind: 'intent-policy',
-  subject: { entityThreadId: mintId(idPrefixes.block), symbolHash: fixtureSymbolHash },
+  subject: {
+    kind: 'entity-thread',
+    entityThreadId: mintId(idPrefixes.entityThread),
+    symbolHash: fixtureSymbolHash
+  },
   missingFact: { kind: 'design-rationale', field: 'why-default-3' },
   requestingPages: [mintId(idPrefixes.page)],
   question: 'Why does retry default to 3 attempts?',
   status: 'open',
+  researchTrail: [],
   createdAt: now
 });
 
 export const buildFixtureKnowledgeFact = (): KnowledgeFact => ({
+  schemaVersion: 1,
   factId: mintId(idPrefixes.knowledgeFact),
+  needId: mintId(idPrefixes.knowledgeNeed),
   statement: 'Retry defaults to 3 attempts to stay under the upstream 10s gateway timeout.',
-  origin: 'human',
+  origin: 'user',
   author: 'github:someuser',
   evidence: [],
-  answeredAtRevision: commit,
-  scope: { kind: 'entity', entityThreadId: mintId(idPrefixes.block) },
-  status: 'active'
+  answeredAt: now,
+  subjectFingerprint: fixtureContentHash,
+  researchTrail: [],
+  scope: { kind: 'entity', entityThreadId: mintId(idPrefixes.entityThread) },
+  status: 'active',
+  propagation: 'answered'
 });
 
 export const buildFixtureStructuralFinding = (pageIds?: [string, string]): StructuralFinding => {
   const [withSection, missingSection] = pageIds ?? [mintId(idPrefixes.page), mintId(idPrefixes.page)];
   return {
+    schemaVersion: 1,
     key: 'sibling-facet-asymmetry:compute-resources:pricing',
     code: 'structure.sibling-facet-asymmetry',
     scope: { kind: 'nav-group', groupId: 'compute-resources', pageIds: [withSection, missingSection] },
     detector: { kind: 'ai-assessed', id: 'sibling-facet-asymmetry', version: '1', model: 'fixture-model' },
+    authority: { kind: 'inferred-convention', cohortSize: 2, prevalence: 0.5 },
     impact: 'medium',
     status: { state: 'open' },
     evidence: [{ pageId: missingSection, detail: 'Sibling pages have a "Pricing" section; this page does not.' }],
     repairTargets: [missingSection],
     message: '1 of 2 compute-resources pages is missing the shared "Pricing" section.',
-    scopeFingerprint: '3'.repeat(64)
+    scopeFingerprint: fixtureContentHash
   };
 };
 
@@ -186,13 +235,20 @@ export const buildFixturePublicationDecision = (): PublicationDecision => ({
   toolVersion: '0.1.0',
   baseSha: commit,
   sourceSha: commit,
-  candidateArtifactHash: '4'.repeat(64),
+  candidateArtifactHash: contentHashSchema.parse('4'.repeat(64)),
   execution: 'completed',
   plan: { planned: 3, completed: 3, deferred: 0 },
   deterministicGate: 'clean',
   regressions: [],
   newBlockingDispositions: [],
-  coverageDelta: { before: 10, after: 12 },
+  coverageDelta: [
+    {
+      obligationId: 'ob-retry',
+      scope: 'src/retry.ts',
+      beforeStatus: 'unassigned',
+      afterStatus: 'documented'
+    }
+  ],
   publishable: true,
   autoMergeEligible: true,
   reasonCodes: []

@@ -17,17 +17,54 @@ describe('ia v2 schema', () => {
     const result = iaV2Schema.safeParse({
       schemaVersion: 2,
       tree: [
-        page('getting-started'),
+        page('getting-started', { sourceScope: { globs: ['src/cli/**'], symbols: ['Cli.*'] } }),
         {
           kind: 'group',
           groupId: 'guides',
           title: 'Guides',
-          consistency: { mode: 'explicit', requiredFacets: ['Pricing'] },
+          consistency: { mode: 'explicit', rules: [{ code: 'required-facets', parameters: { facets: ['Pricing'] } }] },
           children: [page('advanced', { secondaryPersonas: ['operator'], structuralExceptions: ['pricing'] })]
         }
       ]
     });
     expect(result.success).toBe(true);
+  });
+
+  it('models consistency as registry-addressed rules — the legacy requiredFacets key is a hard error', () => {
+    const result = iaV2Schema.safeParse({
+      schemaVersion: 2,
+      tree: [
+        {
+          kind: 'group',
+          groupId: 'guides',
+          title: 'Guides',
+          consistency: { mode: 'explicit', requiredFacets: ['Pricing'] },
+          children: [page('advanced')]
+        }
+      ]
+    });
+    expect(result.success).toBe(false);
+    const badCode = iaV2Schema.safeParse({
+      schemaVersion: 2,
+      tree: [
+        {
+          kind: 'group',
+          groupId: 'guides',
+          title: 'Guides',
+          consistency: { mode: 'explicit', rules: [{ code: 'Not A Code' }] },
+          children: [page('advanced')]
+        }
+      ]
+    });
+    expect(badCode.success).toBe(false);
+  });
+
+  it('rejects a malformed page sourceScope — the coverage ratchet depends on its shape', () => {
+    const result = iaV2Schema.safeParse({
+      schemaVersion: 2,
+      tree: [page('getting-started', { sourceScope: { paths: ['src/**'] } })]
+    });
+    expect(result.success).toBe(false);
   });
 
   it('rejects a node with an unknown kind — the union is explicit, never inferred', () => {

@@ -6,16 +6,40 @@ import { pageIdSchema } from './primitives.ts';
 // ia.yml v2 (quality-ci-reader-v2 decision 19): an explicit discriminated union of group and page
 // nodes replaces the "node without a brief is a group" inference. Groups own stable groupIds (the
 // scope key for structural findings) and optional consistency rules; pages own the primary
-// persona (release-scope-v2 decision 2). ia.yml holds only user intent — AI-derived structure
-// profiles are derived state and never live here.
+// persona (release-scope-v2 decision 2) and a source scope feeding the coverage-obligation
+// ratchet. ia.yml holds only user intent — AI-derived structure profiles are derived state and
+// never live here.
 
 // 'off' → no consistency checking for the group; 'inferred' → sibling-convention candidates may be
-// detected (AI-adjudicated, candidate-only); 'explicit' → requiredFacets are deterministic rules.
+// detected (AI-adjudicated, candidate-only); 'explicit' → the listed rules are deterministic.
 export const consistencyModeSchema = z.enum(['off', 'inferred', 'explicit']);
+
+// Consistency rules are registry-addressed { code, parameters } records: the rule registry owns
+// each code's parameter schema, so new deterministic rules never require an ia.yml schema break.
+export const consistencyRuleCodeSchema = z.string().regex(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/);
+
+// Built-in rule codes shipped in 0.1.0. 'required-facets' takes { facets: string[] } — the former
+// dedicated requiredFacets field is this one rule.
+export const builtinConsistencyRuleCodes = ['required-facets'] as const;
+
+export const consistencyRuleSchema = z.strictObject({
+  code: consistencyRuleCodeSchema,
+  parameters: z.record(z.string().min(1), z.unknown()).optional()
+});
+export type ConsistencyRule = z.infer<typeof consistencyRuleSchema>;
+
+// Which source files/symbols a page owns, aligned with coverage obligations (ARCHITECTURE §13.1,
+// quality-ci-reader-v2 decision 13): new symbols matching a page's scope route to it as the
+// candidate page instead of landing unassigned.
+export type IaPageSourceScope = {
+  globs?: string[] | undefined;
+  // Human-readable symbol path patterns (container paths), not hashes — ia.yml is hand-edited.
+  symbols?: string[] | undefined;
+};
 
 export type IaGroupConsistency = {
   mode: z.infer<typeof consistencyModeSchema>;
-  requiredFacets?: string[] | undefined;
+  rules?: ConsistencyRule[] | undefined;
 };
 
 export type IaGroupNodeV2 = {
@@ -35,6 +59,7 @@ export type IaPageNodeV2 = {
   brief: string;
   primaryPersona: string;
   secondaryPersonas?: string[] | undefined;
+  sourceScope?: IaPageSourceScope | undefined;
   structureProfile?: string | undefined;
   // Facet/rule codes this page is exempt from (e.g. a sibling legitimately missing a section).
   structuralExceptions?: string[] | undefined;
@@ -47,13 +72,18 @@ export type IaNodeV2 = IaGroupNodeV2 | IaPageNodeV2;
 const personaIdSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
 const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
+const sourceScopeObjectSchema = z.strictObject({
+  globs: z.array(z.string().min(1)).optional(),
+  symbols: z.array(z.string().min(1)).optional()
+});
+
 // Strict: ia.yml is human-edited, so a typo'd key must be a hard error.
 const iaGroupNodeV2ObjectSchema = z.strictObject({
   kind: z.literal('group'),
   groupId: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
   title: z.string().min(1),
   consistency: z
-    .strictObject({ mode: consistencyModeSchema, requiredFacets: z.array(z.string().min(1)).optional() })
+    .strictObject({ mode: consistencyModeSchema, rules: z.array(consistencyRuleSchema).optional() })
     .optional(),
   children: z.array(z.lazy((): z.ZodType<IaNodeV2> => iaNodeV2Schema))
 });
@@ -66,6 +96,7 @@ const iaPageNodeV2ObjectSchema = z.strictObject({
   brief: z.string().min(1),
   primaryPersona: personaIdSchema,
   secondaryPersonas: z.array(personaIdSchema).optional(),
+  sourceScope: sourceScopeObjectSchema.optional(),
   structureProfile: z.string().min(1).optional(),
   structuralExceptions: z.array(z.string().min(1)).optional(),
   depth: depthBudgetSchema,

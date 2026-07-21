@@ -2,23 +2,38 @@ import { z } from 'zod';
 import {
   blockIdSchema,
   claimIdSchema,
-  gitShaSchema,
+  contentHashSchema,
+  entityRevisionSchema,
+  evidenceIdSchema,
+  gitCommitSchema,
   isoTimestampSchema,
   lineSpanSchema,
   pageIdSchema,
   repoPathSchema,
   sectionIdSchema,
-  sourceKeySchema
+  symbolSourceKeySchema
 } from './primitives.ts';
 
-// The claim ledger is the v2 trust spine (trust-model-v2 decisions 1-6): the writer emits MDX plus
-// this structured ledger in one task, the kernel anchors and validates it BEFORE verification, and
-// every reader-facing trust surface derives from it.
+// The claim ledger is the v2 trust spine (trust-model-v2 decisions 1-6). Two distinct artifacts
+// share the claim vocabulary and must never be conflated:
+//   1. the WRITER ledger — agent output validated by submit_page: proposed claims keyed by inline
+//      marker id, with proposed evidence and subscriptions; nothing kernel-minted appears here;
+//   2. the KERNEL ledger — the committed record after the kernel anchors, mints/matches claim ids,
+//      and verification assigns correctness. Manifest shards store only this one.
 
-// v2 claim classes (trust-model-v2 decision 3, quality-ci-reader-v2 decision 5). The class formerly
-// called 'structural' is 'code-structure' — page-structure quality is never a claim.
-export const claimClassV2Schema = z.enum(['shape', 'value', 'behavior', 'code-structure']);
-export type ClaimClassV2 = z.infer<typeof claimClassV2Schema>;
+// Claim classes are an open token space (PRODUCT §3.2 calls the built-ins "notable" classes; the
+// capability schema stays open). Unknown class tokens are valid — the kernel routes them to
+// unchecked/no-checker-available until a registered verifier declares support.
+export const claimClassTokenSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
+export type ClaimClassToken = z.infer<typeof claimClassTokenSchema>;
+
+// 'code-structure' IS the existence/shape class (the class formerly called 'structural'/'shape' —
+// page-structure quality is never a claim).
+export const builtinClaimClasses = ['code-structure', 'value', 'behavior', 'intent-history'] as const;
+export type BuiltinClaimClass = (typeof builtinClaimClasses)[number];
+
+export const isBuiltinClaimClass = (value: string): value is BuiltinClaimClass =>
+  (builtinClaimClasses as readonly string[]).includes(value);
 
 // Environment fingerprint recorded with execution evidence (pipeline-v2 decision 5). `sandbox` is an
 // open lowercase token ('none' today) so future sandbox kinds extend without a schema break.
@@ -50,25 +65,25 @@ export const evidenceKindSchema = z.enum([
 export type EvidenceKind = z.infer<typeof evidenceKindSchema>;
 
 export const evidenceRefSchema = z.discriminatedUnion('kind', [
-  // Grounding suffices as "checked" for shape claims only; for value/behavior it confers merely
-  // source-linked (subject real, assertion unchecked) — trust-model-v2 decision 3.
+  // Grounding suffices as "checked" for code-structure claims only; for value/behavior it confers
+  // merely source-linked (subject real, assertion unchecked) — trust-model-v2 decision 3.
   z.object({
     kind: z.literal('codemap-grounding'),
-    symbol: sourceKeySchema,
+    symbol: symbolSourceKeySchema,
     file: repoPathSchema.optional(),
     span: lineSpanSchema.optional(),
-    commit: gitShaSchema.optional()
+    commit: gitCommitSchema.optional()
   }),
   z.object({
     kind: z.literal('source-linked'),
-    symbol: sourceKeySchema,
+    symbol: symbolSourceKeySchema,
     file: repoPathSchema.optional(),
     span: lineSpanSchema.optional(),
-    commit: gitShaSchema.optional()
+    commit: gitCommitSchema.optional()
   }),
   z.object({
     kind: z.literal('value-predicate'),
-    symbol: sourceKeySchema,
+    symbol: symbolSourceKeySchema,
     valueName: z.string().min(1),
     assertedValue: z.string(),
     extractedValue: z.string()
@@ -87,58 +102,203 @@ export const evidenceRefSchema = z.discriminatedUnion('kind', [
 ]);
 export type EvidenceRef = z.infer<typeof evidenceRefSchema>;
 
-// Explicit reason states replacing the old 'out-of-domain' bucket (trust-model-v2 provisional).
-export const uncheckedReasonSchema = z.enum(['no-checker-available', 'needs-owner-input']);
+// Correctness and unresolved disposition are separate axes (trust-model-v2 provisional):
+// correctness states describe factual checking only; the disposition explains an unresolved or
+// attested state. 'owner-attested' is the one disposition that coexists with 'checked'.
+export const claimCorrectnessSchema = z.enum(['checked', 'unchecked', 'contradicted']);
+export type ClaimCorrectness = z.infer<typeof claimCorrectnessSchema>;
 
-// Correctness axis. Owner-attested claims are modeled as 'checked' with 'owner-attestation'
-// evidence — attestation counts toward 100% (trust-model-v2 decision 5); the popover distinguishes
-// it from mechanical checks via the evidence kind.
-export const claimDispositionSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('checked'), evidence: evidenceRefSchema }),
-  z.object({ status: z.literal('unchecked'), reason: uncheckedReasonSchema }),
-  z.object({ status: z.literal('contradicted'), evidence: evidenceRefSchema, detail: z.string().optional() })
-]);
+export const claimDispositionSchema = z
+  .enum(['not-applicable', 'no-checker-available', 'maintainer-input-needed', 'owner-attested'])
+  .nullable();
 export type ClaimDisposition = z.infer<typeof claimDispositionSchema>;
 
-export const isOwnerAttested = (disposition: ClaimDisposition): boolean =>
-  disposition.status === 'checked' && disposition.evidence.kind === 'owner-attestation';
+// The class → deciding-evidence authority table (trust-model-v2 decision 3). 'source-linked' never
+// mints checked for any class; unpromoted 'project-defined' never mints checked; unknown classes
+// are checkable only by a promoted project-defined verifier that declared support.
+const checkedAuthority: Record<BuiltinClaimClass, readonly EvidenceKind[]> = {
+  'code-structure': ['codemap-grounding', 'execution', 'schema-check', 'owner-attestation', 'project-defined'],
+  value: ['value-predicate', 'execution', 'schema-check', 'owner-attestation', 'project-defined'],
+  behavior: ['execution', 'schema-check', 'owner-attestation', 'project-defined'],
+  'intent-history': ['owner-attestation', 'external-citation']
+};
 
-// Typed fingerprint subscriptions (pipeline-v2 decision 4): a claim subscribes to the fingerprint
-// kind it actually depends on. Value subscriptions carry the cited value so a value-print change
-// can be compared against what the docs assert.
-export const fingerprintSubscriptionSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('signature'), symbolHash: sourceKeySchema }),
+export type ClaimTrustState = {
+  class: string;
+  correctness: ClaimCorrectness;
+  disposition: ClaimDisposition;
+  decidingKind: EvidenceKind | undefined;
+  decidingPromoted: boolean | undefined;
+};
+
+// Shared consistency + authority check used by both the kernel ledger claim and the canonical
+// ClaimEvidence projection — one table, no divergence.
+export const claimTrustIssues = (state: ClaimTrustState): string[] => {
+  const issues: string[] = [];
+  if (state.correctness === 'unchecked') {
+    if (state.decidingKind !== undefined) {
+      issues.push('an unchecked claim must not carry deciding evidence');
+    }
+    if (state.disposition === null || state.disposition === 'owner-attested') {
+      issues.push('an unchecked claim requires an unresolved disposition');
+    }
+    return issues;
+  }
+  // checked | contradicted both require authoritative deciding evidence.
+  if (state.decidingKind === undefined) {
+    issues.push(`a ${state.correctness} claim requires deciding evidence`);
+    return issues;
+  }
+  if (state.correctness === 'contradicted' && state.disposition !== null) {
+    issues.push('a contradicted claim carries no disposition');
+  }
+  if (state.correctness === 'checked') {
+    const ownerAttested = state.decidingKind === 'owner-attestation';
+    if (ownerAttested && state.disposition !== 'owner-attested') {
+      issues.push("attestation-decided claims must carry the 'owner-attested' disposition");
+    }
+    if (!ownerAttested && state.disposition !== null) {
+      issues.push('a mechanically checked claim carries no disposition');
+    }
+  }
+  const allowed = isBuiltinClaimClass(state.class) ? checkedAuthority[state.class] : (['project-defined'] as const);
+  if (!allowed.includes(state.decidingKind)) {
+    issues.push(`evidence kind '${state.decidingKind}' has no authority to decide a '${state.class}' claim`);
+  } else if (state.decidingKind === 'project-defined' && state.decidingPromoted !== true) {
+    issues.push('unpromoted project-defined evidence does not mint built-in correctness states');
+  }
+  return issues;
+};
+
+// Typed dependency subscriptions (pipeline-v2 decision 4): a claim subscribes to the exact facet
+// it depends on. The public value token is 'cited-value' (matches the fingerprint ladder name);
+// files no language pack can parse subscribe to whole-file content.
+export const dependencySubscriptionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('signature'), symbolHash: symbolSourceKeySchema }),
   z.object({
-    kind: z.literal('value'),
-    symbolHash: sourceKeySchema,
+    kind: z.literal('cited-value'),
+    symbolHash: symbolSourceKeySchema,
     valueName: z.string().min(1),
     citedValue: z.string()
   }),
-  z.object({ kind: z.literal('body'), symbolHash: sourceKeySchema })
+  z.object({ kind: z.literal('body'), symbolHash: symbolSourceKeySchema }),
+  z.object({ kind: z.literal('file-content'), file: repoPathSchema, contentHash: contentHashSchema })
 ]);
-export type FingerprintSubscription = z.infer<typeof fingerprintSubscriptionSchema>;
+export type DependencySubscription = z.infer<typeof dependencySubscriptionSchema>;
 
 // The id attribute of the inline <Claim id> marker in the MDX (harness-state-v2 decision 5).
 export const claimMarkerIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/);
 
-export const ledgerClaimSchema = z.object({
+// What the writer may point at as proposed grounding — lightweight handles the kernel resolves
+// into real evidence during anchoring/verification. Never verified evidence itself.
+export const proposedEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('symbol'),
+    symbol: symbolSourceKeySchema,
+    file: repoPathSchema.optional(),
+    span: lineSpanSchema.optional()
+  }),
+  z.object({ kind: z.literal('file'), file: repoPathSchema, span: lineSpanSchema.optional() }),
+  z.object({ kind: z.literal('url'), url: z.url() }),
+  z.object({ kind: z.literal('check'), check: z.string().min(1) })
+]);
+export type ProposedEvidence = z.infer<typeof proposedEvidenceSchema>;
+
+// One proposed claim in the writer's submit_page output (trust-model-v2 decision 1): keyed by the
+// inline marker id only — the kernel mints/matches claim ids, anchors to blocks, and verifies.
+// Strict: writer output smuggling kernel-owned fields (claimId, disposition, evidence…) is
+// invalid ledger output, which is a coverage failure.
+export const draftClaimSchema = z.strictObject({
+  markerId: claimMarkerIdSchema,
+  class: claimClassTokenSchema,
+  // The asserted predicate text, stripped of surrounding prose.
+  predicate: z.string().min(1),
+  proposedEvidence: z.array(proposedEvidenceSchema).default([]),
+  proposedSubscriptions: z.array(dependencySubscriptionSchema).default([])
+});
+export type DraftClaim = z.infer<typeof draftClaimSchema>;
+
+// The writer-emitted ledger — what submit_page validates. Invalid, truncated, or duplicate-marker
+// output is a coverage failure that blocks the full-page badge.
+export const writerClaimLedgerSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    claims: z.array(draftClaimSchema).default([])
+  })
+  .superRefine((ledger, ctx) => {
+    const seen = new Set<string>();
+    for (const claim of ledger.claims) {
+      if (seen.has(claim.markerId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['claims'],
+          message: `duplicate markerId "${claim.markerId}" — every inline <Claim> marker anchors exactly one claim`
+        });
+      }
+      seen.add(claim.markerId);
+    }
+  });
+export type WriterClaimLedger = z.infer<typeof writerClaimLedgerSchema>;
+
+// A typed evidence handle on the kernel claim: id + kind (+ promotion for project-defined).
+// The full payload lives once, in the canonical ClaimEvidence record (provenance-v2) — the ledger
+// never embeds duplicate evidence payload arrays.
+export const evidenceHandleSchema = z.object({
+  evidenceId: evidenceIdSchema,
+  kind: evidenceKindSchema,
+  // Meaningful only for project-defined evidence: promotion lets it mint built-in states.
+  promoted: z.boolean().optional()
+});
+export type EvidenceHandle = z.infer<typeof evidenceHandleSchema>;
+
+const ledgerClaimObjectSchema = z.object({
   claimId: claimIdSchema,
-  class: claimClassV2Schema,
-  // Normalized predicate text — what the claim asserts, stripped of surrounding prose.
+  class: claimClassTokenSchema,
   predicate: z.string().min(1),
   // Claims are authored inline: the anchor is the owning block plus the marker id, never offsets.
   anchor: z.object({ blockId: blockIdSchema, markerId: claimMarkerIdSchema }),
-  // Which entity revision the claim was minted against.
+  // Which content-derived entity revision the claim was minted against (never a git commit).
   scope: z.object({
     entityId: z.union([pageIdSchema, sectionIdSchema, blockIdSchema]),
-    revision: gitShaSchema
+    revision: entityRevisionSchema
   }),
-  subscriptions: z.array(fingerprintSubscriptionSchema).default([]),
-  // All evidence collected for the claim; the disposition carries the deciding ref.
-  evidence: z.array(evidenceRefSchema).default([]),
-  disposition: claimDispositionSchema
+  subscriptions: z.array(dependencySubscriptionSchema).default([]),
+  evidence: z.array(evidenceHandleSchema).default([]),
+  correctness: claimCorrectnessSchema,
+  disposition: claimDispositionSchema,
+  // The evidence handle that decided checked/contradicted; absent while unchecked.
+  decidingEvidenceId: evidenceIdSchema.optional()
+});
+
+// The kernel-owned committed claim: minted id, anchored, with computed correctness. The
+// superRefine enforces the class/evidence authority table — impossible checked states never parse.
+export const ledgerClaimSchema = ledgerClaimObjectSchema.superRefine((claim, ctx) => {
+  const deciding =
+    claim.decidingEvidenceId === undefined
+      ? undefined
+      : claim.evidence.find((handle) => handle.evidenceId === claim.decidingEvidenceId);
+  if (claim.decidingEvidenceId !== undefined && deciding === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['decidingEvidenceId'],
+      message: 'decidingEvidenceId must reference one of the claim evidence handles'
+    });
+    return;
+  }
+  for (const message of claimTrustIssues({
+    class: claim.class,
+    correctness: claim.correctness,
+    disposition: claim.disposition,
+    decidingKind: deciding?.kind,
+    decidingPromoted: deciding?.promoted
+  })) {
+    ctx.addIssue({ code: 'custom', path: ['correctness'], message });
+  }
 });
 export type LedgerClaim = z.infer<typeof ledgerClaimSchema>;
+
+export const isOwnerAttested = (claim: Pick<LedgerClaim, 'correctness' | 'disposition'>): boolean =>
+  claim.correctness === 'checked' && claim.disposition === 'owner-attested';
 
 // Coverage-linter output (harness-state-v2 decision 5): assertion-shaped spans (identifiers,
 // defaults, numbers, modal statements) not covered by any claim — ledger omission cannot
@@ -150,10 +310,12 @@ export const coverageLintSpanSchema = z.object({
 });
 export type CoverageLintSpan = z.infer<typeof coverageLintSpanSchema>;
 
+// The kernel-owned committed ledger — what manifest shards store.
 export const claimLedgerSchema = z.object({
   schemaVersion: z.literal(1),
   pageId: pageIdSchema,
-  sourceRevision: gitShaSchema,
+  // The repository commit the ledger was computed against.
+  sourceRevision: gitCommitSchema,
   claims: z.array(ledgerClaimSchema).default([]),
   coverageLint: z.object({ uncovered: z.array(coverageLintSpanSchema).default([]) }).prefault({})
 });

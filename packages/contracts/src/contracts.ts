@@ -15,6 +15,10 @@ export {
   taskIdSchema,
   knowledgeNeedIdSchema,
   knowledgeFactIdSchema,
+  contextIdSchema,
+  evidenceIdSchema,
+  waiverIdSchema,
+  entityThreadIdSchema,
   semverSchema,
   isoTimestampSchema,
   localeCodeSchema,
@@ -23,10 +27,24 @@ export {
   sha256HexSchema,
   gitShaSchema,
   sourceKeySchema,
+  gitCommitSchema,
+  contentHashSchema,
+  fingerprintPrintSchema,
+  entityRevisionSchema,
+  symbolSourceKeySchema,
   severitySchema,
   lineSpanSchema
 } from './primitives.ts';
-export type { IdPrefix, Severity, LineSpan } from './primitives.ts';
+export type {
+  IdPrefix,
+  Severity,
+  LineSpan,
+  GitCommit,
+  ContentHash,
+  FingerprintPrint,
+  EntityRevision,
+  SymbolSourceKey
+} from './primitives.ts';
 
 export { sha256Hex, canonicalJson, hashValue, contentHash } from './hashing.ts';
 
@@ -170,26 +188,40 @@ export { docstubeConfigJsonSchema, iaJsonSchema, glossaryJsonSchema } from './co
 // above until downstream packages migrate in later waves.
 
 export {
-  claimClassV2Schema,
+  claimClassTokenSchema,
+  builtinClaimClasses,
+  isBuiltinClaimClass,
   executionEnvironmentSchema,
   evidenceKindSchema,
   evidenceRefSchema,
-  uncheckedReasonSchema,
+  claimCorrectnessSchema,
   claimDispositionSchema,
+  claimTrustIssues,
   isOwnerAttested,
-  fingerprintSubscriptionSchema,
+  dependencySubscriptionSchema,
   claimMarkerIdSchema,
+  proposedEvidenceSchema,
+  draftClaimSchema,
+  writerClaimLedgerSchema,
+  evidenceHandleSchema,
   ledgerClaimSchema,
   coverageLintSpanSchema,
   claimLedgerSchema
 } from './claim-ledger-schema.ts';
 export type {
-  ClaimClassV2,
+  ClaimClassToken,
+  BuiltinClaimClass,
   ExecutionEnvironment,
   EvidenceKind,
   EvidenceRef,
+  ClaimCorrectness,
   ClaimDisposition,
-  FingerprintSubscription,
+  ClaimTrustState,
+  DependencySubscription,
+  ProposedEvidence,
+  DraftClaim,
+  WriterClaimLedger,
+  EvidenceHandle,
   LedgerClaim,
   CoverageLintSpan,
   ClaimLedger
@@ -203,11 +235,14 @@ export {
   consumedFragmentKindSchema,
   consumedFragmentSchema,
   dependenciesSchema,
+  evidenceRecordSchema,
   claimEvidenceSchema,
   criterionOutcomeSchema,
   reviewCompletionSchema,
+  personaReviewRoleSchema,
   personaReviewSchema,
   riskCriticResultSchema,
+  fidelityAttemptSchema,
   translationFidelitySchema,
   structuralAssessmentSchema,
   assessmentsSchema,
@@ -217,9 +252,11 @@ export type {
   GenerationLineage,
   ConsumedFragment,
   Dependencies,
+  EvidenceRecord,
   ClaimEvidence,
   PersonaReview,
   RiskCriticResult,
+  FidelityAttempt,
   TranslationFidelity,
   StructuralAssessment,
   Assessments,
@@ -227,18 +264,23 @@ export type {
 } from './provenance-v2-schema.ts';
 
 export {
+  knowledgeSubjectSchema,
   knowledgeNeedKindSchema,
   knowledgeNeedStatusSchema,
+  researchAttemptSchema,
   knowledgeNeedSchema,
   knowledgeFactOriginSchema,
   factEvidenceRefSchema,
   knowledgeFactScopeSchema,
   knowledgeFactStatusSchema,
+  knowledgeFactPropagationSchema,
   knowledgeFactSchema
 } from './knowledge-schema.ts';
 export type {
+  KnowledgeSubject,
   KnowledgeNeedKind,
   KnowledgeNeed,
+  ResearchAttempt,
   FactEvidenceRef,
   KnowledgeFactScope,
   KnowledgeFact
@@ -247,42 +289,70 @@ export type {
 export {
   structuralDetectorSchema,
   structuralScopeSchema,
+  structuralAuthoritySchema,
   structuralFindingStatusSchema,
   structuralImpactSchema,
   structuralEvidenceItemSchema,
-  structuralFindingSchema
+  structuralFindingSchema,
+  structuralSnapshotPageSchema,
+  structuralSnapshotSchema
 } from './structural-finding-schema.ts';
 export type {
   StructuralDetector,
   StructuralScope,
+  StructuralAuthority,
   StructuralFindingStatus,
-  StructuralFinding
+  StructuralFinding,
+  StructuralSnapshotPage,
+  StructuralSnapshot
 } from './structural-finding-schema.ts';
 
-export { consistencyModeSchema, iaNodeV2Schema, iaV2Schema, walkIaV2Nodes, convertIaToV2 } from './ia-v2-schema.ts';
-export type { IaGroupConsistency, IaGroupNodeV2, IaPageNodeV2, IaNodeV2, IaV2 } from './ia-v2-schema.ts';
+export {
+  consistencyModeSchema,
+  consistencyRuleCodeSchema,
+  builtinConsistencyRuleCodes,
+  consistencyRuleSchema,
+  iaNodeV2Schema,
+  iaV2Schema,
+  walkIaV2Nodes,
+  convertIaToV2
+} from './ia-v2-schema.ts';
+export type {
+  ConsistencyRule,
+  IaPageSourceScope,
+  IaGroupConsistency,
+  IaGroupNodeV2,
+  IaPageNodeV2,
+  IaNodeV2,
+  IaV2
+} from './ia-v2-schema.ts';
 
 export {
   publicationExecutionSchema,
   publicationRegressionKindSchema,
   publicationRegressionSchema,
   blockingDispositionSchema,
-  coverageDeltaSchema,
+  coverageObligationStatusSchema,
+  coverageObligationDeltaSchema,
+  publicationReasonCodeRegistryVersion,
   reasonCodeSchema,
   publicationDecisionSchema,
   outputInventorySchema,
   waiverScopeSchema,
   waiverSchema
 } from './publication-schema.ts';
-export type { PublicationRegression, PublicationDecision, OutputInventory, Waiver } from './publication-schema.ts';
+export type {
+  PublicationRegression,
+  CoverageObligationStatus,
+  CoverageObligationDelta,
+  PublicationReasonCode,
+  PublicationDecision,
+  OutputInventory,
+  WaiverScope,
+  Waiver
+} from './publication-schema.ts';
 
-export {
-  supportLevelSchema,
-  supportMatrixSchema,
-  publicationRuleSchema,
-  claimClassPolicySchema,
-  assuranceProfileSchema
-} from './assurance-schema.ts';
+export { supportLevelSchema, supportMatrixSchema, assuranceProfileSchema } from './assurance-schema.ts';
 export type { SupportLevel, SupportMatrix, AssuranceProfile } from './assurance-schema.ts';
 
 export {
@@ -296,15 +366,30 @@ export {
 export type { Archetype, Visibility, ProductKind, CoveragePolicy, ArchetypeDefaults } from './archetype-schema.ts';
 
 export {
-  localizationStateSchema,
-  localizationPublicationStateSchema,
-  localizationPageStateSchema,
+  localizationSchedulerStateSchema,
+  retryBasisSchema,
+  localizationSchedulerRecordSchema,
+  localizationRenditionSchema,
+  routeResolutionSchema,
+  localizationRouteRecordSchema,
+  translatableUnitSchema,
+  localizationPlanSchema,
+  terminologyPolicySchema,
+  terminologyEntrySchema,
+  terminologyProfileSchema,
   translationMemoryUnitKeySchema
 } from './localization-state-schema.ts';
 export type {
-  LocalizationState,
-  LocalizationPublicationState,
-  LocalizationPageState,
+  LocalizationSchedulerState,
+  RetryBasis,
+  LocalizationSchedulerRecord,
+  LocalizationRendition,
+  RouteResolution,
+  LocalizationRouteRecord,
+  TranslatableUnit,
+  LocalizationPlan,
+  TerminologyEntry,
+  TerminologyProfile,
   TranslationMemoryUnitKey
 } from './localization-state-schema.ts';
 
@@ -313,6 +398,7 @@ export {
   buildFixturePage,
   buildFixturePageShard,
   fixtureConfigInput,
+  buildFixtureWriterClaimLedger,
   buildFixtureClaimLedger,
   buildFixtureKnowledgeNeed,
   buildFixtureKnowledgeFact,

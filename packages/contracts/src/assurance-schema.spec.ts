@@ -2,53 +2,68 @@ import { describe, expect, it } from 'vitest';
 import { assuranceProfileSchema, supportMatrixSchema } from './assurance-schema.ts';
 
 describe('assurance profile', () => {
-  it('round-trips a profile scoping claim classes to accepted evidence kinds', () => {
+  it('round-trips a descriptive profile: languages, classes, evidence kinds, capabilities', () => {
     const result = assuranceProfileSchema.safeParse({
-      profileVersion: 1,
+      schemaVersion: 1,
+      profileVersion: 3,
       languages: ['typescript', 'python'],
-      sourceProviders: ['openapi'],
-      repoRoots: ['.'],
-      artifactTypes: ['mdx-site'],
-      claimClasses: [
-        { class: 'shape', acceptedEvidence: ['codemap-grounding'] },
-        { class: 'value', acceptedEvidence: ['execution', 'schema-check'] }
-      ],
-      requiredEnvironmentCapabilities: ['node>=24'],
-      publication: { contradicted: 'block' }
+      claimClasses: ['code-structure', 'value'],
+      evidenceKinds: ['codemap-grounding', 'value-predicate', 'execution'],
+      capabilities: ['node>=24']
     });
     expect(result.success).toBe(true);
-    expect(result.data?.ledgerCompleteness).toEqual({ requireInlineAnchors: true, maxUncoveredAssertionSpans: 0 });
-    expect(result.data?.publication).toEqual({
-      unchecked: 'publish-labeled',
-      ownerAttested: 'publish',
-      contradicted: 'block'
+  });
+
+  it('separates the format version from the domain profile revision', () => {
+    expect(assuranceProfileSchema.safeParse({ profileVersion: 1 }).success).toBe(false);
+    expect(assuranceProfileSchema.safeParse({ schemaVersion: 1, profileVersion: 0 }).success).toBe(false);
+  });
+
+  it('is descriptive only — trust-configuration knobs are not part of the contract', () => {
+    const parsed = assuranceProfileSchema.parse({
+      schemaVersion: 1,
+      profileVersion: 1,
+      // Stripped, never honored: class authority and publication policy are kernel-owned.
+      claimClasses: ['value'],
+      ledgerCompleteness: { maxUncoveredAssertionSpans: 100 },
+      publication: { contradicted: 'publish' }
+    });
+    expect(parsed).toEqual({
+      schemaVersion: 1,
+      profileVersion: 1,
+      languages: [],
+      claimClasses: ['value'],
+      evidenceKinds: [],
+      capabilities: []
     });
   });
 
-  it('rejects a claim-class policy with no accepted evidence or unknown kinds', () => {
-    const empty = assuranceProfileSchema.safeParse({
-      profileVersion: 1,
-      claimClasses: [{ class: 'shape', acceptedEvidence: [] }]
-    });
-    expect(empty.success).toBe(false);
-    const unknown = assuranceProfileSchema.safeParse({
-      profileVersion: 1,
-      claimClasses: [{ class: 'shape', acceptedEvidence: ['gut-feeling'] }]
-    });
-    expect(unknown.success).toBe(false);
+  it('rejects unknown evidence kinds and malformed class tokens', () => {
+    expect(
+      assuranceProfileSchema.safeParse({ schemaVersion: 1, profileVersion: 1, evidenceKinds: ['gut-feeling'] }).success
+    ).toBe(false);
+    expect(
+      assuranceProfileSchema.safeParse({ schemaVersion: 1, profileVersion: 1, claimClasses: ['Not A Class'] }).success
+    ).toBe(false);
   });
 });
 
 describe('support matrix', () => {
-  it('maps category → capability → support level', () => {
+  it('maps category → capability → support level under a versioned envelope', () => {
     const result = supportMatrixSchema.safeParse({
-      languages: { typescript: 'supported', python: 'preview', java: 'unavailable' },
-      transports: { 'claude-cli': 'supported' }
+      schemaVersion: 1,
+      categories: {
+        languages: { typescript: 'supported', python: 'preview', java: 'unavailable' },
+        transports: { 'claude-cli': 'supported' }
+      }
     });
     expect(result.success).toBe(true);
   });
 
-  it('rejects levels outside supported/preview/unavailable', () => {
-    expect(supportMatrixSchema.safeParse({ languages: { typescript: 'beta' } }).success).toBe(false);
+  it('rejects levels outside supported/preview/unavailable and unversioned matrices', () => {
+    expect(
+      supportMatrixSchema.safeParse({ schemaVersion: 1, categories: { languages: { typescript: 'beta' } } }).success
+    ).toBe(false);
+    expect(supportMatrixSchema.safeParse({ categories: {} }).success).toBe(false);
   });
 });

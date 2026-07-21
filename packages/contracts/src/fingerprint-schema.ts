@@ -1,17 +1,23 @@
 import { z } from 'zod';
-import { gitShaSchema, repoPathSchema, sha256HexSchema, sourceKeySchema } from './primitives.ts';
+import {
+  contentHashSchema,
+  fingerprintPrintSchema,
+  gitCommitSchema,
+  repoPathSchema,
+  symbolSourceKeySchema
+} from './primitives.ts';
 
 // Typed fingerprint ladder (pipeline-v2 decision 4). `symbolHash` is the codemap identity key
 // (packages/codemap symbol-hash.ts: `<lang>:<sha256>` over kind + containerPath + normalized
-// declaration). The prints below are finer-grained content hashes emitted by language packs so
-// ledger claims can subscribe to exactly the facet they depend on: shape claims → signaturePrint,
-// value claims → the named value's print, body subscriptions rare.
+// declaration). Language packs emit UP TO three prints per symbol — every print is optional where
+// the facet does not exist (.d.ts files are signature-only; symbols without extractable values
+// emit no value prints) — so ledger claims can subscribe to exactly the facet they depend on.
 export const symbolFingerprintSchema = z.object({
-  symbolHash: sourceKeySchema,
-  signaturePrint: sha256HexSchema,
+  symbolHash: symbolSourceKeySchema,
+  signaturePrint: fingerprintPrintSchema.optional(),
   // Named cited values (e.g. a default, a constant) → hash of the normalized value text.
-  valuePrints: z.record(z.string().min(1), sha256HexSchema).default({}),
-  bodyPrint: sha256HexSchema
+  valuePrints: z.record(z.string().min(1), fingerprintPrintSchema).default({}),
+  bodyPrint: fingerprintPrintSchema.optional()
 });
 export type SymbolFingerprint = z.infer<typeof symbolFingerprintSchema>;
 
@@ -19,13 +25,13 @@ export type SymbolFingerprint = z.infer<typeof symbolFingerprintSchema>;
 // ladder is never less safe than whole-file hashing, precision improves per file type.
 export const fileFingerprintSchema = z.object({
   file: repoPathSchema,
-  contentHash: sha256HexSchema
+  contentHash: contentHashSchema
 });
 export type FileFingerprint = z.infer<typeof fileFingerprintSchema>;
 
 export const fingerprintSnapshotSchema = z.object({
   schemaVersion: z.literal(1),
-  commit: gitShaSchema,
+  commit: gitCommitSchema,
   symbols: z.array(symbolFingerprintSchema).default([]),
   unparsedFiles: z.array(fileFingerprintSchema).default([])
 });
