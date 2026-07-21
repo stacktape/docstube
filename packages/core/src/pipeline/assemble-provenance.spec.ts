@@ -5,6 +5,7 @@ import {
   contentHash,
   docstubeConfigSchema,
   glossarySchema,
+  hashValue,
   transcriptSchema
 } from '@docstube/contracts';
 import type { AgentTaskSpec } from '@docstube/contracts';
@@ -94,9 +95,19 @@ const reviews = [
   }
 ];
 
+const node = {
+  kind: 'page' as const,
+  slug: 'retry',
+  title: 'Retry',
+  brief: 'How retries work.',
+  primaryPersona: 'app-developer',
+  depth: 'standard' as const
+};
+
 const assemble = (evidence = claimEvidence) =>
   assembleProvenanceV2({
     pageId: PAGE,
+    node,
     ledger,
     claimEvidence: evidence,
     transcript,
@@ -159,14 +170,23 @@ describe('assembleProvenanceV2', () => {
     // Two claims, one shared dependency → one subscription.
     expect(dependencies.subscriptions).toEqual([subscription]);
     const kinds = dependencies.consumed.map((fragment) => fragment.kind);
-    expect(kinds).toEqual(['instruction', 'criteria', 'knowledge-fact', 'glossary', 'config']);
+    expect(kinds).toEqual(['instruction', 'criteria', 'knowledge-fact', 'glossary', 'config', 'ia']);
     const instruction = dependencies.consumed[0];
     expect(instruction?.hash).toBe(contentHash('Prefer active voice.'));
     expect(instruction?.id).toBe(`instruction-${contentHash('Prefer active voice.').slice(0, 12)}`);
     expect(dependencies.consumed.find((fragment) => fragment.kind === 'knowledge-fact')?.id).toBe('why-retries');
   });
 
-  it('maps persona reviews onto assessments with gating role and honest completion', () => {
+  it('records the page-specific IA fragment as a consumed dependency (title/brief/depth/persona)', () => {
+    const { dependencies } = assemble();
+    const ia = dependencies.consumed.find((fragment) => fragment.kind === 'ia');
+    expect(ia?.id).toBe('ia:retry');
+    expect(ia?.hash).toBe(
+      hashValue({ title: 'Retry', brief: 'How retries work.', depth: 'standard', primaryPersona: 'app-developer' })
+    );
+  });
+
+  it('maps ONLY the primary persona to primary-gating; other recorded reviews are advisory', () => {
     const { assessments } = assemble();
     expect(assessments.reviews).toHaveLength(2);
     expect(assessments.reviews[0]).toMatchObject({
@@ -177,7 +197,13 @@ describe('assembleProvenanceV2', () => {
       completion: 'completed',
       criteria: [{ id: 'audience-fit', outcome: 'met' }]
     });
-    // An invalid reviewer output is a RECORDED failed review, never a missing record.
-    expect(assessments.reviews[1]).toMatchObject({ persona: 'ops', completion: 'failed', criteria: [] });
+    // An invalid reviewer output is a RECORDED failed review, never a missing record — and a
+    // non-primary persona can never masquerade as gating.
+    expect(assessments.reviews[1]).toMatchObject({
+      persona: 'ops',
+      role: 'secondary-advisory',
+      completion: 'failed',
+      criteria: []
+    });
   });
 });

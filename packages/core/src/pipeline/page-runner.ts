@@ -8,7 +8,7 @@ import type {
   Codemap,
   Finding,
   FingerprintSnapshot,
-  IaNode,
+  IaPageNodeV2,
   PageShard,
   ProvenanceV2,
   ToolDescriptor,
@@ -98,7 +98,9 @@ export const contentRelativePath = (locale: string, slug: string): string => `co
 
 export const generatePage = async (
   ctx: PageRunContext,
-  node: IaNode,
+  // The page's ia.yml v2 record (converted at pipeline entry): title, brief, depth, and the
+  // primary persona whose review gates this page.
+  node: IaPageNodeV2,
   previousShard: PageShard | undefined
 ): Promise<{
   outcome: PageOutcome;
@@ -300,6 +302,8 @@ export const generatePage = async (
       config: ctx.config,
       criteria: ctx.criteria,
       artifact,
+      primaryPersona: node.primaryPersona,
+      brief: node.brief,
       runTask: ctx.options.runTask,
       toolDescriptors: ctx.options.toolDescriptors,
       journal: ctx.journal,
@@ -358,6 +362,7 @@ export const generatePage = async (
     // Assembled on every anchored attempt for the same reason as the ledger above.
     lastProvenance = assembleProvenanceV2({
       pageId: page.id,
+      node,
       ledger: verified.ledger,
       claimEvidence: verified.claimEvidence,
       transcript,

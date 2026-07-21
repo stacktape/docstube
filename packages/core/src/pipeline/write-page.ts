@@ -1,4 +1,4 @@
-import type { AgentTaskSpec, Codemap, DocstubeConfig, Finding, Glossary, IaNode } from '@docstube/contracts';
+import type { AgentTaskSpec, Codemap, DocstubeConfig, Finding, Glossary, IaPageNodeV2 } from '@docstube/contracts';
 import { agentTaskSpecSchema, idPrefixes, mintId } from '@docstube/contracts';
 
 // Prompt assembly for the write-page task. The writer gets seed context (recorded as provenance
@@ -9,7 +9,8 @@ export type WritePromptInput = {
   config: DocstubeConfig;
   glossary: Glossary;
   codemap: Codemap;
-  node: IaNode;
+  // The page's ia.yml v2 record: title, brief, depth, and the PRIMARY persona (release-scope-v2).
+  node: IaPageNodeV2;
   // Findings from a failed gate attempt, attached on retry.
   priorFindings: Finding[];
   // The failed attempt's MDX, attached on retry so the writer edits it instead of rewriting.
@@ -73,15 +74,15 @@ const claimAuthorshipRules = [
   '  plain numbers, true/false, null). The asserted value MUST appear verbatim in the prose the marker wraps',
   '  (or in the predicate) — a citedValue the visible sentence never states is rejected;',
   '  { kind: "body", symbolHash } when the claim depends on implementation details beyond the signature.',
+  '  Use symbol hashes from the API surface list or from tool results — never invent a hash. When you have no real',
+  '  symbol hash for a code-structure/value/behavior claim, propose a whole-file dependency instead:',
+  '  { kind: "file-content", file: "<repo-relative file the fact came from>" } (no contentHash — the kernel fills',
+  '  in the authoritative hash). Never leave a code-dependent claim with no subscription at all.',
   '- Behavior claims are CHECKED only through declared execution coverage: when a runnable code example on the page',
   '  actually exercises a behavior claim, declare it in the fence info string with covers=<markerId>[,<markerId>…]',
   '  (e.g. ```ts covers=c3,c5). Declare a claim ONLY if the snippet would fail when that claim is false — coverage',
   '  is a promise, not a decoration. covers= may name only behavior-class markers that exist in your ledger, and',
   '  never appears on a no-exec fence. Behavior claims no snippet exercises simply stay unchecked — that is fine.',
-  '  Use symbol hashes from the API surface list or from tool results — never invent a hash. When you have no real',
-  '  symbol hash for a code-structure/value/behavior claim, propose a whole-file dependency instead:',
-  '  { kind: "file-content", file: "<repo-relative file the fact came from>" } (no contentHash — the kernel fills',
-  '  in the authoritative hash). Never leave a code-dependent claim with no subscription at all.',
   '- Short valid examples, one per class:',
   '  code-structure: <Claim id="c1">`greet` accepts a `GreetOptions` object.</Claim> — ledger: { markerId: "c1",',
   '    class: "code-structure", predicate: "greet accepts a GreetOptions parameter", proposedEvidence:',
@@ -168,8 +169,9 @@ export const buildWriterUserPrompt = (input: WritePromptInput): string => {
       : [];
   return [
     `Write the documentation page "${input.node.title}" (slug: ${input.node.slug}).`,
-    `Page brief: ${input.node.brief ?? input.node.title}`,
-    `Depth budget: ${input.node.depth ?? 'standard'}.`,
+    `Page brief: ${input.node.brief}`,
+    `Depth budget: ${input.node.depth}.`,
+    `Primary audience: the "${input.node.primaryPersona}" persona — this page is written and reviewed for them.`,
     '',
     'Public API surface (from the verified codemap — cite these, explore with tools for detail):',
     symbolSummary(input.codemap),

@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { PageShard, ToolDescriptor } from '@docstube/contracts';
-import { hashValue, idPrefixes, mintId, walkIaNodes } from '@docstube/contracts';
+import type { IaPageNodeV2, PageShard, ToolDescriptor } from '@docstube/contracts';
+import { convertIaToV2, hashValue, idPrefixes, mintId, walkIaV2Nodes } from '@docstube/contracts';
 import { buildCodemap, buildFingerprintSnapshot } from '@docstube/codemap';
 import { loadConfigFamily } from '../config/config-io.ts';
 import { CoreError } from '../errors.ts';
@@ -166,9 +166,11 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     }
     const selected = candidates.slice(0, options.maxPages ?? 3);
 
+    // ia.yml v2 at pipeline entry (finding 6): page nodes carry the gating primary persona.
+    const iaV2 = convertIaToV2(ia, { defaultPrimaryPersona: config.personas[0]?.id ?? 'reader' });
     const nodesBySlug = new Map(
-      walkIaNodes(ia.tree)
-        .filter((node) => node.brief !== undefined)
+      walkIaV2Nodes(iaV2.tree)
+        .filter((node): node is IaPageNodeV2 => node.kind === 'page')
         .map((node) => [node.slug, node])
     );
 

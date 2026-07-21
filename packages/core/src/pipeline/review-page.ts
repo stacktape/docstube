@@ -9,6 +9,7 @@ import type {
   Transcript
 } from '@docstube/contracts';
 import { agentTaskSpecSchema, idPrefixes, mintId, reviewResultSchema } from '@docstube/contracts';
+import { CoreError } from '../errors.ts';
 import type { RunJournal } from '../state/run-journal.ts';
 import type { RunCostTracker } from './run-cost.ts';
 
@@ -77,6 +78,10 @@ export type ReviewPageInput = {
   config: DocstubeConfig;
   criteria: string[];
   artifact: PageArtifact;
+  // The page's primary persona (ia.yml v2): ONLY this persona's review runs and gates in this
+  // slice. Sampled secondary-persona reviews are ADVISORY and arrive with the review-routing
+  // wave — they are deliberately not run here (PRODUCT §3.5 stage 7).
+  primaryPersona: string;
   brief?: string | undefined;
   toolDescriptors?: ToolDescriptor[] | undefined;
   runTask: (spec: AgentTaskSpec) => Promise<Transcript>;
@@ -120,7 +125,18 @@ const reviewFromTranscript = (persona: Persona, transcript: Transcript): ReviewR
 export const reviewPage = async (input: ReviewPageInput): Promise<ScoredReview[]> => {
   const criteria = input.criteria.length > 0 ? input.criteria : [...defaultReviewCriteria];
   const reviews: ScoredReview[] = [];
-  for (const persona of input.config.personas) {
+  // Primary persona ONLY (finding 6): every configured persona reviewing — and every one gating —
+  // recorded false 'primary-gating' assessments and burned review calls per persona per attempt.
+  const primary = input.config.personas.find((persona) => persona.id === input.primaryPersona);
+  if (primary === undefined) {
+    throw new CoreError(
+      'config-invalid',
+      `page primary persona "${input.primaryPersona}" is not a configured persona (personas: ${input.config.personas
+        .map((persona) => persona.id)
+        .join(', ')})`
+    );
+  }
+  for (const persona of [primary]) {
     const task = buildReviewPageTask({
       persona,
       criteria,

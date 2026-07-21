@@ -6,13 +6,14 @@ import type {
   Finding,
   Flag,
   FlagKind,
+  IaPageNodeV2,
   ManifestIndex,
   PageEntity,
   PageShard,
   Provenance,
   ToolDescriptor
 } from '@docstube/contracts';
-import { contentHash, hashValue, idPrefixes, mintId, walkIaNodes } from '@docstube/contracts';
+import { contentHash, convertIaToV2, hashValue, idPrefixes, mintId, walkIaV2Nodes } from '@docstube/contracts';
 import { buildCodemap, buildFingerprintSnapshot } from '@docstube/codemap';
 import { loadConfigFamily } from '../config/config-io.ts';
 import { docstubeVersion } from '../version.ts';
@@ -210,9 +211,11 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     });
 
     const headSymbolHashes = new Set(codemap.symbols.map((symbol) => symbol.hash));
+    // ia.yml v2 at pipeline entry (finding 6): page nodes carry the gating primary persona.
+    const iaV2 = convertIaToV2(ia, { defaultPrimaryPersona: config.personas[0]?.id ?? 'reader' });
     const nodesBySlug = new Map(
-      walkIaNodes(ia.tree)
-        .filter((node) => node.brief !== undefined)
+      walkIaV2Nodes(iaV2.tree)
+        .filter((node): node is IaPageNodeV2 => node.kind === 'page')
         .map((node) => [node.slug, node])
     );
 

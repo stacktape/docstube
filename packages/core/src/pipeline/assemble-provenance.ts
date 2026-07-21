@@ -4,6 +4,7 @@ import type {
   ClaimLedger,
   DocstubeConfig,
   Glossary,
+  IaPageNodeV2,
   ProvenanceV2,
   Transcript
 } from '@docstube/contracts';
@@ -20,6 +21,10 @@ import type { ScoredReview } from './review-page.ts';
 
 export type AssembleProvenanceInput = {
   pageId: string;
+  // The page's ia.yml v2 record: names the PRIMARY persona (only its review gates) and is itself
+  // a consumed dependency — title/brief/depth/persona enter the writer prompt, so an ia.yml edit
+  // must causally invalidate exactly this page (impl-06 finding 6).
+  node: IaPageNodeV2;
   ledger: ClaimLedger;
   claimEvidence: ClaimEvidence[];
   // The accepted write attempt: model/transport/task id/observed reads.
@@ -99,7 +104,20 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
       hash: hashValue({ question: entry.question, answer: entry.answer })
     })),
     ...(input.glossary.terms.length > 0 ? [{ kind: 'glossary', id: 'glossary', hash: hashValue(input.glossary) }] : []),
-    { kind: 'config', id: 'docstube.yml', hash: hashValue(input.config) }
+    { kind: 'config', id: 'docstube.yml', hash: hashValue(input.config) },
+    // The page-specific IA fragment: exactly the fields that entered the writer prompt and the
+    // review routing. Content-hashed so editing THIS page's brief/persona/depth/title invalidates
+    // this page and no other.
+    {
+      kind: 'ia',
+      id: `ia:${input.node.slug}`,
+      hash: hashValue({
+        title: input.node.title,
+        brief: input.node.brief,
+        depth: input.node.depth,
+        primaryPersona: input.node.primaryPersona
+      })
+    }
   ];
 
   return provenanceV2Schema.parse({
@@ -123,11 +141,12 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
     dependencies: { subscriptions, consumed },
     claimEvidence: input.claimEvidence,
     assessments: {
-      // Every configured persona review gates the page today, so each maps to 'primary-gating';
-      // 'secondary-advisory' arrives when ia.yml v2 primary personas thread into the runner.
+      // Role is derived from the page's IA record: ONLY the primary persona's review is
+      // 'primary-gating'. (The runner currently runs only that persona; any other recorded review
+      // — e.g. from a future sampled advisory pass — must never masquerade as gating.)
       reviews: input.reviews.map((review) => ({
         persona: review.persona,
-        role: 'primary-gating',
+        role: review.persona === input.node.primaryPersona ? 'primary-gating' : 'secondary-advisory',
         entityId: input.pageId,
         scoredBy: review.scoredBy,
         completion: review.completed ? 'completed' : 'failed',

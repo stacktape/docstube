@@ -217,6 +217,36 @@ describe('runGenerate', () => {
     expect(summary.pages[0]?.attempts).toBe(1);
   }, 60_000);
 
+  it('runs ONLY the primary persona review — secondary personas are not reviewed in this slice', async () => {
+    // Two configured personas; the page's primary (the ia.yml v2 default: the first persona)
+    // gates. Sampled secondary ADVISORY reviews arrive with the review-routing wave.
+    const twoPersonaConfig = configYaml.replace(
+      '  - id: app-developer\n    description: Builds apps using the library\n',
+      '  - id: app-developer\n    description: Builds apps using the library\n  - id: ops-engineer\n    description: Operates deployments\n'
+    );
+    await writeFile(join(repoRoot, 'docstube.yml'), twoPersonaConfig);
+    const { runTask, reviewCalls } = scriptedRunner([goodMdx]);
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    expect(summary.outcome).toBe('passed');
+    expect(reviewCalls).toHaveLength(1);
+    expect(reviewCalls[0]?.systemPrompt).toContain('app-developer');
+    expect(reviewCalls[0]?.systemPrompt).not.toContain('ops-engineer');
+
+    // The persisted assessment records the correct role and the IA fragment dependency.
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard?.provenance?.assessments.reviews).toHaveLength(1);
+    expect(shard?.provenance?.assessments.reviews[0]).toMatchObject({
+      persona: 'app-developer',
+      role: 'primary-gating',
+      completion: 'completed'
+    });
+    const iaFragment = shard?.provenance?.dependencies.consumed.find((fragment) => fragment.kind === 'ia');
+    expect(iaFragment?.id).toBe('ia:getting-started');
+  }, 60_000);
+
   it('threads the standard read-only tools into review tasks — reviewers get source access', async () => {
     const descriptor = {
       name: 'read_file',
