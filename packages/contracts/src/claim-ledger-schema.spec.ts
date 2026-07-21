@@ -191,6 +191,23 @@ describe('correctness × disposition (local ledger invariants)', () => {
     expect(ledgerClaimSchema.safeParse(dangling).success).toBe(false);
   });
 
+  it('rejects duplicate evidence ids within a claim — each canonical record is referenced at most once', () => {
+    const duplicated = kernelClaim({
+      correctness: 'checked',
+      disposition: null,
+      evidence: [evidenceId, evidenceId],
+      decidingEvidenceId: evidenceId
+    });
+    expect(ledgerClaimSchema.safeParse(duplicated).success).toBe(false);
+    const distinct = kernelClaim({
+      correctness: 'checked',
+      disposition: null,
+      evidence: [evidenceId, otherEvidenceId],
+      decidingEvidenceId: evidenceId
+    });
+    expect(ledgerClaimSchema.safeParse(distinct).success).toBe(true);
+  });
+
   it('rejects typed evidence handles — the ledger stores bare canonical evidence ids only', () => {
     const typedHandle = kernelClaim({
       correctness: 'checked',
@@ -299,6 +316,24 @@ describe('kernel claim ledger', () => {
       scope: { entityId: claim?.scope.entityId, revision: commit }
     });
     expect(result.success).toBe(false);
+  });
+
+  it('rejects duplicate claim ids — a committed claim identity appears exactly once', () => {
+    const ledger = buildFixtureClaimLedger();
+    const [claim] = ledger.claims;
+    // An exact duplicate is rejected — the ledger is keyed by claim id.
+    expect(claimLedgerSchema.safeParse({ ...ledger, claims: [claim, claim] }).success).toBe(false);
+    // A duplicate id with DIVERGENT state is the dangerous forgery: two correctness values for
+    // one canonical identity.
+    const divergent = {
+      ...claim,
+      correctness: 'unchecked',
+      disposition: 'no-checker-available',
+      evidence: [],
+      decidingEvidenceId: undefined
+    };
+    expect(claimLedgerSchema.safeParse({ ...ledger, claims: [claim, divergent] }).success).toBe(false);
+    expect(claimLedgerSchema.safeParse(ledger).success).toBe(true);
   });
 
   it('defaults coverage lint and claim arrays', () => {

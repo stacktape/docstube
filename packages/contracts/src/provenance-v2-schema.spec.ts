@@ -375,6 +375,73 @@ describe('canonical claim evidence — the full authority table', () => {
     });
     expect(claimEvidenceSchema.safeParse(dangling).success).toBe(false);
   });
+
+  it('rejects duplicate evidence ids within one claim — divergent state under one identity', () => {
+    const passRecord = evidenceRecord({ kind: 'execution', check: 'snippet-exec', environment: { os: 'linux' } });
+    const failRecord = evidenceRecord(
+      { kind: 'execution', check: 'snippet-exec', environment: { os: 'linux' } },
+      { outcome: 'fail' }
+    );
+    // Same evidenceId carrying pass AND fail — the canonical identity is ambiguous.
+    const duplicated = record({
+      correctness: 'checked',
+      disposition: null,
+      evidence: [passRecord, failRecord],
+      decidingEvidenceId: evidenceId
+    });
+    expect(claimEvidenceSchema.safeParse(duplicated).success).toBe(false);
+    const distinct = record({
+      correctness: 'checked',
+      disposition: null,
+      evidence: [passRecord, { ...failRecord, evidenceId: otherEvidenceId }],
+      decidingEvidenceId: evidenceId
+    });
+    expect(claimEvidenceSchema.safeParse(distinct).success).toBe(true);
+  });
+});
+
+describe('provenance collection identity', () => {
+  const claimEvidenceEntry = (claimId: string, entryEvidenceId: string) => ({
+    schemaVersion: 1,
+    claimId,
+    class: 'code-structure',
+    correctness: 'checked',
+    disposition: null,
+    evidence: [evidenceRecord({ kind: 'codemap-grounding', symbol }, { evidenceId: entryEvidenceId })],
+    decidingEvidenceId: entryEvidenceId
+  });
+
+  it('holds at most one ClaimEvidence record per claim id', () => {
+    const result = provenanceV2Schema.safeParse({
+      schemaVersion: 1,
+      claimEvidence: [
+        claimEvidenceEntry('cl_00000000000000000000', evidenceId),
+        claimEvidenceEntry('cl_00000000000000000000', otherEvidenceId)
+      ]
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('keeps evidence record ids unique across the whole collection', () => {
+    // The same evidenceId under two different claims could carry divergent payloads — shared
+    // physical evidence gets distinct minted ids instead.
+    const shared = provenanceV2Schema.safeParse({
+      schemaVersion: 1,
+      claimEvidence: [
+        claimEvidenceEntry('cl_00000000000000000000', evidenceId),
+        claimEvidenceEntry('cl_11111111111111111111', evidenceId)
+      ]
+    });
+    expect(shared.success).toBe(false);
+    const distinct = provenanceV2Schema.safeParse({
+      schemaVersion: 1,
+      claimEvidence: [
+        claimEvidenceEntry('cl_00000000000000000000', evidenceId),
+        claimEvidenceEntry('cl_11111111111111111111', otherEvidenceId)
+      ]
+    });
+    expect(distinct.success).toBe(true);
+  });
 });
 
 describe('assessments', () => {

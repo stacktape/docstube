@@ -5,6 +5,10 @@ import { outputInventorySchema, publicationDecisionSchema, waiverSchema } from '
 const hash = 'a'.repeat(64);
 const commit = 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678';
 
+const coverageDowngrade = (beforeStatus: string, afterStatus: string) => [
+  { obligationId: 'ob-retry', scope: 'src/retry.ts', beforeStatus, afterStatus }
+];
+
 describe('publication decision', () => {
   it('round-trips the fixture decision', () => {
     const decision = buildFixturePublicationDecision();
@@ -57,15 +61,28 @@ describe('publication decision', () => {
         reasonCodes: ['plan.deferred']
       }).success
     ).toBe(false);
+    // Deferred work is representable on a paused run with its budget reason stated.
     expect(
       publicationDecisionSchema.safeParse({
         ...decision,
+        execution: 'paused-budget',
+        plan: { planned: 3, completed: 2, deferred: 1 },
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['budget.frozen', 'plan.deferred']
+      }).success
+    ).toBe(true);
+    // A completed run with deferred work is a contradiction — deferrals belong to paused/failed runs.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        execution: 'completed',
         plan: { planned: 3, completed: 2, deferred: 1 },
         publishable: false,
         autoMergeEligible: false,
         reasonCodes: ['plan.deferred']
       }).success
-    ).toBe(true);
+    ).toBe(false);
     // A blocked gate with no stated reason.
     expect(
       publicationDecisionSchema.safeParse({
@@ -87,6 +104,110 @@ describe('publication decision', () => {
     // Auto-merge without publishable.
     expect(
       publicationDecisionSchema.safeParse({ ...decision, publishable: false, autoMergeEligible: true }).success
+    ).toBe(false);
+  });
+
+  it('requires plan counts to reconcile — planned = completed + deferred', () => {
+    const decision = buildFixturePublicationDecision();
+    // The review probe: planned 3, completed 2, deferred 0 claiming publishable.
+    expect(
+      publicationDecisionSchema.safeParse({ ...decision, plan: { planned: 3, completed: 2, deferred: 0 } }).success
+    ).toBe(false);
+    // The arithmetic is unconditional — hidden work never parses even unpublished.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        plan: { planned: 3, completed: 2, deferred: 0 },
+        publishable: false,
+        autoMergeEligible: false
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        execution: 'paused-budget',
+        plan: { planned: 3, completed: 1, deferred: 1 },
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['budget.frozen']
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({ ...decision, plan: { planned: 3, completed: 3, deferred: 0 } }).success
+    ).toBe(true);
+  });
+
+  it('requires each blocking condition to state a reason code from its own family', () => {
+    const decision = buildFixturePublicationDecision();
+    const regression = { kind: 'badge-loss', pageId: 'pg_00000000000000000000' };
+    // A ledger regression is NOT satisfiable by 'budget.frozen' alone.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        regressions: [regression],
+        autoMergeEligible: false,
+        reasonCodes: ['budget.frozen']
+      }).success
+    ).toBe(false);
+    // A blocked gate needs the gate family code, not just any nonempty list.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        deterministicGate: 'blocked',
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['ledger.regression']
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        deterministicGate: 'blocked',
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['gate.blocked']
+      }).success
+    ).toBe(true);
+    // A budget-paused run must cite the budget family.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        execution: 'paused-budget',
+        plan: { planned: 8, completed: 5, deferred: 3 },
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['plan.deferred']
+      }).success
+    ).toBe(false);
+    // A failed run must cite the execution family.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        execution: 'failed',
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['gate.blocked']
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        execution: 'failed',
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['execution.failed']
+      }).success
+    ).toBe(true);
+    // A blocking disposition needs its own family code too.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        newBlockingDispositions: [
+          { pageId: 'pg_00000000000000000000', claimId: 'cl_00000000000000000000', status: 'contradicted' }
+        ],
+        autoMergeEligible: false,
+        reasonCodes: ['ledger.regression']
+      }).success
     ).toBe(false);
   });
 
@@ -193,6 +314,61 @@ describe('publication decision', () => {
       false
     );
   });
+
+  it('treats any coverage-rank decrease as a regression — documented → generated-reference-only fails closed', () => {
+    const decision = buildFixturePublicationDecision();
+    // The review probe: a status downgrade that never reaches 'unassigned' is still new debt.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: coverageDowngrade('documented', 'generated-reference-only')
+      }).success
+    ).toBe(false);
+    // With auto-merge off it still must state the coverage family code.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: coverageDowngrade('documented', 'generated-reference-only'),
+        autoMergeEligible: false,
+        reasonCodes: ['ledger.regression']
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: coverageDowngrade('documented', 'generated-reference-only'),
+        autoMergeEligible: false,
+        reasonCodes: ['coverage.regression']
+      }).success
+    ).toBe(true);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: coverageDowngrade('generated-reference-only', 'unassigned')
+      }).success
+    ).toBe(false);
+    // Rank increases are never regressions.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: coverageDowngrade('generated-reference-only', 'documented')
+      }).success
+    ).toBe(true);
+  });
+
+  it('exempts transitions into user-declared statuses — a policy declaration is not coverage debt', () => {
+    const decision = buildFixturePublicationDecision();
+    for (const declared of ['intentionally-omitted', 'not-public-for-docs']) {
+      const result = publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: [
+          { obligationId: 'ob-retry', scope: 'src/retry.ts', beforeStatus: 'documented', afterStatus: declared }
+        ]
+      });
+      // Auto-merge stays eligible with no coverage reason code required.
+      expect(result.success).toBe(true);
+    }
+  });
 });
 
 describe('output inventory', () => {
@@ -207,6 +383,39 @@ describe('output inventory', () => {
       entries: [{ path: '/etc/passwd', contentHash: hash }]
     });
     expect(absolute.success).toBe(false);
+  });
+
+  it('rejects duplicate paths — the allowlist maps each path to exactly one hash', () => {
+    const path = 'docs-site/src/content/en/setup.mdx';
+    // A duplicate path with a conflicting hash is an ambiguous allowlist.
+    expect(
+      outputInventorySchema.safeParse({
+        schemaVersion: 1,
+        entries: [
+          { path, contentHash: hash },
+          { path, contentHash: 'b'.repeat(64) }
+        ]
+      }).success
+    ).toBe(false);
+    // An exact duplicate is rejected too — the inventory is a map, not a bag.
+    expect(
+      outputInventorySchema.safeParse({
+        schemaVersion: 1,
+        entries: [
+          { path, contentHash: hash },
+          { path, contentHash: hash }
+        ]
+      }).success
+    ).toBe(false);
+    expect(
+      outputInventorySchema.safeParse({
+        schemaVersion: 1,
+        entries: [
+          { path, contentHash: hash },
+          { path: 'docs-site/src/content/en/intro.mdx', contentHash: hash }
+        ]
+      }).success
+    ).toBe(true);
   });
 });
 

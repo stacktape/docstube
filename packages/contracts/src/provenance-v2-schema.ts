@@ -118,6 +118,19 @@ export const claimEvidenceSchema = z
     decidingEvidenceId: evidenceIdSchema.optional()
   })
   .superRefine((record, ctx) => {
+    // Evidence ids are canonical: a repeated id inside one claim's records could carry divergent
+    // payloads/outcomes under a single identity, so the duplicate rejects outright.
+    const seenEvidenceIds = new Set<string>();
+    for (const entry of record.evidence) {
+      if (seenEvidenceIds.has(entry.evidenceId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['evidence'],
+          message: `duplicate evidenceId "${entry.evidenceId}" — a canonical evidence record appears exactly once`
+        });
+      }
+      seenEvidenceIds.add(entry.evidenceId);
+    }
     const deciding =
       record.decidingEvidenceId === undefined
         ? undefined
@@ -253,11 +266,40 @@ export const assessmentsSchema = z.object({
 });
 export type Assessments = z.infer<typeof assessmentsSchema>;
 
-export const provenanceV2Schema = z.object({
-  schemaVersion: z.literal(1),
-  lineage: generationLineageSchema.prefault({}),
-  dependencies: dependenciesSchema.prefault({}),
-  claimEvidence: z.array(claimEvidenceSchema).default([]),
-  assessments: assessmentsSchema.prefault({})
-});
+export const provenanceV2Schema = z
+  .object({
+    schemaVersion: z.literal(1),
+    lineage: generationLineageSchema.prefault({}),
+    dependencies: dependenciesSchema.prefault({}),
+    claimEvidence: z.array(claimEvidenceSchema).default([]),
+    assessments: assessmentsSchema.prefault({})
+  })
+  .superRefine((provenance, ctx) => {
+    // Canonical identity within the collection: at most ONE ClaimEvidence record per claim id
+    // (two records for one claim could disagree on correctness), and evidence record ids are
+    // globally unique across the collection — shared physical evidence gets distinct minted ids,
+    // never one id with potentially divergent payloads under two claims.
+    const seenClaimIds = new Set<string>();
+    const seenEvidenceIds = new Set<string>();
+    for (const record of provenance.claimEvidence) {
+      if (seenClaimIds.has(record.claimId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['claimEvidence'],
+          message: `duplicate claimId "${record.claimId}" — one ClaimEvidence record per claim`
+        });
+      }
+      seenClaimIds.add(record.claimId);
+      for (const entry of record.evidence) {
+        if (seenEvidenceIds.has(entry.evidenceId)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['claimEvidence'],
+            message: `duplicate evidenceId "${entry.evidenceId}" — evidence record ids are unique across the collection`
+          });
+        }
+        seenEvidenceIds.add(entry.evidenceId);
+      }
+    }
+  });
 export type ProvenanceV2 = z.infer<typeof provenanceV2Schema>;

@@ -286,6 +286,18 @@ const ledgerClaimObjectSchema = z.object({
 // deciding record actually holding class authority — is a KERNEL invariant checked at commit
 // time, not a shape this schema can see.
 export const ledgerClaimSchema = ledgerClaimObjectSchema.superRefine((claim, ctx) => {
+  // Evidence handles are canonical ids — a repeated handle is a corrupt ledger, not emphasis.
+  const seenEvidence = new Set<string>();
+  for (const id of claim.evidence) {
+    if (seenEvidence.has(id)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['evidence'],
+        message: `duplicate evidence id "${id}" — a claim references each canonical evidence record at most once`
+      });
+    }
+    seenEvidence.add(id);
+  }
   if (claim.decidingEvidenceId !== undefined && !claim.evidence.includes(claim.decidingEvidenceId)) {
     ctx.addIssue({
       code: 'custom',
@@ -356,12 +368,28 @@ export const coverageLintSpanSchema = z.object({
 export type CoverageLintSpan = z.infer<typeof coverageLintSpanSchema>;
 
 // The kernel-owned committed ledger — what manifest shards store.
-export const claimLedgerSchema = z.object({
-  schemaVersion: z.literal(1),
-  pageId: pageIdSchema,
-  // The repository commit the ledger was computed against.
-  sourceRevision: gitCommitSchema,
-  claims: z.array(ledgerClaimSchema).default([]),
-  coverageLint: z.object({ uncovered: z.array(coverageLintSpanSchema).default([]) }).prefault({})
-});
+export const claimLedgerSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    pageId: pageIdSchema,
+    // The repository commit the ledger was computed against.
+    sourceRevision: gitCommitSchema,
+    claims: z.array(ledgerClaimSchema).default([]),
+    coverageLint: z.object({ uncovered: z.array(coverageLintSpanSchema).default([]) }).prefault({})
+  })
+  .superRefine((ledger, ctx) => {
+    // Minted claim ids are canonical: two committed claims sharing an id could carry divergent
+    // correctness for the same identity, so the collection rejects the duplicate outright.
+    const seen = new Set<string>();
+    for (const claim of ledger.claims) {
+      if (seen.has(claim.claimId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['claims'],
+          message: `duplicate claimId "${claim.claimId}" — a committed claim id appears exactly once in the ledger`
+        });
+      }
+      seen.add(claim.claimId);
+    }
+  });
 export type ClaimLedger = z.infer<typeof claimLedgerSchema>;

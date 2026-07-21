@@ -62,6 +62,23 @@ export const coverageObligationDeltaSchema = z.object({
 });
 export type CoverageObligationDelta = z.infer<typeof coverageObligationDeltaSchema>;
 
+// The coverage ladder, highest first: documented > generated-reference-only > unassigned. The two
+// user-declared statuses ('intentionally-omitted', 'not-public-for-docs') sit OUTSIDE the ladder:
+// a transition into one is a recorded policy declaration, not coverage debt, so it is never a
+// regression — while any rank DECREASE along the ladder (documented → generated-reference-only,
+// or anything → unassigned) is new debt and fails the ratchet.
+const coverageObligationRank: Partial<Record<CoverageObligationStatus, number>> = {
+  documented: 2,
+  'generated-reference-only': 1,
+  unassigned: 0
+};
+
+export const isCoverageObligationRegression = (delta: CoverageObligationDelta): boolean => {
+  const before = coverageObligationRank[delta.beforeStatus];
+  const after = coverageObligationRank[delta.afterStatus];
+  return before !== undefined && after !== undefined && after < before;
+};
+
 // The reason-code registry is CLOSED and versioned with the decision schema: unknown codes are a
 // schema break by design — the Action fails closed on anything it cannot interpret.
 export const publicationReasonCodeRegistryVersion = 1;
@@ -101,6 +118,25 @@ export const publicationDecisionSchema = z
     reasonCodes: z.array(reasonCodeSchema).default([])
   })
   .superRefine((decision, ctx) => {
+    // Plan counts are pages: planned splits exactly into completed + deferred. A decision whose
+    // counts do not reconcile is hiding work (the classic forgery: planned 3, completed 2,
+    // deferred 0) and never parses.
+    if (decision.plan.planned !== decision.plan.completed + decision.plan.deferred) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['plan'],
+        message: 'plan counts must reconcile — planned = completed + deferred'
+      });
+    }
+    // Deferred work belongs to paused or failed runs: a run that completed its plan has nothing
+    // left to defer.
+    if (decision.execution === 'completed' && decision.plan.deferred > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['plan', 'deferred'],
+        message: 'a completed run defers nothing — deferrals belong to paused-budget or failed runs'
+      });
+    }
     if (decision.execution !== 'completed' && decision.publishable) {
       ctx.addIssue({
         code: 'custom',
@@ -122,10 +158,8 @@ export const publicationDecisionSchema = z
         message: 'deferred work fails closed — an incomplete plan is never publishable'
       });
     }
-    // New coverage debt (an obligation regressing to unassigned) is a ratchet violation.
-    const hasCoverageRegression = decision.coverageDelta.some(
-      (delta) => delta.beforeStatus !== 'unassigned' && delta.afterStatus === 'unassigned'
-    );
+    // New coverage debt — any rank decrease along the coverage ladder — is a ratchet violation.
+    const hasCoverageRegression = decision.coverageDelta.some(isCoverageObligationRegression);
     const blockers = [
       decision.regressions.length > 0 ? 'a ledger regression' : undefined,
       decision.newBlockingDispositions.length > 0 ? 'a new blocking disposition' : undefined,
@@ -140,13 +174,6 @@ export const publicationDecisionSchema = z
         });
       }
     }
-    if (blockers.length > 0 && decision.reasonCodes.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['reasonCodes'],
-        message: 'regressions and blocking dispositions must state their reason codes'
-      });
-    }
     if (decision.autoMergeEligible && !decision.publishable) {
       ctx.addIssue({
         code: 'custom',
@@ -154,22 +181,60 @@ export const publicationDecisionSchema = z
         message: 'auto-merge eligibility requires publishable'
       });
     }
-    if (decision.deterministicGate === 'blocked' && decision.reasonCodes.length === 0) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['reasonCodes'],
-        message: 'a blocked gate must state its reason codes'
-      });
+    // Each blocking condition must state a reason code from ITS OWN family — a regression citing
+    // only 'budget.frozen' hides its cause, so presence of any nonempty list is not enough.
+    const requireCode = (code: PublicationReasonCode, condition: string) => {
+      if (!decision.reasonCodes.includes(code)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['reasonCodes'],
+          message: `${condition} must state reason code '${code}'`
+        });
+      }
+    };
+    if (decision.deterministicGate === 'blocked') {
+      requireCode('gate.blocked', 'a blocked deterministic gate');
+    }
+    if (decision.regressions.length > 0) {
+      requireCode('ledger.regression', 'a ledger regression');
+    }
+    if (decision.newBlockingDispositions.length > 0) {
+      requireCode('ledger.blocking-disposition', 'a new blocking disposition');
+    }
+    if (hasCoverageRegression) {
+      requireCode('coverage.regression', 'a coverage-obligation regression');
+    }
+    if (decision.execution === 'paused-budget') {
+      requireCode('budget.frozen', 'a budget-paused run');
+    }
+    if (decision.execution === 'failed') {
+      requireCode('execution.failed', 'a failed run');
     }
   });
 export type PublicationDecision = z.infer<typeof publicationDecisionSchema>;
 
 // The commit-boundary allowlist (decision 11): the Action stages only declared paths and marks the
 // candidate ineligible on any undeclared write or hash mismatch.
-export const outputInventorySchema = z.object({
-  schemaVersion: z.literal(1),
-  entries: z.array(z.object({ path: repoPathSchema, contentHash: contentHashSchema })).default([])
-});
+export const outputInventorySchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    entries: z.array(z.object({ path: repoPathSchema, contentHash: contentHashSchema })).default([])
+  })
+  .superRefine((inventory, ctx) => {
+    // The allowlist is EXACT: each path maps to exactly one content hash. A duplicate path — with
+    // a conflicting hash or otherwise — is an ambiguous allowlist and never parses.
+    const seen = new Set<string>();
+    for (const entry of inventory.entries) {
+      if (seen.has(entry.path)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['entries'],
+          message: `duplicate path "${entry.path}" — the inventory maps each path to exactly one content hash`
+        });
+      }
+      seen.add(entry.path);
+    }
+  });
 export type OutputInventory = z.infer<typeof outputInventorySchema>;
 
 // A recorded waiver replaces silent dismissal (decision 13). Strict scope arms: a claim waiver
