@@ -94,10 +94,45 @@ export type ClaimMatchRecord = z.infer<typeof claimMatchRecordSchema>;
 export const claimOrphanRecordSchema = z.object({ claimId: claimIdSchema });
 export type ClaimOrphanRecord = z.infer<typeof claimOrphanRecordSchema>;
 
-export const claimMatchingSchema = z.object({
-  matches: z.array(claimMatchRecordSchema).default([]),
-  orphans: z.array(claimOrphanRecordSchema).default([])
-});
+export const claimMatchingSchema = z
+  .object({
+    matches: z.array(claimMatchRecordSchema).default([]),
+    orphans: z.array(claimOrphanRecordSchema).default([])
+  })
+  .superRefine((matching, ctx) => {
+    // Matching is a bijection fragment (impl-08 finding 5): the SAME carried claim id appearing in
+    // two match records would thread two fresh claims onto one prior identity, and the same id
+    // twice in orphans (or in both lists) is equally corrupt. Duplicates reject outright.
+    const seenMatchIds = new Set<string>();
+    for (const match of matching.matches) {
+      if (seenMatchIds.has(match.claimId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['matches'],
+          message: `duplicate matching record for claim "${match.claimId}" — a prior claim id carries onto at most one fresh claim`
+        });
+      }
+      seenMatchIds.add(match.claimId);
+    }
+    const seenOrphanIds = new Set<string>();
+    for (const orphan of matching.orphans) {
+      if (seenOrphanIds.has(orphan.claimId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['orphans'],
+          message: `duplicate orphan record for claim "${orphan.claimId}"`
+        });
+      }
+      seenOrphanIds.add(orphan.claimId);
+      if (seenMatchIds.has(orphan.claimId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['orphans'],
+          message: `claim "${orphan.claimId}" appears as both a match and an orphan — an identity either carried or it did not`
+        });
+      }
+    }
+  });
 export type ClaimMatching = z.infer<typeof claimMatchingSchema>;
 
 // One shard = one page in one locale: `.docstube/manifest/pages/<locale>/<pageId>.json`
@@ -163,9 +198,9 @@ export const pageShardSchema = z
         message: `ledger.sourceRevision "${shard.ledger.sourceRevision}" disagrees with the shard's sourceCommit "${shard.sourceCommit}"`
       });
     }
-    const blockIds = new Set(
-      [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)].map((block) => block.id)
-    );
+    const pageBlocks = [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)];
+    const blockIds = new Set(pageBlocks.map((block) => block.id));
+    const blockHashById = new Map(pageBlocks.map((block) => [block.id, block.contentHash]));
     const scopeIds = new Set([shard.page.id, ...shard.page.sections.map((section) => section.id), ...blockIds]);
     for (const claim of shard.ledger.claims) {
       if (!blockIds.has(claim.anchor.blockId)) {
@@ -180,6 +215,17 @@ export const pageShardSchema = z
           code: 'custom',
           path: ['ledger', 'claims'],
           message: `claim "${claim.claimId}" is scoped to entity "${claim.scope.entityId}", which does not exist on this page`
+        });
+      }
+      // Scope revision is the CONTENT hash of the scoped entity (impl-08 finding 5): anchoring
+      // mints the anchor block's contentHash, so a block-scoped claim whose revision disagrees
+      // with the block actually on this page was minted against different content — corrupt.
+      const scopedBlockHash = blockHashById.get(claim.scope.entityId);
+      if (scopedBlockHash !== undefined && claim.scope.revision !== scopedBlockHash) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ledger', 'claims'],
+          message: `claim "${claim.claimId}" carries scope revision "${claim.scope.revision}", but block "${claim.scope.entityId}" on this page has content hash "${scopedBlockHash}"`
         });
       }
     }

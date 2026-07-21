@@ -211,6 +211,16 @@ describe('assembleProvenanceV2', () => {
     expect(() => assemble(claimEvidence, { page: detachedPage })).toThrow(/does not exist on page/);
   });
 
+  it("REFUSES a scope revision that is not the anchored block's content hash (Sol impl-08 probe)", () => {
+    const drifted = claimLedgerSchema.parse({
+      ...ledger,
+      claims: ledger.claims.map((claim, index) =>
+        index === 0 ? { ...claim, scope: { ...claim.scope, revision: 'e'.repeat(64) } } : claim
+      )
+    });
+    expect(() => assemble(claimEvidence, { ledger: drifted })).toThrow(/scope revision/);
+  });
+
   it('REFUSES evidence checked at a revision other than the ledger sourceRevision', () => {
     const evidenceId = `ev_${'c'.repeat(20)}`;
     const staleLedger = claimLedgerSchema.parse({

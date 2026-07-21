@@ -286,3 +286,66 @@ describe('shard ledger↔page linkage (impl-07 finding 5)', () => {
     expect(JSON.stringify(result.error?.issues)).toContain('matching records persist with the ledger');
   });
 });
+
+describe('shard scope-revision and matching-duplicate invariants (impl-08 finding 5)', () => {
+  it("rejects a block-scoped claim whose scope revision is not the block's content hash (Sol probe)", () => {
+    const shard = trustedShard();
+    const broken = {
+      ...shard,
+      ledger: {
+        ...shard.ledger,
+        claims: shard.ledger.claims.map((claim, index) =>
+          index === 0 ? { ...claim, scope: { ...claim.scope, revision: 'e'.repeat(64) } } : claim
+        )
+      }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('scope revision');
+  });
+
+  it('accepts the same shard when the scope revision IS the anchored block content hash', () => {
+    expect(pageShardSchema.safeParse(trustedShard()).success).toBe(true);
+  });
+
+  it('rejects DUPLICATE matching records: the same carried claim id twice (Sol probe)', () => {
+    const shard = trustedShard();
+    const claimId = shard.ledger.claims[0]!.claimId;
+    const broken = {
+      ...shard,
+      claimMatching: {
+        matches: [
+          { claimId, confidence: 'exact' as const, drift: [] },
+          { claimId, confidence: 'ambiguous' as const, drift: ['equal-candidates' as const] }
+        ],
+        orphans: []
+      }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('duplicate matching record');
+  });
+
+  it('rejects duplicate orphan records and match/orphan overlap', () => {
+    const shard = trustedShard();
+    const priorId = mintId(idPrefixes.claim);
+    const duplicateOrphans = {
+      ...shard,
+      claimMatching: { matches: [], orphans: [{ claimId: priorId }, { claimId: priorId }] }
+    };
+    const duplicateResult = pageShardSchema.safeParse(duplicateOrphans);
+    expect(duplicateResult.success).toBe(false);
+    expect(JSON.stringify(duplicateResult.error?.issues)).toContain('duplicate orphan record');
+
+    const overlap = {
+      ...shard,
+      claimMatching: {
+        matches: [{ claimId: shard.ledger.claims[0]!.claimId, confidence: 'exact' as const, drift: [] }],
+        orphans: [{ claimId: shard.ledger.claims[0]!.claimId }]
+      }
+    };
+    const overlapResult = pageShardSchema.safeParse(overlap);
+    expect(overlapResult.success).toBe(false);
+    expect(JSON.stringify(overlapResult.error?.issues)).toContain('both a match and an orphan');
+  });
+});

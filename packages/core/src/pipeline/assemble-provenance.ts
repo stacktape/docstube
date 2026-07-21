@@ -66,9 +66,9 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
       `provenance assembly: ledger.pageId "${input.ledger.pageId}" / page.id "${input.page.id}" disagree with the target page "${input.pageId}"`
     );
   }
-  const blockIds = new Set(
-    [...input.page.preamble, ...input.page.sections.flatMap((section) => section.blocks)].map((block) => block.id)
-  );
+  const pageBlocks = [...input.page.preamble, ...input.page.sections.flatMap((section) => section.blocks)];
+  const blockIds = new Set(pageBlocks.map((block) => block.id));
+  const blockHashById = new Map(pageBlocks.map((block) => [block.id, block.contentHash]));
   const scopeIds = new Set([input.page.id, ...input.page.sections.map((section) => section.id), ...blockIds]);
   const evidenceByClaimId = new Map(input.claimEvidence.map((record) => [record.claimId, record]));
   for (const claim of input.ledger.claims) {
@@ -82,6 +82,15 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
       throw new CoreError(
         'pipeline-failed',
         `provenance assembly: claim "${claim.claimId}" is scoped to entity "${claim.scope.entityId}", which does not exist on page "${input.pageId}"`
+      );
+    }
+    // Scope revision must be the scoped block's ACTUAL content hash (impl-08 finding 5) — the
+    // value anchoring mints. A disagreement means the ledger was minted against different content.
+    const scopedBlockHash = blockHashById.get(claim.scope.entityId);
+    if (scopedBlockHash !== undefined && claim.scope.revision !== scopedBlockHash) {
+      throw new CoreError(
+        'pipeline-failed',
+        `provenance assembly: claim "${claim.claimId}" carries scope revision "${claim.scope.revision}", but block "${claim.scope.entityId}" has content hash "${scopedBlockHash}"`
       );
     }
     const record = evidenceByClaimId.get(claim.claimId);

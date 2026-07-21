@@ -146,7 +146,11 @@ export const buildFixtureWriterClaimLedger = (): WriterClaimLedger => ({
 // claim anchors land on one of its REAL blocks (the shard enforces anchor existence).
 export const buildFixtureClaimLedger = (page?: Pick<PageEntity, 'id' | 'preamble' | 'sections'>): ClaimLedger => {
   const pageId = page?.id ?? mintId(idPrefixes.page);
-  const blockId = page?.preamble[0]?.id ?? page?.sections[0]?.blocks[0]?.id ?? mintId(idPrefixes.block);
+  const block = page?.preamble[0] ?? page?.sections[0]?.blocks[0];
+  const blockId = block?.id ?? mintId(idPrefixes.block);
+  // Scope revision IS the scoped block's content hash (the value anchoring mints) — the shard
+  // rejects a block-scoped claim whose revision disagrees with the block on the page.
+  const blockRevision = block === undefined ? fixtureEntityRevision : entityRevisionSchema.parse(block.contentHash);
   const groundingEvidenceId = mintId(idPrefixes.evidence);
   const sourceLinkEvidenceId = mintId(idPrefixes.evidence);
   return {
@@ -160,7 +164,7 @@ export const buildFixtureClaimLedger = (page?: Pick<PageEntity, 'id' | 'preamble
         predicate: 'there is a function retry(options)',
         anchor: { blockId, markerId: 'c1' },
         quote: 'The library exposes a `retry(options)` function.',
-        scope: { entityId: blockId, revision: fixtureEntityRevision },
+        scope: { entityId: blockId, revision: blockRevision },
         subscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }],
         evidence: [groundingEvidenceId],
         correctness: 'checked',
@@ -173,7 +177,7 @@ export const buildFixtureClaimLedger = (page?: Pick<PageEntity, 'id' | 'preamble
         predicate: 'retry attempts default to 3',
         anchor: { blockId, markerId: 'c2' },
         quote: 'Retry attempts default to 3.',
-        scope: { entityId: blockId, revision: fixtureEntityRevision },
+        scope: { entityId: blockId, revision: blockRevision },
         subscriptions: [{ kind: 'cited-value', symbolHash: fixtureSymbolHash, valueName: 'attempts', citedValue: '3' }],
         evidence: [sourceLinkEvidenceId],
         correctness: 'unchecked',
