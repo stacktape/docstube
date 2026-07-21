@@ -177,6 +177,53 @@ describe('validateSubmission', () => {
     expect(outcome.errors).toEqual([]);
   });
 
+  it('accepts covers= declarations naming existing behavior claims (the coverage grammar)', () => {
+    const outcome = validateSubmission({
+      mdx: mdxWith(
+        '<Claim id="c1">`retry` retries the call.</Claim> <Claim id="c2">`retry` throws on timeout.</Claim>\n\n' +
+          "```ts covers=c1,c2\nawait retry(() => fetch('x'));\n```"
+      ),
+      ledger: ledgerWith([
+        claim('c1', { class: 'behavior', predicate: 'retry retries the call' }),
+        claim('c2', { class: 'behavior', predicate: 'retry throws on timeout' })
+      ])
+    });
+    expect(outcome.errors).toEqual([]);
+  });
+
+  it('rejects covers= naming an unknown marker, a non-behavior claim, or riding a no-exec fence', () => {
+    const behaviorLedger = ledgerWith([
+      claim('c1', { class: 'behavior', predicate: 'retry retries the call' }),
+      claim('c2', { class: 'value', predicate: 'retries defaults to 3' })
+    ]);
+    const unknown = validateSubmission({
+      mdx: mdxWith(
+        '<Claim id="c1">`retry` retries.</Claim> <Claim id="c2">`retries` defaults to 3.</Claim>\n\n' +
+          '```ts covers=c9\nretry();\n```'
+      ),
+      ledger: behaviorLedger
+    });
+    expect(unknown.errors.some((error) => error.includes('"c9"') && error.includes('no ledger claim'))).toBe(true);
+
+    const wrongClass = validateSubmission({
+      mdx: mdxWith(
+        '<Claim id="c1">`retry` retries.</Claim> <Claim id="c2">`retries` defaults to 3.</Claim>\n\n' +
+          '```ts covers=c2\nretry();\n```'
+      ),
+      ledger: behaviorLedger
+    });
+    expect(wrongClass.errors.some((error) => error.includes('class "value"'))).toBe(true);
+
+    const onNoExec = validateSubmission({
+      mdx: mdxWith(
+        '<Claim id="c1">`retry` retries.</Claim> <Claim id="c2">`retries` defaults to 3.</Claim>\n\n' +
+          '```ts no-exec covers=c1\nretry();\n```'
+      ),
+      ledger: behaviorLedger
+    });
+    expect(onNoExec.errors.some((error) => error.includes('no-exec'))).toBe(true);
+  });
+
   it('rejects a ledger claim whose marker is missing from the MDX', () => {
     const outcome = validateSubmission({ mdx: mdxWith('No markers here.'), ledger: ledgerWith([claim('c1')]) });
     expect(outcome.accepted).toBeUndefined();

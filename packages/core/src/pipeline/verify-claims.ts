@@ -8,7 +8,6 @@ import type {
   Finding,
   FingerprintSnapshot,
   LedgerClaim,
-  PageEntity,
   SymbolRecord,
   VerifierRunResult
 } from '@docstube/contracts';
@@ -40,10 +39,10 @@ import type { AnchoredClaim, RejectedProposal } from './anchor-ledger.ts';
 //                   the claim's symbol — both sides normalized by the SAME value-name grammar the
 //                   valuePrints facet hashes. Match → checked; mismatch → CONTRADICTED (a caught
 //                   lie, gating); unresolvable at verify time → stays unchecked (never guess).
-//   behavior        checked ONLY when an executed snippet legitimately covers it — conservative:
-//                   the claim's own section contains a code-example block that snippet-exec ran
-//                   successfully AND the claim itself proposed a check naming that verifier.
-//                   Execution coverage is never stretched beyond that.
+//   behavior        checked ONLY when a PASSING snippet explicitly declared the claim via its
+//                   fence meta (```ts covers=c3,c5 — validated by submit_page, returned by the
+//                   snippet-exec verifier as covered marker ids). Containment (same section, same
+//                   page) narrows nothing and mints nothing — coverage is always declared.
 //   intent-history  stays unchecked / maintainer-input-needed in this slice — owner-attestation
 //                   evidence arrives with the KnowledgeFact wiring in a later wave.
 //   (unknown class) unchecked / no-checker-available until a promoted project-defined verifier
@@ -78,8 +77,6 @@ export type VerifyClaimsInput = {
   fingerprints: FingerprintSnapshot;
   // Deterministic verifier results from the verify stage of THIS attempt (execution coverage).
   verifierResults: VerifierRunResult[];
-  // The extracted page — locates the claim's section for conservative execution coverage.
-  page: PageEntity;
   commit: string;
 };
 
@@ -106,21 +103,6 @@ const citedValueExtractorFor = (packs: LanguagePackDefinition[], file: string): 
     }
   }
   return undefined;
-};
-
-// Block ids sharing the claim's section (or the preamble) — the conservative containment scope
-// for execution coverage.
-const siblingBlockIdsOf = (page: PageEntity, blockId: string): { ids: string[]; codeExampleIds: string[] } => {
-  const groups = [page.preamble, ...page.sections.map((section) => section.blocks)];
-  for (const blocks of groups) {
-    if (blocks.some((block) => block.id === blockId)) {
-      return {
-        ids: blocks.map((block) => block.id),
-        codeExampleIds: blocks.filter((block) => block.blockType === 'code-example').map((block) => block.id)
-      };
-    }
-  }
-  return { ids: [], codeExampleIds: [] };
 };
 
 export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClaimsResult> => {
@@ -152,9 +134,11 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
     });
   }
 
-  // Snippets that executed successfully this attempt: block ids covered by a PASSING snippet-exec
-  // run (an executed-with-failure block would have failed the page before this stage).
-  const executedBlockIds = new Set(
+  // Explicit execution coverage (impl-06 finding 2): a PASSING snippet-exec run returns the
+  // marker ids its fences declared via covers= (alongside the executed block ids). A behavior
+  // claim is checked ONLY when its own marker id appears here — declared coverage, never
+  // proximity. (A failing snippet already failed the page before this stage.)
+  const executionCoveredMarkerIds = new Set(
     input.verifierResults
       .filter((result) => result.verifier === SNIPPET_EXEC_CHECK && result.status === 'pass')
       .flatMap((result) => result.coveredEntityIds)
@@ -337,34 +321,30 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         decidingEvidenceId = firstPass.evidenceId;
       }
     } else if (claim.class === 'behavior') {
-      // Conservative execution coverage: the claim must itself have proposed the snippet-exec
-      // check AND its own section must contain a code-example block that executed successfully.
-      // Anything looser would stretch execution coverage over claims a snippet never exercised.
-      if (entry.proposedChecks.includes(SNIPPET_EXEC_CHECK)) {
-        const { codeExampleIds } = siblingBlockIdsOf(input.page, claim.anchor.blockId);
-        const executed = codeExampleIds.find((id) => executedBlockIds.has(id));
-        if (executed !== undefined) {
-          const record = evidenceRecordSchema.parse({
-            evidenceId: mintId(idPrefixes.evidence),
-            ref: {
-              kind: 'execution',
-              check: SNIPPET_EXEC_CHECK,
-              environment: {
-                os: process.platform,
-                runtimeVersions: { node: process.versions.node },
-                sandbox: 'none'
-              }
-            },
-            checkedAt: now,
-            sourceRevision: commit,
-            outcome: 'pass',
-            detail: `code sample ${executed} in the claim's section executed successfully via ${SNIPPET_EXEC_CHECK}, which the claim proposed as its check`
-          });
-          minted.push(record);
-          correctness = 'checked';
-          disposition = null;
-          decidingEvidenceId = record.evidenceId;
-        }
+      // Explicit execution coverage only: a passing snippet DECLARED this claim via covers=.
+      // Same-section containment mints nothing; an undeclared console.log next door proves
+      // nothing about "retry retries the call".
+      if (executionCoveredMarkerIds.has(entry.markerId)) {
+        const record = evidenceRecordSchema.parse({
+          evidenceId: mintId(idPrefixes.evidence),
+          ref: {
+            kind: 'execution',
+            check: SNIPPET_EXEC_CHECK,
+            environment: {
+              os: process.platform,
+              runtimeVersions: { node: process.versions.node },
+              sandbox: 'none'
+            }
+          },
+          checkedAt: now,
+          sourceRevision: commit,
+          outcome: 'pass',
+          detail: `a code sample declaring covers=${entry.markerId} executed successfully via ${SNIPPET_EXEC_CHECK}`
+        });
+        minted.push(record);
+        correctness = 'checked';
+        disposition = null;
+        decidingEvidenceId = record.evidenceId;
       }
     }
     // intent-history and unknown classes: initial disposition stands (set above) — attestation

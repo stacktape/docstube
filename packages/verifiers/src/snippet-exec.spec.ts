@@ -97,16 +97,31 @@ describe('snippet-exec', () => {
     expect(message).not.toContain('line-15\n');
   });
 
-  it('passes a node script through a real subprocess and covers the block and claims', async () => {
+  it('passes a node script through a real subprocess and covers the block plus DECLARED covers= markers', async () => {
     const code = 'const total = [1, 2, 3].reduce((sum, n) => sum + n, 0);\nif (total !== 6) { process.exit(1); }';
+    const { block, page } = pageWithBlock(code, 'js');
+
+    const result = await snippetExecVerifier.verify(withExec(realExec), [
+      makeArtifact(page, mdxWithFence('js covers=b1,b2', code))
+    ]);
+
+    expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
+    expect(result.coveredEntityIds).toContain(block.id);
+    // Declared coverage rides along verbatim — the kernel checks exactly these marker ids.
+    expect(result.coveredEntityIds).toContain('b1');
+    expect(result.coveredEntityIds).toContain('b2');
+  });
+
+  it('covers ONLY the executed block when the fence declares no covers= — proximity mints nothing', async () => {
+    const code = "console.log('ok');";
     const { block, claim, page } = pageWithBlock(code, 'js');
 
     const result = await snippetExecVerifier.verify(withExec(realExec), [makeArtifact(page, mdxWithFence('js', code))]);
 
     expect(result.status).toBe('pass');
-    expect(result.findings).toEqual([]);
-    expect(result.coveredEntityIds).toContain(block.id);
-    expect(result.coveredEntityIds).toContain(claim.id);
+    expect(result.coveredEntityIds).toEqual([block.id]);
+    expect(result.coveredEntityIds).not.toContain(claim.id);
   });
 
   it('transpiles and executes a TypeScript snippet', async () => {

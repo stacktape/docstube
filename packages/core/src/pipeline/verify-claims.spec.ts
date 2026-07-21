@@ -137,7 +137,7 @@ const snippetPass = (coveredEntityIds: string[]): VerifierRunResult => ({
 
 const verify = (
   anchoredResult: Extract<AnchorLedgerResult, { ok: true }>,
-  page: ReturnType<typeof pageOf>,
+  _page: ReturnType<typeof pageOf>,
   verifierResults: VerifierRunResult[] = [],
   snapshot: FingerprintSnapshot = fingerprints
 ) =>
@@ -151,7 +151,6 @@ const verify = (
     repoRoot,
     fingerprints: snapshot,
     verifierResults,
-    page,
     commit: COMMIT
   });
 
@@ -363,52 +362,65 @@ describe('verifyClaims — code-structure and grounding', () => {
   });
 });
 
-describe('verifyClaims — behavior (conservative execution coverage)', () => {
-  const behaviorDraft = (markerId: string, withCheck: boolean) => ({
+describe('verifyClaims — behavior (declared execution coverage only)', () => {
+  const behaviorDraft = (markerId: string) => ({
     markerId,
     class: 'behavior',
     predicate: 'retry retries the call',
-    proposedEvidence: withCheck
-      ? [
-          { kind: 'symbol', symbol: KNOWN_SYMBOL },
-          { kind: 'check', check: 'snippet-exec' }
-        ]
-      : [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+    proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
     proposedSubscriptions: [{ kind: 'body', symbolHash: KNOWN_SYMBOL }]
   });
 
-  it('checks a behavior claim when its section snippet executed AND the claim proposed that check', async () => {
+  it('checks a behavior claim ONLY when a passing snippet declared it via covers=', async () => {
+    // The snippet-exec result carries the fence's covers= marker ids alongside the block id.
     const page = pageOf();
-    const result = await verify(anchorFixture([behaviorDraft('b1', true)], page), page, [
-      snippetPass([codeBlockIdOf(page)])
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
+      snippetPass([codeBlockIdOf(page), 'b1'])
     ]);
 
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
     const evidence = result.claimEvidence[0];
     const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
     expect(deciding?.ref).toMatchObject({ kind: 'execution', check: 'snippet-exec' });
+    expect(deciding?.detail).toContain('covers=b1');
   });
 
-  it('stays unchecked without the proposed check — execution coverage is never stretched', async () => {
+  it("the committed console.log case is NEGATIVE: same-section execution without covers= mints nothing", async () => {
+    // The impl-06 probe: a passing `console.log('ok')` block in the claim's own section. Without
+    // an explicit covers=b1 declaration it proves nothing about "retry retries the call".
     const page = pageOf();
-    const result = await verify(anchorFixture([behaviorDraft('b1', false)], page), page, [
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
       snippetPass([codeBlockIdOf(page)])
     ]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'execution')).toBe(true);
   });
 
-  it('stays unchecked when the executed snippet lives in a DIFFERENT section', async () => {
-    // b2 sits in the "Other" section; the executed code block is in "Usage".
+  it('a declared claim in ANOTHER section is still covered — coverage is the declaration, not proximity', async () => {
+    // b2 sits in "Other"; the executed snippet lives in "Usage" but explicitly declares covers=b2.
     const page = pageOf();
-    const result = await verify(anchorFixture([behaviorDraft('b2', true)], page), page, [
-      snippetPass([codeBlockIdOf(page)])
+    const result = await verify(anchorFixture([behaviorDraft('b2')], page), page, [
+      snippetPass([codeBlockIdOf(page), 'b2'])
     ]);
-    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
   });
 
   it('stays unchecked when no snippet executed at all', async () => {
     const page = pageOf();
-    const result = await verify(anchorFixture([behaviorDraft('b1', true)]), page, []);
+    const result = await verify(anchorFixture([behaviorDraft('b1')]), page, []);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+
+  it('a FAILING snippet run covers nothing even when it declared the claim', async () => {
+    const page = pageOf();
+    const failed: VerifierRunResult = {
+      verifier: 'snippet-exec',
+      plugin: '@docstube/verifiers',
+      status: 'fail',
+      findings: [],
+      coveredEntityIds: [codeBlockIdOf(page), 'b1']
+    };
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [failed]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
   });
 });

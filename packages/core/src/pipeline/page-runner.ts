@@ -181,8 +181,97 @@ export const generatePage = async (
       version: ctx.version
     };
 
-    // Verify (deterministic) and review (per-persona, explainable criteria) both gate the draft.
+    lastArtifact = artifact;
+    const scheduleRetry = async (): Promise<void> => {
+      if (attempt < maxAttempts) {
+        await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
+        await ctx.journal.append({ type: 'retry-scheduled', pageId: page.id, attempt: attempt + 1, maxAttempts });
+      }
+    };
+
+    // KERNEL ANCHORING RUNS FIRST — before deterministic verification and reviews (impl-06
+    // finding 2): the accepted writer ledger becomes the committed kernel ledger (marker → block
+    // anchors, minted claim ids, subscriptions resolved against the fingerprint snapshot), so the
+    // later stages can bind evidence to CLAIMS, and a draft whose ledger cannot anchor never
+    // burns expensive review calls. The post-hoc claim extractor is gone from this path — it
+    // survives only inside `docstube audit` for foreign docs.
     await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'checking' });
+    const anchoredLedger = anchorWriterLedger({
+      mdx,
+      writerLedger,
+      page,
+      fingerprints: ctx.fingerprints,
+      codemap: ctx.codemap,
+      observedReads: transcript.observedReads,
+      commit: ctx.commit
+    });
+    if (anchoredLedger.warnings.length > 0) {
+      const claimWarnings: Finding[] = anchoredLedger.warnings.map((warning) => ({
+        source: 'verifier',
+        check: 'claim-anchoring',
+        severity: 'warning',
+        message: warning
+      }));
+      await ctx.journal.append({ type: 'findings', pageId: page.id, findings: claimWarnings });
+    }
+    if (!anchoredLedger.ok) {
+      // Fail-closed anchoring (PRODUCT §3.3/§3.5): a claim that cannot anchor NEVER produces a
+      // passing ledger with fewer claims. Kernel invariant breaches (the accepted MDX no longer
+      // matches what submit_page validated) abort the run; writer-repairable errors feed the
+      // bounded retry loop with the precise error, exactly like verifier findings.
+      const kernelErrors = anchoredLedger.errors.filter((issue) => issue.kernel);
+      if (kernelErrors.length > 0) {
+        throw new CoreError(
+          'pipeline-failed',
+          `claim anchoring on "${node.slug}" hit a kernel invariant breach: ${kernelErrors
+            .map((issue) => issue.message)
+            .join('; ')}`
+        );
+      }
+      findings = anchoredLedger.errors.map((issue) => ({
+        source: 'verifier',
+        check: 'claim-anchoring',
+        severity: 'error',
+        message: issue.message
+      }));
+      await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
+      await scheduleRetry();
+      continue;
+    }
+    // Claim identity matching (trust-model-v2 decision 8): a continuing assertion on a matched
+    // block reuses the previous shard's claim id — identity carries, while predicate, anchor,
+    // subscriptions, evidence, and trust state all come from the CURRENT ledger.
+    const matched = matchClaimIds({
+      ledger: anchoredLedger.ledger,
+      anchored: anchoredLedger.anchored,
+      previousPage: previousShard?.page
+    });
+    // Ambiguous threads (drift markers) and orphaned prior claims are recorded facts, never
+    // silent: they ride the journal and the shard's claimMatching records.
+    const matchingWarnings: Finding[] = [
+      ...matched.matches
+        .filter((match) => match.confidence === 'ambiguous')
+        .map((match) => ({
+          source: 'verifier' as const,
+          check: 'claim-matching',
+          severity: 'warning' as const,
+          message: `claim ${match.priorId} threaded ambiguously (equal candidates) — content changed substantially since its human threads were written; drift marker recorded`,
+          data: { priorId: match.priorId, confidence: match.confidence }
+        })),
+      ...matched.orphans.map((orphanId) => ({
+        source: 'verifier' as const,
+        check: 'claim-matching',
+        severity: 'warning' as const,
+        message: `previous claim ${orphanId} matched nothing in the regenerated page — its threads are orphaned for re-attachment or dismissal`,
+        data: { orphanId }
+      }))
+    ];
+    if (matchingWarnings.length > 0) {
+      await ctx.journal.append({ type: 'findings', pageId: page.id, findings: matchingWarnings });
+    }
+
+    // Deterministic verifiers and persona review both gate the draft. They run AFTER anchoring:
+    // snippet execution results carry the covers= marker ids claim verification consumes.
     const results = await runVerifiers({
       repoRoot: ctx.repoRoot,
       config: ctx.config,
@@ -211,164 +300,72 @@ export const generatePage = async (
     if (reviewWarnings.length > 0) {
       await ctx.journal.append({ type: 'findings', pageId: page.id, findings: reviewWarnings });
     }
-    findings = [
-      ...errorFindings(results),
-      ...reviews.flatMap((review) => review.findings.filter((finding) => finding.severity === 'error'))
-    ];
-    if (findings.length > 0) {
-      await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
-    }
     const verifiedPage = assignGuarantees(page, results, ctx.host);
     lastArtifact = { ...artifact, page: verifiedPage };
-    if (findings.length === 0) {
-      // Kernel anchoring on the passing path: the accepted writer ledger becomes the committed
-      // kernel ledger (marker → block anchors, minted claim/evidence ids, subscriptions resolved
-      // against the fingerprint snapshot). The post-hoc claim extractor is gone from this path —
-      // it survives only inside `docstube audit` for foreign docs.
-      const anchoredLedger = anchorWriterLedger({
-        mdx,
-        writerLedger,
-        page: verifiedPage,
-        fingerprints: ctx.fingerprints,
-        codemap: ctx.codemap,
-        observedReads: transcript.observedReads,
-        commit: ctx.commit
-      });
-      if (anchoredLedger.warnings.length > 0) {
-        const claimWarnings: Finding[] = anchoredLedger.warnings.map((warning) => ({
-          source: 'verifier',
-          check: 'claim-anchoring',
-          severity: 'warning',
-          message: warning
-        }));
-        await ctx.journal.append({ type: 'findings', pageId: page.id, findings: claimWarnings });
-      }
-      if (!anchoredLedger.ok) {
-        // Fail-closed anchoring (PRODUCT §3.3/§3.5): a claim that cannot anchor NEVER produces a
-        // passing ledger with fewer claims. Kernel invariant breaches (the accepted MDX no longer
-        // matches what submit_page validated) abort the run; writer-repairable errors feed the
-        // bounded retry loop with the precise error, exactly like verifier findings.
-        const kernelErrors = anchoredLedger.errors.filter((issue) => issue.kernel);
-        if (kernelErrors.length > 0) {
-          throw new CoreError(
-            'pipeline-failed',
-            `claim anchoring on "${node.slug}" hit a kernel invariant breach: ${kernelErrors
-              .map((issue) => issue.message)
-              .join('; ')}`
-          );
-        }
-        findings = anchoredLedger.errors.map((issue) => ({
-          source: 'verifier',
-          check: 'claim-anchoring',
-          severity: 'error',
-          message: issue.message
-        }));
-        await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
-        if (attempt < maxAttempts) {
-          await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
-          await ctx.journal.append({ type: 'retry-scheduled', pageId: page.id, attempt: attempt + 1, maxAttempts });
-        }
-        continue;
-      }
-      // Claim identity matching (trust-model-v2 decision 8): a continuing assertion on a matched
-      // block reuses the previous shard's claim id — identity carries, while predicate, anchor,
-      // subscriptions, evidence, and trust state all come from the CURRENT ledger.
-      const matched = matchClaimIds({
-        ledger: anchoredLedger.ledger,
-        anchored: anchoredLedger.anchored,
-        previousPage: previousShard?.page
-      });
-      // Ambiguous threads (drift markers) and orphaned prior claims are recorded facts, never
-      // silent: they ride the journal now; shard persistence of matching confidence is 2b-iii.
-      const matchingWarnings: Finding[] = [
-        ...matched.matches
-          .filter((match) => match.confidence === 'ambiguous')
-          .map((match) => ({
-            source: 'verifier' as const,
-            check: 'claim-matching',
-            severity: 'warning' as const,
-            message: `claim ${match.priorId} threaded ambiguously (equal candidates) — content changed substantially since its human threads were written; drift marker recorded`,
-            data: { priorId: match.priorId, confidence: match.confidence }
-          })),
-        ...matched.orphans.map((orphanId) => ({
-          source: 'verifier' as const,
-          check: 'claim-matching',
-          severity: 'warning' as const,
-          message: `previous claim ${orphanId} matched nothing in the regenerated page — its threads are orphaned for re-attachment or dismissal`,
-          data: { orphanId }
-        }))
-      ];
-      if (matchingWarnings.length > 0) {
-        await ctx.journal.append({ type: 'findings', pageId: page.id, findings: matchingWarnings });
-      }
-      // Claim verification (wave 2b-ii): the authority table assigns correctness per claim by
-      // minting canonical EvidenceRecords (codemap grounding, the minimal value-predicate
-      // verifier, conservative execution coverage). Contradictions and grounding failures come
-      // back as BLOCKING error findings and take the exact same path as verifier findings:
-      // journal → bounded retry with the precise detail → flagged after retries, never shipped
-      // as neutral content.
-      const verified = await verifyClaims({
-        ledger: matched.ledger,
-        anchored: matched.anchored,
-        anchorEvidence: anchoredLedger.evidence,
-        rejectedProposals: anchoredLedger.rejectedProposals,
-        codemap: ctx.codemap,
-        packs: ctx.host.languagePacks().map((entry) => entry.definition),
-        repoRoot: ctx.repoRoot,
-        fingerprints: ctx.fingerprints,
-        verifierResults: results,
-        page: verifiedPage,
-        commit: ctx.commit
-      });
-      if (verified.warnings.length > 0) {
-        await ctx.journal.append({
-          type: 'findings',
-          pageId: page.id,
-          findings: verified.warnings.map((warning) => ({
-            source: 'verifier' as const,
-            check: CLAIM_VERIFICATION_CHECK,
-            severity: 'warning' as const,
-            message: warning
-          }))
-        });
-      }
-      if (verified.findings.length > 0) {
-        findings = verified.findings;
-        await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
-        if (attempt < maxAttempts) {
-          await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
-          await ctx.journal.append({ type: 'retry-scheduled', pageId: page.id, attempt: attempt + 1, maxAttempts });
-        }
-        continue;
-      }
-      lastLedger = verified.ledger;
-      // Provenance v2 for the gated page: lineage / dependencies / claimEvidence / assessments,
-      // validated by parse. In-memory on the page result this wave; shard persistence is 2b-iii.
-      lastProvenance = assembleProvenanceV2({
+
+    // Claim verification: the authority table assigns correctness per claim by minting canonical
+    // EvidenceRecords (codemap grounding, the minimal value-predicate verifier, declared
+    // execution coverage). It runs on EVERY anchored attempt — including the final failing one —
+    // so the persisted artifact always carries its true final ledger/evidence state (impl-06
+    // finding 3: the lastLedger/lastProvenance assignment bug). Contradictions, grounding
+    // failures, and value-binding violations are BLOCKING error findings on the same bounded
+    // retry path as verifier findings.
+    const verified = await verifyClaims({
+      ledger: matched.ledger,
+      anchored: matched.anchored,
+      anchorEvidence: anchoredLedger.evidence,
+      rejectedProposals: anchoredLedger.rejectedProposals,
+      codemap: ctx.codemap,
+      packs: ctx.host.languagePacks().map((entry) => entry.definition),
+      repoRoot: ctx.repoRoot,
+      fingerprints: ctx.fingerprints,
+      verifierResults: results,
+      commit: ctx.commit
+    });
+    if (verified.warnings.length > 0) {
+      await ctx.journal.append({
+        type: 'findings',
         pageId: page.id,
-        ledger: verified.ledger,
-        claimEvidence: verified.claimEvidence,
-        transcript,
-        writeTask: task,
-        reviews,
-        instructions: ctx.instructions,
-        criteria: ctx.criteria,
-        glossary: ctx.glossary,
-        config: ctx.config,
-        knowledge: ctx.knowledge
+        findings: verified.warnings.map((warning) => ({
+          source: 'verifier' as const,
+          check: CLAIM_VERIFICATION_CHECK,
+          severity: 'warning' as const,
+          message: warning
+        }))
       });
-      // TEMPORARY (until wave 2b-iii): the bridge REPLACES every block's legacy claims with the
-      // verified ledger view (checked → proven, unchecked → scored; contradiction cannot reach it
-      // — the gate above already failed the attempt); the lift then upgrades blocks whose every
-      // claim is proven.
-      const bridgedPage = attachLedgerClaims(verifiedPage, verified.anchored);
-      lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(bridgedPage) };
-      break;
     }
-    if (attempt < maxAttempts) {
-      await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
-      await ctx.journal.append({ type: 'retry-scheduled', pageId: page.id, attempt: attempt + 1, maxAttempts });
+    findings = [
+      ...errorFindings(results),
+      ...reviews.flatMap((review) => review.findings.filter((finding) => finding.severity === 'error')),
+      ...verified.findings
+    ];
+    lastLedger = verified.ledger;
+    // Provenance v2: lineage / dependencies / claimEvidence / assessments, validated by parse.
+    // Assembled on every anchored attempt for the same reason as the ledger above.
+    lastProvenance = assembleProvenanceV2({
+      pageId: page.id,
+      ledger: verified.ledger,
+      claimEvidence: verified.claimEvidence,
+      transcript,
+      writeTask: task,
+      reviews,
+      instructions: ctx.instructions,
+      criteria: ctx.criteria,
+      glossary: ctx.glossary,
+      config: ctx.config,
+      knowledge: ctx.knowledge
+    });
+    if (findings.length > 0) {
+      await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
+      await scheduleRetry();
+      continue;
     }
+    // TEMPORARY (removed with the guarantee-ladder demolition): the bridge REPLACES every block's
+    // legacy claims with the verified ledger view; the lift then upgrades blocks whose every
+    // claim is proven. Contradiction cannot reach it — the gate above already failed the attempt.
+    const bridgedPage = attachLedgerClaims(verifiedPage, verified.anchored);
+    lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(bridgedPage) };
+    break;
   }
 
   if (lastArtifact === undefined || lastTranscript === undefined) {

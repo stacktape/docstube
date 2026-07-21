@@ -25,6 +25,15 @@ const hasNoExecMeta = (fence: MdxCodeBlock): boolean => /(^|\s)no-exec(\s|$)/u.t
 // samples that legitimately read configuration from the environment.
 const hasAllowEnvMeta = (fence: MdxCodeBlock): boolean => /(^|\s)allow-env(\s|$)/u.test(fence.meta);
 
+// Explicit execution coverage (`covers=c3,c5` in the fence meta): the marker ids of the behavior
+// claims this snippet exercises. A PASSING execution covers exactly these claims — the kernel's
+// claim verification checks a behavior claim ONLY when a passing snippet declared it; proximity
+// (same section, same page) mints nothing. submit_page validates the declarations in-session.
+const coveredMarkerIds = (fence: MdxCodeBlock): string[] =>
+  [...fence.meta.matchAll(/(?:^|\s)covers=([^\s]+)/gu)].flatMap((match) =>
+    (match[1] ?? '').split(',').filter((token) => token !== '')
+  );
+
 // Snippets run with a scrubbed environment by default: PATH plus the platform essentials and
 // nothing else, so API keys and tokens in the host env cannot leak into documentation samples.
 const minimalSnippetEnv = (): Record<string, string> => {
@@ -161,7 +170,8 @@ export const snippetExecVerifier: VerifierDefinition = {
             const run = await runSnippet(ctx, language, fence.code, cwd, hasAllowEnvMeta(fence));
             executedCount += 1;
             if (run.exitCode === 0) {
-              coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
+              // The covered set is the block itself plus EXACTLY the declared covers= marker ids.
+              coveredEntityIds.push(block.id, ...coveredMarkerIds(fence));
             } else if (!bashLanguages.has(language) && isModuleNotFound(run.stderr)) {
               // Unresolvable import in the sandbox: not proven, not failed.
             } else if (bashLanguages.has(language) && isCommandNotFound(run.exitCode, run.stderr)) {
@@ -172,7 +182,7 @@ export const snippetExecVerifier: VerifierDefinition = {
                 executionFailureFinding(
                   artifact,
                   block.id,
-                  block.claims.map((claim) => claim.id),
+                  coveredMarkerIds(fence),
                   fence,
                   `exit code ${run.exitCode}${tail === '' ? '' : `\n${tail}`}`
                 )
@@ -185,7 +195,7 @@ export const snippetExecVerifier: VerifierDefinition = {
               executionFailureFinding(
                 artifact,
                 block.id,
-                block.claims.map((claim) => claim.id),
+                coveredMarkerIds(fence),
                 fence,
                 `${error instanceof Error ? error.message : String(error)} (timeout ${executionTimeoutMs}ms)`
               )
