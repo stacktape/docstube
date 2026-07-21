@@ -64,7 +64,7 @@ export type EmitSiteResult = {
 
 // Kernel invariants pinned exactly (no ranges): a generated site must build identically whenever
 // it is rebuilt, and a docstube release is only ever validated against these versions.
-// `docstube refresh` updates them. Theme dependencies merge on top; a conflicting pin is an error.
+// `docstube generate` updates them. Theme dependencies merge on top; a conflicting pin is an error.
 const kernelBaseDependencies: Record<string, string> = {
   '@astrojs/mdx': '6.0.3',
   astro: '6.4.6',

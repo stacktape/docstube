@@ -167,7 +167,7 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
         }
       },
       runDocstube: async (input) => {
-        operations.push(`cli:${input.mode}:${input.workspaceDir}`);
+        operations.push(`cli:generate:${input.workspaceDir}`);
         return options.cliResult ?? { exitCode: 0 };
       }
     }
@@ -182,7 +182,6 @@ describe('GitHub Action orchestration', () => {
       {
         baseBranch: 'main',
         githubToken: 'ghs_secret_token_123456',
-        mode: 'generate',
         refName: 'main',
         workspaceDir: '/repo',
         workflowName: 'Docs'
@@ -228,7 +227,7 @@ describe('GitHub Action orchestration', () => {
       ]
     });
 
-    const result = await runGitHubAction({ baseBranch: 'main', mode: 'refresh', workspaceDir: '/repo' }, harness.deps);
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
 
     expect(result.autoMerge).toBe('blocked');
     expect(result.openFlagCount).toBe(2);
@@ -324,7 +323,7 @@ describe('GitHub Action orchestration', () => {
     });
     const ok = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, withCustom.deps);
     expect(ok.exitCode).toBe(0);
-    expect(withCustom.operations).toContain('cli:refresh:/repo');
+    expect(withCustom.operations).toContain('cli:generate:/repo');
 
     // The common names do not satisfy a config that names its own env var.
     const withWrong = createHarness({
@@ -402,8 +401,9 @@ describe('inputs and CLI invocation', () => {
       return { exitCode: 0, stdout: 'ok', stderr: '' };
     });
 
-    await expect(runner({ mode: 'refresh', workspaceDir: '/repo' })).resolves.toEqual({ exitCode: 0, output: 'ok' });
-    expect(calls).toEqual([{ command: 'npx', args: ['--yes', 'docstube@1.0.0', 'refresh'], cwd: '/repo' }]);
+    await expect(runner({ workspaceDir: '/repo' })).resolves.toEqual({ exitCode: 0, output: 'ok' });
+    // The one supported command: generate (pipeline-v2 decision 1).
+    expect(calls).toEqual([{ command: 'npx', args: ['--yes', 'docstube@1.0.0', 'generate'], cwd: '/repo' }]);
   });
 
   it('creates deterministic branch names and concurrency groups', () => {
@@ -415,35 +415,33 @@ describe('inputs and CLI invocation', () => {
     );
   });
 
-  it('reads generate and refresh modes from the environment', () => {
+  it('reads inputs from the environment (no mode input exists anymore)', () => {
     const inputs = readGitHubActionInputsFromEnv({
       GITHUB_REPOSITORY: 'stacktape/docstube',
       GITHUB_WORKSPACE: '/repo',
-      INPUT_MODE: 'generate',
       'INPUT_GITHUB-TOKEN': 'ghs_secret_token_123456'
     });
 
     expect(inputs).toMatchObject({
       githubToken: 'ghs_secret_token_123456',
-      mode: 'generate',
       repository: 'stacktape/docstube',
       workspaceDir: '/repo'
     });
+    expect(inputs).not.toHaveProperty('mode');
   });
 
-  it('rejects removed and unknown modes', () => {
-    expect(() => readGitHubActionInputsFromEnv({ GITHUB_WORKSPACE: '/repo', INPUT_MODE: 'validate' })).toThrow(
-      'Unsupported docstube Action mode: validate.'
-    );
-    expect(() => readGitHubActionInputsFromEnv({ GITHUB_WORKSPACE: '/repo', INPUT_MODE: 'update' })).toThrow(
-      'Unsupported docstube Action mode: update.'
-    );
+  it('rejects the removed mode input instead of silently ignoring it (generate is the one command)', () => {
+    for (const value of ['generate', 'refresh', 'validate']) {
+      expect(() => readGitHubActionInputsFromEnv({ GITHUB_WORKSPACE: '/repo', INPUT_MODE: value })).toThrow(
+        'The mode input was removed'
+      );
+    }
   });
 
   it('rejects the removed dry-run input instead of silently ignoring it', () => {
-    expect(() =>
-      readGitHubActionInputsFromEnv({ GITHUB_WORKSPACE: '/repo', INPUT_MODE: 'refresh', 'INPUT_DRY-RUN': 'true' })
-    ).toThrow('dry-run input was removed');
+    expect(() => readGitHubActionInputsFromEnv({ GITHUB_WORKSPACE: '/repo', 'INPUT_DRY-RUN': 'true' })).toThrow(
+      'dry-run input was removed'
+    );
   });
 });
 

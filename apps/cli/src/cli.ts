@@ -120,29 +120,8 @@ const plugin = defineCommand({
   }
 });
 
-// TRANSITIONAL (Sol impl-07 obligation 8): `refresh` still derives invalidation from the legacy
-// per-entity provenance. The reconciler wave REPLACES this command — generate-as-reconciler
-// driven exclusively by ProvenanceV2 dependency subscriptions — and removes the public refresh
-// path. Nothing new may depend on the legacy provenance invalidation it uses.
-const refresh = defineCommand({
-  meta: { description: 'Regenerate only the entities affected by code changes.', name: 'refresh' },
-  args: {
-    'max-attempts': { type: 'string', description: 'Max write attempts per page (default 3).' }
-  },
-  async run({ args }) {
-    await runCliCommand('refresh', async () => {
-      enableNodeCompileCache();
-      const maxAttempts = typeof args['max-attempts'] === 'string' ? Number(args['max-attempts']) : undefined;
-      if (maxAttempts !== undefined && (!Number.isInteger(maxAttempts) || maxAttempts < 1)) {
-        output.error(`Invalid --max-attempts value: ${args['max-attempts']}`);
-        return { exitCode: 1 };
-      }
-      const { runRefreshCommand } = await import('./commands/refresh-command.ts');
-      return runRefreshCommand({ workspaceDir: process.cwd(), maxAttempts }, output);
-    });
-  }
-});
-
+// `refresh` is REMOVED as a public command (pipeline-v2 decision 1): `docstube generate` is the
+// one idempotent reconciler; the maintain engine survives only as internals generate will call.
 const refine = defineCommand({
   meta: { description: 'Improve the lowest-quality generated pages first.', name: 'refine' },
   args: {
@@ -334,7 +313,6 @@ const main = defineCommand({
   subCommands: {
     wizard,
     generate,
-    refresh,
     refine,
     preview,
     audit,

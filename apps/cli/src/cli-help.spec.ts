@@ -7,7 +7,6 @@ describe('cli help', () => {
     for (const command of [
       'wizard',
       'generate',
-      'refresh',
       'refine',
       'audit',
       'validate',
@@ -19,6 +18,11 @@ describe('cli help', () => {
     ]) {
       expect(help).toContain(`  ${command}`);
     }
+  });
+
+  it('has NO public refresh command — generate is the one reconciler (pipeline-v2 decision 1)', () => {
+    expect(getCommandHelp()).not.toContain('refresh');
+    expect(getCommandHelp('refresh')).toContain('Unknown command: refresh');
   });
 
   it('documents check kinds as plugin-derived, not a hardcoded list', () => {

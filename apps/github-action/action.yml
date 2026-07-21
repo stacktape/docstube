@@ -1,10 +1,6 @@
 name: docstube
-description: Run docstube (generate or refresh), open a verified-delta PR, and auto-merge when no flag blocks it.
+description: Run docstube generate (the idempotent reconciler), open a verified-delta PR, and auto-merge when no flag blocks it.
 inputs:
-  mode:
-    description: docstube command to run. `generate` for the first run, `refresh` to maintain docs on code changes.
-    required: false
-    default: refresh
   github-token:
     description: GitHub token used by the gh CLI for the PR, flag comment, digest issue, and auto-merge.
     required: false

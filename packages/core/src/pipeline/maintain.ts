@@ -43,7 +43,7 @@ import { createRunCostTracker, freezeReason } from './run-cost.ts';
 // TODO(v2): regenerate at block/section granularity — blocks carry their own provenance, so the
 // affected-entity set is already computable per block; v1 regenerates whole pages.
 
-export type RefreshOptions = {
+export type MaintainOptions = {
   repoRoot: string;
   runTask: TaskRunner;
   toolDescriptors: ToolDescriptor[];
@@ -51,7 +51,7 @@ export type RefreshOptions = {
   maxAttemptsPerPage?: number | undefined;
 };
 
-export type RefreshSummary = {
+export type MaintainSummary = {
   runId: string;
   outcome: 'passed' | 'flagged' | 'frozen';
   // Slugs of the pages that were regenerated this run.
@@ -160,7 +160,7 @@ const openFlag = (input: {
 const shardHasOpenFlags = (shard: PageShard): boolean =>
   shard.flags.some((flag) => flag.status === 'open' && flag.kind !== 'tribal-knowledge');
 
-export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummary> => {
+export const runMaintain = async (options: MaintainOptions): Promise<MaintainSummary> => {
   const { repoRoot } = options;
   const family = await loadConfigFamily(repoRoot);
   const { config, ia, glossary } = family;
@@ -177,7 +177,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   // read as still running (journalRunFailure rethrows).
   try {
     const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot);
-    await journal.append({ type: 'run-started', mode: 'refresh', commit });
+    await journal.append({ type: 'run-started', mode: 'maintain', commit });
     if (dirtyWorkingTree) {
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
     }
@@ -200,7 +200,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     if (previousIndex === undefined) {
       throw new CoreError(
         'state-corrupt',
-        'no committed manifest found — run `docstube generate` before `docstube refresh`',
+        'no committed manifest found — run `docstube generate` first',
         { repoRoot, version }
       );
     }

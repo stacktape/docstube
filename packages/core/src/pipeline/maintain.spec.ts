@@ -6,7 +6,7 @@ import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/con
 import { contentHash } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { runGenerate } from './generate.ts';
-import { runRefresh } from './maintain.ts';
+import { runMaintain } from './maintain.ts';
 
 // Maintain/refresh over a real temp repo: generate first (scripted writer + passing reviewers),
 // then refresh and assert which pages regenerate. CI never calls a live model. Writer tasks
@@ -136,17 +136,17 @@ afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
-describe('runRefresh', () => {
+describe('runMaintain', () => {
   it('fails with a clear error when no manifest exists yet', async () => {
     const { runTask } = scriptedRunner([], fixtureSource);
-    await expect(runRefresh({ repoRoot, runTask, toolDescriptors: [] })).rejects.toThrow(/docstube generate/);
+    await expect(runMaintain({ repoRoot, runTask, toolDescriptors: [] })).rejects.toThrow(/docstube generate/);
   });
 
   it('regenerates nothing when the source is unchanged', async () => {
     await generateFixtureDocs();
 
     const { runTask, writeCalls, reviewCalls } = scriptedRunner([], fixtureSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
 
     expect(summary.outcome).toBe('passed');
     expect(summary.regenerated).toEqual([]);
@@ -162,7 +162,7 @@ describe('runRefresh', () => {
     await writeFile(join(repoRoot, 'src', 'greeter.ts'), changedSource);
 
     const { runTask, writeCalls, reviewCalls } = scriptedRunner([goodMdx], changedSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
 
     expect(summary.regenerated).toEqual(['getting-started']);
     expect(summary.unchangedCount).toBe(0);
@@ -184,7 +184,7 @@ describe('runRefresh', () => {
     await rm(join(repoRoot, 'src', 'greeter.ts'));
 
     const { runTask, writeCalls } = scriptedRunner([goodMdx], fixtureSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
 
     expect(summary.regenerated).toEqual(['getting-started']);
     expect(writeCalls).toHaveLength(1);
@@ -201,7 +201,7 @@ describe('runRefresh', () => {
     );
 
     const { runTask, writeCalls } = scriptedRunner([], fixtureSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
 
     // The new file was never an observed read, so the page itself is unaffected.
     expect(writeCalls).toHaveLength(0);
@@ -229,7 +229,7 @@ tree:
     );
 
     const { runTask, writeCalls } = scriptedRunner([], fixtureSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
 
     expect(writeCalls).toHaveLength(0);
     expect(summary.outcome).toBe('flagged');
@@ -256,14 +256,14 @@ tree:
     await writeFile(join(repoRoot, 'ia.yml'), missingNodeIa);
 
     // First refresh: the indexed page lost its IA node — one open structural-change flag.
-    await runRefresh({ repoRoot, runTask: scriptedRunner([], fixtureSource).runTask, toolDescriptors: [] });
+    await runMaintain({ repoRoot, runTask: scriptedRunner([], fixtureSource).runTask, toolDescriptors: [] });
     const store = createManifestStore(repoRoot, 'latest');
     let index = await store.readIndex();
     expect(index?.systemFlags.filter((flag) => flag.kind === 'structural-change')).toHaveLength(1);
 
     // Second refresh with the SAME condition: the open flag is not duplicated, and the run stays
     // flagged because the docs still carry it.
-    const second = await runRefresh({
+    const second = await runMaintain({
       repoRoot,
       runTask: scriptedRunner([], fixtureSource).runTask,
       toolDescriptors: []
@@ -275,7 +275,7 @@ tree:
 
     // The IA node returns: the condition no longer holds, so the flag resolves and the run passes.
     await writeFile(join(repoRoot, 'ia.yml'), iaYaml);
-    const third = await runRefresh({
+    const third = await runMaintain({
       repoRoot,
       runTask: scriptedRunner([], fixtureSource).runTask,
       toolDescriptors: []
@@ -329,7 +329,7 @@ tree:
     // Refresh with nothing changed: the page is carried, not regenerated — but its standing open
     // flag must keep the run flagged, or the auto-merge gate reads a defective site as clean.
     const { runTask, writeCalls } = scriptedRunner([], fixtureSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
     expect(writeCalls).toHaveLength(0);
     expect(summary.unchangedCount).toBe(1);
     expect(summary.outcome).toBe('flagged');
@@ -359,7 +359,7 @@ tree:
     });
 
     const { runTask, writeCalls } = scriptedRunner([goodMdx], fixtureSource);
-    const summary = await runRefresh({ repoRoot, runTask, toolDescriptors: [] });
+    const summary = await runMaintain({ repoRoot, runTask, toolDescriptors: [] });
 
     expect(summary.regenerated).toEqual(['getting-started']);
     expect(writeCalls).toHaveLength(1);

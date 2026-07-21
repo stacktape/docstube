@@ -32,7 +32,9 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
   const trpc = useTrpc();
-  const [runMode, setRunMode] = useState<RunMode>(state.mode === 'scaffold' ? 'generate' : 'refresh');
+  // `refresh` is gone (pipeline-v2 decision 1): generate is the idempotent reconciler for both
+  // first runs and maintenance.
+  const [runMode, setRunMode] = useState<RunMode>('generate');
   const issues = allIssues(state);
 
   // Scaffold mode: write the config family first; starting the run is a separate step so a
@@ -170,7 +172,6 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
             onChange={(event) => setRunMode(event.target.value as RunMode)}
           >
             <option value="generate">generate</option>
-            <option value="refresh">refresh</option>
             <option value="refine">refine</option>
           </select>
           <button

@@ -25,7 +25,7 @@ permissions:
   issues: write
 
 jobs:
-  refresh-docs:
+  generate-docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,13 +33,12 @@ jobs:
       - name: Run docstube
         uses: ./apps/github-action
         with:
-          mode: refresh
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-Use `mode: generate` for a first documentation run and `mode: refresh` for ongoing maintenance after code changes. If `mode` is omitted, the action uses `refresh`.
+The action always runs `docstube generate` — the idempotent reconciler handles first runs and ongoing maintenance alike. The former `mode` input was removed; workflows still passing it fail with an actionable message.
 
 The `github-token` input is used by the `gh` CLI for pull requests, PR comments, the digest issue, and auto-merge. If it is not provided, the action reads `GITHUB_TOKEN`.
 
@@ -49,25 +48,24 @@ The model credential is separate from the GitHub token. Before running the CLI, 
 
 | Input | Default | Behavior |
 | --- | --- | --- |
-| `mode` | `refresh` | Runs either `generate` or `refresh`. Other values fail. |
 | `github-token` | `GITHUB_TOKEN` | Token passed to `gh` for PRs, comments, issues, and auto-merge. |
 | `base-branch` | `GITHUB_BASE_REF`, then `GITHUB_REF_NAME`, then `main` | Branch checked out and targeted by the PR. |
 | `branch-prefix` | `docstube/docs` | Prefix for the generated docs branch. |
-| `commit-message` | `docs: docstube <mode>` | Commit message for the docs update. |
+| `commit-message` | `docs: docstube generate` | Commit message for the docs update. |
 | `docstube-package` | `docstube@0.0.2` | Package spec passed to `npx --yes`. |
 | `workspace` | `GITHUB_WORKSPACE`, then the current working directory | Checked-out repository path. |
 
-The action rejects the removed `dry-run` input. It always opens or updates a real pull request when there are commit-worthy changes.
+The action rejects the removed `dry-run` and `mode` inputs. It always opens or updates a real pull request when there are commit-worthy changes.
 
 ## What The Action Runs
 
 The action checks out the base branch, creates or resets a docs branch, and runs the CLI as:
 
 ```bash
-npx --yes docstube@0.0.2 refresh
+npx --yes docstube@0.0.2 generate
 ```
 
-The package spec and command change when `docstube-package` or `mode` are set.
+The package spec changes when `docstube-package` is set.
 
 After the CLI exits successfully, the action reads `git status --porcelain`, filters out machine-local state under `.docstube/db.sqlite`, `.docstube/cache/`, and `.docstube/runs/`, and commits the remaining changed paths together.
 

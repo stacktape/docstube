@@ -11,7 +11,6 @@ import {
   resolveCommit,
   runGenerate,
   runRefine,
-  runRefresh,
   startLocalServer
 } from '@docstube/core';
 import type { ControlPlaneInjection } from '@docstube/core';
@@ -78,8 +77,8 @@ export const runWizardCommand = async (input: WizardCommandInput, output: CliOut
         toolDescriptors: runner.toolDescriptors,
         runId
       };
-      const run =
-        mode === 'generate' ? runGenerate(common) : mode === 'refresh' ? runRefresh(common) : runRefine(common);
+      // `refresh` is gone (pipeline-v2 decision 1): generate IS the reconciler.
+      const run = mode === 'generate' ? runGenerate(common) : runRefine(common);
       // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
       void run.catch((error: unknown) => output.error(`background ${mode} run failed: ${(error as Error).message}`));
       return { runId };

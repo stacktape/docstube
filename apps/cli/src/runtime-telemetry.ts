@@ -46,7 +46,6 @@ const knownRuntimeTelemetryCommands = new Set([
   'generate',
   'help',
   'plugin',
-  'refresh',
   'refine',
   'status',
   'upgrade',

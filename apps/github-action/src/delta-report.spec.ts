@@ -64,10 +64,10 @@ describe('PR body (verified delta annotation)', () => {
       committedPaths: [shardRelativePath(shard), 'docs-site/content/en/getting-started/installation.mdx'],
       decision,
       delta,
-      mode: 'refresh'
+      mode: 'generate'
     });
 
-    expect(body).toContain('## docstube refresh');
+    expect(body).toContain('## docstube generate');
     expect(body).toContain('| `getting-started/installation` (en) | 1 | 1 | 0 | 1 |');
     expect(body).toContain('Totals: 1 checked · 1 unchecked · 0 contradicted claim(s).');
     expect(body).toContain('### Open flags (1)');
@@ -164,7 +164,7 @@ describe('job summary', () => {
       committedPaths: ['docs-site/content/en/index.mdx'],
       decision: decideAutoMerge([]),
       delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
-      mode: 'refresh',
+      mode: 'generate',
       pullRequestUrl: 'https://github.com/stacktape/docstube/pull/12',
       status: 'pull-request'
     });

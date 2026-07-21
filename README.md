@@ -20,7 +20,7 @@ The repository is mid-way through the v1 rewrite described in [PRODUCT.md](PRODU
 - Working today: `generate` (codemap → write → per-persona review → deterministic verify → gate →
   manifest → site), `check` (kinds derive from registered verifier plugins), `status`, `doctor`,
   `validate`, `upgrade`, verified translations for declared locales, and version snapshot cutting.
-- Being rebuilt on the new entity-model pipeline: `wizard`, `refresh`, `refine`, `audit`,
+- Being rebuilt on the new entity-model pipeline: `wizard`, `refine`, `audit`,
   `plugin`, and the local web UI. These commands fail with an honest message until they land.
 - The plugin API ships as `@docstube/plugin-sdk` (experimental until 1.0): verifiers, language
   packs, content sources, importers, deploy targets, search providers, and MDX components are all
@@ -58,7 +58,6 @@ After a release is published, the normal Node path is:
 ```bash
 npx docstube wizard
 npx docstube generate
-npx docstube refresh
 ```
 
 No-Node users install a standalone binary through the Stacktape-hosted scripts, which download
@@ -102,7 +101,7 @@ deliberately.
 - `knowledge/design/`: subsystem design docs (agent transports, salvage inventory, …).
 - `apps/cli`: published `docstube` CLI package.
 - `apps/local-ui`: localhost web UI (wizard · dashboard · review · flag queue).
-- `apps/github-action`: GitHub Action wrapper (auto-merging refresh PRs).
+- `apps/github-action`: GitHub Action wrapper (auto-merging generated docs PRs).
 - `apps/install-events`: install telemetry Lambda.
 - `packages/contracts`: the S0 schema layer (entities, provenance, manifest, config).
 - `packages/plugin-sdk`: the public plugin API (second published package).

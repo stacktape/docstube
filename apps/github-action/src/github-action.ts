@@ -23,15 +23,15 @@ import type { VerifiedDelta, WorkspaceFileReader } from './verified-delta.ts';
 // the workspace, reads the committed manifest for the verified delta, and handles git + GitHub
 // (branch, atomic commit, PR, auto-merge gate, flag delivery). Honest L4 posture per PRODUCT §3.3.
 
-export type GitHubActionMode = 'generate' | 'refresh';
-
+// The Action runs exactly ONE docstube command: `generate`, the idempotent reconciler
+// (pipeline-v2 decision 1). The former `mode` input (generate|refresh) is removed; a workflow
+// still passing it fails with an actionable message instead of silently running something else.
 export type GitHubActionInputs = {
   baseBranch?: string;
   branchPrefix?: string;
   commitMessage?: string;
   docstubePackage?: string;
   githubToken?: string;
-  mode?: GitHubActionMode;
   refName?: string;
   repository?: string;
   workflowName?: string;
@@ -118,7 +118,7 @@ export type GitHubActionDeps = {
   pullRequest: GitHubActionPullRequestClient;
   readWorkspaceFile: WorkspaceFileReader;
   reporter: GitHubActionReporter;
-  runDocstube: (input: { mode: GitHubActionMode; workspaceDir: string }) => Promise<DocstubeCliRunResult>;
+  runDocstube: (input: { workspaceDir: string }) => Promise<DocstubeCliRunResult>;
   // Ambient environment used for the model-credential precondition and secret redaction;
   // defaults to process.env.
   env?: NodeJS.ProcessEnv;
@@ -368,7 +368,9 @@ export const runGitHubAction = async (
   inputs: GitHubActionInputs,
   deps: GitHubActionDeps
 ): Promise<GitHubActionResult> => {
-  const mode: GitHubActionMode = inputs.mode ?? 'refresh';
+  // The one supported command (pipeline-v2 decision 1) — kept as a named constant because the
+  // job summary and PR body render it.
+  const mode = 'generate';
   const baseBranch = inputs.baseBranch ?? 'main';
   const branchName = createDocstubeActionBranchName({ baseBranch, branchPrefix: inputs.branchPrefix });
   const concurrencyGroup = createDocstubeActionConcurrencyGroup({
@@ -423,7 +425,7 @@ export const runGitHubAction = async (
   await deps.git.checkoutBase({ baseBranch, workspaceDir: inputs.workspaceDir });
   await deps.git.createBranch({ branchName, workspaceDir: inputs.workspaceDir });
 
-  const cliResult = await deps.runDocstube({ mode, workspaceDir: inputs.workspaceDir });
+  const cliResult = await deps.runDocstube({ workspaceDir: inputs.workspaceDir });
   if (cliResult.exitCode !== 0) {
     return completeAction(
       emptyResult({
@@ -827,16 +829,16 @@ const createMergeControl = (input: { token?: string | undefined; workspaceDir: s
   };
 };
 
-export const createDocstubeCliArgs = (input: { docstubePackage: string; mode: GitHubActionMode }): string[] => [
+export const createDocstubeCliArgs = (input: { docstubePackage: string }): string[] => [
   '--yes',
   input.docstubePackage,
-  input.mode
+  'generate'
 ];
 
 export const createDocstubeCliRunner =
   (docstubePackage: string, processRunner: GitHubActionProcessRunner = runProcess) =>
-  async (input: { mode: GitHubActionMode; workspaceDir: string }): Promise<DocstubeCliRunResult> => {
-    const args = createDocstubeCliArgs({ docstubePackage, mode: input.mode });
+  async (input: { workspaceDir: string }): Promise<DocstubeCliRunResult> => {
+    const args = createDocstubeCliArgs({ docstubePackage });
     const result = await processRunner('npx', args, { cwd: input.workspaceDir });
     return {
       exitCode: result.exitCode,
@@ -912,17 +914,14 @@ const readActionInput = (env: NodeJS.ProcessEnv, name: string): string | undefin
   return undefined;
 };
 
-const readActionMode = (env: NodeJS.ProcessEnv): GitHubActionMode => {
-  const raw = readActionInput(env, 'mode') ?? 'refresh';
-  if (raw === 'generate' || raw === 'refresh') {
-    return raw;
-  }
-  throw new Error(`Unsupported docstube Action mode: ${raw}. Supported modes: generate, refresh.`);
-};
-
 export const readGitHubActionInputsFromEnv = (env: NodeJS.ProcessEnv = process.env): GitHubActionInputs => {
   if (readActionInput(env, 'dry-run') !== undefined) {
     throw new Error('The dry-run input was removed; the docstube Action always opens a real PR.');
+  }
+  if (readActionInput(env, 'mode') !== undefined) {
+    throw new Error(
+      'The mode input was removed; the docstube Action always runs `docstube generate` (the idempotent reconciler). Drop the input from the workflow.'
+    );
   }
   return {
     baseBranch: readActionInput(env, 'base-branch') ?? env.GITHUB_BASE_REF ?? env.GITHUB_REF_NAME ?? 'main',
@@ -930,7 +929,6 @@ export const readGitHubActionInputsFromEnv = (env: NodeJS.ProcessEnv = process.e
     commitMessage: readActionInput(env, 'commit-message'),
     docstubePackage: readActionInput(env, 'docstube-package'),
     githubToken: readActionInput(env, 'github-token') ?? env.GITHUB_TOKEN,
-    mode: readActionMode(env),
     refName: env.GITHUB_REF_NAME,
     repository: env.GITHUB_REPOSITORY,
     workflowName: env.GITHUB_WORKFLOW,

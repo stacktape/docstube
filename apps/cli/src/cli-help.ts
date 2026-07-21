@@ -3,8 +3,7 @@ export const commandHelp = [
   '',
   'Commands:',
   '  wizard                 Open the local setup wizard and control plane.',
-  '  generate               Generate docs from existing config.',
-  '  refresh                Regenerate entities affected by code changes.',
+  '  generate               Generate docs from existing config (idempotent — later runs do only the affected work).',
   '  refine                 Improve the lowest-quality generated pages first.',
   '  preview                Build (when stale) and serve the generated docs site locally.',
   '  audit                  Measure verified defects in any existing docs site.',
@@ -21,9 +20,8 @@ export const commandHelp = [
 
 export const commandHelpByCommand: Record<string, string> = {
   wizard: 'Usage: docstube wizard [--port <n>]\n\nOpen the local setup wizard and control plane.',
-  generate: 'Usage: docstube generate [--max-attempts <n>]\n\nGenerate docs from existing config.',
-  refresh:
-    'Usage: docstube refresh [--max-attempts <n>]\n\nRegenerate only the entities affected by code changes since the committed manifest.',
+  generate:
+    'Usage: docstube generate [--max-attempts <n>]\n\nGenerate docs from existing config. Idempotent reconciler: the first run generates everything; later runs redo only affected work.',
   refine:
     'Usage: docstube refine [page] [--failed] [--max-pages <n>] [--max-rounds-per-page <n>] [--total-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
   audit:

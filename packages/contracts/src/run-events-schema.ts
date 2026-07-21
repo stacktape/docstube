@@ -23,7 +23,9 @@ export type PipelineStage = z.infer<typeof pipelineStageSchema>;
 export const pageStatusSchema = z.enum(['queued', 'writing', 'checking', 'judging', 'retrying', 'passed', 'flagged']);
 export type PageStatus = z.infer<typeof pageStatusSchema>;
 
-export const runModeSchema = z.enum(['generate', 'refresh', 'refine', 'audit']);
+// 'maintain' is the internal invalidation engine (no public `refresh` command exists —
+// pipeline-v2 decision 1: generate is the one reconciler).
+export const runModeSchema = z.enum(['generate', 'maintain', 'refine', 'audit']);
 
 const eventBase = {
   runId: runIdSchema,

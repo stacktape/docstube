@@ -21,18 +21,10 @@ docstube wizard --port 3001
 
 ## `generate`
 
-Generates docs from the existing config. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
+Generates docs from the existing config. `generate` is an idempotent reconciler: the first run generates everything; later runs redo only the affected work. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
 
 ```bash
 docstube generate --max-attempts 3
-```
-
-## `refresh`
-
-Regenerates only entities affected by code changes. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
-
-```bash
-docstube refresh --max-attempts 2
 ```
 
 ## `refine`

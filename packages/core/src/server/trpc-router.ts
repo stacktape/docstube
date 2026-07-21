@@ -49,7 +49,8 @@ import {
 // agent goes through the injected task runner — when the host did not inject one, those mutations
 // fail with a clean "agent runner not configured" error the UI can show.
 
-export type RunMode = 'generate' | 'refresh' | 'refine';
+// `refresh` is removed (pipeline-v2 decision 1): generate is the one reconciling run mode.
+export type RunMode = 'generate' | 'refine';
 
 // Same shape as the pipeline TaskRunner minus extraTools — kept local so the server never imports
 // from the pipeline entry files owned by the generation workstream.
@@ -295,7 +296,7 @@ export const controlPlaneRouter = t.router({
     // Fire-and-forget: the injected launcher starts the pipeline in the host process and returns
     // the run id; the dashboard then follows it through runs.events/runs.summary.
     start: t.procedure
-      .input(z.object({ mode: z.enum(['generate', 'refresh', 'refine']) }))
+      .input(z.object({ mode: z.enum(['generate', 'refine']) }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.launchRun === undefined) {
           throw notConfigured('starting runs');
