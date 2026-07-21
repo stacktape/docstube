@@ -172,9 +172,14 @@ describe('anchorWriterLedger', () => {
     expect(result.rejectedProposals.some((rejected) => rejected.reason.includes('not in the fingerprint'))).toBe(true);
   });
 
-  it('falls back to the observed reads when a code claim has no resolvable proposals at all', () => {
+  it('derives the fallback from a known symbol named by a rejected facet subscription', () => {
+    // The cited-value name is bogus but the SYMBOL is real: the grounded subject is the symbol's
+    // codemap file, and the observed-read hash for that exact file is derivable.
     const input = anchorInput([
-      draft('c1', { class: 'behavior', proposedSubscriptions: [] } as Partial<DraftClaim>),
+      draft('c1', {
+        class: 'value',
+        proposedSubscriptions: [{ kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'NOPE', citedValue: '3' }]
+      } as Partial<DraftClaim>),
       draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
     ]);
     const result = expectOk(anchorWriterLedger(input));
@@ -183,14 +188,35 @@ describe('anchorWriterLedger', () => {
     ]);
   });
 
-  it('fails closed with a repair-eligible error when no conservative fallback is derivable', () => {
+  it('NEVER substitutes unrelated observed reads: a grounded subject with no derivable hash fails closed', () => {
+    // The review probe: the claim grounds src/retry.ts, but the page only observed README.md.
+    // Subscribing the claim to README.md would let the subject change without invalidation — the
+    // claim must fail closed instead.
     const input = anchorInput(
       [
-        draft('c1', { class: 'value', proposedSubscriptions: [] } as Partial<DraftClaim>),
+        draft('c1', {
+          class: 'code-structure',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: []
+        } as Partial<DraftClaim>),
         draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
       ],
-      { observedReads: [] }
+      { observedReads: [{ file: 'README.md', contentHash: READ_HASH }] }
     );
+    const result = anchorWriterLedger(input);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]).toMatchObject({ code: 'subscription-unresolvable', kernel: false, markerId: 'c1' });
+    expect(result.errors[0]?.message).toContain('grounded subject');
+  });
+
+  it('fails closed when a code claim proposes nothing at all — no grounded subject exists to fall back to', () => {
+    const input = anchorInput([
+      draft('c1', { class: 'behavior', proposedSubscriptions: [] } as Partial<DraftClaim>),
+      draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+    ]);
     const result = anchorWriterLedger(input);
     expect(result.ok).toBe(false);
     if (result.ok) {

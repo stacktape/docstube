@@ -24,9 +24,17 @@ Second paragraph, no marker.
 
 const anchoredFixture = () => {
   const page = extractPageEntity({ mdx, slug: 'p' });
+  // Fail-closed anchoring: code-dependent claims need a resolvable dependency proposal.
   const writerLedger = writerClaimLedgerSchema.parse({
     schemaVersion: 1,
-    claims: [{ markerId: 'c1', class: 'code-structure', predicate: 'greet exists' }]
+    claims: [
+      {
+        markerId: 'c1',
+        class: 'code-structure',
+        predicate: 'greet exists',
+        proposedSubscriptions: [{ kind: 'file-content', file: 'src/greet.ts' }]
+      }
+    ]
   });
   const result = anchorWriterLedger({ mdx, writerLedger, page, fingerprints, codemap, observedReads, commit: COMMIT });
   if (!result.ok) {

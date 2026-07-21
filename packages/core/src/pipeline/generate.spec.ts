@@ -14,7 +14,9 @@ import { runGenerate, unwrapMdxFence } from './generate.ts';
 // the writer claim ledger, exactly what an accepted submit_page call produces.
 
 // Derives a marker-consistent writer ledger from the scripted MDX, the way a cooperating writer
-// would author one (one code-structure claim per marker).
+// would author one (one code-structure claim per marker). Code-dependent claims must carry a
+// resolvable dependency (fail-closed anchoring), so the scripted writer proposes the source file
+// it "read" — the kernel resolves the authoritative hash from the observed reads.
 const ledgerFor = (mdx: string): WriterClaimLedger => ({
   schemaVersion: 1,
   claims: scanClaimMarkers(mdx).markers.map((marker) => ({
@@ -22,7 +24,7 @@ const ledgerFor = (mdx: string): WriterClaimLedger => ({
     class: 'code-structure',
     predicate: marker.innerMdx,
     proposedEvidence: [],
-    proposedSubscriptions: []
+    proposedSubscriptions: [{ kind: 'file-content', file: 'src/greeter.ts' }]
   }))
 });
 

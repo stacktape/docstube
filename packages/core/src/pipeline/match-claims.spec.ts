@@ -24,11 +24,23 @@ const mdx = `# Page
 `;
 
 const anchorFor = (page: PageEntity) => {
+  // Code-dependent claims must carry a resolvable dependency (fail-closed anchoring): a
+  // cooperating writer proposes the source file; the kernel resolves the hash from observed reads.
   const writerLedger = writerClaimLedgerSchema.parse({
     schemaVersion: 1,
     claims: [
-      { markerId: 'c1', class: 'code-structure', predicate: 'greet exists' },
-      { markerId: 'c2', class: 'value', predicate: 'retries defaults to 3' }
+      {
+        markerId: 'c1',
+        class: 'code-structure',
+        predicate: 'greet exists',
+        proposedSubscriptions: [{ kind: 'file-content', file: 'src/greet.ts' }]
+      },
+      {
+        markerId: 'c2',
+        class: 'value',
+        predicate: 'retries defaults to 3',
+        proposedSubscriptions: [{ kind: 'file-content', file: 'src/greet.ts' }]
+      }
     ]
   });
   const result = anchorWriterLedger({ mdx, writerLedger, page, fingerprints, codemap, observedReads, commit: COMMIT });

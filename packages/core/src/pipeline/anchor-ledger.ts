@@ -200,19 +200,33 @@ const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): Depend
 };
 
 // Conservative dependency fallback (kernel-derived, never invented from model output): when a
-// code-dependent claim resolved nothing, subscribe it to whole-file content — first the grounding
-// symbol's file (from the codemap), then a proposed evidence file, then every file the writer
-// actually read. Over-invalidation is acceptable; silent non-invalidation is not.
+// code-dependent claim resolved nothing, subscribe it to the whole-file content of the claim's
+// GROUNDED SUBJECT — the grounding symbol's codemap file (named by a proposed evidence symbol or
+// a symbol-bearing proposed subscription) or a proposed evidence file. The hash for THAT specific
+// file must come from the kernel's own records (fingerprint snapshot or the page's observed
+// reads); when it is underivable the claim fails closed (subscription-unresolvable). Unrelated
+// observed reads are NEVER substituted: subscribing a claim about src/subject.ts to README.md
+// would let the subject change without ever invalidating the claim.
 const conservativeFallback = (claim: DraftClaim, ctx: ResolutionContext): DependencySubscription[] => {
   const fileCandidates: string[] = [];
+  const subjectFileOf = (symbolHash: string): void => {
+    const record = ctx.codemap.symbols.find((symbol) => symbol.hash === symbolHash);
+    if (record !== undefined) {
+      fileCandidates.push(record.file);
+    }
+  };
   for (const proposal of claim.proposedEvidence) {
     if (proposal.kind === 'symbol') {
-      const record = ctx.codemap.symbols.find((symbol) => symbol.hash === (proposal.symbol as string));
-      if (record !== undefined) {
-        fileCandidates.push(record.file);
-      }
+      subjectFileOf(proposal.symbol as string);
     } else if (proposal.kind === 'file') {
       fileCandidates.push(proposal.file);
+    }
+  }
+  // A rejected facet subscription (e.g. an unknown value name) on a KNOWN symbol still names the
+  // grounded subject — its file is a legitimate conservative target.
+  for (const subscription of claim.proposedSubscriptions) {
+    if (subscription.kind !== 'file-content') {
+      subjectFileOf(subscription.symbolHash as string);
     }
   }
   for (const file of fileCandidates) {
@@ -221,12 +235,10 @@ const conservativeFallback = (claim: DraftClaim, ctx: ResolutionContext): Depend
       return [{ kind: 'file-content', file, contentHash }];
     }
   }
-  // Last resort: every observed read — any consulted source changing invalidates the claim.
-  return ctx.observedReads.map((read) => ({
-    kind: 'file-content',
-    file: read.file,
-    contentHash: contentHashSchema.parse(read.contentHash)
-  }));
+  // No grounded subject with a derivable authoritative hash: fail closed (the caller raises
+  // subscription-unresolvable). Over-invalidation would be acceptable; a fabricated or unrelated
+  // dependency is not.
+  return [];
 };
 
 // Minted grounding for resolved symbol proposals: 'source-linked' asserts only that the subject
@@ -352,7 +364,7 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
           code: 'subscription-unresolvable',
           kernel: false,
           markerId: draft.markerId,
-          message: `claim "${draft.markerId}" (${draft.class}) has no resolvable code dependency and no conservative fallback could be derived — propose { kind: "file-content", file: "<repo-relative source file>" } for the file the fact came from, or a symbol subscription with a real hash from the API surface list`
+          message: `claim "${draft.markerId}" (${draft.class}) has no resolvable code dependency, and no conservative fallback could be derived from its grounded subject (no proposed symbol/file resolved to a file with a kernel-derived content hash) — propose { kind: "file-content", file: "<repo-relative source file>" } for the file the fact came from, or a symbol subscription with a real hash from the API surface list`
         });
         continue;
       }
