@@ -1,3 +1,5 @@
+> Folded into PRODUCT.md / ARCHITECTURE.md on 2026-07-21; this file remains the decision record.
+
 # Release scope & DX v2 — founder decisions (2026-07-19)
 
 Source: Sol xhigh design review domains 06-09, adjudicated by the founder. Binding for 0.1.0.

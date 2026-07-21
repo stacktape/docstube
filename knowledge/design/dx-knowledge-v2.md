@@ -1,3 +1,5 @@
+> Folded into PRODUCT.md / ARCHITECTURE.md on 2026-07-21; this file remains the decision record.
+
 # DX & knowledge v2 — founder decisions (2026-07-21)
 
 Source: Sol xhigh design review domains 08 (config & DX) and 09 (knowledge & feedback),

@@ -1,3 +1,5 @@
+> Folded into PRODUCT.md / ARCHITECTURE.md on 2026-07-21; this file remains the decision record.
+
 # Trust model v2 — founder decisions (2026-07-19)
 
 Source: the Sol xhigh design review, domains 01 (entity identity) and 02 (provenance &
