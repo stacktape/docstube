@@ -51,7 +51,12 @@ export { sha256Hex, canonicalJson, canonicalStateJson, hashValue, contentHash } 
 
 export { detectFailureCapableAssertion, snippetRuntimeOf } from './assertion-detection.ts';
 
-export { normalizeCitedValue, citedValueOccursInText, bindCitedValue, lexNumericTokens } from './cited-value-binding.ts';
+export {
+  normalizeCitedValue,
+  citedValueOccursInText,
+  bindCitedValue,
+  lexNumericTokens
+} from './cited-value-binding.ts';
 export type {
   CitedValueKind,
   NormalizedCitedValue,

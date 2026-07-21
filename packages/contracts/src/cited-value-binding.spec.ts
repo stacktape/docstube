@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { bindCitedValue, citedValueOccursInText, lexNumericTokens, normalizeCitedValue } from './cited-value-binding.ts';
+import {
+  bindCitedValue,
+  citedValueOccursInText,
+  lexNumericTokens,
+  normalizeCitedValue
+} from './cited-value-binding.ts';
 
 describe('normalizeCitedValue', () => {
   it('normalizes numeric spellings to one canonical form', () => {

@@ -72,7 +72,8 @@ const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\
 //     token), "13" is 13 (not 1 and 3), "1.2.3" is a version string and yields NO token;
 //   - trailing sentence punctuation is fine ("defaults to 3." tokenizes 3), but a literal glued
 //     to trailing identifier characters ("3px") is unit/identifier text, not a bindable number.
-const NUMERIC_TOKEN = /(?<![A-Za-z0-9_.])[+-]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d+)?(?![A-Za-z0-9_]|\.\d)/gu;
+const NUMERIC_TOKEN =
+  /(?<![A-Za-z0-9_.])[+-]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d+)?(?![A-Za-z0-9_]|\.\d)/gu;
 
 // Every lexically valid numeric token in the text, as canonicalized numbers.
 export const lexNumericTokens = (text: string): number[] =>
@@ -88,7 +89,8 @@ const NEGATION_CUE = /\b(?:not|never|cannot|no longer|rather than|instead of)\b|
 
 const WINDOW = 32;
 
-const negatedAt = (text: string, index: number): boolean => NEGATION_CUE.test(text.slice(Math.max(0, index - WINDOW), index));
+const negatedAt = (text: string, index: number): boolean =>
+  NEGATION_CUE.test(text.slice(Math.max(0, index - WINDOW), index));
 
 // Match positions of the value's occurrences in the text (empty when it never occurs).
 const occurrenceIndexes = (value: NormalizedCitedValue, text: string): number[] => {

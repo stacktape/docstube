@@ -80,7 +80,13 @@ describe('proof conformance (basic theme)', () => {
 
   it('mounts every mandatory primitive in the theme layout', async () => {
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    for (const mount of ['<DocstubeClaims', '<DocstubeContradictions', '<DocstubeSources', '<DocstubeSectionChips', '<DocstubeEntity']) {
+    for (const mount of [
+      '<DocstubeClaims',
+      '<DocstubeContradictions',
+      '<DocstubeSources',
+      '<DocstubeSectionChips',
+      '<DocstubeEntity'
+    ]) {
       expect(layout).toContain(mount);
     }
     // The entity wrapper receives the page identity injected by the kernel.
@@ -105,10 +111,7 @@ describe('proof conformance (basic theme)', () => {
   it('renders a first-generation contradiction LOUD: warning frontmatter and per-claim marker ids', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-proof-contra-'));
     await emitSite(buildFixtureInput(repoRoot, { withContradiction: true }));
-    const page = await readFile(
-      join(repoRoot, 'docs-site', 'src/pages/getting-started/installation.mdx'),
-      'utf8'
-    );
+    const page = await readFile(join(repoRoot, 'docs-site', 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(page).toContain('docstubeClaimsContradicted: 1');
     expect(page).toContain('docstubeContradictedClaims: ["c3"]');
     expect(page).toContain('docstubeClaimsTotal: 3');

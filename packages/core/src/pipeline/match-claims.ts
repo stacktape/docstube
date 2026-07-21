@@ -147,7 +147,9 @@ export const matchClaimIds = (input: MatchClaimIdsInput): MatchedClaimIds => {
   const adjacency = orderedAdjacency(input.anchored.length, edges);
   // The deterministic maximum matching (prior→fresh), inverted to document order for emission.
   const maximum = solveMaximumMatching(adjacency);
-  const freshToPrior = new Map<number, number>([...maximum].map(([priorIndex, freshIndex]) => [freshIndex, priorIndex]));
+  const freshToPrior = new Map<number, number>(
+    [...maximum].map(([priorIndex, freshIndex]) => [freshIndex, priorIndex])
+  );
 
   const matches: ClaimMatch[] = [];
   // minted claim id -> previous claim id

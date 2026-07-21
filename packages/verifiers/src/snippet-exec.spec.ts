@@ -33,6 +33,9 @@ const missingBashExec: PluginExec = async (command) => {
   return { exitCode: 0, stdout: '', stderr: '' };
 };
 
+const bashPassExec: PluginExec = async (_command, args) =>
+  args[0] === '--version' ? { exitCode: 0, stdout: 'GNU bash', stderr: '' } : { exitCode: 0, stdout: '', stderr: '' };
+
 const pageWithBlock = (code: string, language: string) => {
   const claim = makeClaim('the sample runs');
   const block = makeBlock({ content: code, blockType: 'code-example', language, claims: [claim] });
@@ -126,7 +129,7 @@ describe('snippet-exec', () => {
     });
   });
 
-  it("marks a console.log-only covers= snippet assertionBearing: false — the kernel then mints nothing", async () => {
+  it('marks a console.log-only covers= snippet assertionBearing: false — the kernel then mints nothing', async () => {
     const code = "console.log('ok');";
     const { block, page } = pageWithBlock(code, 'js');
 
@@ -146,10 +149,8 @@ describe('snippet-exec', () => {
   it('records bash as the ACTUAL runtime for bash covers= snippets, never node', async () => {
     const code = '[ 1 -eq 1 ]';
     const { block, page } = pageWithBlock(code, 'bash');
-    const exec: PluginExec = async (_command, args) =>
-      args[0] === '--version' ? { exitCode: 0, stdout: 'GNU bash', stderr: '' } : { exitCode: 0, stdout: '', stderr: '' };
 
-    const result = await snippetExecVerifier.verify(withExec(exec), [
+    const result = await snippetExecVerifier.verify(withExec(bashPassExec), [
       makeArtifact(page, mdxWithFence('bash covers=b1', code))
     ]);
 

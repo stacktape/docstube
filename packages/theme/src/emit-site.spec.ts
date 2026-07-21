@@ -114,8 +114,12 @@ describe('emitSite', () => {
     expect(warning).toContain('role="alert"');
     expect(warning).toContain('contradicted by the source');
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    expect(layout).toContain('<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} />');
-    expect(layout).toContain('<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />');
+    expect(layout).toContain(
+      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} />'
+    );
+    expect(layout).toContain(
+      '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />'
+    );
   });
 
   it('writes one route per page at its nested slug path with injected frontmatter', async () => {

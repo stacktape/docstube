@@ -61,9 +61,7 @@ describe('projectShardProof', () => {
     // A FAILED primary review: recorded fact, but the label is withheld.
     expect(projectShardProof(withReviews(shard, [review({ completion: 'failed' })])).reviewedFor).toBeUndefined();
     // A completed SECONDARY review never masquerades as the primary label.
-    expect(
-      projectShardProof(withReviews(shard, [review({ role: 'secondary-advisory' })])).reviewedFor
-    ).toBeUndefined();
+    expect(projectShardProof(withReviews(shard, [review({ role: 'secondary-advisory' })])).reviewedFor).toBeUndefined();
     // Only the genuinely completed primary review earns the label.
     expect(projectShardProof(withReviews(shard, [review({})])).reviewedFor).toBe('app-developer');
   });

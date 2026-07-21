@@ -249,7 +249,10 @@ describe('shard ledger↔page linkage (impl-07 finding 5)', () => {
     const shard = trustedShard();
     const withMatching = {
       ...shard,
-      claimMatching: { matches: [{ claimId: mintId(idPrefixes.claim), confidence: 'exact' as const, drift: [] }], orphans: [] }
+      claimMatching: {
+        matches: [{ claimId: mintId(idPrefixes.claim), confidence: 'exact' as const, drift: [] }],
+        orphans: []
+      }
     };
     const result = pageShardSchema.safeParse(withMatching);
     expect(result.success).toBe(false);

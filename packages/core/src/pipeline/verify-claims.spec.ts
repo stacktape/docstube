@@ -300,7 +300,7 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0]?.severity).toBe('error');
     expect(result.findings[0]?.message).toContain('visible marked prose');
-    expect((result.findings[0]?.data as { bindingIssue?: string }).bindingIssue).toBe('missing-in-marker');
+    expect(result.findings[0]?.data).toMatchObject({ bindingIssue: 'missing-in-marker' });
     expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
@@ -457,10 +457,7 @@ describe('verifyClaims — behavior (assertion-bearing, kernel-verified executio
     const page = pageOf();
     const blocks = codeBlocksOf(page);
     const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
-      snippetPass(
-        [blocks[1]!.id, 'b1'],
-        [executionOf(page, 'b1', 1, LOG_ONLY_SNIPPET, { assertionBearing: false })]
-      )
+      snippetPass([blocks[1]!.id, 'b1'], [executionOf(page, 'b1', 1, LOG_ONLY_SNIPPET, { assertionBearing: false })])
     ]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'execution')).toBe(true);
@@ -479,9 +476,7 @@ describe('verifyClaims — behavior (assertion-bearing, kernel-verified executio
     // Declared coverage without the structured record (the pre-round-2 channel) decides nothing.
     const page = pageOf();
     const blocks = codeBlocksOf(page);
-    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
-      snippetPass([blocks[0]!.id, 'b1'])
-    ]);
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [snippetPass([blocks[0]!.id, 'b1'])]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'execution')).toBe(true);
   });
@@ -495,9 +490,8 @@ describe('verifyClaims — behavior (assertion-bearing, kernel-verified executio
     const evidence = result.claimEvidence[0];
     const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
     expect(deciding?.ref).toMatchObject({ kind: 'execution', snippet: { runtime: 'bash' } });
-    if (deciding?.ref.kind === 'execution') {
-      expect(Object.keys(deciding.ref.environment.runtimeVersions)).toEqual(['bash']);
-    }
+    const environment = deciding?.ref.kind === 'execution' ? deciding.ref.environment : undefined;
+    expect(Object.keys(environment?.runtimeVersions ?? {})).toEqual(['bash']);
   });
 
   it('rejects an execution record whose source does not hash to its declared block (identity binding)', async () => {

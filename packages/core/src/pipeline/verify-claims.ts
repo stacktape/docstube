@@ -104,6 +104,13 @@ export type VerifyClaimsResult = {
   warnings: string[];
 };
 
+// Block content hashes tolerate extractors hashing with or without a trailing newline (same rule
+// as mapFencesByHash in the verifiers package).
+const sourceMatchesHash = (source: string, hash: string): boolean =>
+  contentHash(source) === hash ||
+  contentHash(`${source}\n`) === hash ||
+  contentHash(source.replace(/\n$/u, '')) === hash;
+
 const citedValueExtractorFor = (packs: LanguagePackDefinition[], file: string): CitedValueExtractor | undefined => {
   for (const pack of packs) {
     if (pack.fileExtensions.some((extension) => file.endsWith(extension))) {
@@ -157,8 +164,6 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
   // Bare coveredEntityIds mint nothing; proximity mints nothing; console.log proves nothing.
   const pageBlocks = [...input.page.preamble, ...input.page.sections.flatMap((section) => section.blocks)];
   const blockHashById = new Map(pageBlocks.map((block) => [block.id, block.contentHash]));
-  const sourceMatchesHash = (source: string, hash: string): boolean =>
-    contentHash(source) === hash || contentHash(`${source}\n`) === hash || contentHash(source.replace(/\n$/u, '')) === hash;
   const acceptedExecutionsByMarker = new Map<string, ClaimExecutionRecord[]>();
   for (const result of input.verifierResults) {
     if (result.verifier !== SNIPPET_EXEC_CHECK || result.status !== 'pass') {
@@ -397,8 +402,7 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             environment: {
               os: process.platform,
               // The ACTUAL runtime the snippet ran under — bash records bash, never node.
-              runtimeVersions:
-                execution.runtime === 'node' ? { node: process.versions.node } : { bash: 'system' },
+              runtimeVersions: execution.runtime === 'node' ? { node: process.versions.node } : { bash: 'system' },
               sandbox: 'none'
             },
             snippet: {
