@@ -117,13 +117,23 @@ export const generatePage = async (
   const maxAttempts = Math.max(1, ctx.options.maxAttemptsPerPage ?? 3);
   let findings: Finding[] = [];
   let priorDraft: string | undefined;
-  let lastArtifact: PageArtifact | undefined;
-  let lastTranscript: Transcript | undefined;
-  let lastReviews: ScoredReview[] = [];
   let attemptsUsed = 0;
-  let lastLedger: ClaimLedger | undefined;
-  let lastProvenance: ProvenanceV2 | undefined;
-  let lastMatching: ClaimMatching | undefined;
+  // ONE attempt-local candidate (impl-07 finding 3): artifact, ledger, provenance, matching,
+  // reviews, findings, and transcript are created together per attempt and replaced together.
+  // Persistence reads ONLY this final coherent candidate — an attempt that fails before
+  // verification carries NO ledger/provenance/matching, so a later attempt's MDX can never ship
+  // under an earlier attempt's trust state.
+  type AttemptCandidate = {
+    attempt: number;
+    artifact: PageArtifact;
+    transcript: Transcript;
+    findings: Finding[];
+    reviews: ScoredReview[];
+    ledger?: ClaimLedger;
+    provenance?: ProvenanceV2;
+    matching?: ClaimMatching;
+  };
+  let candidate: AttemptCandidate | undefined;
   // One collector across attempts: retries re-asking the same question stay a single flag.
   const questionCollector = createQuestionCollector();
 
@@ -147,7 +157,6 @@ export const generatePage = async (
     const transcript = await ctx.options.runTask(task, [submitPage.tool, questionCollector.tool]);
     await ctx.journal.append({ type: 'task-completed', taskId: task.id, usage: transcript.usage });
     ctx.costTracker.add(transcript.usage);
-    lastTranscript = transcript;
     if (transcript.result?.type !== 'mdx-ledger') {
       throw new CoreError(
         'pipeline-failed',
@@ -194,7 +203,9 @@ export const generatePage = async (
       version: ctx.version
     };
 
-    lastArtifact = artifact;
+    // Fresh candidate for THIS attempt — replaces the previous attempt's candidate wholesale.
+    const attemptCandidate: AttemptCandidate = { attempt, artifact, transcript, findings: [], reviews: [] };
+    candidate = attemptCandidate;
     const scheduleRetry = async (): Promise<void> => {
       if (attempt < maxAttempts) {
         await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
@@ -247,6 +258,9 @@ export const generatePage = async (
         severity: 'error',
         message: issue.message
       }));
+      // The candidate stays ledger-less: this attempt never reached a committed trust state, so
+      // nothing from any other attempt may pair with its MDX (impl-07 finding 3).
+      attemptCandidate.findings = findings;
       await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
       await scheduleRetry();
       continue;
@@ -260,7 +274,7 @@ export const generatePage = async (
       previousLedger: previousShard?.ledger,
       blockConfidence
     });
-    lastMatching = matched.matching;
+    attemptCandidate.matching = matched.matching;
     // Ambiguous threads (drift markers) and orphaned prior claims are recorded facts, never
     // silent: they ride the journal and the shard's claimMatching records.
     const matchingWarnings: Finding[] = [
@@ -308,7 +322,7 @@ export const generatePage = async (
       journal: ctx.journal,
       costTracker: ctx.costTracker
     });
-    lastReviews = reviews;
+    attemptCandidate.reviews = reviews;
     // Review warnings never gate, but they must be visible: a skipped persona review (invalid
     // reviewer output) surfaces only here — filtering errors alone would swallow it silently.
     const reviewWarnings = reviews.flatMap((review) =>
@@ -354,10 +368,11 @@ export const generatePage = async (
       ...reviews.flatMap((review) => review.findings.filter((finding) => finding.severity === 'error')),
       ...verified.findings
     ];
-    lastLedger = verified.ledger;
+    attemptCandidate.findings = findings;
+    attemptCandidate.ledger = verified.ledger;
     // Provenance v2: lineage / dependencies / claimEvidence / assessments, validated by parse.
-    // Assembled on every anchored attempt for the same reason as the ledger above.
-    lastProvenance = assembleProvenanceV2({
+    // Assembled on every anchored attempt so the candidate always carries its OWN final state.
+    attemptCandidate.provenance = assembleProvenanceV2({
       pageId: page.id,
       node,
       ledger: verified.ledger,
@@ -379,23 +394,23 @@ export const generatePage = async (
     break;
   }
 
-  if (lastArtifact === undefined || lastTranscript === undefined) {
+  if (candidate === undefined) {
     throw new CoreError('pipeline-failed', `page "${node.slug}" produced no artifact`);
   }
 
   // The committed manifest explains every badge: the shipped page carries compact verdicts from
-  // the reviews that scored it (reasoning prose stays in the run journal).
-  const reviewRecords = lastReviews.map((review) => ({
+  // the reviews of the FINAL candidate's own attempt (reasoning prose stays in the run journal).
+  const reviewRecords = candidate.reviews.map((review) => ({
     persona: review.persona,
     criteria: review.criteria.map((criterion) => ({ criterion: criterion.criterion, outcome: criterion.outcome })),
     runId: ctx.journal.runId,
     at: new Date().toISOString()
   }));
-  lastArtifact = {
-    ...lastArtifact,
+  const finalArtifact: PageArtifact = {
+    ...candidate.artifact,
     page: {
-      ...lastArtifact.page,
-      provenance: { ...lastArtifact.page.provenance, reviews: reviewRecords }
+      ...candidate.artifact.page,
+      provenance: { ...candidate.artifact.page.provenance, reviews: reviewRecords }
     }
   };
 
@@ -412,13 +427,15 @@ export const generatePage = async (
     knowledgeKeys: new Set(ctx.knowledge.map((entry) => entry.key)),
     openQuestions: ctx.openQuestions,
     shard: { locale: ctx.locale, version: ctx.version },
-    pageId: lastArtifact.page.id,
+    pageId: finalArtifact.page.id,
     runId: ctx.journal.runId
   });
 
   // Gate: clean → passed; findings after bounded retries → flag and ship the flagged state.
-  // Never silently wrong (PRODUCT §3.5 stage 6).
-  const passed = findings.length === 0;
+  // Never silently wrong (PRODUCT §3.5 stage 6). Read from the final candidate — the single
+  // source of attempt-consistent state.
+  const finalFindings = candidate.findings;
+  const passed = finalFindings.length === 0;
 
   // FAILED-ATTEMPT PUBLICATION ROUTE (impl-06 finding 3, anticipating pipeline-v2 staged-atomic
   // publish): when the final retry still carries blocking CLAIM findings (a contradiction, a
@@ -427,7 +444,7 @@ export const generatePage = async (
   // ledger, evidence, matching) carries forward unchanged, with an open flag referencing the
   // rejected candidate attempt. Publishing prose whose claims the kernel just refuted would be
   // shipping a known lie under a clean layout.
-  const claimFindings = findings.filter(
+  const claimFindings = finalFindings.filter(
     (finding) => finding.check === CLAIM_VERIFICATION_CHECK || finding.check === 'claim-anchoring'
   );
   if (!passed && claimFindings.length > 0 && previousShard !== undefined) {
@@ -446,7 +463,7 @@ export const generatePage = async (
         summary: `regeneration of "${node.slug}" rejected — claim verification failed; previous published page retained`,
         detail: [
           `the candidate from run ${ctx.journal.runId} (${attemptsUsed} attempt(s)) was discarded:`,
-          ...findings.map((finding) => `[${finding.check}] ${finding.message}`)
+          ...finalFindings.map((finding) => `[${finding.check}] ${finding.message}`)
         ].join('\n'),
         entity: { version: ctx.version, locale: ctx.locale, pageId: previousShard.page.id },
         runId: ctx.journal.runId,
@@ -458,7 +475,7 @@ export const generatePage = async (
           pageId: previousShard.page.id,
           slug: node.slug,
           status: 'flagged',
-          findings,
+          findings: finalFindings,
           attempts: attemptsUsed
         },
         artifact: {
@@ -477,21 +494,24 @@ export const generatePage = async (
     }
   }
 
-  // The shard embeds the trust spine of the FINAL attempt — kernel ledger, ProvenanceV2
-  // (ClaimEvidence), and the claim-matching records — in its true final state: on a first
+  // The shard embeds the trust spine of the FINAL candidate — kernel ledger, ProvenanceV2
+  // (ClaimEvidence), and the claim-matching records — as one attempt-consistent unit: on a first
   // generation with no prior page, a contradicted claim persists AS contradicted, loud and
-  // machine-readable, never a bare system flag over clean-looking prose (impl-06 finding 3).
+  // machine-readable; a final attempt that failed before verification persists with NO trust
+  // spine at all, never with an earlier attempt's (impl-07 finding 3).
   const shard: PageShard = {
     schemaVersion: 2,
     locale: ctx.locale,
     version: ctx.version,
     sourceCommit: ctx.commit,
     generatedAt: new Date().toISOString(),
-    page: lastArtifact.page,
-    ...(lastLedger === undefined || lastProvenance === undefined
+    page: finalArtifact.page,
+    ...(candidate.ledger === undefined || candidate.provenance === undefined
       ? {}
-      : { ledger: lastLedger, provenance: lastProvenance }),
-    ...(lastMatching === undefined ? {} : { claimMatching: lastMatching }),
+      : { ledger: candidate.ledger, provenance: candidate.provenance }),
+    ...(candidate.ledger === undefined || candidate.matching === undefined
+      ? {}
+      : { claimMatching: candidate.matching }),
     flags: passed
       ? [...carriedFlags, ...questionFlags]
       : [
@@ -502,8 +522,8 @@ export const generatePage = async (
             kind: 'system',
             status: 'open',
             summary: `verification kept failing after retries on "${node.slug}"`,
-            detail: findings.map((finding) => `[${finding.check}] ${finding.message}`).join('\n'),
-            entity: { version: ctx.version, locale: ctx.locale, pageId: lastArtifact.page.id },
+            detail: finalFindings.map((finding) => `[${finding.check}] ${finding.message}`).join('\n'),
+            entity: { version: ctx.version, locale: ctx.locale, pageId: finalArtifact.page.id },
             runId: ctx.journal.runId,
             createdAt: new Date().toISOString()
           }
@@ -511,17 +531,17 @@ export const generatePage = async (
   };
   return {
     outcome: {
-      pageId: lastArtifact.page.id,
+      pageId: finalArtifact.page.id,
       slug: node.slug,
       status: passed ? 'passed' : 'flagged',
-      findings,
+      findings: finalFindings,
       attempts: attemptsUsed
     },
-    artifact: lastArtifact,
+    artifact: finalArtifact,
     shard,
     // The committed kernel ledger and its provenance v2 for the shipped page (undefined when the
-    // page shipped flagged without ever passing the gate). Shard persistence is wave 2b-iii.
-    ...(lastLedger === undefined ? {} : { ledger: lastLedger }),
-    ...(lastProvenance === undefined ? {} : { provenance: lastProvenance })
+    // final candidate never reached verification). Always the candidate's OWN state.
+    ...(candidate.ledger === undefined ? {} : { ledger: candidate.ledger }),
+    ...(candidate.provenance === undefined ? {} : { provenance: candidate.provenance })
   };
 };

@@ -677,6 +677,78 @@ describe('runGenerate', () => {
     expect(shard?.flags.some((flag) => flag.status === 'open')).toBe(true);
   }, 120_000);
 
+  it('never mixes attempts: a verified attempt 1 + final anchoring-failed attempt 2 persists NO stale trust spine (Sol impl-07 probe)', async () => {
+    // Attempt 1 reaches verification and is CONTRADICTED (it has a full ledger/provenance);
+    // attempt 2 — the final attempt — fails anchoring (marker in a heading). With no prior
+    // published page, the persisted shard must be entirely attempt-2-consistent: attempt 2's MDX
+    // with NO ledger, provenance, or matching — never attempt 1's trust state under attempt 2's
+    // prose.
+    const contradictedMdx = valueMdxWith('5');
+    const headingClaimMdx = goodMdx.replace('## Usage', '## <Claim id="h1">Usage claims things</Claim>');
+    const codemap = await buildCodemap({
+      repoRoot,
+      commit: 'a'.repeat(40),
+      packs: [typescriptLanguagePack],
+      logger: { info: () => {}, warn: () => {} }
+    });
+    const symbolHash = codemap.symbols.find((symbol) => symbol.name === 'DEFAULT_RETRIES')?.hash ?? '';
+    const attempt1Ledger = writerClaimLedgerSchema.parse({
+      schemaVersion: 1,
+      claims: [
+        ...ledgerFor(contradictedMdx).claims.filter((entry) => entry.markerId !== 'v1'),
+        {
+          markerId: 'v1',
+          class: 'value',
+          predicate: 'DEFAULT_RETRIES defaults to 5',
+          proposedEvidence: [{ kind: 'symbol', symbol: symbolHash }],
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'DEFAULT_RETRIES', citedValue: '5' }]
+        }
+      ]
+    });
+    const attempt2Ledger = writerClaimLedgerSchema.parse({
+      schemaVersion: 1,
+      claims: [
+        ...ledgerFor(headingClaimMdx).claims,
+        { markerId: 'h1', class: 'code-structure', predicate: 'usage claims things' }
+      ]
+    });
+    let writeCall = 0;
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      writeCall += 1;
+      const mdx = writeCall === 1 ? contradictedMdx : headingClaimMdx;
+      const ledger = writeCall === 1 ? attempt1Ledger : attempt2Ledger;
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
+        result: { type: 'mdx-ledger', mdx, ledger }
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });
+
+    expect(summary.pages[0]?.status).toBe('flagged');
+    expect(summary.pages[0]?.attempts).toBe(2);
+    // The final findings are attempt 2's anchoring errors, not attempt 1's contradiction.
+    expect(summary.pages[0]?.findings.every((finding) => finding.check === 'claim-anchoring')).toBe(true);
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard).toBeDefined();
+    // Attempt-consistent shard: attempt 2 never reached a kernel ledger, so NOTHING of attempt
+    // 1's trust spine may persist.
+    expect(shard?.ledger).toBeUndefined();
+    expect(shard?.provenance).toBeUndefined();
+    expect(shard?.claimMatching).toBeUndefined();
+    // The shipped MDX is attempt 2's prose (flagged, visible — never attempt 1's).
+    const mdxOnDisk = await readFile(join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx'), 'utf8');
+    expect(mdxOnDisk).toContain('Usage claims things');
+    expect(mdxOnDisk).not.toContain('defaults to 5');
+    expect(shard?.flags.some((flag) => flag.status === 'open' && flag.detail?.includes('claim-anchoring'))).toBe(true);
+  }, 180_000);
+
   it('RETAINS the previously published page byte-for-byte when a regeneration is contradicted', async () => {
     // Run 1: a clean, checked page publishes.
     const first = await runGenerate({ repoRoot, runTask: await valueRunner('3'), toolDescriptors: [] });
