@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { writerClaimLedgerSchema } from './claim-ledger-schema.ts';
 import { hashValue } from './hashing.ts';
 import { observedReadSchema } from './provenance-schema.ts';
 import { repoPathSchema, taskIdSchema } from './primitives.ts';
@@ -28,6 +29,9 @@ export type ToolDescriptor = z.infer<typeof toolDescriptorSchema>;
 
 export const taskOutputSpecSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mdx') }),
+  // The writer contract (ARCHITECTURE §8.1): MDX plus the writer claim ledger, delivered in ONE
+  // task via the submit_page tool — the task result is the accepted submission, never final text.
+  z.object({ type: z.literal('mdx-ledger') }),
   z.object({ type: z.literal('text') }),
   z.object({ type: z.literal('structured'), jsonSchema: z.record(z.string(), z.unknown()) })
 ]);
@@ -84,6 +88,8 @@ export const taskUsageSchema = z.object({
 
 export const taskResultSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('mdx'), mdx: z.string() }),
+  // The accepted submit_page artifact: markers validated against the ledger in-session.
+  z.object({ type: z.literal('mdx-ledger'), mdx: z.string(), ledger: writerClaimLedgerSchema }),
   z.object({ type: z.literal('text'), text: z.string() }),
   z.object({ type: z.literal('structured'), value: z.unknown() })
 ]);

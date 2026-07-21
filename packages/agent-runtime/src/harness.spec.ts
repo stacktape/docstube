@@ -6,6 +6,7 @@ import { agentTaskSpecSchema, contentHash, idPrefixes, mintId } from '@docstube/
 import type { AgentTaskSpec } from '@docstube/contracts';
 import { ToolPolicyError } from './errors.ts';
 import { runAgentTask, unwrapMdxResponse } from './harness.ts';
+import { createSubmitPageTool } from './submit-page.ts';
 import type { Transport } from './transport.ts';
 import { standardToolDescriptors } from './tools.ts';
 import type { AssistantTurn, CompleteInput, LoopTransport, SessionTransport } from './transport.ts';
@@ -260,6 +261,80 @@ describe('runAgentTask with a session transport', () => {
     expect(transcript.turns).toHaveLength(3);
     expect(transcript.observedReads).toEqual([{ file: 'src/retry.ts', contentHash: contentHash(RETRY_TS) }]);
     expect(transcript.usage).toMatchObject({ inputTokens: 100, outputTokens: 40 });
+  });
+});
+
+describe('mdx-ledger output via submit_page', () => {
+  const submittedMdx = '---\ntitle: "Retry"\n---\n\n# Retry\n\n<Claim id="c1">`retries` defaults to 3.</Claim>\n';
+  const submittedLedger = {
+    schemaVersion: 1,
+    claims: [{ markerId: 'c1', class: 'value', predicate: 'retries defaults to 3' }]
+  };
+
+  const ledgerSpec = () => {
+    const { tool } = createSubmitPageTool();
+    const spec = buildSpec({
+      tools: [...standardToolDescriptors(), tool.descriptor],
+      output: { type: 'mdx-ledger' }
+    });
+    return { spec, tool };
+  };
+
+  it('completes with the accepted submission as the task result (loop transport)', async () => {
+    const { spec, tool } = ledgerSpec();
+    const transport = scriptedTransport([
+      toolCallTurn('submit_page', { mdx: submittedMdx, ledger: submittedLedger }),
+      textTurn('Done.')
+    ]);
+    const transcript = await runAgentTask(spec, { transport, model: 'm', repoRoot, extraTools: [tool] });
+    expect(transcript.stopReason).toBe('complete');
+    expect(transcript.result).toMatchObject({ type: 'mdx-ledger', mdx: submittedMdx });
+  });
+
+  it('feeds rejection errors back in-session so the model can repair and resubmit', async () => {
+    const { spec, tool } = ledgerSpec();
+    const transport = scriptedTransport([
+      // First submission misses the ledger entry for its marker.
+      toolCallTurn('submit_page', { mdx: submittedMdx, ledger: { schemaVersion: 1, claims: [] } }),
+      toolCallTurn('submit_page', { mdx: submittedMdx, ledger: submittedLedger }, 't2'),
+      textTurn('Done.')
+    ]);
+    const transcript = await runAgentTask(spec, { transport, model: 'm', repoRoot, extraTools: [tool] });
+    expect(transcript.stopReason).toBe('complete');
+    const firstResult = transcript.turns[1]?.blocks[0];
+    expect(firstResult).toMatchObject({ type: 'tool-result', isError: false });
+    expect(JSON.stringify(firstResult)).toContain('has no ledger entry');
+    expect(transcript.result?.type).toBe('mdx-ledger');
+  });
+
+  it('prompts once for a missing submission, then errors honestly', async () => {
+    const { spec, tool } = ledgerSpec();
+    const transport = scriptedTransport([textTurn('Here is the page as chat text (wrong).')]);
+    const transcript = await runAgentTask(spec, { transport, model: 'm', repoRoot, extraTools: [tool] });
+    expect(transcript.stopReason).toBe('error');
+    expect(transcript.error).toContain('without an accepted submit_page call');
+    // The repair nudge was actually sent before giving up.
+    expect(transport.calls.at(-1)?.messages.some((message) => 'text' in message && /submit_page/.test(message.text ?? ''))).toBe(
+      true
+    );
+  });
+
+  it('reads the accepted submission after session-transport replay (forwarded tools)', async () => {
+    const { spec, tool } = ledgerSpec();
+    const transport: SessionTransport = {
+      mode: 'session',
+      id: 'fake-session',
+      capabilities: { toolInjection: 'mcp', structuredOutput: false },
+      runSession: async (input, hooks) => {
+        // Simulates forwarded-tool replay: the real handler runs before runSession returns.
+        const submit = input.tools.find((candidate) => candidate.descriptor.name === 'submit_page');
+        await submit?.handler({ mdx: submittedMdx, ledger: submittedLedger });
+        hooks.onTurn({ role: 'assistant', blocks: [{ type: 'text', text: 'submitted' }] });
+        return { finalText: 'submitted', usage: { inputTokens: 5, outputTokens: 5 }, stopReason: 'complete' as const };
+      }
+    };
+    const transcript = await runAgentTask(spec, { transport, model: 'm', repoRoot, extraTools: [tool] });
+    expect(transcript.result).toMatchObject({ type: 'mdx-ledger', mdx: submittedMdx });
   });
 });
 

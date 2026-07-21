@@ -8,6 +8,9 @@ export type { RunAgentTaskOptions } from './harness.ts';
 export { createObservedReadsCollector, createStandardTools, standardToolDescriptors } from './tools.ts';
 export type { ObservedReadsCollector, StandardToolsOptions, ToolImplementation } from './tools.ts';
 
+export { createSubmitPageTool, scanClaimMarkers, submitPageDescriptor, validateSubmission } from './submit-page.ts';
+export type { AcceptedSubmission, ClaimMarker, MarkerScan, SubmitPageTool } from './submit-page.ts';
+
 export type {
   AssistantTurn,
   CompleteInput,

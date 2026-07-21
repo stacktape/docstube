@@ -61,4 +61,37 @@ describe('transcript schema', () => {
     expect(transcript.observedReads).toHaveLength(1);
     expect(transcript.turns[1]?.blocks[0]?.type).toBe('tool-result');
   });
+
+  it('parses an mdx-ledger result and validates the embedded writer ledger', () => {
+    const result = {
+      type: 'mdx-ledger',
+      mdx: '# Retry\n\n<Claim id="c1">`retries` defaults to 3.</Claim>\n',
+      ledger: {
+        schemaVersion: 1,
+        claims: [{ markerId: 'c1', class: 'value', predicate: 'retries defaults to 3' }]
+      }
+    };
+    const spec = buildSpec();
+    const transcript = transcriptSchema.parse({
+      schemaVersion: 1,
+      taskId: spec.id,
+      cacheKey: 'k',
+      transport: 'replay',
+      model: 'test-model',
+      turns: [],
+      usage: { inputTokens: 1, outputTokens: 1 },
+      stopReason: 'complete',
+      result
+    });
+    expect(transcript.result?.type).toBe('mdx-ledger');
+    // Kernel-owned fields inside a writer ledger claim are rejected at the transcript boundary.
+    const smuggled = {
+      ...result,
+      ledger: {
+        schemaVersion: 1,
+        claims: [{ markerId: 'c1', class: 'value', predicate: 'p', correctness: 'checked' }]
+      }
+    };
+    expect(() => transcriptSchema.parse({ ...transcript, result: smuggled })).toThrow();
+  });
 });

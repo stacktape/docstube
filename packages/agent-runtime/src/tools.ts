@@ -2,7 +2,7 @@ import { glob as fsGlob, open, readdir, readFile, realpath, stat } from 'node:fs
 import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { contentHash } from '@docstube/contracts';
-import type { ObservedRead, ToolDescriptor } from '@docstube/contracts';
+import type { ObservedRead, TaskResult, ToolDescriptor } from '@docstube/contracts';
 import { ToolPolicyError } from './errors.ts';
 
 // The standard read-only tool surface (ARCHITECTURE.md §8.1). Handlers execute in the harness
@@ -41,6 +41,9 @@ export const createObservedReadsCollector = (onRecord?: (read: ObservedRead) => 
 export type ToolImplementation = {
   descriptor: ToolDescriptor;
   handler: (args: unknown) => Promise<unknown>;
+  // Result-bearing tools (submit_page): the harness asks these for the task result when the spec
+  // declares a tool-delivered output type ('mdx-ledger') instead of reading the final text.
+  taskResult?: (() => TaskResult | undefined) | undefined;
 };
 
 export type StandardToolsOptions = {

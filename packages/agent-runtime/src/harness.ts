@@ -118,6 +118,21 @@ const addUsage = (target: TokenUsage, delta: TokenUsage): void => {
 const buildTextResult = (spec: AgentTaskSpec, finalText: string): TaskResult =>
   spec.output.type === 'mdx' ? { type: 'mdx', mdx: unwrapMdxResponse(finalText) } : { type: 'text', text: finalText };
 
+// Tool-delivered outputs ('mdx-ledger'): the result is the artifact a result-bearing tool
+// (submit_page) accepted during the session — final text is never the deliverable.
+const toolDeliveredResult = (tools: Map<string, ToolImplementation>): TaskResult | undefined => {
+  for (const implementation of tools.values()) {
+    const result = implementation.taskResult?.();
+    if (result !== undefined) {
+      return result;
+    }
+  }
+  return undefined;
+};
+
+const MISSING_SUBMISSION_ERROR =
+  'task completed without an accepted submit_page call — the page was never submitted';
+
 const resolveToolImplementations = (
   spec: AgentTaskSpec,
   options: RunAgentTaskOptions,
@@ -222,6 +237,21 @@ const runLoopSession = async (
         .map((block) => block.text)
         .join('\n')
         .trim();
+      if (spec.output.type === 'mdx-ledger') {
+        const delivered = toolDeliveredResult(tools);
+        if (delivered !== undefined) {
+          return { turns, usage, stopReason: 'complete', result: delivered };
+        }
+        if (repairAttempted) {
+          return { turns, usage, stopReason: 'error', error: MISSING_SUBMISSION_ERROR };
+        }
+        repairAttempted = true;
+        messages.push({
+          role: 'user',
+          text: 'You have not submitted the page. Call the submit_page tool now with the complete MDX and claim ledger — the task result is the accepted submission, not chat text.'
+        });
+        continue;
+      }
       if (spec.output.type !== 'structured') {
         return { turns, usage, stopReason: 'complete', result: buildTextResult(spec, finalText) };
       }
@@ -286,6 +316,15 @@ const runVendorSession = async (
     return { turns, usage: outcome.usage, stopReason: outcome.stopReason, error: outcome.errorMessage };
   }
   const finalText = (outcome.finalText ?? '').trim();
+  if (spec.output.type === 'mdx-ledger') {
+    // On session transports the submit_page call reaches the real handler via forwarded-tool
+    // replay (transports/forwarded-tools.ts), which has already run by the time runSession
+    // returns — the provider holds the accepted artifact here. No mid-session repair is possible.
+    const delivered = toolDeliveredResult(tools);
+    return delivered !== undefined
+      ? { turns, usage: outcome.usage, stopReason: 'complete', result: delivered }
+      : { turns, usage: outcome.usage, stopReason: 'error', error: MISSING_SUBMISSION_ERROR };
+  }
   if (spec.output.type !== 'structured') {
     return { turns, usage: outcome.usage, stopReason: 'complete', result: buildTextResult(spec, finalText) };
   }
