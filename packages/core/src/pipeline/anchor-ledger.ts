@@ -1,17 +1,23 @@
 import { scanClaimMarkers } from '@docstube/agent-runtime';
+import type { MarkerScanError } from '@docstube/agent-runtime';
 import type {
   BlockEntity,
   ClaimLedger,
+  Codemap,
+  ContentHash,
   DependencySubscription,
   DraftClaim,
   EvidenceRecord,
   FingerprintSnapshot,
   LedgerClaim,
+  ObservedRead,
   PageEntity,
+  SymbolRecord,
   WriterClaimLedger
 } from '@docstube/contracts';
 import {
   claimLedgerSchema,
+  contentHashSchema,
   entityRevisionSchema,
   evidenceRecordSchema,
   gitCommitSchema,
@@ -27,8 +33,13 @@ import { blockSourceRanges } from '../entities/extract-entities.ts';
 // proposed subscriptions against the fingerprint snapshot, and assigns the initial trust state:
 // every claim starts 'unchecked' with disposition 'no-checker-available' ('maintainer-input-
 // needed' for intent-history) — verification flips correctness in wave 2b-ii, never this stage.
-// Resolution never invents: an unknown symbol, value name, or file drops the proposal with a
-// recorded warning.
+//
+// Anchoring is FAIL-CLOSED (PRODUCT §3.3/§3.5): a claim that cannot anchor, or a required code
+// dependency that cannot resolve even conservatively, fails the whole page attempt with a typed,
+// repair-eligible error. A passing ledger with fewer claims than the writer asserted would
+// silently shrink the trust denominator, which is exactly what the writer ledger exists to
+// prevent. Resolution never invents: an unknown symbol, value name, or file becomes a
+// rejected-proposal record, and code claims fall back to a kernel-derived whole-file dependency.
 
 const flattenBlocks = (page: PageEntity): BlockEntity[] => [
   ...page.preamble,
@@ -42,15 +53,49 @@ export type AnchoredClaim = {
   quote: string;
 };
 
-export type AnchorLedgerResult = {
-  ledger: ClaimLedger;
-  anchored: AnchoredClaim[];
-  // Canonical evidence records minted during anchoring (source-linked grounding for resolved
-  // symbol proposals) — provenance-v2 storage is wave 2b-iii; tests and the verifier wave consume
-  // these directly for now.
-  evidence: EvidenceRecord[];
-  warnings: string[];
+export type AnchorIssueCode =
+  // Repair-eligible: the writer can fix these — they feed the bounded retry loop.
+  | 'marker-misplaced' // marker in a heading / flow position / JSX expression
+  | 'marker-unanchored' // marker maps into no content block
+  | 'marker-missing' // ledger claim whose marker is absent from the accepted MDX
+  | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
+  // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
+  // post-acceptance means the MDX was altered after acceptance — a kernel bug, never repairable.
+  | 'marker-scan-invalid';
+
+export type AnchorIssue = {
+  code: AnchorIssueCode;
+  // True for kernel invariant breaches; false for writer-repairable errors.
+  kernel: boolean;
+  markerId?: string;
+  message: string;
 };
+
+// A proposal the kernel refused to resolve into canonical state — recorded, never silently gone.
+export type RejectedProposal = {
+  markerId: string;
+  proposal: 'evidence' | 'subscription';
+  reason: string;
+};
+
+export type AnchorLedgerResult =
+  | {
+      ok: true;
+      ledger: ClaimLedger;
+      anchored: AnchoredClaim[];
+      // Canonical evidence records minted during anchoring (source-linked grounding for resolved
+      // symbol proposals) — provenance-v2 storage is wave 2b-iii; tests and the verifier wave
+      // consume these directly for now.
+      evidence: EvidenceRecord[];
+      rejectedProposals: RejectedProposal[];
+      warnings: string[];
+    }
+  | {
+      ok: false;
+      errors: AnchorIssue[];
+      rejectedProposals: RejectedProposal[];
+      warnings: string[];
+    };
 
 export type AnchorLedgerInput = {
   mdx: string;
@@ -58,52 +103,94 @@ export type AnchorLedgerInput = {
   // The extracted (and id-matched) page the MDX parsed into — block ids anchor the claims.
   page: PageEntity;
   fingerprints: FingerprintSnapshot;
+  // The verified codemap: the ONLY source of file/span on minted source-linked evidence and of
+  // the grounding-symbol file for the conservative dependency fallback.
+  codemap: Codemap;
+  // The page's authoritative observed reads (kernel-recorded file content hashes) — the
+  // conservative fallback derives whole-file subscriptions from these, never from model output.
+  observedReads: ObservedRead[];
   commit: string;
 };
 
-const resolveSubscriptions = (
-  claim: DraftClaim,
-  fingerprints: FingerprintSnapshot,
-  warnings: string[]
-): DependencySubscription[] => {
-  const symbolByHash = new Map(fingerprints.symbols.map((symbol) => [symbol.symbolHash as string, symbol]));
-  const fileByPath = new Map(fingerprints.unparsedFiles.map((file) => [file.file, file]));
+// Classes whose claims depend on code and therefore MUST end anchoring with at least one resolved
+// subscription or an explicit conservative fallback (PRODUCT §3.2/§3.5): without one, a future
+// ledger-driven reconciliation would silently miss source changes.
+const CODE_DEPENDENT_CLASSES = new Set(['code-structure', 'value', 'behavior']);
+
+// Placement errors are writer-repairable; grammar-level scan errors post-acceptance are kernel
+// invariant breaches (submit_page rejected them in-session, so the MDX must have been altered).
+const REPAIRABLE_SCAN_CODES = new Set(['marker-flow', 'marker-in-heading', 'marker-in-expression']);
+
+const scanErrorToIssue = (error: MarkerScanError): AnchorIssue =>
+  REPAIRABLE_SCAN_CODES.has(error.code)
+    ? {
+        code: 'marker-misplaced',
+        kernel: false,
+        ...(error.markerId === undefined ? {} : { markerId: error.markerId }),
+        message: error.message
+      }
+    : {
+        code: 'marker-scan-invalid',
+        kernel: true,
+        ...(error.markerId === undefined ? {} : { markerId: error.markerId }),
+        message: `accepted MDX failed the marker scan (${error.code}): ${error.message}`
+      };
+
+type ResolutionContext = {
+  fingerprints: FingerprintSnapshot;
+  codemap: Codemap;
+  observedReads: ObservedRead[];
+  rejectedProposals: RejectedProposal[];
+};
+
+// Kernel-derived content hash for a repo file: the fingerprint snapshot's whole-file fallback or
+// the page's observed reads. Never the writer's value.
+const authoritativeFileHash = (ctx: ResolutionContext, file: string): ContentHash | undefined => {
+  const snapshot = ctx.fingerprints.unparsedFiles.find((entry) => entry.file === file)?.contentHash;
+  if (snapshot !== undefined) {
+    return snapshot;
+  }
+  const observed = ctx.observedReads.find((read) => read.file === file)?.contentHash;
+  return observed === undefined ? undefined : contentHashSchema.parse(observed);
+};
+
+const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): DependencySubscription[] => {
+  const symbolByHash = new Map(ctx.fingerprints.symbols.map((symbol) => [symbol.symbolHash as string, symbol]));
+  const reject = (reason: string): void => {
+    ctx.rejectedProposals.push({ markerId: claim.markerId, proposal: 'subscription', reason });
+  };
   const resolved: DependencySubscription[] = [];
   for (const subscription of claim.proposedSubscriptions) {
     if (subscription.kind === 'file-content') {
-      const file = fileByPath.get(subscription.file);
-      if (file === undefined) {
-        warnings.push(
-          `claim "${claim.markerId}": file-content subscription to "${subscription.file}" dropped — the file is not in the fingerprint snapshot`
+      // The kernel-derived hash is authoritative — the writer cannot know content hashes.
+      const contentHash = authoritativeFileHash(ctx, subscription.file);
+      if (contentHash === undefined) {
+        reject(
+          `file-content subscription to "${subscription.file}" — the file is in neither the fingerprint snapshot nor the page's observed reads`
         );
         continue;
       }
-      // The snapshot hash is authoritative — the writer cannot know content hashes.
-      resolved.push({ kind: 'file-content', file: file.file, contentHash: file.contentHash });
+      resolved.push({ kind: 'file-content', file: subscription.file, contentHash });
       continue;
     }
     const symbol = symbolByHash.get(subscription.symbolHash as string);
     if (symbol === undefined) {
-      warnings.push(
-        `claim "${claim.markerId}": ${subscription.kind} subscription dropped — symbol ${subscription.symbolHash} is not in the fingerprint snapshot`
+      reject(
+        `${subscription.kind} subscription — symbol ${subscription.symbolHash} is not in the fingerprint snapshot`
       );
       continue;
     }
     if (subscription.kind === 'signature' && symbol.signaturePrint === undefined) {
-      warnings.push(
-        `claim "${claim.markerId}": signature subscription dropped — symbol ${subscription.symbolHash} has no signature print`
-      );
+      reject(`signature subscription — symbol ${subscription.symbolHash} has no signature print`);
       continue;
     }
     if (subscription.kind === 'body' && symbol.bodyPrint === undefined) {
-      warnings.push(
-        `claim "${claim.markerId}": body subscription dropped — symbol ${subscription.symbolHash} has no body print`
-      );
+      reject(`body subscription — symbol ${subscription.symbolHash} has no body print`);
       continue;
     }
     if (subscription.kind === 'cited-value' && symbol.valuePrints[subscription.valueName] === undefined) {
-      warnings.push(
-        `claim "${claim.markerId}": cited-value subscription dropped — symbol ${subscription.symbolHash} has no value named "${subscription.valueName}"`
+      reject(
+        `cited-value subscription — symbol ${subscription.symbolHash} has no value named "${subscription.valueName}"`
       );
       continue;
     }
@@ -112,26 +199,76 @@ const resolveSubscriptions = (
   return resolved;
 };
 
+// Conservative dependency fallback (kernel-derived, never invented from model output): when a
+// code-dependent claim resolved nothing, subscribe it to whole-file content — first the grounding
+// symbol's file (from the codemap), then a proposed evidence file, then every file the writer
+// actually read. Over-invalidation is acceptable; silent non-invalidation is not.
+const conservativeFallback = (claim: DraftClaim, ctx: ResolutionContext): DependencySubscription[] => {
+  const fileCandidates: string[] = [];
+  for (const proposal of claim.proposedEvidence) {
+    if (proposal.kind === 'symbol') {
+      const record = ctx.codemap.symbols.find((symbol) => symbol.hash === (proposal.symbol as string));
+      if (record !== undefined) {
+        fileCandidates.push(record.file);
+      }
+    } else if (proposal.kind === 'file') {
+      fileCandidates.push(proposal.file);
+    }
+  }
+  for (const file of fileCandidates) {
+    const contentHash = authoritativeFileHash(ctx, file);
+    if (contentHash !== undefined) {
+      return [{ kind: 'file-content', file, contentHash }];
+    }
+  }
+  // Last resort: every observed read — any consulted source changing invalidates the claim.
+  return ctx.observedReads.map((read) => ({
+    kind: 'file-content',
+    file: read.file,
+    contentHash: contentHashSchema.parse(read.contentHash)
+  }));
+};
+
 // Minted grounding for resolved symbol proposals: 'source-linked' asserts only that the subject
 // is real (trust-model-v2 decision 3) — it never decides correctness, so the claims stay
 // unchecked. file/url/check proposals mint nothing here: they are verifier input (wave 2b-ii).
-const mintSymbolEvidence = (
-  claim: DraftClaim,
-  fingerprints: FingerprintSnapshot,
-  commit: string,
-  warnings: string[]
-): EvidenceRecord[] => {
-  const known = new Set(fingerprints.symbols.map((symbol) => symbol.symbolHash as string));
+// file/span on the minted record come from the CODEMAP record for the symbol, never from the
+// writer: a writer-supplied location that mismatches the codemap is a rejected proposal.
+const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: string): EvidenceRecord[] => {
+  const known = new Set(ctx.fingerprints.symbols.map((symbol) => symbol.symbolHash as string));
   const records: EvidenceRecord[] = [];
   for (const proposal of claim.proposedEvidence) {
     if (proposal.kind !== 'symbol') {
       continue;
     }
     if (!known.has(proposal.symbol as string)) {
-      warnings.push(
-        `claim "${claim.markerId}": symbol evidence dropped — symbol ${proposal.symbol} is not in the fingerprint snapshot`
-      );
+      ctx.rejectedProposals.push({
+        markerId: claim.markerId,
+        proposal: 'evidence',
+        reason: `symbol evidence — symbol ${proposal.symbol} is not in the fingerprint snapshot`
+      });
       continue;
+    }
+    const codemapRecord: SymbolRecord | undefined = ctx.codemap.symbols.find(
+      (symbol) => symbol.hash === (proposal.symbol as string)
+    );
+    if (proposal.file !== undefined && codemapRecord !== undefined && proposal.file !== codemapRecord.file) {
+      ctx.rejectedProposals.push({
+        markerId: claim.markerId,
+        proposal: 'evidence',
+        reason: `writer-supplied location "${proposal.file}" for symbol ${proposal.symbol} mismatches the codemap record ("${codemapRecord.file}") — using the codemap location`
+      });
+    }
+    if (
+      proposal.span !== undefined &&
+      codemapRecord !== undefined &&
+      (proposal.span[0] !== codemapRecord.span[0] || proposal.span[1] !== codemapRecord.span[1])
+    ) {
+      ctx.rejectedProposals.push({
+        markerId: claim.markerId,
+        proposal: 'evidence',
+        reason: `writer-supplied span [${proposal.span.join(', ')}] for symbol ${proposal.symbol} mismatches the codemap record — using the codemap span`
+      });
     }
     records.push(
       evidenceRecordSchema.parse({
@@ -139,8 +276,8 @@ const mintSymbolEvidence = (
         ref: {
           kind: 'source-linked',
           symbol: symbolSourceKeySchema.parse(proposal.symbol),
-          ...(proposal.file === undefined ? {} : { file: proposal.file }),
-          ...(proposal.span === undefined ? {} : { span: proposal.span }),
+          // Codemap-resolved location only; omitted entirely when the codemap cannot resolve it.
+          ...(codemapRecord === undefined ? {} : { file: codemapRecord.file, span: codemapRecord.span }),
           commit: gitCommitSchema.parse(commit)
         },
         checkedAt: new Date().toISOString(),
@@ -155,12 +292,28 @@ const mintSymbolEvidence = (
 
 export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult => {
   const warnings: string[] = [];
+  const errors: AnchorIssue[] = [];
+  const rejectedProposals: RejectedProposal[] = [];
+  const ctx: ResolutionContext = {
+    fingerprints: input.fingerprints,
+    codemap: input.codemap,
+    observedReads: input.observedReads,
+    rejectedProposals
+  };
   const blocks = flattenBlocks(input.page);
-  const ranges = blockSourceRanges(input.mdx);
-  // submit_page already guaranteed marker/ledger agreement; scan errors here would mean the MDX
-  // was altered after acceptance, which is a kernel bug — surface as warnings, never invent.
+  // submit_page already validated the markers; the re-scan here classifies anything that slipped
+  // through: placement problems are writer-repairable, grammar problems post-acceptance mean the
+  // MDX was altered after acceptance — a kernel invariant breach, never a warning.
   const scan = scanClaimMarkers(input.mdx);
-  warnings.push(...scan.errors);
+  errors.push(...scan.errors.map(scanErrorToIssue));
+  // Unparsable MDX already produced a kernel-level scan error above; ranges degrade to empty so
+  // the remaining claims report precise marker-missing errors instead of crashing the stage.
+  let ranges: Array<[number, number]>;
+  try {
+    ranges = blockSourceRanges(input.mdx);
+  } catch {
+    ranges = [];
+  }
   const markerByid = new Map(scan.markers.map((marker) => [marker.markerId, marker]));
 
   const anchored: AnchoredClaim[] = [];
@@ -168,19 +321,42 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
   for (const draft of input.writerLedger.claims) {
     const marker = markerByid.get(draft.markerId);
     if (marker === undefined) {
-      warnings.push(`claim "${draft.markerId}" dropped — its marker is missing from the accepted MDX`);
+      // The scan may already carry the precise placement error for this marker; the claim-level
+      // error still fires so the ledger/marker mismatch is explicit.
+      errors.push({
+        code: 'marker-missing',
+        kernel: false,
+        markerId: draft.markerId,
+        message: `claim "${draft.markerId}" cannot anchor — its <Claim id="${draft.markerId}"> marker is missing from the accepted MDX; wrap the asserted prose inline or remove the ledger entry`
+      });
       continue;
     }
     const blockIndex = ranges.findIndex(([start, end]) => marker.offset >= start && marker.offset < end);
     const block = blockIndex === -1 ? undefined : blocks[blockIndex];
     if (block === undefined) {
-      warnings.push(
-        `claim "${draft.markerId}" dropped — its marker does not sit inside any content block (headings and frontmatter cannot carry claims)`
-      );
+      errors.push({
+        code: 'marker-unanchored',
+        kernel: false,
+        markerId: draft.markerId,
+        message: `claim "${draft.markerId}" cannot anchor — its marker does not sit inside any content block (headings and frontmatter cannot carry claims); move the marker into the body prose`
+      });
       continue;
     }
-    const claimEvidence = mintSymbolEvidence(draft, input.fingerprints, input.commit, warnings);
+    const claimEvidence = mintSymbolEvidence(draft, ctx, input.commit);
     evidence.push(...claimEvidence);
+    let subscriptions = resolveSubscriptions(draft, ctx);
+    if (subscriptions.length === 0 && CODE_DEPENDENT_CLASSES.has(draft.class)) {
+      subscriptions = conservativeFallback(draft, ctx);
+      if (subscriptions.length === 0) {
+        errors.push({
+          code: 'subscription-unresolvable',
+          kernel: false,
+          markerId: draft.markerId,
+          message: `claim "${draft.markerId}" (${draft.class}) has no resolvable code dependency and no conservative fallback could be derived — propose { kind: "file-content", file: "<repo-relative source file>" } for the file the fact came from, or a symbol subscription with a real hash from the API surface list`
+        });
+        continue;
+      }
+    }
     const claim: LedgerClaim = {
       claimId: mintId(idPrefixes.claim),
       class: draft.class,
@@ -188,12 +364,23 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       anchor: { blockId: block.id, markerId: draft.markerId },
       // The content-derived block revision — never a git commit (trust-model-v2).
       scope: { entityId: block.id, revision: entityRevisionSchema.parse(block.contentHash) },
-      subscriptions: resolveSubscriptions(draft, input.fingerprints, warnings),
+      subscriptions,
       evidence: claimEvidence.map((record) => record.evidenceId),
       correctness: 'unchecked',
       disposition: draft.class === 'intent-history' ? 'maintainer-input-needed' : 'no-checker-available'
     };
     anchored.push({ claim, markerId: draft.markerId, quote: marker.innerMdx });
+  }
+
+  warnings.push(
+    ...rejectedProposals.map(
+      (rejected) => `claim "${rejected.markerId}": rejected ${rejected.proposal} proposal — ${rejected.reason}`
+    )
+  );
+
+  if (errors.length > 0) {
+    // FAIL-CLOSED: no ledger leaves this stage with fewer claims than the writer asserted.
+    return { ok: false, errors, rejectedProposals, warnings };
   }
 
   const ledger = claimLedgerSchema.parse({
@@ -205,5 +392,5 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
     // schema migration when it lands.
     coverageLint: { uncovered: [] }
   });
-  return { ledger, anchored, evidence, warnings };
+  return { ok: true, ledger, anchored, evidence, rejectedProposals, warnings };
 };

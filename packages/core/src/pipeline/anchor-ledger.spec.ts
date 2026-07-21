@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
-import type { DraftClaim, FingerprintSnapshot } from '@docstube/contracts';
+import { codemapSchema, fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import type { Codemap, DraftClaim, FingerprintSnapshot, ObservedRead } from '@docstube/contracts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
+import type { AnchorLedgerResult } from './anchor-ledger.ts';
 
 const COMMIT = 'a'.repeat(40);
 const KNOWN_SYMBOL = `ts:${'1'.repeat(64)}`;
 const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
 const PRINT = '3'.repeat(64);
 const FILE_HASH = '4'.repeat(64);
+const READ_HASH = '5'.repeat(64);
 
 const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
   schemaVersion: 1,
@@ -23,6 +25,23 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
   ],
   unparsedFiles: [{ file: 'package.json', contentHash: FILE_HASH }]
 });
+
+const codemap: Codemap = codemapSchema.parse({
+  schemaVersion: 1,
+  commit: COMMIT,
+  symbols: [
+    {
+      hash: KNOWN_SYMBOL,
+      lang: 'ts',
+      kind: 'function',
+      name: 'retry',
+      file: 'src/retry.ts',
+      span: [3, 9]
+    }
+  ]
+});
+
+const observedReads: ObservedRead[] = [{ file: 'src/retry.ts', contentHash: READ_HASH }];
 
 const mdx = `---
 title: "Retry"
@@ -44,18 +63,39 @@ const draft = (markerId: string, overrides: Partial<DraftClaim> = {}): unknown =
   markerId,
   class: 'value',
   predicate: 'retries defaults to 3',
+  // A resolvable default so value claims pass the fail-closed dependency requirement; tests that
+  // exercise resolution/fallback override this.
+  proposedSubscriptions: [
+    { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'DEFAULT_RETRIES', citedValue: '3' }
+  ],
   ...overrides
 });
 
-const anchorInput = (claims: unknown[]) => {
+const anchorInput = (claims: unknown[], overrides: Partial<Parameters<typeof anchorWriterLedger>[0]> = {}) => {
   const page = extractPageEntity({ mdx, slug: 'retry' });
-  return { mdx, writerLedger: ledger(claims), page, fingerprints, commit: COMMIT };
+  return {
+    mdx,
+    writerLedger: ledger(claims),
+    page,
+    fingerprints,
+    codemap,
+    observedReads,
+    commit: COMMIT,
+    ...overrides
+  };
+};
+
+const expectOk = (result: AnchorLedgerResult): Extract<AnchorLedgerResult, { ok: true }> => {
+  if (!result.ok) {
+    throw new Error(`expected ok anchoring, got errors: ${result.errors.map((issue) => issue.message).join('; ')}`);
+  }
+  return result;
 };
 
 describe('anchorWriterLedger', () => {
   it('maps each marker to its owning block, mints cl_ ids, and assigns the initial trust state', () => {
-    const input = anchorInput([draft('c1'), draft('c2', { class: 'intent-history' })]);
-    const result = anchorWriterLedger(input);
+    const input = anchorInput([draft('c1'), draft('c2', { class: 'intent-history', proposedSubscriptions: [] })]);
+    const result = expectOk(anchorWriterLedger(input));
 
     expect(result.warnings).toEqual([]);
     expect(result.ledger.claims).toHaveLength(2);
@@ -75,7 +115,7 @@ describe('anchorWriterLedger', () => {
     expect(result.anchored[0]?.quote).toBe('`retries` defaults to 3.');
   });
 
-  it('resolves subscriptions against the fingerprint snapshot and drops unknowns with warnings', () => {
+  it('resolves subscriptions against the fingerprint snapshot and records rejected proposals', () => {
     const input = anchorInput([
       draft('c1', {
         proposedSubscriptions: [
@@ -86,45 +126,130 @@ describe('anchorWriterLedger', () => {
           { kind: 'file-content', file: 'missing.toml', contentHash: '0'.repeat(64) }
         ]
       } as Partial<DraftClaim>),
-      draft('c2')
+      draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
     ]);
-    const result = anchorWriterLedger(input);
+    const result = expectOk(anchorWriterLedger(input));
 
     const subscriptions = result.ledger.claims[0]?.subscriptions ?? [];
     expect(subscriptions).toHaveLength(2);
     expect(subscriptions[0]).toMatchObject({ kind: 'cited-value', valueName: 'DEFAULT_RETRIES' });
     // The snapshot's hash is authoritative for whole-file subscriptions — never the writer's.
     expect(subscriptions[1]).toMatchObject({ kind: 'file-content', file: 'package.json', contentHash: FILE_HASH });
+    expect(result.rejectedProposals).toHaveLength(3);
+    expect(result.rejectedProposals[0]?.reason).toContain('no value named "NOT_A_VALUE"');
+    expect(result.rejectedProposals[1]?.reason).toContain('is not in the fingerprint snapshot');
+    expect(result.rejectedProposals[2]?.reason).toContain('missing.toml');
+    // Rejected proposals surface as warnings too (journaled by the page runner).
     expect(result.warnings).toHaveLength(3);
-    expect(result.warnings[0]).toContain('no value named "NOT_A_VALUE"');
-    expect(result.warnings[1]).toContain('is not in the fingerprint snapshot');
-    expect(result.warnings[2]).toContain('missing.toml');
+    expect(result.warnings.every((warning) => warning.includes('rejected'))).toBe(true);
   });
 
-  it('mints source-linked evidence for resolvable symbol proposals and drops unknown symbols', () => {
+  it('resolves a hash-less file-content proposal from the observed reads (kernel-derived hash)', () => {
+    const input = anchorInput([
+      draft('c1', { proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }] } as Partial<DraftClaim>),
+      draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+    ]);
+    const result = expectOk(anchorWriterLedger(input));
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+    ]);
+  });
+
+  it('falls back to a conservative file-content subscription from the grounding symbol when nothing resolves', () => {
+    const input = anchorInput([
+      draft('c1', {
+        class: 'code-structure',
+        proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+        proposedSubscriptions: [{ kind: 'signature', symbolHash: UNKNOWN_SYMBOL }]
+      } as Partial<DraftClaim>),
+      draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+    ]);
+    const result = expectOk(anchorWriterLedger(input));
+    // The grounding symbol's file (from the codemap) with the observed-read hash, never invented.
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+    ]);
+    expect(result.rejectedProposals.some((rejected) => rejected.reason.includes('not in the fingerprint'))).toBe(true);
+  });
+
+  it('falls back to the observed reads when a code claim has no resolvable proposals at all', () => {
+    const input = anchorInput([
+      draft('c1', { class: 'behavior', proposedSubscriptions: [] } as Partial<DraftClaim>),
+      draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+    ]);
+    const result = expectOk(anchorWriterLedger(input));
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+    ]);
+  });
+
+  it('fails closed with a repair-eligible error when no conservative fallback is derivable', () => {
+    const input = anchorInput(
+      [
+        draft('c1', { class: 'value', proposedSubscriptions: [] } as Partial<DraftClaim>),
+        draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+      ],
+      { observedReads: [] }
+    );
+    const result = anchorWriterLedger(input);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]).toMatchObject({ code: 'subscription-unresolvable', kernel: false, markerId: 'c1' });
+    expect(result.errors[0]?.message).toContain('file-content');
+  });
+
+  it('mints source-linked evidence with the CODEMAP location, rejecting writer-supplied mismatches', () => {
     const input = anchorInput([
       draft('c1', {
         proposedEvidence: [
-          { kind: 'symbol', symbol: KNOWN_SYMBOL },
+          // Writer supplies a wrong file and span: the codemap wins, the mismatch is recorded.
+          { kind: 'symbol', symbol: KNOWN_SYMBOL, file: 'src/other.ts', span: [1, 2] },
           { kind: 'symbol', symbol: UNKNOWN_SYMBOL },
           { kind: 'url', url: 'https://example.com/spec' }
         ]
       } as Partial<DraftClaim>),
-      draft('c2')
+      draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
     ]);
-    const result = anchorWriterLedger(input);
+    const result = expectOk(anchorWriterLedger(input));
 
     expect(result.evidence).toHaveLength(1);
     expect(result.evidence[0]?.evidenceId).toMatch(/^ev_/);
-    expect(result.evidence[0]?.ref).toMatchObject({ kind: 'source-linked', symbol: KNOWN_SYMBOL });
+    expect(result.evidence[0]?.ref).toMatchObject({
+      kind: 'source-linked',
+      symbol: KNOWN_SYMBOL,
+      // Canonical location from the codemap record, never the writer's file/span.
+      file: 'src/retry.ts',
+      span: [3, 9]
+    });
     expect(result.evidence[0]?.outcome).toBe('pass');
     expect(result.ledger.claims[0]?.evidence).toEqual([result.evidence[0]?.evidenceId]);
     // Source-linked grounding never decides correctness — the claim stays unchecked.
     expect(result.ledger.claims[0]?.decidingEvidenceId).toBeUndefined();
-    expect(result.warnings.some((warning) => warning.includes('symbol evidence dropped'))).toBe(true);
+    expect(result.rejectedProposals.some((rejected) => rejected.reason.includes('mismatches the codemap record'))).toBe(
+      true
+    );
+    expect(result.rejectedProposals.some((rejected) => rejected.reason.includes('symbol evidence'))).toBe(true);
   });
 
-  it('drops a claim whose marker sits outside every content block, with a warning', () => {
+  it('omits evidence file/span entirely when the codemap cannot resolve the symbol location', () => {
+    const bareCodemap = codemapSchema.parse({ schemaVersion: 1, commit: COMMIT, symbols: [] });
+    const input = anchorInput(
+      [
+        draft('c1', { proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }] } as Partial<DraftClaim>),
+        draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+      ],
+      { codemap: bareCodemap }
+    );
+    const result = expectOk(anchorWriterLedger(input));
+    const ref = result.evidence[0]?.ref as { kind: string; file?: string; span?: unknown } | undefined;
+    expect(ref).toMatchObject({ kind: 'source-linked', symbol: KNOWN_SYMBOL });
+    expect(ref?.file).toBeUndefined();
+    expect(ref?.span).toBeUndefined();
+  });
+
+  it('FAILS (never drops) a claim whose marker sits outside every content block', () => {
     const headingMdx = `# Title\n\n## <Claim id="h1">Heading claim</Claim>\n\nBody text.\n`;
     const page = extractPageEntity({ mdx: headingMdx, slug: 'h' });
     const result = anchorWriterLedger({
@@ -132,9 +257,38 @@ describe('anchorWriterLedger', () => {
       writerLedger: ledger([draft('h1')]),
       page,
       fingerprints,
+      codemap,
+      observedReads,
       commit: COMMIT
     });
-    expect(result.ledger.claims).toHaveLength(0);
-    expect(result.warnings[0]).toContain('does not sit inside any content block');
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    // The placement error is repair-eligible; the ledger claim also reports its missing marker.
+    expect(result.errors.some((issue) => issue.code === 'marker-misplaced' && !issue.kernel)).toBe(true);
+    expect(result.errors.some((issue) => issue.code === 'marker-missing' && issue.markerId === 'h1')).toBe(true);
+  });
+
+  it('classifies post-acceptance grammar-level scan errors as kernel invariant breaches', () => {
+    // The page was extracted from the ACCEPTED MDX; the anchoring input was then altered — the
+    // exact drift the kernel must refuse to paper over (submit_page guaranteed a clean scan).
+    const acceptedMdx = `# Title\n\nText <Claim id="c1">closed properly.</Claim>\n`;
+    const alteredMdx = `# Title\n\nText <Claim id="c1">never closed.\n`;
+    const page = extractPageEntity({ mdx: acceptedMdx, slug: 'h' });
+    const result = anchorWriterLedger({
+      mdx: alteredMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors.some((issue) => issue.code === 'marker-scan-invalid' && issue.kernel)).toBe(true);
   });
 });

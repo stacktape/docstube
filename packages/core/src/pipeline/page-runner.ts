@@ -23,6 +23,7 @@ import { assignGuarantees, errorFindings, liftClaimGroundedBlocks, runVerifiers 
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
+import { matchClaimIds } from './match-claims.ts';
 import { attachLedgerClaims } from './ledger-bridge.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
 import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
@@ -218,9 +219,10 @@ export const generatePage = async (
         writerLedger,
         page: verifiedPage,
         fingerprints: ctx.fingerprints,
+        codemap: ctx.codemap,
+        observedReads: transcript.observedReads,
         commit: ctx.commit
       });
-      lastLedger = anchoredLedger.ledger;
       if (anchoredLedger.warnings.length > 0) {
         const claimWarnings: Finding[] = anchoredLedger.warnings.map((warning) => ({
           source: 'verifier',
@@ -230,10 +232,46 @@ export const generatePage = async (
         }));
         await ctx.journal.append({ type: 'findings', pageId: page.id, findings: claimWarnings });
       }
-      // TEMPORARY (until wave 2b-iii): the bridge derives the legacy per-block ClaimEntity view
-      // from the kernel ledger; the lift then upgrades blocks whose every claim is proven (a
-      // no-op while everything is 'unchecked' — verification is wave 2b-ii).
-      const bridgedPage = attachLedgerClaims(verifiedPage, anchoredLedger.anchored);
+      if (!anchoredLedger.ok) {
+        // Fail-closed anchoring (PRODUCT §3.3/§3.5): a claim that cannot anchor NEVER produces a
+        // passing ledger with fewer claims. Kernel invariant breaches (the accepted MDX no longer
+        // matches what submit_page validated) abort the run; writer-repairable errors feed the
+        // bounded retry loop with the precise error, exactly like verifier findings.
+        const kernelErrors = anchoredLedger.errors.filter((issue) => issue.kernel);
+        if (kernelErrors.length > 0) {
+          throw new CoreError(
+            'pipeline-failed',
+            `claim anchoring on "${node.slug}" hit a kernel invariant breach: ${kernelErrors
+              .map((issue) => issue.message)
+              .join('; ')}`
+          );
+        }
+        findings = anchoredLedger.errors.map((issue) => ({
+          source: 'verifier',
+          check: 'claim-anchoring',
+          severity: 'error',
+          message: issue.message
+        }));
+        await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
+        if (attempt < maxAttempts) {
+          await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
+          await ctx.journal.append({ type: 'retry-scheduled', pageId: page.id, attempt: attempt + 1, maxAttempts });
+        }
+        continue;
+      }
+      // Claim identity matching (trust-model-v2 decision 8): a continuing assertion on a matched
+      // block reuses the previous shard's claim id — identity carries, while predicate, anchor,
+      // subscriptions, evidence, and trust state all come from the CURRENT ledger.
+      const matched = matchClaimIds({
+        ledger: anchoredLedger.ledger,
+        anchored: anchoredLedger.anchored,
+        previousPage: previousShard?.page
+      });
+      lastLedger = matched.ledger;
+      // TEMPORARY (until wave 2b-iii): the bridge REPLACES every block's legacy claims with the
+      // ledger-derived view; the lift then upgrades blocks whose every claim is proven (a no-op
+      // while everything is 'unchecked' — verification is wave 2b-ii).
+      const bridgedPage = attachLedgerClaims(verifiedPage, matched.anchored);
       lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(bridgedPage) };
       break;
     }

@@ -444,6 +444,97 @@ describe('runGenerate', () => {
     expect(shardAfter?.flags.filter((flag) => flag.kind === 'system' && flag.status === 'open')).toHaveLength(1);
   }, 60_000);
 
+  it('regeneration of unchanged MDX keeps the claim id but NEVER carries old trust (review repro)', async () => {
+    // First run establishes the shard, then the stored claim is lifted to 'proven' to simulate a
+    // previous run's trust state (the exact reproduction from the wave 2b-i gate review: a
+    // dependency-triggered regeneration must not ship a second claim identity, must not carry the
+    // old guarantee, and must not let stale proven claims lift the block).
+    const first = await runGenerate({ repoRoot, toolDescriptors: [], runTask: scriptedRunner([goodMdx]).runTask });
+    expect(first.outcome).toBe('passed');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const pageId = index?.pages[0]?.id ?? '';
+    const shard = await store.readPageShard({ locale: 'en', pageId });
+    const previousClaimId = shard?.page.preamble[0]?.claims[0]?.id;
+    expect(previousClaimId).toMatch(/^cl_/);
+    if (shard === undefined) {
+      throw new Error('expected a shard');
+    }
+    await store.writePageShard({
+      ...shard,
+      page: {
+        ...shard.page,
+        preamble: [
+          {
+            ...shard.page.preamble[0]!,
+            guarantee: 'proven',
+            claims: shard.page.preamble[0]!.claims.map((claim) => ({ ...claim, guarantee: 'proven' as const }))
+          },
+          ...shard.page.preamble.slice(1)
+        ]
+      }
+    });
+
+    // Second run: unchanged MDX regenerates (generate always rewrites).
+    const second = await runGenerate({ repoRoot, toolDescriptors: [], runTask: scriptedRunner([goodMdx]).runTask });
+    expect(second.outcome).toBe('passed');
+    const regenerated = await store.readPageShard({ locale: 'en', pageId });
+    const markerBlock = regenerated?.page.preamble[0];
+    // ONE claim identity: the ledger-anchored claim reuses the previous shard's claim id.
+    expect(markerBlock?.claims).toHaveLength(1);
+    expect(markerBlock?.claims[0]?.id).toBe(previousClaimId);
+    // Trust does NOT carry: the claim is back to 'scored' (unchecked), and the stale 'proven'
+    // claim no longer lifts the block.
+    expect(markerBlock?.claims[0]?.guarantee).toBe('scored');
+    expect(markerBlock?.guarantee).toBe('scored');
+  }, 120_000);
+
+  it('fails closed when a claim cannot anchor: writer repair, then flagged — never a shrunken ledger', async () => {
+    // A marker in a heading plus its ledger entry: submit_page rejects this in-session on real
+    // transports; the scripted runner bypasses submit_page, so anchoring must catch it as a
+    // repair-eligible error that feeds the retry loop and finally flags the page.
+    const headingClaimMdx = goodMdx.replace('## Usage', '## <Claim id="h1">Usage claims things</Claim>');
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: headingClaimMdx }] }],
+        result: {
+          type: 'mdx-ledger',
+          mdx: headingClaimMdx,
+          ledger: {
+            schemaVersion: 1,
+            claims: [
+              ...ledgerFor(headingClaimMdx).claims,
+              {
+                markerId: 'h1',
+                class: 'code-structure',
+                predicate: 'usage claims things',
+                proposedEvidence: [],
+                proposedSubscriptions: []
+              }
+            ]
+          }
+        }
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });
+
+    // Both attempts hit the anchoring error: the page ships FLAGGED with the precise error —
+    // never 'passed' with the h1 claim silently dropped from the ledger denominator.
+    expect(summary.pages[0]?.status).toBe('flagged');
+    expect(summary.pages[0]?.findings.some((finding) => finding.check === 'claim-anchoring')).toBe(true);
+    expect(summary.pages[0]?.findings.some((finding) => finding.message.includes('h1'))).toBe(true);
+    expect(summary.pages[0]?.attempts).toBe(2);
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard?.flags.some((flag) => flag.status === 'open' && flag.detail?.includes('claim-anchoring'))).toBe(true);
+  }, 120_000);
+
   it('flags the page instead of shipping silently when defects persist', async () => {
     const { runTask } = scriptedRunner([badMdx, badMdx]);
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });

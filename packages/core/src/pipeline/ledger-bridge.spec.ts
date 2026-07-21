@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import { codemapSchema, fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import { CoreError } from '../errors.ts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import { attachLedgerClaims, guaranteeForCorrectness } from './ledger-bridge.ts';
@@ -11,6 +12,8 @@ const fingerprints = fingerprintSnapshotSchema.parse({
   symbols: [],
   unparsedFiles: []
 });
+const codemap = codemapSchema.parse({ schemaVersion: 1, commit: COMMIT, symbols: [] });
+const observedReads = [{ file: 'src/greet.ts', contentHash: 'c'.repeat(64) }];
 
 const mdx = `# Page
 
@@ -25,15 +28,24 @@ const anchoredFixture = () => {
     schemaVersion: 1,
     claims: [{ markerId: 'c1', class: 'code-structure', predicate: 'greet exists' }]
   });
-  return { page, result: anchorWriterLedger({ mdx, writerLedger, page, fingerprints, commit: COMMIT }) };
+  const result = anchorWriterLedger({ mdx, writerLedger, page, fingerprints, codemap, observedReads, commit: COMMIT });
+  if (!result.ok) {
+    throw new Error('fixture anchoring failed');
+  }
+  return { page, result };
 };
 
 describe('guaranteeForCorrectness', () => {
-  it('maps checked to proven and everything else to scored', () => {
+  it('maps checked to proven and unchecked to scored', () => {
     expect(guaranteeForCorrectness('checked')).toBe('proven');
     expect(guaranteeForCorrectness('unchecked')).toBe('scored');
-    // 2b-ii turns contradictions into gating findings; until then they never count as proven.
-    expect(guaranteeForCorrectness('contradicted')).toBe('scored');
+  });
+
+  it('THROWS on contradicted — a caught lie must never project as neutral scored content', () => {
+    // 2b-ii must replace this kernel invariant with a gating error finding before enabling
+    // verification; until then contradiction reaching the bridge is a kernel bug.
+    expect(() => guaranteeForCorrectness('contradicted')).toThrowError(CoreError);
+    expect(() => guaranteeForCorrectness('contradicted')).toThrowError(/contradicted/);
   });
 });
 
@@ -56,7 +68,7 @@ describe('attachLedgerClaims', () => {
     expect(bridged.preamble[1]?.claims).toEqual([]);
   });
 
-  it('keeps claims carried by the entity-matching pass instead of overwriting stable ids', () => {
+  it('REPLACES carried legacy claims — old trust state never survives the bridge', () => {
     const { page, result } = anchoredFixture();
     const carried = {
       id: `cl_${'0'.repeat(20)}`,
@@ -68,6 +80,15 @@ describe('attachLedgerClaims', () => {
     };
     const withCarried = { ...page, preamble: [{ ...page.preamble[0]!, claims: [carried] }, page.preamble[1]!] };
     const bridged = attachLedgerClaims(withCarried, result.anchored);
-    expect(bridged.preamble[0]?.claims).toEqual([carried]);
+    // The ledger is the only source: the stale 'proven' claim is gone, the ledger claim is there.
+    expect(bridged.preamble[0]?.claims).toHaveLength(1);
+    expect(bridged.preamble[0]?.claims[0]).toMatchObject({
+      id: result.ledger.claims[0]?.claimId,
+      guarantee: 'scored'
+    });
+    // A block the ledger anchors nothing to is cleared too — no orphaned legacy trust.
+    const withStrayCarried = { ...page, preamble: [page.preamble[0]!, { ...page.preamble[1]!, claims: [carried] }] };
+    const bridgedStray = attachLedgerClaims(withStrayCarried, result.anchored);
+    expect(bridgedStray.preamble[1]?.claims).toEqual([]);
   });
 });

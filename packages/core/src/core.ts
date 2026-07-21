@@ -61,7 +61,16 @@ export {
 } from './pipeline/tribal-knowledge.ts';
 export type { CapturedQuestion, KnowledgeEntry } from './pipeline/tribal-knowledge.ts';
 export { anchorWriterLedger } from './pipeline/anchor-ledger.ts';
-export type { AnchoredClaim, AnchorLedgerInput, AnchorLedgerResult } from './pipeline/anchor-ledger.ts';
+export type {
+  AnchoredClaim,
+  AnchorIssue,
+  AnchorIssueCode,
+  AnchorLedgerInput,
+  AnchorLedgerResult,
+  RejectedProposal
+} from './pipeline/anchor-ledger.ts';
+export { matchClaimIds } from './pipeline/match-claims.ts';
+export type { MatchClaimIdsInput, MatchedClaimIds } from './pipeline/match-claims.ts';
 export { attachLedgerClaims, guaranteeForCorrectness } from './pipeline/ledger-bridge.ts';
 export { translateArtifact, buildTranslatePageTask, alignTranslatedEntities } from './pipeline/translate-page.ts';
 export type { TranslationOutcome } from './pipeline/translate-page.ts';
