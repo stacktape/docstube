@@ -27,7 +27,7 @@ import { loadContextFiles } from './context-files.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
-import { attachSiteFindingsToShards, resolveCommit } from './generate.ts';
+import { attachSiteFindingsToShards, dirtyWorkingTreeWarning, resolveSourceRevision } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
 // The maintain/refresh stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
@@ -171,8 +171,11 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
   // Any escaping error journals a terminal 'failed' outcome first — a crashed run must never
   // read as still running (journalRunFailure rethrows).
   try {
-    const commit = await resolveCommit(repoRoot);
+    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot);
     await journal.append({ type: 'run-started', mode: 'refresh', commit });
+    if (dirtyWorkingTree) {
+      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
+    }
 
     await journal.append({ type: 'stage-started', stage: 'codemap' });
     const codemapStarted = Date.now();
@@ -241,6 +244,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
       openQuestions,
       costTracker,
       commit,
+      dirtyWorkingTree,
       locale,
       version
     };

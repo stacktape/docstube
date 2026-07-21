@@ -41,7 +41,14 @@ export const generationLineageSchema = z.object({
   transcripts: z.array(taskIdSchema).default([]),
   // Context-pack inputs handed to the writer (ctx_… ids into the run journal).
   seedContext: z.array(contextIdSchema).default([]),
-  observedReads: z.array(observedReadSchema).default([])
+  observedReads: z.array(observedReadSchema).default([]),
+  // Honest revision labeling (impl-07 finding 7): fingerprinting and verification read the
+  // WORKING TREE. sourceRevision fields still record HEAD (the schema requires a git commit),
+  // but when the tree was dirty at run start — or the repo had no HEAD at all — this marker
+  // records that HEAD may never have contained the checked bytes. Absent for a clean tree.
+  // Full immutable-snapshot reads (evidence bound to the exact tree object) land with the
+  // reconciler wave.
+  dirtyWorkingTree: z.boolean().optional()
 });
 export type GenerationLineage = z.infer<typeof generationLineageSchema>;
 

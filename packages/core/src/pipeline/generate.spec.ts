@@ -192,6 +192,9 @@ describe('runGenerate', () => {
     expect(shard?.ledger?.claims[0]?.claimId).toMatch(/^cl_/);
     expect(shard?.provenance?.claimEvidence).toHaveLength(1);
     expect(shard?.provenance?.claimEvidence[0]?.claimId).toBe(shard?.ledger?.claims[0]?.claimId);
+    // The temp repo has no HEAD: the run reads working-tree bytes no commit can vouch for, so
+    // lineage carries the honest dirtyWorkingTree marker (finding 7).
+    expect(shard?.provenance?.lineage.dirtyWorkingTree).toBe(true);
     // Blocks carry no legacy ClaimEntity records anymore.
     const blocks = [...(shard?.page.preamble ?? []), ...(shard?.page.sections.flatMap((s) => s.blocks) ?? [])];
     expect(blocks.every((block) => block.claims.length === 0)).toBe(true);

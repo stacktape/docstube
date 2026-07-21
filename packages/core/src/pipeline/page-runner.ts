@@ -75,6 +75,9 @@ export type PageRunContext = {
   // Accumulates every task's reported cost; callers check shouldFreeze() between pages.
   costTracker: RunCostTracker;
   commit: string;
+  // True when HEAD may never have contained the working-tree bytes this run read (dirty tree or
+  // no HEAD) — persisted on GenerationLineage so evidence labeling stays honest (finding 7).
+  dirtyWorkingTree: boolean;
   locale: string;
   version: string;
 };
@@ -378,6 +381,7 @@ export const generatePage = async (
       node,
       ledger: verified.ledger,
       claimEvidence: verified.claimEvidence,
+      dirtyWorkingTree: ctx.dirtyWorkingTree,
       transcript,
       writeTask: task,
       reviews,

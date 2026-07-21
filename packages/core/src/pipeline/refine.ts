@@ -11,7 +11,7 @@ import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal, journalRunFailure } from '../state/run-journal.ts';
 import { loadContextFiles } from './context-files.ts';
 import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
-import { resolveCommit } from './generate.ts';
+import { dirtyWorkingTreeWarning, resolveSourceRevision } from './generate.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
@@ -118,8 +118,11 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   // Any escaping error journals a terminal 'failed' outcome first — a crashed run must never
   // read as still running (journalRunFailure rethrows).
   try {
-    const commit = await resolveCommit(repoRoot);
+    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot);
     await journal.append({ type: 'run-started', mode: 'refine', commit });
+    if (dirtyWorkingTree) {
+      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
+    }
 
     const packs = host.languagePacks().map((entry) => entry.definition);
     const codemap = await buildCodemap({ repoRoot, commit, packs });
@@ -193,6 +196,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       openQuestions,
       costTracker,
       commit,
+      dirtyWorkingTree,
       locale,
       version
     };

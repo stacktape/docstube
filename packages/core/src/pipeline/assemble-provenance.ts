@@ -31,6 +31,9 @@ export type AssembleProvenanceInput = {
   node: IaPageNodeV2;
   ledger: ClaimLedger;
   claimEvidence: ClaimEvidence[];
+  // Honest revision labeling (finding 7): true when HEAD may never have contained the bytes the
+  // run read — recorded on lineage, never silently dropped.
+  dirtyWorkingTree?: boolean | undefined;
   // The accepted write attempt: model/transport/task id/observed reads.
   transcript: Transcript;
   // The write task the accepted attempt ran — its prompts are the revision refs.
@@ -187,7 +190,8 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
       // Journal-registered ctx_ context packs are a later wave; the page's current seed-context
       // strings are not ctx_ ids, so lineage starts without them rather than faking handles.
       seedContext: [],
-      observedReads: input.transcript.observedReads
+      observedReads: input.transcript.observedReads,
+      ...(input.dirtyWorkingTree === true ? { dirtyWorkingTree: true } : {})
     },
     dependencies: { subscriptions, consumed },
     claimEvidence: input.claimEvidence,
