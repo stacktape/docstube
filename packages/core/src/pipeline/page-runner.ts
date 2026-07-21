@@ -314,6 +314,9 @@ export const generatePage = async (
       includeSiteScope: false
     });
     await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'judging' });
+    // Persona review is strictly EDITORIAL (audience fit + brief conformance, harness-state-v2
+    // decision 4): no source tools ride along — factual risk is claim verification's job now and
+    // the evidence-fed risk critic's in a later wave (impl-07 finding 9).
     const reviews = await reviewPage({
       config: ctx.config,
       criteria: ctx.criteria,
@@ -321,7 +324,6 @@ export const generatePage = async (
       primaryPersona: node.primaryPersona,
       brief: node.brief,
       runTask: ctx.options.runTask,
-      toolDescriptors: ctx.options.toolDescriptors,
       journal: ctx.journal,
       costTracker: ctx.costTracker
     });

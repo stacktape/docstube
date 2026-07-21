@@ -52,11 +52,15 @@ describe('built-in skills', () => {
   it('reviewer skill mirrors the review-page criteria semantics', () => {
     const content = skillContent('reviewer');
     expect(content).toContain('`met`, `not-met`, or `not-applicable`');
-    for (const criterion of ['audience-fit', 'correctness-risk', 'brief-conformance']) {
+    for (const criterion of ['audience-fit', 'brief-conformance']) {
       expect(content).toContain(criterion);
     }
     expect(content).toContain('Severity `error` only when the page would mislead or block this persona');
     expect(content).toContain('Never assign numeric quality scores');
+    // Persona review is editorial only (impl-07 finding 9): correctness lives with claim
+    // verification and the risk critic, never in the reviewer skill.
+    expect(content).not.toContain('correctness-risk');
+    expect(content).toContain('Factual correctness is NOT');
   });
 
   it('writing-conventions skill bans AI-isms and demands sentence variety', () => {

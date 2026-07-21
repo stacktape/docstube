@@ -252,15 +252,22 @@ describe('runGenerate', () => {
     expect(iaFragment?.id).toBe('ia:getting-started');
   }, 60_000);
 
-  it('threads the standard read-only tools into review tasks — reviewers get source access', async () => {
+  it('keeps persona review strictly editorial: no source tools, no correctness-risk criterion (impl-07 finding 9)', async () => {
     const descriptor = {
       name: 'read_file',
       description: 'Read a repo file.',
       paramsJsonSchema: { type: 'object', properties: { path: { type: 'string' } } }
     };
-    const { runTask, reviewCalls } = scriptedRunner([goodMdx]);
+    const { runTask, reviewCalls, writeCalls } = scriptedRunner([goodMdx]);
     await runGenerate({ repoRoot, runTask, toolDescriptors: [descriptor] });
-    expect(reviewCalls[0]?.tools.map((tool) => tool.name)).toContain('read_file');
+    // The writer still gets the standard tools; the EDITORIAL reviewer gets none — source
+    // checking was the removed correctness-risk axis (claim verification + risk critic own it).
+    expect(writeCalls[0]?.tools.map((tool) => tool.name)).toContain('read_file');
+    expect(reviewCalls[0]?.tools).toEqual([]);
+    expect(reviewCalls[0]?.systemPrompt).not.toContain('correctness-risk');
+    expect(reviewCalls[0]?.systemPrompt).toContain('audience-fit');
+    expect(reviewCalls[0]?.systemPrompt).toContain('brief-conformance');
+    expect(reviewCalls[0]?.systemPrompt).toContain('Do NOT judge factual correctness');
   }, 60_000);
 
   it('journals a run-completed failed event when the pipeline escapes with an error', async () => {
