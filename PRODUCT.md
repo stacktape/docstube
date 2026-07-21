@@ -143,10 +143,15 @@ surface as orphans for re-attachment or dismissal.
   timeout"), intent/history.
   - *Shape claims*: grounding against the codemap suffices — the identifier's existence is most
     of the assertion.
-  - *Value/behavior claims*: grounding confers only `source-linked` (subject real, assertion
-    unchecked); they count as **checked** only when a claim-class predicate verifier passes
-    (signature/default-value comparison, execution assertions, schema validation — the v1.x
-    verifier roadmap). Grounding failures (missing identifiers) are hard defects for every class.
+  - *Value claims*: 0.1.0 ships a **minimal value-predicate verifier** (founder decision,
+    2026-07-21): the claim's asserted value is normalized and compared against the value
+    fingerprints the typed fingerprint ladder already extracts per symbol — match → `checked`,
+    mismatch → `contradicted` (a caught lie). This makes the full badge honestly achievable at
+    launch instead of rare.
+  - *Behavior claims*: grounding confers only `source-linked` (subject real, assertion
+    unchecked); they count as **checked** when snippet execution exercises the behavior or, from
+    v1.x, when richer predicate verifiers pass (execution assertions, schema validation).
+    Grounding failures (missing identifiers) are hard defects for every class.
   - *Intent/history claims*: a recorded maintainer answer (**owner-attested**, with authorship +
     timestamp in the evidence record) is legitimate evidence and counts toward 100%; the UI
     distinguishes attestation from mechanical checks.
@@ -620,7 +625,7 @@ or is planned.
 | Item | Spec |
 |---|---|
 | **Versioned docs** | The complete lifecycle ships whole: current version live from HEAD, past versions frozen snapshots cut at release time; cut anytime — never waits on localization; snapshots record which pages fell back; **sealed + explicit repair** (`docstube version repair <label>` consciously backfills, recorded); new-locale backfill targets current only. Version is already an address dimension; the half-built cut/state code is parked, not deleted |
-| Claim-class predicate verifiers | Signature/default-value comparison, execution assertions, schema validation — flips value/behavior claims from source-linked to checked (§3.2) |
+| Richer predicate verifiers | Execution assertions, schema validation, signature comparison beyond values — flips remaining behavior claims from source-linked to checked (§3.2; the minimal value-predicate verifier ships in 0.1.0) |
 | Diagram edge grounding | Relations graph; extends 0.1.0's syntax + node-name checking |
 | Sandboxed snippet execution | OS sandbox; supersedes environment-fingerprinted host execution evidence |
 | Public MCP endpoint | After a deployment adapter exists |
