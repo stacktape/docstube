@@ -223,6 +223,52 @@ describe('matchClaimIds', () => {
     expect(matched.matching.orphans).toEqual([]);
   });
 
+  it("finds the MAXIMUM matching — Sol's impl-07 probe: f1→{p1,p2}, f2→{p1} must match both, p2 never orphaned", () => {
+    // Greedy document-order assignment gave f1→p1 and orphaned p2. The maximum matching is
+    // f1→p2 (predicate edge), f2→p1 (quote edge) — and it is the UNIQUE maximum, so both
+    // matches are exact under the alternative-matchings rule.
+    const twinMdx = `# Page
+
+<Claim id="c1">\`greet\` exists.</Claim> and <Claim id="c2">\`greet\` exists.</Claim>
+`;
+    const twinClaims = [
+      {
+        markerId: 'c1',
+        class: 'code-structure',
+        // Matches ONLY p2's predicate (its quote also matches p1's quote → two candidates).
+        predicate: 'the greet helper is exported',
+        proposedSubscriptions: [{ kind: 'file-content', file: 'src/greet.ts' }]
+      },
+      {
+        markerId: 'c2',
+        class: 'code-structure',
+        // Matches ONLY p1 (quote equality); no predicate candidate anywhere.
+        predicate: 'something else entirely',
+        proposedSubscriptions: [{ kind: 'file-content', file: 'src/greet.ts' }]
+      }
+    ];
+    const previousPage = extractPageEntity({ mdx: twinMdx, slug: 'p' });
+    const { fresh, blockConfidence } = rethread(previousPage, twinMdx);
+    const anchoredLedger = anchorFor(fresh, twinMdx, twinClaims);
+    const blockId = previousPage.preamble[0]!.id;
+    const previousLedger = priorLedgerOf(previousPage.id, [
+      priorClaim({ id: ID_A, blockId, quote: '`greet` exists.', predicate: 'greet exists' }),
+      priorClaim({ id: ID_B, blockId, quote: 'The old sentence.', predicate: 'the greet helper is exported' })
+    ]);
+    const matched = matchClaimIds({
+      ledger: anchoredLedger.ledger,
+      anchored: anchoredLedger.anchored,
+      previousLedger,
+      blockConfidence
+    });
+    // The two-edge matching is found: c1 carries ID_B (predicate thread), c2 carries ID_A.
+    expect(matched.ledger.claims.map((claim) => claim.claimId)).toEqual([ID_B, ID_A]);
+    expect(matched.matching.orphans).toEqual([]);
+    // The maximum is unique — no alternative maximum matchings — so both matches are exact.
+    expect(matched.matches.map((match) => match.confidence)).toEqual(['exact', 'exact']);
+    expect(matched.matches.every((match) => match.drift.length === 0)).toBe(true);
+  });
+
   it('a unique claim candidate on a POSITIONALLY threaded (content-changed) block is never exact', () => {
     // The previous page's paragraph read differently: block matching threads it positionally
     // (same slot, changed content). Even though the claim-level candidate is unique (predicate

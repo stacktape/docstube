@@ -14,19 +14,22 @@ import type { AnchoredClaim } from './anchor-ledger.ts';
 // ONLY the id carries. Predicate, anchor, subscriptions, evidence, correctness, and disposition
 // all come from the CURRENT kernel ledger; the previous claim's state is never read.
 //
-// The identity-threading half of decision 8 is CONFIDENCE-AWARE and GLOBAL (impl-06 finding 4):
-// candidates are solved as connected components of the fresh×prior bipartite candidate graph,
-// never greedily —
-//   - a component pairing exactly ONE fresh with ONE prior claim, on an exactly-threaded block,
-//     is a confident match ('exact'): the id and its human threads carry silently;
-//   - a component with ANY alternative assignment marks EVERY match inside it 'ambiguous'
-//     (drift 'equal-candidates'): ids still carry deterministically, but every carried human
-//     thread renders a drift marker ("content changed substantially since this was written");
+// The identity-threading half of decision 8 solves a deterministic MAXIMUM-CARDINALITY bipartite
+// matching over the fresh×prior candidate graph (impl-07 finding 6 — greedy first-unused-prior
+// assignment orphaned reachable priors: with edges f1→{p1,p2} and f2→{p1} it matched only f1→p1
+// and dropped p2 although a two-edge matching exists):
+//   - the matching is computed by augmenting paths (Kuhn) with stable ordering — fresh claims in
+//     document order, candidates quote-equality first then prior-ledger order — so the chosen
+//     maximum is deterministic;
+//   - a matched pair is 'exact' only when NO alternative maximum matching assigns its fresh claim
+//     differently (removing the pair's edge strictly shrinks the maximum). If an alternative
+//     maximum exists, the pair is 'ambiguous' (drift 'equal-candidates'): the id still carries
+//     deterministically, but every carried human thread renders a drift marker;
 //   - a claim threading through a POSITIONALLY matched block (content changed) is 'ambiguous'
 //     (drift 'block-thread-inexact') even when its own candidate is unique — the block thread
 //     itself is a guess;
-//   - prior claims nothing threaded onto are ORPHANS, returned explicitly and persisted on the
-//     shard — never a silent disappearance.
+//   - prior claims outside the chosen maximum matching are ORPHANS, returned explicitly and
+//     persisted on the shard — never a silent disappearance.
 
 export type ClaimMatchConfidence = 'exact' | 'ambiguous';
 
@@ -78,53 +81,54 @@ const candidateEdges = (fresh: AnchoredClaim[], prior: LedgerClaim[]): Candidate
   return edges;
 };
 
-// Union-find over the bipartite node space: fresh nodes are [0, freshCount), prior nodes are
-// offset by freshCount.
-const connectedComponents = (
-  freshCount: number,
-  priorCount: number,
-  edges: CandidateEdge[]
-): Array<{ freshIndexes: number[]; priorIndexes: number[] }> => {
-  const parent = Array.from({ length: freshCount + priorCount }, (_, index) => index);
-  const find = (node: number): number => {
-    while (parent[node] !== node) {
-      const next = parent[node] ?? node;
-      parent[node] = parent[next] ?? next;
-      node = parent[node] ?? node;
-    }
-    return node;
-  };
-  const union = (left: number, right: number): void => {
-    parent[find(left)] = find(right);
-  };
-  for (const edge of edges) {
-    union(edge.freshIndex, freshCount + edge.priorIndex);
-  }
-  const byRoot = new Map<number, { freshIndexes: number[]; priorIndexes: number[] }>();
-  const componentOf = (root: number) => {
-    const existing = byRoot.get(root);
-    if (existing !== undefined) {
-      return existing;
-    }
-    const created = { freshIndexes: [] as number[], priorIndexes: [] as number[] };
-    byRoot.set(root, created);
-    return created;
-  };
-  // Only nodes touched by at least one edge belong to a matching component.
-  const touched = new Set<number>();
-  for (const edge of edges) {
-    touched.add(edge.freshIndex);
-    touched.add(freshCount + edge.priorIndex);
-  }
-  for (const node of touched) {
-    const component = componentOf(find(node));
-    if (node < freshCount) {
-      component.freshIndexes.push(node);
-    } else {
-      component.priorIndexes.push(node - freshCount);
+// Ordered adjacency: fresh index → candidate prior indexes, quote-equality edges before
+// predicate-equality edges, then prior-ledger order. The order makes both the chosen maximum
+// matching and the augmenting search deterministic.
+const orderedAdjacency = (freshCount: number, edges: CandidateEdge[]): Map<number, number[]> => {
+  const adjacency = new Map<number, number[]>();
+  for (let freshIndex = 0; freshIndex < freshCount; freshIndex += 1) {
+    const candidates = edges
+      .filter((edge) => edge.freshIndex === freshIndex)
+      .toSorted((left, right) =>
+        left.kind === right.kind ? left.priorIndex - right.priorIndex : left.kind === 'quote' ? -1 : 1
+      )
+      .map((edge) => edge.priorIndex);
+    if (candidates.length > 0) {
+      adjacency.set(freshIndex, candidates);
     }
   }
-  return [...byRoot.values()];
+  return adjacency;
+};
+
+// Maximum-cardinality bipartite matching by augmenting paths (Kuhn's algorithm). Small graphs
+// (claims on one page), deterministic through the stable adjacency order. Returns prior→fresh.
+// `banned` excludes one edge — the alternative-maximum probe for ambiguity classification.
+const solveMaximumMatching = (
+  adjacency: ReadonlyMap<number, readonly number[]>,
+  banned?: { freshIndex: number; priorIndex: number }
+): Map<number, number> => {
+  const priorToFresh = new Map<number, number>();
+  const augment = (freshIndex: number, visited: Set<number>): boolean => {
+    for (const priorIndex of adjacency.get(freshIndex) ?? []) {
+      if (banned !== undefined && banned.freshIndex === freshIndex && banned.priorIndex === priorIndex) {
+        continue;
+      }
+      if (visited.has(priorIndex)) {
+        continue;
+      }
+      visited.add(priorIndex);
+      const holder = priorToFresh.get(priorIndex);
+      if (holder === undefined || augment(holder, visited)) {
+        priorToFresh.set(priorIndex, freshIndex);
+        return true;
+      }
+    }
+    return false;
+  };
+  for (const freshIndex of [...adjacency.keys()].toSorted((left, right) => left - right)) {
+    augment(freshIndex, new Set());
+  }
+  return priorToFresh;
 };
 
 export const matchClaimIds = (input: MatchClaimIdsInput): MatchedClaimIds => {
@@ -140,55 +144,45 @@ export const matchClaimIds = (input: MatchClaimIdsInput): MatchedClaimIds => {
   }
 
   const edges = candidateEdges(input.anchored, priorClaims);
-  const components = connectedComponents(input.anchored.length, priorClaims.length, edges);
+  const adjacency = orderedAdjacency(input.anchored.length, edges);
+  // The deterministic maximum matching (prior→fresh), inverted to document order for emission.
+  const maximum = solveMaximumMatching(adjacency);
+  const freshToPrior = new Map<number, number>([...maximum].map(([priorIndex, freshIndex]) => [freshIndex, priorIndex]));
 
   const matches: ClaimMatch[] = [];
   // minted claim id -> previous claim id
   const idMapping = new Map<string, string>();
-  const usedPriorIndexes = new Set<number>();
+  const usedPriorIndexes = new Set<number>(maximum.keys());
 
-  for (const component of components) {
-    const unique = component.freshIndexes.length === 1 && component.priorIndexes.length === 1;
-    // Deterministic assignment inside the component: fresh claims in document order, each taking
-    // its first unused candidate (quote-equality preferred over predicate-equality, then prior
-    // ledger order). With a non-unique component the SELECTION is arbitrary among equals — which
-    // is exactly why every match in it records 'ambiguous'.
-    for (const freshIndex of [...component.freshIndexes].toSorted((left, right) => left - right)) {
-      const entry = input.anchored[freshIndex];
-      if (entry === undefined) {
-        continue;
-      }
-      const candidates = edges
-        .filter((edge) => edge.freshIndex === freshIndex && !usedPriorIndexes.has(edge.priorIndex))
-        .toSorted((left, right) =>
-          left.kind === right.kind ? left.priorIndex - right.priorIndex : left.kind === 'quote' ? -1 : 1
-        );
-      const chosen = candidates[0];
-      const prior = chosen === undefined ? undefined : priorClaims[chosen.priorIndex];
-      if (chosen === undefined || prior === undefined) {
-        continue;
-      }
-      usedPriorIndexes.add(chosen.priorIndex);
-      idMapping.set(entry.claim.claimId, prior.claimId);
-      const drift: ClaimMatchDriftReason[] = [];
-      if (!unique) {
-        drift.push('equal-candidates');
-      }
-      // A positionally threaded (content-changed) block makes the claim thread inexact no matter
-      // how unique the claim-level candidate was.
-      if (input.blockConfidence.get(entry.claim.anchor.blockId) !== 'exact') {
-        drift.push('block-thread-inexact');
-      }
-      matches.push({
-        freshId: entry.claim.claimId,
-        priorId: prior.claimId,
-        confidence: drift.length === 0 ? 'exact' : 'ambiguous',
-        drift
-      });
+  for (const freshIndex of [...freshToPrior.keys()].toSorted((left, right) => left - right)) {
+    const entry = input.anchored[freshIndex];
+    const priorIndex = freshToPrior.get(freshIndex);
+    const prior = priorIndex === undefined ? undefined : priorClaims[priorIndex];
+    if (entry === undefined || priorIndex === undefined || prior === undefined) {
+      continue;
     }
+    idMapping.set(entry.claim.claimId, prior.claimId);
+    const drift: ClaimMatchDriftReason[] = [];
+    // Ambiguity = an ALTERNATIVE maximum matching exists that assigns this fresh claim
+    // differently: removing this pair's edge and re-solving still reaches the same cardinality.
+    // A pair whose removal strictly shrinks the maximum is forced — a confident match.
+    if (solveMaximumMatching(adjacency, { freshIndex, priorIndex }).size === maximum.size) {
+      drift.push('equal-candidates');
+    }
+    // A positionally threaded (content-changed) block makes the claim thread inexact no matter
+    // how unique the claim-level candidate was.
+    if (input.blockConfidence.get(entry.claim.anchor.blockId) !== 'exact') {
+      drift.push('block-thread-inexact');
+    }
+    matches.push({
+      freshId: entry.claim.claimId,
+      priorId: prior.claimId,
+      confidence: drift.length === 0 ? 'exact' : 'ambiguous',
+      drift
+    });
   }
 
-  // Prior claims nothing threaded onto: explicit orphans, never a silent disappearance.
+  // Prior claims outside the maximum matching: explicit orphans, never a silent disappearance.
   const orphans = priorClaims
     .filter((_, priorIndex) => !usedPriorIndexes.has(priorIndex))
     .map((previous) => previous.claimId);
