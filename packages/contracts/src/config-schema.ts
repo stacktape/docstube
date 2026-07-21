@@ -126,26 +126,6 @@ export const siteConfigSchema = z.strictObject({
   favicon: repoPathSchema.optional()
 });
 
-// Reserved v2 policy-engine surface (PRODUCT §4.2) — validated now, enforced later. v1 uses the
-// hardcoded exception rules regardless of what this says.
-export const autonomyConfigSchema = z.strictObject({
-  default: z
-    .strictObject({
-      mode: z.enum(['auto-merge', 'review']).default('auto-merge'),
-      guaranteeFloor: z.enum(['proven', 'scored', 'out-of-domain']).optional()
-    })
-    .prefault({}),
-  rules: z
-    .array(
-      z.strictObject({
-        glob: z.string().min(1),
-        mode: z.enum(['auto-merge', 'review']),
-        guaranteeFloor: z.enum(['proven', 'scored', 'out-of-domain']).optional()
-      })
-    )
-    .default([])
-});
-
 // The whole family is strict (z.strictObject): docstube.yml is human-edited, so an unknown key is
 // a hard error — a typo'd option (or a mistyped secret-looking key) must never be silently dropped.
 export const docstubeConfigSchema = z.strictObject({
@@ -168,11 +148,12 @@ export const docstubeConfigSchema = z.strictObject({
   plugins: z.array(z.string().min(1)).default([]),
   // Doc-type-conditional coverage metric; 'auto' derives from docType.
   coverage: z.enum(['on', 'off', 'auto']).default('auto'),
-  autonomy: autonomyConfigSchema.optional(),
+  // NOTE (impl-07 finding 8 / quality-ci-reader-v2 §7): the reserved `autonomy` policy block and
+  // the `screenshots` stub were deleted — validated-but-unenforced config keys are fake
+  // affordances. The v2 policy engine and screenshot capture add their config WITH their
+  // implementations.
   outDir: repoPathSchema.default('docs-site'),
-  telemetry: z.strictObject({ enabled: z.boolean().default(true) }).prefault({}),
-  // Reserved: screenshot capture is a declared TBD boundary (PRODUCT §6).
-  screenshots: z.unknown().optional()
+  telemetry: z.strictObject({ enabled: z.boolean().default(true) }).prefault({})
 });
 export type DocstubeConfig = z.infer<typeof docstubeConfigSchema>;
 export type DocstubeConfigInput = z.input<typeof docstubeConfigSchema>;

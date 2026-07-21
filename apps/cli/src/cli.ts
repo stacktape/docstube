@@ -120,6 +120,10 @@ const plugin = defineCommand({
   }
 });
 
+// TRANSITIONAL (Sol impl-07 obligation 8): `refresh` still derives invalidation from the legacy
+// per-entity provenance. The reconciler wave REPLACES this command — generate-as-reconciler
+// driven exclusively by ProvenanceV2 dependency subscriptions — and removes the public refresh
+// path. Nothing new may depend on the legacy provenance invalidation it uses.
 const refresh = defineCommand({
   meta: { description: 'Regenerate only the entities affected by code changes.', name: 'refresh' },
   args: {

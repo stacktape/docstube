@@ -102,12 +102,17 @@ describe('docstube.yml schema', () => {
     expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, theme: { nmae: 'basic' } }).success).toBe(false);
   });
 
-  it('accepts the reserved autonomy block without requiring it', () => {
-    const config = docstubeConfigSchema.parse({
-      ...fixtureConfigInput,
-      autonomy: { rules: [{ glob: 'docs/internals/**', mode: 'review' }] }
-    });
-    expect(config.autonomy?.default.mode).toBe('auto-merge');
+  it('REJECTS the deleted reserved stubs: autonomy and screenshots are fake affordances (impl-07 finding 8)', () => {
+    // Validated-but-unenforced keys misrepresent capability; strict parsing now hard-errors on
+    // them like any other unknown key. The v2 policy engine / screenshot capture will add their
+    // config together with their implementations.
+    expect(
+      docstubeConfigSchema.safeParse({
+        ...fixtureConfigInput,
+        autonomy: { rules: [{ glob: 'docs/internals/**', mode: 'review' }] }
+      }).success
+    ).toBe(false);
+    expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, screenshots: {} }).success).toBe(false);
   });
 });
 

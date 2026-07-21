@@ -155,7 +155,6 @@ export {
   localesConfigSchema,
   themeConfigSchema,
   siteConfigSchema,
-  autonomyConfigSchema,
   docstubeConfigSchema
 } from './config-schema.ts';
 export type { DocType, Persona, TransportId, DocstubeConfig, DocstubeConfigInput } from './config-schema.ts';
