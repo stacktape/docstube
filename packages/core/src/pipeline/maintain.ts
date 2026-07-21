@@ -27,7 +27,12 @@ import { loadContextFiles } from './context-files.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
-import { attachSiteFindingsToShards, dirtyWorkingTreeWarning, resolveSourceRevision } from './generate.ts';
+import {
+  attachSiteFindingsToShards,
+  dirtyTreeEndOfRunSweep,
+  dirtyWorkingTreeWarning,
+  resolveSourceRevision
+} from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
 // The maintain/refresh stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
@@ -252,6 +257,8 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
     await journal.append({ type: 'stage-started', stage: 'maintain' });
     const maintainStarted = Date.now();
     const regenerated: string[] = [];
+    // Shards persisted this run — the end-of-run dirty-tree sweep re-marks exactly these.
+    const persistedShards: Array<{ locale: string; pageId: string }> = [];
     const artifacts: PageArtifact[] = [];
     const indexEntries: ManifestIndex['pages'] = [];
     const newSystemFlags: Flag[] = [];
@@ -337,6 +344,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
       await mkdir(dirname(mdxTarget), { recursive: true });
       await writeFile(mdxTarget, artifact.mdx, 'utf8');
       await store.writePageShard(newShard);
+      persistedShards.push({ locale: newShard.locale, pageId: newShard.page.id });
       for (const flag of newShard.flags) {
         await journal.append({ type: 'flag-raised', flag });
         if (flag.status === 'open') {
@@ -468,6 +476,9 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
       keepPageIds: index.pages.map((entry) => entry.id),
       locales: [locale, ...config.locales.targets]
     });
+
+    // Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim).
+    await dirtyTreeEndOfRunSweep({ repoRoot, store, journal, commit, dirtyAtStart: dirtyWorkingTree, persistedShards });
 
     // A persisting condition whose flag was deduped still means the docs carry open system flags —
     // the outcome reflects the shipped state, not just what this run newly raised.
