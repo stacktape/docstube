@@ -115,11 +115,36 @@ export const publicationDecisionSchema = z
         message: 'publishable requires a clean deterministic gate'
       });
     }
-    if (decision.plan.deferred > 0 && decision.autoMergeEligible) {
+    if (decision.plan.deferred > 0 && decision.publishable) {
       ctx.addIssue({
         code: 'custom',
-        path: ['autoMergeEligible'],
-        message: 'deferred work fails closed — an incomplete plan is never auto-merge eligible'
+        path: ['publishable'],
+        message: 'deferred work fails closed — an incomplete plan is never publishable'
+      });
+    }
+    // New coverage debt (an obligation regressing to unassigned) is a ratchet violation.
+    const hasCoverageRegression = decision.coverageDelta.some(
+      (delta) => delta.beforeStatus !== 'unassigned' && delta.afterStatus === 'unassigned'
+    );
+    const blockers = [
+      decision.regressions.length > 0 ? 'a ledger regression' : undefined,
+      decision.newBlockingDispositions.length > 0 ? 'a new blocking disposition' : undefined,
+      hasCoverageRegression ? 'a coverage-obligation regression' : undefined
+    ].filter((blocker) => blocker !== undefined);
+    for (const blocker of blockers) {
+      if (decision.autoMergeEligible) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['autoMergeEligible'],
+          message: `${blocker} fails closed — the candidate is never auto-merge eligible`
+        });
+      }
+    }
+    if (blockers.length > 0 && decision.reasonCodes.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['reasonCodes'],
+        message: 'regressions and blocking dispositions must state their reason codes'
       });
     }
     if (decision.autoMergeEligible && !decision.publishable) {

@@ -158,7 +158,7 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
         anchor: { blockId, markerId: 'c1' },
         scope: { entityId: blockId, revision: fixtureEntityRevision },
         subscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }],
-        evidence: [{ evidenceId: groundingEvidenceId, kind: 'codemap-grounding' }],
+        evidence: [groundingEvidenceId],
         correctness: 'checked',
         disposition: null,
         decidingEvidenceId: groundingEvidenceId
@@ -170,7 +170,7 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
         anchor: { blockId, markerId: 'c2' },
         scope: { entityId: blockId, revision: fixtureEntityRevision },
         subscriptions: [{ kind: 'cited-value', symbolHash: fixtureSymbolHash, valueName: 'attempts', citedValue: '3' }],
-        evidence: [{ evidenceId: sourceLinkEvidenceId, kind: 'source-linked' }],
+        evidence: [sourceLinkEvidenceId],
         correctness: 'unchecked',
         disposition: 'no-checker-available'
       }
@@ -206,7 +206,6 @@ export const buildFixtureKnowledgeFact = (): KnowledgeFact => ({
   evidence: [],
   answeredAt: now,
   subjectFingerprint: fixtureContentHash,
-  researchTrail: [],
   scope: { kind: 'entity', entityThreadId: mintId(idPrefixes.entityThread) },
   status: 'active',
   propagation: 'answered'
@@ -220,12 +219,12 @@ export const buildFixtureStructuralFinding = (pageIds?: [string, string]): Struc
     code: 'structure.sibling-facet-asymmetry',
     scope: { kind: 'nav-group', groupId: 'compute-resources', pageIds: [withSection, missingSection] },
     detector: { kind: 'ai-assessed', id: 'sibling-facet-asymmetry', version: '1', model: 'fixture-model' },
-    authority: { kind: 'inferred-convention', cohortSize: 2, prevalence: 0.5 },
+    authority: { kind: 'inferred-convention', cohortSize: 4, prevalence: 0.75 },
     impact: 'medium',
     status: { state: 'open' },
     evidence: [{ pageId: missingSection, detail: 'Sibling pages have a "Pricing" section; this page does not.' }],
     repairTargets: [missingSection],
-    message: '1 of 2 compute-resources pages is missing the shared "Pricing" section.',
+    message: '1 of 4 compute-resources pages is missing the shared "Pricing" section.',
     scopeFingerprint: fixtureContentHash
   };
 };

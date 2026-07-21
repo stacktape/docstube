@@ -72,21 +72,41 @@ export const dependenciesSchema = z.object({
 export type Dependencies = z.infer<typeof dependenciesSchema>;
 
 // One canonical evidence record: stable id, payload, and the common check metadata every reader
-// surface needs (quality-ci-reader-v2 decision 24). The ledger references these by id only.
-export const evidenceRecordSchema = z.object({
-  evidenceId: evidenceIdSchema,
-  ref: evidenceRefSchema,
-  checkedAt: isoTimestampSchema,
-  // The repository commit the check ran against.
-  sourceRevision: gitCommitSchema.optional(),
-  // Human-readable check outcome detail ("docs assert 3, source says 5").
-  detail: z.string().optional()
-});
+// surface needs (quality-ci-reader-v2 decision 24). The ledger references these by id only —
+// kind, payload, promotion, outcome, and revision live HERE and nowhere else.
+export const evidenceRecordSchema = z
+  .object({
+    evidenceId: evidenceIdSchema,
+    ref: evidenceRefSchema,
+    checkedAt: isoTimestampSchema,
+    // The repository commit the check ran against — required: evidence without a revision is not
+    // reproducible and cannot be re-validated.
+    sourceRevision: gitCommitSchema,
+    // Structured check outcome: 'pass' backs checked, 'fail' backs contradicted.
+    outcome: z.enum(['pass', 'fail']),
+    // Human-readable check outcome detail ("docs assert 3, source says 5").
+    detail: z.string().optional()
+  })
+  .superRefine((record, ctx) => {
+    // A value predicate IS its comparison — the recorded outcome must agree with it, so an
+    // equal-values predicate can never carry 'fail' (and thus never decide a contradiction).
+    if (record.ref.kind === 'value-predicate') {
+      const expected = record.ref.assertedValue === record.ref.extractedValue ? 'pass' : 'fail';
+      if (record.outcome !== expected) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['outcome'],
+          message: `a value-predicate with ${expected === 'pass' ? 'matching' : 'differing'} values must record outcome '${expected}'`
+        });
+      }
+    }
+  });
 export type EvidenceRecord = z.infer<typeof evidenceRecordSchema>;
 
 // The canonical, versioned per-claim trust projection — the ONLY provenance part reader surfaces
-// consume: class, correctness, disposition, evidence records, and the deciding evidence id. The
-// same authority table as the kernel ledger applies; the two can never diverge.
+// consume: class, correctness, disposition, evidence records, and the deciding evidence id. This
+// is where FULL class/evidence authority is enforced (the ledger claim holds bare evidence ids and
+// checks only local invariants); ledger-handle ids ⊆ these records is a kernel commit invariant.
 export const claimEvidenceSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -116,7 +136,8 @@ export const claimEvidenceSchema = z
       correctness: record.correctness,
       disposition: record.disposition,
       decidingKind: decidingRef?.kind,
-      decidingPromoted: decidingRef?.kind === 'project-defined' ? decidingRef.promoted : undefined
+      decidingPromoted: decidingRef?.kind === 'project-defined' ? decidingRef.promoted : undefined,
+      decidingOutcome: deciding?.outcome
     })) {
       ctx.addIssue({ code: 'custom', path: ['correctness'], message });
     }
@@ -169,8 +190,10 @@ export type FidelityAttempt = z.infer<typeof fidelityAttemptSchema>;
 
 // Translation fidelity is a discriminated lifecycle keyed by page + locale + the EXACT canonical
 // source content revision the review judged (content-derived — never a git commit). Strict arms:
-// a pending record carrying an outcome, or a failure without findings, must not parse.
-export const translationFidelitySchema = z.discriminatedUnion('state', [
+// a pending record carrying an outcome, or a failure without findings, must not parse. The
+// correction cycle, when present, is what PRODUCED the terminal state — so its outcome must agree
+// with it: passed-with-failed-correction and failed-with-passed-correction are impossible.
+const translationFidelityUnionSchema = z.discriminatedUnion('state', [
   z.strictObject({
     state: z.literal('pending'),
     pageId: pageIdSchema,
@@ -198,6 +221,20 @@ export const translationFidelitySchema = z.discriminatedUnion('state', [
     correction: fidelityAttemptSchema.optional()
   })
 ]);
+
+export const translationFidelitySchema = translationFidelityUnionSchema.superRefine((record, ctx) => {
+  if (record.state === 'pending' || record.correction === undefined) {
+    return;
+  }
+  const expected = record.state === 'passed' ? 'passed' : 'failed';
+  if (record.correction.outcome !== expected) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['correction', 'outcome'],
+      message: `a ${record.state} fidelity record requires a correction outcome of '${expected}'`
+    });
+  }
+});
 export type TranslationFidelity = z.infer<typeof translationFidelitySchema>;
 
 // AI adjudication of a structural-finding candidate for this page (quality-ci-reader-v2 §19-20).

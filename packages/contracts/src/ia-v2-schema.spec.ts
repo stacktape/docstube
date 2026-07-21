@@ -81,12 +81,43 @@ describe('ia v2 schema', () => {
     expect(iaV2Schema.safeParse({ schemaVersion: 2, tree: [node] }).success).toBe(false);
   });
 
-  it('rejects duplicate slugs, pageIds, and groupIds anywhere in the tree', () => {
-    const dupSlug = iaV2Schema.safeParse({
+  it('enforces slug uniqueness on the resolved ancestry path, not the bare leaf slug', () => {
+    // guides/setup and reference/setup are distinct routes — both legal.
+    const nestedReuse = iaV2Schema.safeParse({
       schemaVersion: 2,
-      tree: [page('setup'), { kind: 'group', groupId: 'g', title: 'G', children: [page('setup')] }]
+      tree: [
+        { kind: 'group', groupId: 'guides', title: 'Guides', children: [page('setup')] },
+        { kind: 'group', groupId: 'reference', title: 'Reference', children: [page('setup')] }
+      ]
     });
-    expect(dupSlug.success).toBe(false);
+    expect(nestedReuse.success).toBe(true);
+    // A parent page's slug also namespaces its children.
+    const pageNested = iaV2Schema.safeParse({
+      schemaVersion: 2,
+      tree: [page('guides', { children: [page('setup')] }), page('reference', { children: [page('setup')] })]
+    });
+    expect(pageNested.success).toBe(true);
+    // Two siblings resolving to the same path still collide.
+    const siblingCollision = iaV2Schema.safeParse({
+      schemaVersion: 2,
+      tree: [
+        {
+          kind: 'group',
+          groupId: 'guides',
+          title: 'Guides',
+          children: [page('setup'), page('setup', { title: 'Setup again' })]
+        }
+      ]
+    });
+    expect(siblingCollision.success).toBe(false);
+  });
+
+  it('rejects duplicate resolved paths, pageIds, and groupIds anywhere in the tree', () => {
+    const dupPath = iaV2Schema.safeParse({
+      schemaVersion: 2,
+      tree: [page('setup'), page('setup', { title: 'Other setup' })]
+    });
+    expect(dupPath.success).toBe(false);
     const pageId = 'pg_00000000000000000000';
     const dupPageId = iaV2Schema.safeParse({
       schemaVersion: 2,

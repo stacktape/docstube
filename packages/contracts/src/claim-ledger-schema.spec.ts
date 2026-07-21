@@ -57,12 +57,22 @@ describe('evidence refs', () => {
       { kind: 'execution', check: 'snippet-exec', environment: { os: 'linux' } },
       { kind: 'schema-check', check: 'openapi-response-shape' },
       { kind: 'owner-attestation', author: 'github:someuser', at: '2026-07-12T00:00:00.000Z' },
-      { kind: 'external-citation', url: 'https://docs.example.com/limits' },
+      { kind: 'external-citation', url: 'https://docs.example.com/limits', factId: 'kf_00000000000000000000' },
       { kind: 'project-defined', verifier: 'custom-links', plugin: 'docstube-plugin-links' }
     ];
     for (const ref of refs) {
       expect(evidenceRefSchema.safeParse(ref).success).toBe(true);
     }
+  });
+
+  it('requires the knowledge-fact linkage on external citations — origin must be revalidatable', () => {
+    expect(evidenceRefSchema.safeParse({ kind: 'external-citation', url: 'https://docs.example.com' }).success).toBe(
+      false
+    );
+    expect(
+      evidenceRefSchema.safeParse({ kind: 'external-citation', url: 'https://docs.example.com', factId: 'not-an-id' })
+        .success
+    ).toBe(false);
   });
 
   it('defaults the execution sandbox to none', () => {
@@ -130,121 +140,10 @@ describe('writer claim ledger', () => {
   });
 });
 
-describe('class/evidence authority table', () => {
-  it('rejects checked-via-source-linked on a value claim', () => {
-    const claim = kernelClaim({
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'source-linked' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(claim).success).toBe(false);
-  });
-
-  it('rejects checked-via-codemap-grounding on value and behavior claims', () => {
-    for (const cls of ['value', 'behavior']) {
-      const claim = kernelClaim({
-        class: cls,
-        correctness: 'checked',
-        disposition: null,
-        evidence: [{ evidenceId, kind: 'codemap-grounding' }],
-        decidingEvidenceId: evidenceId
-      });
-      expect(ledgerClaimSchema.safeParse(claim).success).toBe(false);
-    }
-  });
-
-  it('accepts codemap-grounding as the deciding check for a code-structure claim', () => {
-    const claim = kernelClaim({
-      class: 'code-structure',
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'codemap-grounding' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(claim).success).toBe(true);
-  });
-
-  it('accepts value-predicate for value claims but not for behavior claims', () => {
-    const valueClaim = kernelClaim({
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'value-predicate' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(valueClaim).success).toBe(true);
-    const behaviorClaim = kernelClaim({
-      class: 'behavior',
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'value-predicate' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(behaviorClaim).success).toBe(false);
-  });
-
-  it('lets unpromoted project-defined evidence exist but never mint checked', () => {
-    const unpromoted = kernelClaim({
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'project-defined', promoted: false }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(unpromoted).success).toBe(false);
-    const promoted = kernelClaim({
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'project-defined', promoted: true }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(promoted).success).toBe(true);
-    // Non-deciding unpromoted evidence may sit on an unchecked claim.
-    const collected = kernelClaim({ evidence: [{ evidenceId, kind: 'project-defined', promoted: false }] });
-    expect(ledgerClaimSchema.safeParse(collected).success).toBe(true);
-  });
-
-  it('restricts intent-history to owner attestation or external citation', () => {
-    const attested = kernelClaim({
-      class: 'intent-history',
-      correctness: 'checked',
-      disposition: 'owner-attested',
-      evidence: [{ evidenceId, kind: 'owner-attestation' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(attested).success).toBe(true);
-    const grounded = kernelClaim({
-      class: 'intent-history',
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'codemap-grounding' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(grounded).success).toBe(false);
-  });
-
-  it('routes unknown classes to unchecked unless a promoted project-defined verifier decided', () => {
-    const unknownChecked = kernelClaim({
-      class: 'api-compat',
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'execution' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(unknownChecked).success).toBe(false);
-    const unknownUnchecked = kernelClaim({ class: 'api-compat' });
-    expect(ledgerClaimSchema.safeParse(unknownUnchecked).success).toBe(true);
-    const unknownPromoted = kernelClaim({
-      class: 'api-compat',
-      correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'project-defined', promoted: true }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(unknownPromoted).success).toBe(true);
-  });
-});
-
-describe('correctness × disposition', () => {
+// The full class/evidence authority table is enforced on the canonical ClaimEvidence records
+// (provenance-v2-schema.spec.ts) — the ledger claim holds bare evidence ids and enforces only its
+// LOCAL invariants below; handle ids ⊆ evidence records is a kernel commit invariant.
+describe('correctness × disposition (local ledger invariants)', () => {
   it('requires an unresolved disposition on unchecked claims and forbids deciding evidence', () => {
     expect(ledgerClaimSchema.safeParse(kernelClaim({ disposition: null })).success).toBe(false);
     expect(ledgerClaimSchema.safeParse(kernelClaim({ disposition: 'owner-attested' })).success).toBe(false);
@@ -252,7 +151,7 @@ describe('correctness × disposition', () => {
       expect(ledgerClaimSchema.safeParse(kernelClaim({ disposition })).success).toBe(true);
     }
     const decidedUnchecked = kernelClaim({
-      evidence: [{ evidenceId, kind: 'value-predicate' }],
+      evidence: [evidenceId],
       decidingEvidenceId: evidenceId
     });
     expect(ledgerClaimSchema.safeParse(decidedUnchecked).success).toBe(false);
@@ -266,55 +165,77 @@ describe('correctness × disposition', () => {
     const contradicted = kernelClaim({
       correctness: 'contradicted',
       disposition: null,
-      evidence: [{ evidenceId, kind: 'value-predicate' }],
+      evidence: [evidenceId],
       decidingEvidenceId: evidenceId
     });
     expect(ledgerClaimSchema.safeParse(contradicted).success).toBe(true);
   });
 
-  it('rejects a decidingEvidenceId that resolves to no evidence handle', () => {
+  it('forbids any disposition on contradicted claims', () => {
+    const contradictedAttested = kernelClaim({
+      correctness: 'contradicted',
+      disposition: 'owner-attested',
+      evidence: [evidenceId],
+      decidingEvidenceId: evidenceId
+    });
+    expect(ledgerClaimSchema.safeParse(contradictedAttested).success).toBe(false);
+  });
+
+  it('rejects a decidingEvidenceId that is not among the claim evidence ids', () => {
     const dangling = kernelClaim({
       correctness: 'checked',
       disposition: null,
-      evidence: [{ evidenceId, kind: 'value-predicate' }],
+      evidence: [evidenceId],
       decidingEvidenceId: otherEvidenceId
     });
     expect(ledgerClaimSchema.safeParse(dangling).success).toBe(false);
   });
 
-  it('binds the owner-attested disposition to attestation-decided checked claims, both ways', () => {
+  it('rejects typed evidence handles — the ledger stores bare canonical evidence ids only', () => {
+    const typedHandle = kernelClaim({
+      correctness: 'checked',
+      disposition: null,
+      evidence: [{ evidenceId, kind: 'value-predicate' }],
+      decidingEvidenceId: evidenceId
+    });
+    expect(ledgerClaimSchema.safeParse(typedHandle).success).toBe(false);
+  });
+
+  it('permits the owner-attested disposition only on checked intent-history claims', () => {
     const attested = ledgerClaimSchema.parse(
       kernelClaim({
         class: 'intent-history',
         correctness: 'checked',
         disposition: 'owner-attested',
-        evidence: [{ evidenceId, kind: 'owner-attestation' }],
+        evidence: [evidenceId],
         decidingEvidenceId: evidenceId
       })
     );
     expect(isOwnerAttested(attested)).toBe(true);
-    // Attestation-decided without the disposition — inconsistent.
-    const missingDisposition = kernelClaim({
-      class: 'intent-history',
+    // A maintainer attestation cannot mint checked for value/behavior/code-structure claims.
+    for (const cls of ['value', 'behavior', 'code-structure']) {
+      const fakeAttested = kernelClaim({
+        class: cls,
+        correctness: 'checked',
+        disposition: 'owner-attested',
+        evidence: [evidenceId],
+        decidingEvidenceId: evidenceId
+      });
+      expect(ledgerClaimSchema.safeParse(fakeAttested).success).toBe(false);
+    }
+    // Checked claims carry no other disposition.
+    const unresolvedChecked = kernelClaim({
       correctness: 'checked',
-      disposition: null,
-      evidence: [{ evidenceId, kind: 'owner-attestation' }],
+      disposition: 'maintainer-input-needed',
+      evidence: [evidenceId],
       decidingEvidenceId: evidenceId
     });
-    expect(ledgerClaimSchema.safeParse(missingDisposition).success).toBe(false);
-    // Mechanical check claiming the attested disposition — inconsistent.
-    const fakeAttested = kernelClaim({
-      correctness: 'checked',
-      disposition: 'owner-attested',
-      evidence: [{ evidenceId, kind: 'value-predicate' }],
-      decidingEvidenceId: evidenceId
-    });
-    expect(ledgerClaimSchema.safeParse(fakeAttested).success).toBe(false);
+    expect(ledgerClaimSchema.safeParse(unresolvedChecked).success).toBe(false);
     const mechanical = ledgerClaimSchema.parse(
       kernelClaim({
         correctness: 'checked',
         disposition: null,
-        evidence: [{ evidenceId, kind: 'value-predicate' }],
+        evidence: [evidenceId],
         decidingEvidenceId: evidenceId
       })
     );

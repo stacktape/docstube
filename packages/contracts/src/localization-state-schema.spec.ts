@@ -24,7 +24,31 @@ describe('localization scheduler', () => {
     expect(localizationSchedulerStateSchema.safeParse('source-fallback').success).toBe(false);
   });
 
-  it('keys records by optional version, locale, and page with a retry basis for dead letters', () => {
+  it('canonicalizes the version key — an omitted version parses to the explicit latest label', () => {
+    const omitted = localizationSchedulerRecordSchema.parse({ schemaVersion: 1, locale: 'de', pageId, state: 'ready' });
+    expect(omitted.version).toBe('latest');
+    const explicit = localizationSchedulerRecordSchema.parse({
+      schemaVersion: 1,
+      version: 'latest',
+      locale: 'de',
+      pageId,
+      state: 'ready'
+    });
+    // One encoding: both inputs produce the identical canonical key.
+    expect(explicit).toEqual(omitted);
+    const rendition = localizationRenditionSchema.parse({
+      schemaVersion: 1,
+      locale: 'de',
+      pageId,
+      rendition: 'candidate',
+      sourceContentRevision: hash
+    });
+    expect(rendition.version).toBe('latest');
+    const route = localizationRouteRecordSchema.parse({ schemaVersion: 1, locale: 'de', pageId, resolution: 'ready' });
+    expect(route.version).toBe('latest');
+  });
+
+  it('keys records by version, locale, and page with a retry basis for dead letters', () => {
     const result = localizationSchedulerRecordSchema.safeParse({
       schemaVersion: 1,
       locale: 'pt-BR',
@@ -60,6 +84,41 @@ describe('localization scheduler', () => {
       retryBasis: { sourceContentRevision: hash }
     });
     expect(result.success).toBe(false);
+  });
+
+  it('permits dead-lettering only on failed records, and only with a retry basis', () => {
+    const retryBasis = { sourceContentRevision: hash, glossaryRevision: hash, policyVersion: 'v1', model: 'model-x' };
+    // A ready record cannot be dead-lettered.
+    expect(
+      localizationSchedulerRecordSchema.safeParse({
+        schemaVersion: 1,
+        locale: 'de',
+        pageId,
+        state: 'ready',
+        deadLettered: true,
+        retryBasis
+      }).success
+    ).toBe(false);
+    // A dead letter without its retry basis cannot decide when to retry.
+    expect(
+      localizationSchedulerRecordSchema.safeParse({
+        schemaVersion: 1,
+        locale: 'de',
+        pageId,
+        state: 'failed',
+        deadLettered: true
+      }).success
+    ).toBe(false);
+    expect(
+      localizationSchedulerRecordSchema.safeParse({
+        schemaVersion: 1,
+        locale: 'de',
+        pageId,
+        state: 'failed',
+        deadLettered: true,
+        retryBasis
+      }).success
+    ).toBe(true);
   });
 });
 
@@ -163,6 +222,30 @@ describe('terminology profile entries', () => {
     expect(
       terminologyEntrySchema.safeParse({ term: 'claim', locale: 'de', policy: 'keep-source', origin: 'vendor' }).success
     ).toBe(false);
+  });
+
+  it('requires at least one forbidden variant on a forbidden entry', () => {
+    expect(
+      terminologyEntrySchema.safeParse({ term: 'docstube', locale: 'de', policy: 'forbidden', origin: 'user' }).success
+    ).toBe(false);
+    expect(
+      terminologyEntrySchema.safeParse({
+        term: 'docstube',
+        locale: 'de',
+        policy: 'forbidden',
+        forbiddenVariants: [],
+        origin: 'user'
+      }).success
+    ).toBe(false);
+    expect(
+      terminologyEntrySchema.safeParse({
+        term: 'docstube',
+        locale: 'de',
+        policy: 'forbidden',
+        forbiddenVariants: ['DocsTube', 'Docstube-Programm'],
+        origin: 'user'
+      }).success
+    ).toBe(true);
   });
 });
 

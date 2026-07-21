@@ -52,20 +52,37 @@ describe('knowledge needs', () => {
     expect(knowledgeNeedSchema.safeParse(need).success).toBe(false);
   });
 
-  it('carries the auto-answer research trail so escalation preserves the research', () => {
-    const need = {
-      ...buildFixtureKnowledgeNeed(),
-      status: 'escalated',
-      researchTrail: [
-        {
-          attemptedBy: 'model-x',
-          at: now,
-          sourcesConsulted: [{ kind: 'url', url: 'https://docs.example.com/limits' }],
-          summary: 'Upstream docs do not state the intent; needs a maintainer.'
-        }
-      ]
+  it('never auto-answers an intent-policy need — project intent is human-only', () => {
+    // The fixture need IS intent-policy: an auto-answered status on it must not parse.
+    const autoAnswered = { ...buildFixtureKnowledgeNeed(), status: 'auto-answered' };
+    expect(knowledgeNeedSchema.safeParse(autoAnswered).success).toBe(false);
+    const derivable = { ...buildFixtureKnowledgeNeed(), kind: 'derivable', status: 'auto-answered' };
+    expect(knowledgeNeedSchema.safeParse(derivable).success).toBe(true);
+  });
+
+  it('carries the canonical auto-answer research trail with stable attempt ids', () => {
+    const attempt = {
+      attemptId: 'ra_00000000000000000000',
+      attemptedBy: 'model-x',
+      at: now,
+      sourcesConsulted: [{ kind: 'url', url: 'https://docs.example.com/limits' }],
+      summary: 'Upstream docs do not state the intent; needs a maintainer.'
     };
+    const need = { ...buildFixtureKnowledgeNeed(), status: 'escalated', researchTrail: [attempt] };
     expect(knowledgeNeedSchema.safeParse(need).success).toBe(true);
+    // Attempts are individually addressable — an unidentified or duplicated attempt is invalid.
+    const { attemptId: _attemptId, ...anonymous } = attempt;
+    expect(
+      knowledgeNeedSchema.safeParse({ ...buildFixtureKnowledgeNeed(), status: 'escalated', researchTrail: [anonymous] })
+        .success
+    ).toBe(false);
+    expect(
+      knowledgeNeedSchema.safeParse({
+        ...buildFixtureKnowledgeNeed(),
+        status: 'escalated',
+        researchTrail: [attempt, attempt]
+      }).success
+    ).toBe(false);
   });
 });
 
@@ -91,20 +108,42 @@ describe('knowledge facts', () => {
   });
 
   it('requires evidence for origin:ai facts — an uncited answer is a failure', () => {
-    const uncited = { ...buildFixtureKnowledgeFact(), origin: 'ai', author: 'model-x', evidence: [] };
-    expect(knowledgeFactSchema.safeParse(uncited).success).toBe(false);
-    const cited = {
-      ...uncited,
-      evidence: [{ kind: 'url', url: 'https://docs.example.com/limits' }],
-      researchTrail: [
-        {
-          attemptedBy: 'model-x',
-          at: now,
-          sourcesConsulted: [{ kind: 'url', url: 'https://docs.example.com/limits' }]
-        }
-      ]
+    const uncited = {
+      ...buildFixtureKnowledgeFact(),
+      origin: 'ai',
+      author: 'model-x',
+      evidence: [],
+      successfulAttemptId: 'ra_00000000000000000000'
     };
+    expect(knowledgeFactSchema.safeParse(uncited).success).toBe(false);
+    const cited = { ...uncited, evidence: [{ kind: 'url', url: 'https://docs.example.com/limits' }] };
     expect(knowledgeFactSchema.safeParse(cited).success).toBe(true);
+  });
+
+  it('references the successful research attempt instead of duplicating the trail', () => {
+    const base = {
+      ...buildFixtureKnowledgeFact(),
+      origin: 'ai',
+      author: 'model-x',
+      evidence: [{ kind: 'url', url: 'https://docs.example.com/limits' }]
+    };
+    // An AI fact without its producing attempt is untraceable.
+    expect(knowledgeFactSchema.safeParse(base).success).toBe(false);
+    expect(knowledgeFactSchema.safeParse({ ...base, successfulAttemptId: 'ra_00000000000000000000' }).success).toBe(
+      true
+    );
+    // Human answers do not come from research attempts.
+    expect(
+      knowledgeFactSchema.safeParse({ ...buildFixtureKnowledgeFact(), successfulAttemptId: 'ra_00000000000000000000' })
+        .success
+    ).toBe(false);
+    // The trail itself is canonical on the need — a fact carrying a copy has it stripped, and the
+    // fact schema no longer owns a researchTrail field.
+    const withTrail = knowledgeFactSchema.parse({
+      ...buildFixtureKnowledgeFact(),
+      researchTrail: [{ attemptId: 'ra_00000000000000000000', attemptedBy: 'model-x', at: now, sourcesConsulted: [] }]
+    });
+    expect('researchTrail' in withTrail).toBe(false);
   });
 
   it('tracks propagation separately from lifecycle status', () => {

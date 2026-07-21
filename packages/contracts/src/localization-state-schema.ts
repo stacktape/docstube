@@ -12,9 +12,10 @@ import {
 
 // Localization contracts (i18n-lifecycle-v2 target architecture). Three separate axes that must
 // never collapse into one field: (a) SCHEDULER state — desired vs published reconciliation per
-// {version?, locale, page}; (b) ARTIFACT references — candidate and published renditions bound to
+// {version, locale, page}; (b) ARTIFACT references — candidate and published renditions bound to
 // a content-derived source revision; (c) ROUTE resolution — what the emitter serves. The version
-// dimension is reserved-optional now (0.1.0 documents `latest` only; v1.x versioning fills it).
+// dimension is REQUIRED and defaults to the explicit 'latest' label: one canonical encoding, no
+// omitted-vs-'latest' ambiguity (0.1.0 documents `latest` only; v1.x versioning adds labels).
 
 export const localizationSchedulerStateSchema = z.enum(['absent', 'pending', 'ready', 'stale', 'failed']);
 export type LocalizationSchedulerState = z.infer<typeof localizationSchedulerStateSchema>;
@@ -29,18 +30,38 @@ export const retryBasisSchema = z.object({
 });
 export type RetryBasis = z.infer<typeof retryBasisSchema>;
 
-export const localizationSchedulerRecordSchema = z.object({
-  schemaVersion: z.literal(1),
-  // Reserved: absent means the current ("latest") version until v1.x versioning ships.
-  version: versionLabelSchema.optional(),
-  locale: localeCodeSchema,
-  pageId: pageIdSchema,
-  state: localizationSchedulerStateSchema,
-  // Persistent failures dead-letter; the recorded basis decides when a retry is warranted.
-  deadLettered: z.boolean().default(false),
-  retryBasis: retryBasisSchema.optional(),
-  updatedAt: isoTimestampSchema.optional()
-});
+export const localizationSchedulerRecordSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    version: versionLabelSchema.default('latest'),
+    locale: localeCodeSchema,
+    pageId: pageIdSchema,
+    state: localizationSchedulerStateSchema,
+    // Persistent failures dead-letter; the recorded basis decides when a retry is warranted.
+    deadLettered: z.boolean().default(false),
+    retryBasis: retryBasisSchema.optional(),
+    updatedAt: isoTimestampSchema.optional()
+  })
+  .superRefine((record, ctx) => {
+    if (!record.deadLettered) {
+      return;
+    }
+    // Dead-lettering is a terminal failure refinement — a ready/pending record cannot be one.
+    if (record.state !== 'failed') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['deadLettered'],
+        message: "only a 'failed' page-locale can be dead-lettered"
+      });
+    }
+    if (record.retryBasis === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['retryBasis'],
+        message: 'a dead-lettered record must capture the retry basis that decides when to retry'
+      });
+    }
+  });
 export type LocalizationSchedulerRecord = z.infer<typeof localizationSchedulerRecordSchema>;
 
 // A candidate or published rendition artifact reference. `sourceContentRevision` is the
@@ -48,7 +69,7 @@ export type LocalizationSchedulerRecord = z.infer<typeof localizationSchedulerRe
 // never a git commit ('stale' = the source page content moved past it).
 export const localizationRenditionSchema = z.object({
   schemaVersion: z.literal(1),
-  version: versionLabelSchema.optional(),
+  version: versionLabelSchema.default('latest'),
   locale: localeCodeSchema,
   pageId: pageIdSchema,
   rendition: z.enum(['candidate', 'published']),
@@ -57,14 +78,14 @@ export const localizationRenditionSchema = z.object({
 });
 export type LocalizationRendition = z.infer<typeof localizationRenditionSchema>;
 
-// Route resolution per {version?, locale, page} — what the emitter serves, with reader-visible
+// Route resolution per {version, locale, page} — what the emitter serves, with reader-visible
 // explanations. Emit consumes this explicitly, never infers from file presence.
 export const routeResolutionSchema = z.enum(['ready', 'stale', 'source-fallback', 'unavailable']);
 export type RouteResolution = z.infer<typeof routeResolutionSchema>;
 
 export const localizationRouteRecordSchema = z.object({
   schemaVersion: z.literal(1),
-  version: versionLabelSchema.optional(),
+  version: versionLabelSchema.default('latest'),
   locale: localeCodeSchema,
   pageId: pageIdSchema,
   resolution: routeResolutionSchema
@@ -90,7 +111,7 @@ export type TranslatableUnit = z.infer<typeof translatableUnitSchema>;
 export const localizationPlanSchema = z
   .object({
     schemaVersion: z.literal(1),
-    version: versionLabelSchema.optional(),
+    version: versionLabelSchema.default('latest'),
     locale: localeCodeSchema,
     pageId: pageIdSchema,
     sourceContentRevision: contentHashSchema,
@@ -133,6 +154,16 @@ export const terminologyEntrySchema = z
         code: 'custom',
         path: ['translation'],
         message: "a 'translate-to' entry must name the target rendering"
+      });
+    }
+    if (
+      entry.policy === 'forbidden' &&
+      (entry.forbiddenVariants === undefined || entry.forbiddenVariants.length === 0)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['forbiddenVariants'],
+        message: "a 'forbidden' entry must list at least one forbidden variant"
       });
     }
   });

@@ -18,7 +18,10 @@ export const supportMatrixSchema = z.object({
 });
 export type SupportMatrix = z.infer<typeof supportMatrixSchema>;
 
-export const assuranceProfileSchema = z.object({
+// Strict: a removed/foreign policy knob (publication rules, ledger-completeness thresholds…) must
+// be REJECTED, not silently stripped — silently accepting one would let a profile masquerade as a
+// trust-policy control surface.
+export const assuranceProfileSchema = z.strictObject({
   schemaVersion: z.literal(1),
   // The domain revision of the profile CONTENT (bumps when coverage genuinely changes);
   // schemaVersion above is the serialization-format version.

@@ -8,6 +8,7 @@ import {
   lineSpanSchema,
   pageIdSchema,
   repoPathSchema,
+  researchAttemptIdSchema,
   symbolSourceKeySchema
 } from './primitives.ts';
 
@@ -50,8 +51,10 @@ export const factEvidenceRefSchema = z.discriminatedUnion('kind', [
 export type FactEvidenceRef = z.infer<typeof factEvidenceRefSchema>;
 
 // One auto-answer research attempt: which model tried, what it consulted, what it concluded.
-// Escalated needs carry the trail so humans answer faster (dx-knowledge-v2 decision 7).
+// Escalated needs carry the trail so humans answer faster (dx-knowledge-v2 decision 7). Attempts
+// carry stable ids so a produced fact can reference exactly the attempt that succeeded.
 export const researchAttemptSchema = z.object({
+  attemptId: researchAttemptIdSchema,
   attemptedBy: z.string().min(1),
   at: isoTimestampSchema,
   sourcesConsulted: z.array(factEvidenceRefSchema).default([]),
@@ -75,7 +78,8 @@ export const knowledgeNeedSchema = z
     question: z.string().min(1),
     status: knowledgeNeedStatusSchema,
     mergedInto: knowledgeNeedIdSchema.optional(),
-    // Auto-answer attempts recorded on the need so escalation carries the research.
+    // The CANONICAL research trail: auto-answer attempts live on the need only, so escalation
+    // carries the research and no second divergent copy exists (facts reference attempts by id).
     researchTrail: z.array(researchAttemptSchema).default([]),
     createdAt: isoTimestampSchema
   })
@@ -86,6 +90,25 @@ export const knowledgeNeedSchema = z
         path: ['mergedInto'],
         message: 'a merged need must reference the surviving need'
       });
+    }
+    // intent-policy is human-only — AI never invents project intent (dx-knowledge-v2 decision 6).
+    if (need.kind === 'intent-policy' && need.status === 'auto-answered') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['status'],
+        message: "an 'intent-policy' need is human-only and can never be auto-answered"
+      });
+    }
+    const seenAttemptIds = new Set<string>();
+    for (const attempt of need.researchTrail) {
+      if (seenAttemptIds.has(attempt.attemptId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['researchTrail'],
+          message: `duplicate attemptId "${attempt.attemptId}" — attempts are individually addressable`
+        });
+      }
+      seenAttemptIds.add(attempt.attemptId);
     }
   });
 export type KnowledgeNeed = z.infer<typeof knowledgeNeedSchema>;
@@ -124,8 +147,9 @@ export const knowledgeFactSchema = z
     // Content fingerprint of the subject at answer time (content-derived, never a git commit):
     // material change → needs-revalidation, ONE targeted re-ask.
     subjectFingerprint: contentHashSchema,
-    // The auto-answerer's research trail when the fact was AI-produced.
-    researchTrail: z.array(researchAttemptSchema).default([]),
+    // The research trail is canonical on the NEED; an AI-produced fact references the successful
+    // attempt by its stable id instead of carrying a divergent copy of the trail.
+    successfulAttemptId: researchAttemptIdSchema.optional(),
     scope: knowledgeFactScopeSchema,
     status: knowledgeFactStatusSchema,
     propagation: knowledgeFactPropagationSchema,
@@ -135,6 +159,20 @@ export const knowledgeFactSchema = z
     // An uncited confident AI answer counts as failure and escalates (dx-knowledge-v2 decision 7).
     if (fact.origin === 'ai' && fact.evidence.length === 0) {
       ctx.addIssue({ code: 'custom', path: ['evidence'], message: 'origin:ai facts must cite evidence' });
+    }
+    if (fact.origin === 'ai' && fact.successfulAttemptId === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['successfulAttemptId'],
+        message: "an origin:ai fact must reference the need's successful research attempt"
+      });
+    }
+    if (fact.origin !== 'ai' && fact.successfulAttemptId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['successfulAttemptId'],
+        message: 'only AI-produced facts come from a research attempt'
+      });
     }
   });
 export type KnowledgeFact = z.infer<typeof knowledgeFactSchema>;

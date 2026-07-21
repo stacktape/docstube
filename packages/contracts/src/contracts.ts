@@ -15,6 +15,7 @@ export {
   taskIdSchema,
   knowledgeNeedIdSchema,
   knowledgeFactIdSchema,
+  researchAttemptIdSchema,
   contextIdSchema,
   evidenceIdSchema,
   waiverIdSchema,
@@ -203,7 +204,6 @@ export {
   proposedEvidenceSchema,
   draftClaimSchema,
   writerClaimLedgerSchema,
-  evidenceHandleSchema,
   ledgerClaimSchema,
   coverageLintSpanSchema,
   claimLedgerSchema
@@ -221,7 +221,6 @@ export type {
   ProposedEvidence,
   DraftClaim,
   WriterClaimLedger,
-  EvidenceHandle,
   LedgerClaim,
   CoverageLintSpan,
   ClaimLedger

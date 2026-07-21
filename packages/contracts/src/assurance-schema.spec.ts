@@ -19,15 +19,25 @@ describe('assurance profile', () => {
     expect(assuranceProfileSchema.safeParse({ schemaVersion: 1, profileVersion: 0 }).success).toBe(false);
   });
 
-  it('is descriptive only — trust-configuration knobs are not part of the contract', () => {
-    const parsed = assuranceProfileSchema.parse({
-      schemaVersion: 1,
-      profileVersion: 1,
-      // Stripped, never honored: class authority and publication policy are kernel-owned.
-      claimClasses: ['value'],
-      ledgerCompleteness: { maxUncoveredAssertionSpans: 100 },
-      publication: { contradicted: 'publish' }
-    });
+  it('is descriptive only — an attempted trust-configuration knob is REJECTED, not stripped', () => {
+    // Class authority and publication policy are kernel-owned: a profile smuggling policy fields
+    // must fail parse loudly so it can never masquerade as a policy control surface.
+    expect(
+      assuranceProfileSchema.safeParse({
+        schemaVersion: 1,
+        profileVersion: 1,
+        claimClasses: ['value'],
+        publication: { contradicted: 'publish' }
+      }).success
+    ).toBe(false);
+    expect(
+      assuranceProfileSchema.safeParse({
+        schemaVersion: 1,
+        profileVersion: 1,
+        ledgerCompleteness: { maxUncoveredAssertionSpans: 100 }
+      }).success
+    ).toBe(false);
+    const parsed = assuranceProfileSchema.parse({ schemaVersion: 1, profileVersion: 1, claimClasses: ['value'] });
     expect(parsed).toEqual({
       schemaVersion: 1,
       profileVersion: 1,

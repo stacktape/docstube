@@ -7,6 +7,7 @@ import {
   evidenceIdSchema,
   gitCommitSchema,
   isoTimestampSchema,
+  knowledgeFactIdSchema,
   lineSpanSchema,
   pageIdSchema,
   repoPathSchema,
@@ -91,7 +92,9 @@ export const evidenceRefSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('execution'), check: z.string().min(1), environment: executionEnvironmentSchema }),
   z.object({ kind: z.literal('schema-check'), check: z.string().min(1) }),
   z.object({ kind: z.literal('owner-attestation'), author: z.string().min(1), at: isoTimestampSchema }),
-  z.object({ kind: z.literal('external-citation'), url: z.url() }),
+  // A cited external fact (platform limit, upstream default…). factId links back to the knowledge
+  // fact the citation came from, so the kernel can revalidate its origin (dx-knowledge-v2).
+  z.object({ kind: z.literal('external-citation'), url: z.url(), factId: knowledgeFactIdSchema }),
   z.object({
     kind: z.literal('project-defined'),
     verifier: z.string().min(1),
@@ -115,12 +118,16 @@ export type ClaimDisposition = z.infer<typeof claimDispositionSchema>;
 
 // The class → deciding-evidence authority table (trust-model-v2 decision 3). 'source-linked' never
 // mints checked for any class; unpromoted 'project-defined' never mints checked; unknown classes
-// are checkable only by a promoted project-defined verifier that declared support.
+// are checkable only by a promoted project-defined verifier that declared support. Owner
+// attestation decides ONLY intent-history claims — a maintainer attestation cannot mint checked
+// for code-structure/value/behavior, those need mechanical evidence (trust-model-v2 reserves
+// attestation for intent/history). External citations decide value/behavior claims (a cited
+// external fact such as a platform limit), never project intent — intent is human-attested only.
 const checkedAuthority: Record<BuiltinClaimClass, readonly EvidenceKind[]> = {
-  'code-structure': ['codemap-grounding', 'execution', 'schema-check', 'owner-attestation', 'project-defined'],
-  value: ['value-predicate', 'execution', 'schema-check', 'owner-attestation', 'project-defined'],
-  behavior: ['execution', 'schema-check', 'owner-attestation', 'project-defined'],
-  'intent-history': ['owner-attestation', 'external-citation']
+  'code-structure': ['codemap-grounding', 'execution', 'schema-check', 'project-defined'],
+  value: ['value-predicate', 'execution', 'schema-check', 'external-citation', 'project-defined'],
+  behavior: ['execution', 'schema-check', 'external-citation', 'project-defined'],
+  'intent-history': ['owner-attestation']
 };
 
 export type ClaimTrustState = {
@@ -129,10 +136,12 @@ export type ClaimTrustState = {
   disposition: ClaimDisposition;
   decidingKind: EvidenceKind | undefined;
   decidingPromoted: boolean | undefined;
+  decidingOutcome: 'pass' | 'fail' | undefined;
 };
 
-// Shared consistency + authority check used by both the kernel ledger claim and the canonical
-// ClaimEvidence projection — one table, no divergence.
+// The full authority + outcome consistency check. It needs evidence kinds and outcomes, which
+// live ONLY on the canonical ClaimEvidence records (provenance-v2) — so full enforcement happens
+// there; the kernel ledger claim enforces just its local invariants (ledgerClaimLocalIssues).
 export const claimTrustIssues = (state: ClaimTrustState): string[] => {
   const issues: string[] = [];
   if (state.correctness === 'unchecked') {
@@ -149,8 +158,14 @@ export const claimTrustIssues = (state: ClaimTrustState): string[] => {
     issues.push(`a ${state.correctness} claim requires deciding evidence`);
     return issues;
   }
-  if (state.correctness === 'contradicted' && state.disposition !== null) {
-    issues.push('a contradicted claim carries no disposition');
+  if (state.correctness === 'contradicted') {
+    if (state.disposition !== null) {
+      issues.push('a contradicted claim carries no disposition');
+    }
+    // A contradiction is a recorded negative check — deciding evidence must have failed.
+    if (state.decidingOutcome !== 'fail') {
+      issues.push("a contradicted claim requires deciding evidence with outcome 'fail'");
+    }
   }
   if (state.correctness === 'checked') {
     const ownerAttested = state.decidingKind === 'owner-attestation';
@@ -159,6 +174,9 @@ export const claimTrustIssues = (state: ClaimTrustState): string[] => {
     }
     if (!ownerAttested && state.disposition !== null) {
       issues.push('a mechanically checked claim carries no disposition');
+    }
+    if (state.decidingOutcome !== undefined && state.decidingOutcome !== 'pass') {
+      issues.push("a checked claim requires deciding evidence with outcome 'pass'");
     }
   }
   const allowed = isBuiltinClaimClass(state.class) ? checkedAuthority[state.class] : (['project-defined'] as const);
@@ -240,17 +258,6 @@ export const writerClaimLedgerSchema = z
   });
 export type WriterClaimLedger = z.infer<typeof writerClaimLedgerSchema>;
 
-// A typed evidence handle on the kernel claim: id + kind (+ promotion for project-defined).
-// The full payload lives once, in the canonical ClaimEvidence record (provenance-v2) — the ledger
-// never embeds duplicate evidence payload arrays.
-export const evidenceHandleSchema = z.object({
-  evidenceId: evidenceIdSchema,
-  kind: evidenceKindSchema,
-  // Meaningful only for project-defined evidence: promotion lets it mint built-in states.
-  promoted: z.boolean().optional()
-});
-export type EvidenceHandle = z.infer<typeof evidenceHandleSchema>;
-
 const ledgerClaimObjectSchema = z.object({
   claimId: claimIdSchema,
   class: claimClassTokenSchema,
@@ -263,36 +270,74 @@ const ledgerClaimObjectSchema = z.object({
     revision: entityRevisionSchema
   }),
   subscriptions: z.array(dependencySubscriptionSchema).default([]),
-  evidence: z.array(evidenceHandleSchema).default([]),
+  // Bare references into the canonical ClaimEvidence records (provenance-v2) — the ONE place
+  // evidence kind/payload/promotion live. The ledger never duplicates evidence metadata.
+  evidence: z.array(evidenceIdSchema).default([]),
   correctness: claimCorrectnessSchema,
   disposition: claimDispositionSchema,
-  // The evidence handle that decided checked/contradicted; absent while unchecked.
+  // The evidence record that decided checked/contradicted; absent while unchecked.
   decidingEvidenceId: evidenceIdSchema.optional()
 });
 
-// The kernel-owned committed claim: minted id, anchored, with computed correctness. The
-// superRefine enforces the class/evidence authority table — impossible checked states never parse.
+// The kernel-owned committed claim: minted id, anchored, with computed correctness. Only LOCAL
+// invariants are enforceable here (the handles are bare ids — kinds and outcomes live on the
+// canonical ClaimEvidence records, where the full class/evidence authority table is enforced).
+// Cross-artifact consistency — every handle id resolving to a ClaimEvidence record, and the
+// deciding record actually holding class authority — is a KERNEL invariant checked at commit
+// time, not a shape this schema can see.
 export const ledgerClaimSchema = ledgerClaimObjectSchema.superRefine((claim, ctx) => {
-  const deciding =
-    claim.decidingEvidenceId === undefined
-      ? undefined
-      : claim.evidence.find((handle) => handle.evidenceId === claim.decidingEvidenceId);
-  if (claim.decidingEvidenceId !== undefined && deciding === undefined) {
+  if (claim.decidingEvidenceId !== undefined && !claim.evidence.includes(claim.decidingEvidenceId)) {
     ctx.addIssue({
       code: 'custom',
       path: ['decidingEvidenceId'],
-      message: 'decidingEvidenceId must reference one of the claim evidence handles'
+      message: 'decidingEvidenceId must reference one of the claim evidence ids'
     });
     return;
   }
-  for (const message of claimTrustIssues({
-    class: claim.class,
-    correctness: claim.correctness,
-    disposition: claim.disposition,
-    decidingKind: deciding?.kind,
-    decidingPromoted: deciding?.promoted
-  })) {
-    ctx.addIssue({ code: 'custom', path: ['correctness'], message });
+  if (claim.correctness === 'unchecked') {
+    if (claim.decidingEvidenceId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['decidingEvidenceId'],
+        message: 'an unchecked claim must not carry deciding evidence'
+      });
+    }
+    if (claim.disposition === null || claim.disposition === 'owner-attested') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['disposition'],
+        message: 'an unchecked claim requires an unresolved disposition'
+      });
+    }
+    return;
+  }
+  if (claim.decidingEvidenceId === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['decidingEvidenceId'],
+      message: `a ${claim.correctness} claim requires deciding evidence`
+    });
+  }
+  if (claim.correctness === 'contradicted' && claim.disposition !== null) {
+    ctx.addIssue({ code: 'custom', path: ['disposition'], message: 'a contradicted claim carries no disposition' });
+  }
+  if (claim.correctness === 'checked') {
+    if (claim.disposition !== null && claim.disposition !== 'owner-attested') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['disposition'],
+        message: "a checked claim carries no disposition unless it is 'owner-attested'"
+      });
+    }
+    // Attestation only decides intent-history — an owner-attested checked claim of any other
+    // class is impossible under the authority table, and that much IS locally visible.
+    if (claim.disposition === 'owner-attested' && claim.class !== 'intent-history') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['disposition'],
+        message: "owner attestation decides only 'intent-history' claims"
+      });
+    }
   }
 });
 export type LedgerClaim = z.infer<typeof ledgerClaimSchema>;

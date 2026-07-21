@@ -47,6 +47,25 @@ describe('publication decision', () => {
         reasonCodes: ['plan.deferred']
       }).success
     ).toBe(false);
+    // Deferred work claiming publishable — an incomplete plan never publishes.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        plan: { planned: 3, completed: 2, deferred: 1 },
+        publishable: true,
+        autoMergeEligible: false,
+        reasonCodes: ['plan.deferred']
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        plan: { planned: 3, completed: 2, deferred: 1 },
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['plan.deferred']
+      }).success
+    ).toBe(true);
     // A blocked gate with no stated reason.
     expect(
       publicationDecisionSchema.safeParse({
@@ -87,15 +106,81 @@ describe('publication decision', () => {
     expect(publicationDecisionSchema.safeParse(decision).success).toBe(false);
   });
 
+  it('fails closed on ledger regressions and new blocking dispositions — never auto-merge eligible', () => {
+    const decision = buildFixturePublicationDecision();
+    const regression = { kind: 'badge-loss', pageId: 'pg_00000000000000000000' };
+    // A regression claiming auto-merge eligibility never parses.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        regressions: [regression],
+        reasonCodes: ['ledger.regression']
+      }).success
+    ).toBe(false);
+    // With auto-merge off and a stated reason it is representable (publishable for human review).
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        regressions: [regression],
+        autoMergeEligible: false,
+        reasonCodes: ['ledger.regression']
+      }).success
+    ).toBe(true);
+    // A regression without reason codes hides its cause — rejected.
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        regressions: [regression],
+        autoMergeEligible: false,
+        reasonCodes: []
+      }).success
+    ).toBe(false);
+    const blocking = {
+      pageId: 'pg_00000000000000000000',
+      claimId: 'cl_00000000000000000000',
+      status: 'contradicted'
+    };
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        newBlockingDispositions: [blocking],
+        reasonCodes: ['ledger.blocking-disposition']
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        newBlockingDispositions: [blocking],
+        autoMergeEligible: false,
+        reasonCodes: ['ledger.blocking-disposition']
+      }).success
+    ).toBe(true);
+  });
+
   it('carries typed per-obligation coverage deltas from the documented status set', () => {
     const decision = buildFixturePublicationDecision();
-    const regressed = {
-      ...decision,
-      coverageDelta: [
-        { obligationId: 'ob-retry', scope: 'src/retry.ts', beforeStatus: 'documented', afterStatus: 'unassigned' }
-      ]
-    };
-    expect(publicationDecisionSchema.safeParse(regressed).success).toBe(true);
+    const regressedDelta = [
+      { obligationId: 'ob-retry', scope: 'src/retry.ts', beforeStatus: 'documented', afterStatus: 'unassigned' }
+    ];
+    // A documented → unassigned regression is new coverage debt: it fails closed and must never
+    // remain auto-merge eligible or hide its reason.
+    expect(publicationDecisionSchema.safeParse({ ...decision, coverageDelta: regressedDelta }).success).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: regressedDelta,
+        autoMergeEligible: false,
+        reasonCodes: []
+      }).success
+    ).toBe(false);
+    expect(
+      publicationDecisionSchema.safeParse({
+        ...decision,
+        coverageDelta: regressedDelta,
+        autoMergeEligible: false,
+        reasonCodes: ['coverage.regression']
+      }).success
+    ).toBe(true);
     const unknownStatus = {
       ...decision,
       coverageDelta: [

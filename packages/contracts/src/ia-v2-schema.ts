@@ -129,9 +129,11 @@ export const iaV2Schema = z
   })
   .superRefine((ia, ctx) => {
     const seenPageIds = new Set<string>();
-    const seenSlugs = new Set<string>();
+    const seenPaths = new Set<string>();
     const seenGroupIds = new Set<string>();
-    for (const node of walkIaV2Nodes(ia.tree)) {
+    // Route identity is the RESOLVED ancestry path, not the bare leaf slug: guides/setup and
+    // reference/setup are both legal; two 'setup' pages resolving to the same path are not.
+    const visit = (node: IaNodeV2, ancestry: readonly string[]) => {
       if (node.kind === 'group') {
         if (seenGroupIds.has(node.groupId)) {
           ctx.addIssue({
@@ -141,7 +143,11 @@ export const iaV2Schema = z
           });
         }
         seenGroupIds.add(node.groupId);
-        continue;
+        const childAncestry = [...ancestry, node.groupId];
+        for (const child of node.children) {
+          visit(child, childAncestry);
+        }
+        return;
       }
       if (node.pageId !== undefined) {
         if (seenPageIds.has(node.pageId)) {
@@ -153,14 +159,22 @@ export const iaV2Schema = z
         }
         seenPageIds.add(node.pageId);
       }
-      if (seenSlugs.has(node.slug)) {
+      const resolvedPath = [...ancestry, node.slug].join('/');
+      if (seenPaths.has(resolvedPath)) {
         ctx.addIssue({
           code: 'custom',
           path: ['tree'],
-          message: `duplicate page slug "${node.slug}" — two pages would collide on the same route`
+          message: `duplicate resolved path "${resolvedPath}" — two pages would collide on the same route`
         });
       }
-      seenSlugs.add(node.slug);
+      seenPaths.add(resolvedPath);
+      const childAncestry = [...ancestry, node.slug];
+      for (const child of node.children ?? []) {
+        visit(child, childAncestry);
+      }
+    };
+    for (const node of ia.tree) {
+      visit(node, []);
     }
   });
 export type IaV2 = z.infer<typeof iaV2Schema>;

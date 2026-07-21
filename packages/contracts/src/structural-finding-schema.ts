@@ -52,9 +52,10 @@ export const structuralAuthoritySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('ai-plan-conformance'), model: z.string().min(1) }),
   z.strictObject({
     kind: z.literal('inferred-convention'),
-    cohortSize: z.number().int().min(2),
-    // Fraction of cohort pages exhibiting the convention when it was inferred (≥ 0.6 in 0.1.0).
-    prevalence: z.number().min(0).max(1)
+    // Candidate thresholds are binding (quality-ci-reader-v2 decision 19): a convention inferred
+    // from fewer than 4 cohort pages or below 0.6 prevalence is not a candidate at all.
+    cohortSize: z.number().int().min(4),
+    prevalence: z.number().min(0.6).max(1)
   })
 ]);
 export type StructuralAuthority = z.infer<typeof structuralAuthoritySchema>;
@@ -77,7 +78,17 @@ export const structuralEvidenceItemSchema = z.object({
   detail: z.string().min(1)
 });
 
-export const structuralFindingSchema = z.object({
+// Authority is coupled to detector kind: an inferred convention exists only via AI adjudication;
+// explicit rules and accepted profiles are deterministic by definition; AI plan conformance may be
+// surfaced by either detector kind but is always labeled with the deriving model.
+const structuralAuthorityDetectorKinds: Record<StructuralAuthority['kind'], readonly StructuralDetector['kind'][]> = {
+  'explicit-ia-rule': ['deterministic'],
+  'accepted-profile': ['deterministic'],
+  'ai-plan-conformance': ['deterministic', 'ai-assessed'],
+  'inferred-convention': ['ai-assessed']
+};
+
+const structuralFindingObjectSchema = z.object({
   schemaVersion: z.literal(1),
   // Stable semantic key (detector + scope + facet), NOT a minted id — the same defect re-detected
   // across runs must collapse onto one finding.
@@ -98,6 +109,17 @@ export const structuralFindingSchema = z.object({
   // Fingerprint of the scoped content at detection time; drives auto-resolve and suppression
   // reopening on material change.
   scopeFingerprint: contentHashSchema
+});
+
+export const structuralFindingSchema = structuralFindingObjectSchema.superRefine((finding, ctx) => {
+  const allowed = structuralAuthorityDetectorKinds[finding.authority.kind];
+  if (!allowed.includes(finding.detector.kind)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['authority'],
+      message: `'${finding.authority.kind}' authority cannot come from a '${finding.detector.kind}' detector`
+    });
+  }
 });
 export type StructuralFinding = z.infer<typeof structuralFindingSchema>;
 

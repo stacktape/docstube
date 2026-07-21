@@ -16,6 +16,8 @@ export const idPrefixes = {
   context: 'ctx',
   knowledgeNeed: 'kn',
   knowledgeFact: 'kf',
+  // One auto-answer research attempt on a knowledge need — the stable id facts reference.
+  researchAttempt: 'ra',
   evidence: 'ev',
   waiver: 'wv',
   // A locale/version-independent logical entity thread (trust-model-v2 decision 8): the durable
@@ -46,6 +48,7 @@ export const runIdSchema = idSchema(idPrefixes.run);
 export const taskIdSchema = idSchema(idPrefixes.task);
 export const knowledgeNeedIdSchema = idSchema(idPrefixes.knowledgeNeed);
 export const knowledgeFactIdSchema = idSchema(idPrefixes.knowledgeFact);
+export const researchAttemptIdSchema = idSchema(idPrefixes.researchAttempt);
 export const contextIdSchema = idSchema(idPrefixes.context);
 export const evidenceIdSchema = idSchema(idPrefixes.evidence);
 export const waiverIdSchema = idSchema(idPrefixes.waiver);

@@ -81,6 +81,58 @@ describe('structural evidence authority', () => {
     // AI-derived conformance must be labeled with the model that derived it.
     expect(structuralAuthoritySchema.safeParse({ kind: 'ai-plan-conformance' }).success).toBe(false);
   });
+
+  it('enforces the binding candidate thresholds on inferred conventions (cohort ≥ 4, prevalence ≥ 0.6)', () => {
+    expect(
+      structuralAuthoritySchema.safeParse({ kind: 'inferred-convention', cohortSize: 2, prevalence: 0.5 }).success
+    ).toBe(false);
+    expect(
+      structuralAuthoritySchema.safeParse({ kind: 'inferred-convention', cohortSize: 3, prevalence: 0.9 }).success
+    ).toBe(false);
+    expect(
+      structuralAuthoritySchema.safeParse({ kind: 'inferred-convention', cohortSize: 6, prevalence: 0.59 }).success
+    ).toBe(false);
+    expect(
+      structuralAuthoritySchema.safeParse({ kind: 'inferred-convention', cohortSize: 4, prevalence: 0.6 }).success
+    ).toBe(true);
+  });
+
+  it('couples authority to detector kind on findings', () => {
+    const base = buildFixtureStructuralFinding();
+    const deterministicDetector = { kind: 'deterministic', id: 'required-facets', version: '1' };
+    // An inferred convention can never be a deterministic finding.
+    expect(structuralFindingSchema.safeParse({ ...base, detector: deterministicDetector }).success).toBe(false);
+    // Explicit rules and accepted profiles are deterministic-only.
+    expect(
+      structuralFindingSchema.safeParse({
+        ...base,
+        authority: { kind: 'explicit-ia-rule', ruleCode: 'required-facets' }
+      }).success
+    ).toBe(false);
+    expect(
+      structuralFindingSchema.safeParse({
+        ...base,
+        authority: { kind: 'accepted-profile', profileId: 'resource-page' }
+      }).success
+    ).toBe(false);
+    expect(
+      structuralFindingSchema.safeParse({
+        ...base,
+        detector: deterministicDetector,
+        authority: { kind: 'explicit-ia-rule', ruleCode: 'required-facets' }
+      }).success
+    ).toBe(true);
+    // AI plan conformance may come from either detector kind — always labeled with its model.
+    for (const detector of [deterministicDetector, base.detector]) {
+      expect(
+        structuralFindingSchema.safeParse({
+          ...base,
+          detector,
+          authority: { kind: 'ai-plan-conformance', model: 'model-x' }
+        }).success
+      ).toBe(true);
+    }
+  });
 });
 
 describe('structural snapshot', () => {
