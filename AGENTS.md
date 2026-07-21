@@ -68,9 +68,12 @@ for behavior that can be tested.
 
 The project infrastructure and product surfaces are in place: workspace layout, tooling, CI,
 deployment, release workflow, npm publishing, standalone binaries, Stacktape-hosted install
-scripts, installer telemetry, CLI, local UI, generated theme, core generation, refresh, refine,
-GitHub Action, evals, and dogfood build. Agents should not rework broad infrastructure or
-architecture unless a focused failing check requires it.
+scripts, installer telemetry, CLI, local UI, generated theme, core generation, refine,
+GitHub Action, evals, and dogfood build. The 0.1.0 redesign program (see PRODUCT.md §9 and the
+`knowledge/design/*-v2.md` decision records) is actively migrating these surfaces; `refresh` is
+removed as a user command — `docstube generate` is the single idempotent reconciler. Agents
+should not rework broad infrastructure or architecture unless a focused failing check or the
+redesign program requires it.
 
 TBD boundaries are hard boundaries. Do not implement or improvise screenshot capture,
 migration-import, hosted-backend internals, or additional agent adapters beyond the built-in four.
@@ -131,7 +134,7 @@ Package entry files are named by responsibility (`core.ts`, `plugin-sdk.ts`, `cl
   installer scripts and never include paths, usernames, hostnames, args, prompts, or source code.
 - Generated docs sites vendor the theme/source they need. Do not make user docs sites depend on
   `@docstube/theme` in v1.
-- Theme updates are applied by `docstube refresh` or the GitHub Action without
+- Theme updates are applied by `docstube generate` or the GitHub Action without
   regenerating docs content unless explicitly requested.
 
 ## Style rules
