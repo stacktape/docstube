@@ -123,10 +123,18 @@ export const pageShardSchema = z
     signature: z.string().optional()
   })
   .superRefine((shard, ctx) => {
+    // Matching records make sense only relative to a committed ledger.
+    if (shard.claimMatching !== undefined && shard.ledger === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['claimMatching'],
+        message: 'claimMatching without a ledger references nothing — matching records persist with the ledger'
+      });
+    }
     // The ledger↔ClaimEvidence bijection is a COMMIT-TIME invariant (impl-06 finding 5): the two
     // artifacts describe the same claims and must agree on identity, class, correctness,
-    // disposition, evidence handles, and the deciding id. A shard carrying one without the other,
-    // or with any disagreement, is corrupt and must not parse.
+    // disposition, the EXACT evidence-id set, and the deciding id. A shard carrying one without
+    // the other, or with any disagreement, is corrupt and must not parse.
     if (shard.ledger === undefined && shard.provenance === undefined) {
       return;
     }
@@ -137,6 +145,66 @@ export const pageShardSchema = z
         message: 'ledger and provenance persist together — one without the other cannot prove the bijection'
       });
       return;
+    }
+    // Ledger↔page linkage (impl-07 finding 5): the ledger must be THIS page's ledger, every claim
+    // anchor must reference a real block, every claim scope a real entity, and revisions must
+    // agree — a foreign ledger under this page's prose is corrupt state.
+    if (shard.ledger.pageId !== shard.page.id) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ledger', 'pageId'],
+        message: `ledger.pageId "${shard.ledger.pageId}" is not this shard's page ("${shard.page.id}") — a foreign ledger cannot persist under this page`
+      });
+    }
+    if (shard.ledger.sourceRevision !== shard.sourceCommit) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ledger', 'sourceRevision'],
+        message: `ledger.sourceRevision "${shard.ledger.sourceRevision}" disagrees with the shard's sourceCommit "${shard.sourceCommit}"`
+      });
+    }
+    const blockIds = new Set(
+      [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)].map((block) => block.id)
+    );
+    const scopeIds = new Set([shard.page.id, ...shard.page.sections.map((section) => section.id), ...blockIds]);
+    for (const claim of shard.ledger.claims) {
+      if (!blockIds.has(claim.anchor.blockId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ledger', 'claims'],
+          message: `claim "${claim.claimId}" anchors to block "${claim.anchor.blockId}", which does not exist on this page`
+        });
+      }
+      if (!scopeIds.has(claim.scope.entityId)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ledger', 'claims'],
+          message: `claim "${claim.claimId}" is scoped to entity "${claim.scope.entityId}", which does not exist on this page`
+        });
+      }
+    }
+    // Matching records reference CURRENT-ledger claim ids; orphans are prior ids that did NOT
+    // carry, so an orphan appearing in the ledger is a contradiction in terms.
+    if (shard.claimMatching !== undefined) {
+      const ledgerClaimIds = new Set(shard.ledger.claims.map((claim) => claim.claimId));
+      for (const match of shard.claimMatching.matches) {
+        if (!ledgerClaimIds.has(match.claimId)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['claimMatching', 'matches'],
+            message: `matching record references claim "${match.claimId}", which is not in the current ledger`
+          });
+        }
+      }
+      for (const orphan of shard.claimMatching.orphans) {
+        if (ledgerClaimIds.has(orphan.claimId)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['claimMatching', 'orphans'],
+            message: `orphan record names claim "${orphan.claimId}", which IS in the current ledger — an orphan is a prior claim that did not carry`
+          });
+        }
+      }
     }
     const evidenceByClaimId = new Map(shard.provenance.claimEvidence.map((record) => [record.claimId, record]));
     if (evidenceByClaimId.size !== shard.provenance.claimEvidence.length) {
@@ -167,10 +235,27 @@ export const pageShardSchema = z
       if (record.decidingEvidenceId !== claim.decidingEvidenceId) {
         mismatches.push('decidingEvidenceId');
       }
+      // EXACT evidence-id set equality (impl-07 finding 5): every ledger handle resolves to a
+      // canonical record AND every canonical record is referenced by the ledger claim — extra
+      // canonical evidence is unaccounted trust surface, not harmless surplus.
+      const claimEvidenceIds = new Set(claim.evidence);
       const recordEvidenceIds = new Set(record.evidence.map((entry) => entry.evidenceId));
       for (const evidenceId of claim.evidence) {
         if (!recordEvidenceIds.has(evidenceId)) {
           mismatches.push(`evidence handle "${evidenceId}" resolves to no canonical evidence record`);
+        }
+      }
+      for (const evidenceId of recordEvidenceIds) {
+        if (!claimEvidenceIds.has(evidenceId)) {
+          mismatches.push(`canonical evidence "${evidenceId}" is not referenced by the ledger claim`);
+        }
+      }
+      // Evidence must vouch for the revision this ledger was computed against.
+      for (const entry of record.evidence) {
+        if (entry.sourceRevision !== shard.ledger.sourceRevision) {
+          mismatches.push(
+            `evidence "${entry.evidenceId}" was checked at revision "${entry.sourceRevision}", not the ledger's "${shard.ledger.sourceRevision}"`
+          );
         }
       }
       if (mismatches.length > 0) {

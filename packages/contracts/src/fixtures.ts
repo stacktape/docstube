@@ -142,9 +142,11 @@ export const buildFixtureWriterClaimLedger = (): WriterClaimLedger => ({
 });
 
 // The kernel-side committed ledger: minted ids, anchors, computed correctness×disposition, and
-// evidence handles referencing the canonical evidence records in provenance.
-export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)): ClaimLedger => {
-  const blockId = mintId(idPrefixes.block);
+// evidence handles referencing the canonical evidence records in provenance. Pass the page so
+// claim anchors land on one of its REAL blocks (the shard enforces anchor existence).
+export const buildFixtureClaimLedger = (page?: Pick<PageEntity, 'id' | 'preamble' | 'sections'>): ClaimLedger => {
+  const pageId = page?.id ?? mintId(idPrefixes.page);
+  const blockId = page?.preamble[0]?.id ?? page?.sections[0]?.blocks[0]?.id ?? mintId(idPrefixes.block);
   const groundingEvidenceId = mintId(idPrefixes.evidence);
   const sourceLinkEvidenceId = mintId(idPrefixes.evidence);
   return {

@@ -63,7 +63,7 @@ export const buildFixtureWorkspace = (input: {
 // unchecked) so claim-count assertions have honest non-zero inputs.
 export const buildFixtureShardWithFlags = (flags: readonly Flag[]): PageShard => {
   const page = buildFixturePage();
-  const ledger = buildFixtureClaimLedger(page.id);
+  const ledger = buildFixtureClaimLedger(page);
   return {
     ...buildFixturePageShard(page),
     ledger,

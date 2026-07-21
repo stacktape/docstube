@@ -5,6 +5,7 @@ import type {
   DocstubeConfig,
   Glossary,
   IaPageNodeV2,
+  PageEntity,
   ProvenanceV2,
   Transcript
 } from '@docstube/contracts';
@@ -21,6 +22,9 @@ import type { ScoredReview } from './review-page.ts';
 
 export type AssembleProvenanceInput = {
   pageId: string;
+  // The extracted page the ledger anchors into — the commit validator proves ledger↔page linkage
+  // (page id, anchor blocks, scope entities) before anything persists (impl-07 finding 5).
+  page: PageEntity;
   // The page's ia.yml v2 record: names the PRIMARY persona (only its review gates) and is itself
   // a consumed dependency — title/brief/depth/persona enter the writer prompt, so an ia.yml edit
   // must causally invalidate exactly this page (impl-06 finding 6).
@@ -48,12 +52,35 @@ const fragmentOf = (kind: 'instruction' | 'criteria', text: string) => {
 };
 
 export const assembleProvenanceV2 = (input: AssembleProvenanceInput): ProvenanceV2 => {
-  // Kernel commit validator (impl-06 finding 5): the ledger and its ClaimEvidence records are one
-  // artifact in two projections — assembly REFUSES a partial or disagreeing pair instead of
-  // parsing it into committed state. The shard schema re-proves this at every parse; failing here
-  // names the bug at its source.
+  // Kernel commit validator (impl-06 finding 5, tightened impl-07): the ledger and its
+  // ClaimEvidence records are one artifact in two projections — assembly REFUSES a partial or
+  // disagreeing pair instead of parsing it into committed state. The shard schema re-proves this
+  // at every parse; failing here names the bug at its source.
+  // Ledger↔page linkage first: a foreign ledger must never assemble under this page.
+  if (input.page.id !== input.pageId || input.ledger.pageId !== input.pageId) {
+    throw new CoreError(
+      'pipeline-failed',
+      `provenance assembly: ledger.pageId "${input.ledger.pageId}" / page.id "${input.page.id}" disagree with the target page "${input.pageId}"`
+    );
+  }
+  const blockIds = new Set(
+    [...input.page.preamble, ...input.page.sections.flatMap((section) => section.blocks)].map((block) => block.id)
+  );
+  const scopeIds = new Set([input.page.id, ...input.page.sections.map((section) => section.id), ...blockIds]);
   const evidenceByClaimId = new Map(input.claimEvidence.map((record) => [record.claimId, record]));
   for (const claim of input.ledger.claims) {
+    if (!blockIds.has(claim.anchor.blockId)) {
+      throw new CoreError(
+        'pipeline-failed',
+        `provenance assembly: claim "${claim.claimId}" anchors to block "${claim.anchor.blockId}", which does not exist on page "${input.pageId}"`
+      );
+    }
+    if (!scopeIds.has(claim.scope.entityId)) {
+      throw new CoreError(
+        'pipeline-failed',
+        `provenance assembly: claim "${claim.claimId}" is scoped to entity "${claim.scope.entityId}", which does not exist on page "${input.pageId}"`
+      );
+    }
     const record = evidenceByClaimId.get(claim.claimId);
     if (record === undefined) {
       throw new CoreError(
@@ -72,6 +99,30 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
         'pipeline-failed',
         `provenance assembly: ledger claim "${claim.claimId}" disagrees with its ClaimEvidence record on class/correctness/disposition/decidingEvidenceId`
       );
+    }
+    // EXACT evidence-id set equality (impl-07 finding 5): the ledger handles and the canonical
+    // records must be the same set — a canonical record the ledger never references is
+    // unaccounted trust surface; a handle without a record is a dangling reference.
+    const claimEvidenceIds = new Set(claim.evidence);
+    const recordEvidenceIds = new Set(record.evidence.map((entry) => entry.evidenceId));
+    const missing = claim.evidence.filter((id) => !recordEvidenceIds.has(id));
+    const extra = [...recordEvidenceIds].filter((id) => !claimEvidenceIds.has(id));
+    if (missing.length > 0 || extra.length > 0) {
+      throw new CoreError(
+        'pipeline-failed',
+        `provenance assembly: ledger claim "${claim.claimId}" and its ClaimEvidence record carry different evidence sets` +
+          `${missing.length > 0 ? ` (dangling handles: ${missing.join(', ')})` : ''}` +
+          `${extra.length > 0 ? ` (unreferenced canonical evidence: ${extra.join(', ')})` : ''}`
+      );
+    }
+    // Every evidence record must vouch for the revision this ledger was computed against.
+    for (const entry of record.evidence) {
+      if (entry.sourceRevision !== input.ledger.sourceRevision) {
+        throw new CoreError(
+          'pipeline-failed',
+          `provenance assembly: evidence "${entry.evidenceId}" on claim "${claim.claimId}" was checked at revision "${entry.sourceRevision}", not the ledger's "${input.ledger.sourceRevision}"`
+        );
+      }
     }
   }
   const stray = [...evidenceByClaimId.keys()];

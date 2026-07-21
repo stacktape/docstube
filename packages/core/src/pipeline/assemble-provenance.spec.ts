@@ -6,9 +6,10 @@ import {
   docstubeConfigSchema,
   glossarySchema,
   hashValue,
+  pageEntitySchema,
   transcriptSchema
 } from '@docstube/contracts';
-import type { AgentTaskSpec } from '@docstube/contracts';
+import type { AgentTaskSpec, ClaimEvidence, ClaimLedger, PageEntity } from '@docstube/contracts';
 import { assembleProvenanceV2 } from './assemble-provenance.ts';
 
 const COMMIT = 'a'.repeat(40);
@@ -19,6 +20,30 @@ const PAGE = `pg_${'4'.repeat(20)}`;
 const HASH = '5'.repeat(64);
 
 const subscription = { kind: 'file-content', file: 'src/retry.ts', contentHash: HASH };
+
+const emptyProvenance = { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] };
+
+// The page the ledger anchors into: BLOCK is a real block of PAGE (the commit validator proves
+// ledger↔page linkage).
+const page: PageEntity = pageEntitySchema.parse({
+  id: PAGE,
+  kind: 'page',
+  slug: 'retry',
+  title: 'Retry',
+  preamble: [
+    {
+      id: BLOCK,
+      kind: 'block',
+      blockType: 'paragraph',
+      contentHash: HASH,
+      guarantee: 'scored',
+      provenance: emptyProvenance
+    }
+  ],
+  sections: [],
+  guarantee: 'scored',
+  provenance: emptyProvenance
+});
 
 const ledger = claimLedgerSchema.parse({
   schemaVersion: 1,
@@ -104,11 +129,15 @@ const node = {
   depth: 'standard' as const
 };
 
-const assemble = (evidence = claimEvidence) =>
+const assemble = (
+  evidence: ClaimEvidence[] = claimEvidence,
+  overrides: { ledger?: ClaimLedger; page?: PageEntity } = {}
+) =>
   assembleProvenanceV2({
     pageId: PAGE,
+    page: overrides.page ?? page,
     node,
-    ledger,
+    ledger: overrides.ledger ?? ledger,
     claimEvidence: evidence,
     transcript,
     writeTask,
@@ -148,6 +177,63 @@ describe('assembleProvenanceV2', () => {
       index === 0 ? claimEvidenceSchema.parse({ ...record, class: 'value' }) : record
     );
     expect(() => assemble(disagreeing)).toThrow(/disagrees/);
+  });
+
+  it('REFUSES extra canonical evidence the ledger never references (Sol impl-07 probe)', () => {
+    // The ledger claim carries no evidence handles, but the ClaimEvidence record smuggles a
+    // canonical record in: unaccounted trust surface — exact set equality, not subset.
+    const padded = claimEvidence.map((record, index) =>
+      index === 0
+        ? claimEvidenceSchema.parse({
+            ...record,
+            evidence: [
+              {
+                evidenceId: `ev_${'a'.repeat(20)}`,
+                ref: { kind: 'source-linked', symbol: `ts:${'b'.repeat(64)}` },
+                checkedAt: '2026-07-12T00:00:00.000Z',
+                sourceRevision: COMMIT,
+                outcome: 'pass'
+              }
+            ]
+          })
+        : record
+    );
+    expect(() => assemble(padded)).toThrow(/unreferenced canonical evidence/);
+  });
+
+  it('REFUSES a ledger whose pageId is not the target page (Sol impl-07 probe)', () => {
+    const foreign = claimLedgerSchema.parse({ ...ledger, pageId: `pg_${'f'.repeat(20)}` });
+    expect(() => assemble(claimEvidence, { ledger: foreign })).toThrow(/disagree with the target page/);
+  });
+
+  it('REFUSES a claim anchored to a block that does not exist on the page (Sol impl-07 probe)', () => {
+    const detachedPage = pageEntitySchema.parse({ ...page, preamble: [], sections: [] });
+    expect(() => assemble(claimEvidence, { page: detachedPage })).toThrow(/does not exist on page/);
+  });
+
+  it('REFUSES evidence checked at a revision other than the ledger sourceRevision', () => {
+    const evidenceId = `ev_${'c'.repeat(20)}`;
+    const staleLedger = claimLedgerSchema.parse({
+      ...ledger,
+      claims: ledger.claims.map((claim, index) => (index === 0 ? { ...claim, evidence: [evidenceId] } : claim))
+    });
+    const staleEvidence = claimEvidence.map((record, index) =>
+      index === 0
+        ? claimEvidenceSchema.parse({
+            ...record,
+            evidence: [
+              {
+                evidenceId,
+                ref: { kind: 'source-linked', symbol: `ts:${'b'.repeat(64)}` },
+                checkedAt: '2026-07-12T00:00:00.000Z',
+                sourceRevision: 'b'.repeat(40),
+                outcome: 'pass'
+              }
+            ]
+          })
+        : record
+    );
+    expect(() => assemble(staleEvidence, { ledger: staleLedger })).toThrow(/checked at revision/);
   });
 
   it('lineage carries models, prompt revisions, transcript pointers, and observed reads', () => {

@@ -374,6 +374,7 @@ export const generatePage = async (
     // Assembled on every anchored attempt so the candidate always carries its OWN final state.
     attemptCandidate.provenance = assembleProvenanceV2({
       pageId: page.id,
+      page,
       node,
       ledger: verified.ledger,
       claimEvidence: verified.claimEvidence,

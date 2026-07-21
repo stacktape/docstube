@@ -57,7 +57,7 @@ describe('manifest shards', () => {
 
 const trustedShard = () => {
   const page = buildFixturePage();
-  const ledger = buildFixtureClaimLedger(page.id);
+  const ledger = buildFixtureClaimLedger(page);
   return { ...buildFixturePageShard(page), ledger, provenance: buildFixtureProvenanceV2(ledger) };
 };
 
@@ -145,5 +145,141 @@ describe('shard ledger↔ClaimEvidence bijection (commit invariant)', () => {
     const result = pageShardSchema.safeParse(broken);
     expect(result.success).toBe(false);
     expect(JSON.stringify(result.error?.issues)).toContain('resolves to no canonical evidence record');
+  });
+
+  it('rejects EXTRA canonical evidence the ledger never references (Sol impl-07 probe)', () => {
+    const shard = trustedShard();
+    const broken = {
+      ...shard,
+      provenance: {
+        ...shard.provenance,
+        claimEvidence: shard.provenance.claimEvidence.map((record, index) =>
+          index === 1
+            ? {
+                ...record,
+                evidence: [
+                  ...record.evidence,
+                  {
+                    evidenceId: mintId(idPrefixes.evidence),
+                    ref: { kind: 'source-linked' as const, symbol: `ts:${'2'.repeat(64)}` },
+                    checkedAt: '2026-07-12T00:00:00.000Z',
+                    sourceRevision: shard.ledger.sourceRevision,
+                    outcome: 'pass' as const
+                  }
+                ]
+              }
+            : record
+        )
+      }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('not referenced by the ledger claim');
+  });
+});
+
+describe('shard ledger↔page linkage (impl-07 finding 5)', () => {
+  it('rejects a ledger whose pageId is foreign to the shard page (Sol probe)', () => {
+    const shard = trustedShard();
+    const broken = { ...shard, ledger: { ...shard.ledger, pageId: mintId(idPrefixes.page) } };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('foreign ledger');
+  });
+
+  it('rejects a claim anchored to a nonexistent block (Sol probe)', () => {
+    const shard = trustedShard();
+    const broken = {
+      ...shard,
+      ledger: {
+        ...shard.ledger,
+        claims: shard.ledger.claims.map((claim, index) =>
+          index === 0 ? { ...claim, anchor: { ...claim.anchor, blockId: mintId(idPrefixes.block) } } : claim
+        )
+      }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('does not exist on this page');
+  });
+
+  it('rejects a claim scoped to a nonexistent entity', () => {
+    const shard = trustedShard();
+    const broken = {
+      ...shard,
+      ledger: {
+        ...shard.ledger,
+        claims: shard.ledger.claims.map((claim, index) =>
+          index === 0 ? { ...claim, scope: { ...claim.scope, entityId: mintId(idPrefixes.section) } } : claim
+        )
+      }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('is scoped to entity');
+  });
+
+  it('rejects a ledger sourceRevision that disagrees with the shard sourceCommit', () => {
+    const shard = trustedShard();
+    const broken = { ...shard, sourceCommit: 'b'.repeat(40) };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('disagrees with the shard');
+  });
+
+  it('rejects evidence records checked at a revision other than the ledger sourceRevision', () => {
+    const shard = trustedShard();
+    const broken = {
+      ...shard,
+      provenance: {
+        ...shard.provenance,
+        claimEvidence: shard.provenance.claimEvidence.map((record, index) =>
+          index === 0
+            ? { ...record, evidence: record.evidence.map((entry) => ({ ...entry, sourceRevision: 'c'.repeat(40) })) }
+            : record
+        )
+      }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('was checked at revision');
+  });
+
+  it('rejects matching records referencing claims outside the current ledger', () => {
+    const shard = trustedShard();
+    const withMatching = {
+      ...shard,
+      claimMatching: { matches: [{ claimId: mintId(idPrefixes.claim), confidence: 'exact' as const, drift: [] }], orphans: [] }
+    };
+    const result = pageShardSchema.safeParse(withMatching);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('not in the current ledger');
+    // A matching record naming a CURRENT ledger claim parses.
+    const valid = {
+      ...shard,
+      claimMatching: {
+        matches: [{ claimId: shard.ledger.claims[0]!.claimId, confidence: 'exact' as const, drift: [] }],
+        orphans: []
+      }
+    };
+    expect(pageShardSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('rejects an orphan record naming a claim that IS in the current ledger', () => {
+    const shard = trustedShard();
+    const broken = {
+      ...shard,
+      claimMatching: { matches: [], orphans: [{ claimId: shard.ledger.claims[0]!.claimId }] }
+    };
+    const result = pageShardSchema.safeParse(broken);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('an orphan is a prior claim that did not carry');
+  });
+
+  it('rejects claimMatching without a ledger', () => {
+    const bare = { ...buildFixturePageShard(buildFixturePage()), claimMatching: { matches: [], orphans: [] } };
+    const result = pageShardSchema.safeParse(bare);
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error?.issues)).toContain('matching records persist with the ledger');
   });
 });
