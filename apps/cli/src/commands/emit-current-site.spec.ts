@@ -121,8 +121,8 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(result.emitted).toBe(true);
 
     const route = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8');
-    // 1/1 claims checked → the honest 100% rule projects 'proven' ("verified").
-    expect(route).toContain('docstubeGuarantee: "proven"');
+    // Literal counts only — the guarantee-label projection is gone (impl-07 finding 4).
+    expect(route).not.toContain('docstubeGuarantee');
     expect(route).toContain('docstubeClaimsChecked: 1');
     expect(route).toContain('docstubeClaimsTotal: 1');
     expect(route).toContain('docstubeClaimsContradicted: 0');

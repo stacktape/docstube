@@ -6,8 +6,10 @@ import { projectShardProof } from './proof-projection.ts';
 import type { ThemeConflict } from './apply-theme-bundle.ts';
 import { docsMcpReadmeMd, docsMcpServerMjs } from './mcp-server-source.ts';
 import {
+  docstubeClaimAstro,
+  docstubeClaimsAstro,
+  docstubeContradictionsAstro,
   docstubeEntityAstro,
-  docstubeGuaranteeAstro,
   docstubeSearchAstro,
   docstubeSectionChipsAstro,
   docstubeSourcesAstro
@@ -240,8 +242,8 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
   const slug = page.shard.page.slug;
   const depth = slug.split('/').length + (isSourceLocale ? 0 : 1);
   const up = '../'.repeat(depth);
-  // INTERIM (until the trust-chip wave): verified/reviewed chips derive from claim counts +
-  // assessments via the shard proof projection — never from the removed guarantee ladder.
+  // LITERAL proof surface (impl-07 finding 4): claim counts, contradiction facts, and per-claim
+  // contradicted markers straight from ClaimEvidence — the guarantee-label ladder is gone.
   const proof = projectShardProof(page.shard);
   const alternates = context.alternatesBySlug.get(slug) ?? [];
   const sources = collectPageSources(page.shard.page).map((ref) => ({
@@ -258,10 +260,12 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
       : []),
     `docstubeLocale: ${JSON.stringify(locale)}`,
     `docstubePageId: ${JSON.stringify(page.shard.page.id)}`,
-    `docstubeGuarantee: ${JSON.stringify(proof.guarantee)}`,
     `docstubeClaimsChecked: ${proof.checkedClaims}`,
     `docstubeClaimsTotal: ${proof.totalClaims}`,
     `docstubeClaimsContradicted: ${proof.contradictedClaims}`,
+    ...(proof.contradictedMarkers.length > 0
+      ? [`docstubeContradictedClaims: ${JSON.stringify(proof.contradictedMarkers)}`]
+      : []),
     ...(proof.reviewedFor === undefined ? [] : [`docstubeReviewedFor: ${JSON.stringify(proof.reviewedFor)}`]),
     // JSON is valid YAML flow syntax, so these round-trip through Astro's frontmatter parser.
     ...(alternates.length > 1 ? [`docstubeAlternates: ${JSON.stringify(alternates)}`] : []),
@@ -274,6 +278,9 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
     ...injected,
     '---',
     '',
+    // The kernel-owned inline Claim renderer is always in scope: writer MDX carries <Claim>
+    // markers, and the contradiction marks target their rendered spans.
+    `import Claim from '${up}docstube/DocstubeClaim.astro';`,
     ...rendererImportLines(context.renderers, up),
     '',
     body.trimEnd(),
@@ -524,7 +531,9 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
     // Kernel-owned proof primitives + design tokens (src/docstube/**): every theme layout mounts
     // these; rewritten on every emit, never part of the theme bundle.
     writeTextFile(join(siteRoot, 'src/docstube/tokens.css'), tokensCss(theme, input.config)),
-    writeTextFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), docstubeGuaranteeAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), docstubeClaimsAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), docstubeContradictionsAstro()),
+    writeTextFile(join(siteRoot, 'src/docstube/DocstubeClaim.astro'), docstubeClaimAstro()),
     writeTextFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), docstubeSourcesAstro()),
     writeTextFile(join(siteRoot, 'src/docstube/DocstubeEntity.astro'), docstubeEntityAstro()),
     writeTextFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), docstubeSectionChipsAstro()),

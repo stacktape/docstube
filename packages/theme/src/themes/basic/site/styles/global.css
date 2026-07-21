@@ -128,31 +128,51 @@ pre {
   background: var(--surface-raised);
   border-color: var(--accent);
 }
-.dt-guarantee {
+.dt-claims,
+.dt-reviewed {
   border: 1px solid var(--border);
   border-radius: 999px;
   font-size: 0.78rem;
   font-weight: 600;
   padding: 3px 10px;
 }
-.dt-guarantee--proven {
+.dt-claims {
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+.dt-reviewed {
   background: #e7f5ec;
   border-color: #b6dfc4;
   color: var(--success);
 }
-.dt-guarantee--scored {
-  background: #fdf3e1;
-  border-color: #ecd9ab;
-  color: var(--warning);
+.dt-contradictions {
+  background: #fdeaea;
+  border: 1px solid #eec1c1;
+  border-radius: 8px;
+  color: var(--danger, #b3261e);
+  font-weight: 600;
+  margin: 12px 0 20px;
+  padding: 10px 14px;
 }
-.dt-guarantee--out-of-domain {
-  background: var(--surface-muted);
-  color: var(--text-muted);
+.dt-claim--contradicted {
+  background: #fdeaea;
+  border-bottom: 2px solid var(--danger, #b3261e);
+}
+.dt-claim-mark {
+  color: var(--danger, #b3261e);
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-left: 4px;
+  text-transform: uppercase;
+  vertical-align: middle;
 }
 .dt-section-chip {
   font-size: 0.7rem;
   font-weight: 500;
   vertical-align: middle;
+}
+.dt-section-chip--contradicted {
+  color: var(--danger, #b3261e);
 }
 .dt-sources {
   border-top: 1px solid var(--border);

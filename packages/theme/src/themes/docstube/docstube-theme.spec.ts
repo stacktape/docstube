@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildFixtureInput } from '../../emit-site-fixture.ts';
 import { emitSite } from '../../emit-site.ts';
-import { guaranteeLabels } from '../../proof-source.ts';
 import { themeBundle } from './bundle.generated.ts';
 import { manifest } from './theme.ts';
 
 // docstube-theme conformance: same contract as proof-conformance.spec.ts but emitted with the
-// docstube bundle — the kernel primitives, all three guarantee levels' visible labels, and the
-// stable data attributes must survive this theme's layout. Plus bundle smoke checks for the
-// theme's own contract: fonts embedded, dual shiki themes, dark-mode rail, semantic tokens.
+// docstube bundle — the kernel primitives (literal claims chip, contradiction warning, per-claim
+// marks) and the stable data attributes must survive this theme's layout. Plus bundle smoke
+// checks for the theme's own contract: fonts embedded, dual shiki themes, dark-mode rail,
+// semantic tokens.
 
 const bundlePaths = new Set(themeBundle.files.map((file) => file.path));
 
@@ -37,7 +37,9 @@ describe('proof conformance (docstube theme)', () => {
 
   it('emits the kernel proof primitives under src/docstube/', async () => {
     for (const file of [
-      'DocstubeGuarantee.astro',
+      'DocstubeClaims.astro',
+      'DocstubeContradictions.astro',
+      'DocstubeClaim.astro',
       'DocstubeSources.astro',
       'DocstubeEntity.astro',
       'DocstubeSectionChips.astro',
@@ -47,20 +49,23 @@ describe('proof conformance (docstube theme)', () => {
     }
   });
 
-  it('renders all three guarantee levels with visible accessible labels', async () => {
-    const badge = await readFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), 'utf8');
-    const chips = await readFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), 'utf8');
-    expect(Object.keys(guaranteeLabels).toSorted()).toEqual(['out-of-domain', 'proven', 'scored']);
-    for (const label of Object.values(guaranteeLabels)) {
-      expect(badge).toContain(`"${label}"`);
-      expect(chips).toContain(`"${label}"`);
+  it('renders literal claim counts — the guarantee-label vocabulary is gone from the surface', async () => {
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
+    expect(chip).toContain('claims checked');
+    expect(chip).toContain('reviewed for {reviewedFor}');
+    expect(warning).toContain('contradicted by the source');
+    for (const banned of ['proven', 'scored', 'out-of-domain', '"verified"', '"unverified"']) {
+      expect(chip).not.toContain(banned);
+      expect(warning).not.toContain(banned);
     }
   });
 
   it('mounts every mandatory primitive in the emitted layout', async () => {
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     for (const mount of [
-      '<DocstubeGuarantee',
+      '<DocstubeClaims',
+      '<DocstubeContradictions',
       '<DocstubeSources',
       '<DocstubeSectionChips',
       '<DocstubeEntity',
@@ -71,19 +76,21 @@ describe('proof conformance (docstube theme)', () => {
     expect(layout).toContain('entityId={frontmatter.docstubePageId}');
   });
 
-  it('styles the guarantee chips without hiding the stable hooks', async () => {
+  it('styles the claim chips and contradiction surfaces without hiding the stable hooks', async () => {
     const css = await readFile(join(siteRoot, 'src/styles/global.css'), 'utf8');
-    for (const selector of ['.dt-guarantee--proven', '.dt-guarantee--scored', '.dt-guarantee--out-of-domain']) {
+    for (const selector of ['.dt-claims', '.dt-reviewed', '.dt-contradictions', '.dt-claim--contradicted']) {
       expect(css).toContain(selector);
       expect(css).not.toMatch(new RegExp(`${selector.replaceAll('.', '\\.')}[^{]*\\{[^}]*display:\\s*none`, 'u'));
     }
   });
 
-  it('injects the page entity id and guarantee data into every generated route', async () => {
+  it('injects the page entity id and literal claim counts into every generated route', async () => {
     const page = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(page).toMatch(/docstubePageId: "pg[_A-Za-z0-9-]+"/u);
-    expect(page).toContain('docstubeGuarantee: "scored"');
-    expect(page).toContain('"guarantee":"proven"');
+    expect(page).not.toContain('docstubeGuarantee');
+    expect(page).toContain('docstubeClaimsChecked: 1');
+    expect(page).toContain('docstubeClaimsTotal: 2');
+    expect(page).toContain('"checked":1');
     // Astro components expose default exports, so renderer imports alias them by contract name.
     expect(page).toContain("import { default as Callout } from '../../components/Callout.astro';");
   });
@@ -177,8 +184,8 @@ describe('docstube theme bundle smoke', () => {
     ]) {
       expect(css).toContain(token);
     }
-    expect(css).toMatch(/\.dt-guarantee--proven \{[^}]*color: var\(--status-proven-text\)/u);
-    expect(css).toMatch(/\.dt-guarantee--proven::before \{[^}]*background: var\(--status-proven\)/u);
+    expect(css).toMatch(/\.dt-reviewed \{[^}]*color: var\(--status-proven-text\)/u);
+    expect(css).toMatch(/\.dt-reviewed::before \{[^}]*background: var\(--status-proven\)/u);
     expect(css).toMatch(/\.dt-badge--warning \{[^}]*color: var\(--status-flagged-text\)/u);
     expect(css).toMatch(/\.dt-badge--danger \{[^}]*color: var\(--status-danger-text\)/u);
   });

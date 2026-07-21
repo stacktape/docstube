@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { emitSite } from '../../emit-site.ts';
 import { buildFixtureInput } from '../../emit-site-fixture.ts';
-import { guaranteeLabels } from '../../proof-source.ts';
 import { themeBundle } from './bundle.generated.ts';
 
 // Proof rendering is a conformance contract, not a theme choice (knowledge/design/theming.md):
-// the fixture site emitted with the stacktape bundle must carry the kernel primitives, all three
-// guarantee levels' visible labels, and the stable data attributes — same shape as the basic
-// theme's proof-conformance.spec.ts. String-level assertions; building the site is CI's job.
+// the fixture site emitted with the stacktape bundle must carry the kernel primitives — the
+// literal claims chip, contradiction warning, per-claim marks — and the stable data attributes,
+// same shape as the basic theme's proof-conformance.spec.ts. String-level assertions; building
+// the site is CI's job.
 
 const bundleText = (path: string): string => {
   const file = themeBundle.files.find((candidate) => candidate.path === path);
@@ -34,7 +34,9 @@ describe('proof conformance (stacktape theme)', () => {
 
   it('emits the kernel proof primitives under src/docstube/', async () => {
     for (const file of [
-      'DocstubeGuarantee.astro',
+      'DocstubeClaims.astro',
+      'DocstubeContradictions.astro',
+      'DocstubeClaim.astro',
       'DocstubeSources.astro',
       'DocstubeEntity.astro',
       'DocstubeSectionChips.astro',
@@ -44,24 +46,27 @@ describe('proof conformance (stacktape theme)', () => {
     }
   });
 
-  it('renders all three guarantee levels with visible accessible labels', async () => {
-    const badge = await readFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), 'utf8');
-    const chips = await readFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), 'utf8');
-    expect(Object.keys(guaranteeLabels).toSorted()).toEqual(['out-of-domain', 'proven', 'scored']);
-    for (const label of Object.values(guaranteeLabels)) {
-      expect(badge).toContain(`"${label}"`);
-      expect(chips).toContain(`"${label}"`);
+  it('renders literal claim counts — no guarantee-label vocabulary on the surface', async () => {
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
+    expect(chip).toContain('claims checked');
+    expect(warning).toContain('contradicted by the source');
+    for (const banned of ['proven', 'scored', 'out-of-domain', '"verified"', '"unverified"']) {
+      expect(chip).not.toContain(banned);
+      expect(warning).not.toContain(banned);
     }
   });
 
-  it('stamps the stable data attributes on badge, chips, sources, and entity wrapper', async () => {
-    const badge = await readFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), 'utf8');
-    expect(badge).toContain('data-docstube-guarantee={guarantee}');
+  it('stamps the stable data attributes on chip, marks, sources, and entity wrapper', async () => {
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('data-docstube-claims-checked={checked}');
+    expect(chip).toContain('data-docstube-claims-total={total}');
+    const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
+    expect(warning).toContain('data-docstube-contradicted={contradicted}');
     const entity = await readFile(join(siteRoot, 'src/docstube/DocstubeEntity.astro'), 'utf8');
     expect(entity).toContain('data-docstube-entity-id={entityId}');
-    expect(entity).toContain('data-docstube-guarantee={guarantee}');
-    const chips = await readFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), 'utf8');
-    expect(chips).toContain('chip.dataset.docstubeGuarantee = section.guarantee;');
+    const claim = await readFile(join(siteRoot, 'src/docstube/DocstubeClaim.astro'), 'utf8');
+    expect(claim).toContain('data-docstube-claim={id}');
     const sources = await readFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), 'utf8');
     expect(sources).toContain('data-docstube-sources');
   });
@@ -75,7 +80,8 @@ describe('proof conformance (stacktape theme)', () => {
   it('mounts every mandatory primitive in the theme layout', async () => {
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     for (const mount of [
-      '<DocstubeGuarantee',
+      '<DocstubeClaims',
+      '<DocstubeContradictions',
       '<DocstubeSources',
       '<DocstubeSectionChips',
       '<DocstubeEntity',
@@ -87,12 +93,14 @@ describe('proof conformance (stacktape theme)', () => {
     expect(layout).toContain('entityId={frontmatter.docstubePageId}');
   });
 
-  it('injects the page entity id and guarantee data into every generated route', async () => {
+  it('injects the page entity id and literal claim counts into every generated route', async () => {
     const page = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(page).toMatch(/docstubePageId: "pg[_A-Za-z0-9-]+"/u);
-    expect(page).toContain('docstubeGuarantee: "scored"');
-    // Section chips cover the remaining level so all three appear in the emitted site data.
-    expect(page).toContain('"guarantee":"proven"');
+    expect(page).not.toContain('docstubeGuarantee');
+    expect(page).toContain('docstubeClaimsChecked: 1');
+    expect(page).toContain('docstubeClaimsTotal: 2');
+    // Section chips carry literal per-section counts.
+    expect(page).toContain('"checked":1');
   });
 
   it('imports the kernel token sheet and honors the semantic tokens in the emitted styles', async () => {

@@ -105,25 +105,26 @@ describe('emitSite', () => {
     }
   });
 
-  it('renders the guarantee badge as the kernel DocstubeGuarantee primitive with a claims-checked title', async () => {
-    const badge = await readFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), 'utf8');
-    expect(badge).toContain('dt-guarantee--${guarantee}');
-    expect(badge).toContain('data-docstube-guarantee={guarantee}');
-    expect(badge).toContain('"proven":"verified"');
-    expect(badge).toContain('"scored":"reviewed"');
-    expect(badge).toContain('"out-of-domain":"unverified"');
+  it('renders the literal claims chip and contradiction warning as kernel primitives', async () => {
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('claims checked');
+    expect(chip).toContain('data-docstube-claims-checked={checked}');
+    expect(chip).not.toContain('"verified"');
+    const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
+    expect(warning).toContain('role="alert"');
+    expect(warning).toContain('contradicted by the source');
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    expect(layout).toContain('<DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} />');
-    expect(layout).toContain('claims checked');
+    expect(layout).toContain('<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} />');
+    expect(layout).toContain('<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />');
   });
 
   it('writes one route per page at its nested slug path with injected frontmatter', async () => {
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(install).toContain('layout: "../../layouts/DocLayout.astro"');
     expect(install).toContain('title: "Installation"');
-    // The fixture shard's ClaimEvidence has 1 checked claim of 2 — the interim projection keeps
-    // the page at 'scored' (the honest 100% rule) with the literal claim counts alongside.
-    expect(install).toContain('docstubeGuarantee: "scored"');
+    // The fixture shard's ClaimEvidence has 1 checked claim of 2 — literal counts only; the
+    // guarantee-label projection is gone (impl-07 finding 4).
+    expect(install).not.toContain('docstubeGuarantee');
     expect(install).toContain('docstubeClaimsChecked: 1');
     expect(install).toContain('docstubeClaimsTotal: 2');
     expect(install).toContain('docstubeClaimsContradicted: 0');
@@ -184,13 +185,13 @@ describe('emitSite', () => {
     expect(bareData).toContain('"frozen":[]');
   });
 
-  it('injects per-page source citations and per-section guarantee chips', async () => {
+  it('injects per-page source citations and per-section claim-count chips', async () => {
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     // Block-level sources roll up into the page Sources footer (fixture page-level list is empty).
     expect(install).toContain('docstubeSources: ');
     expect(install).toContain('"file":"src/cli.ts","line":1,"endLine":12');
     expect(install).toContain('docstubeSections: ');
-    expect(install).toContain('"anchor":"requirements","title":"Requirements","guarantee":"proven"');
+    expect(install).toContain('"anchor":"requirements","title":"Requirements","checked":1,"total":1,"contradicted":0');
 
     const sourcesFooter = await readFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), 'utf8');
     expect(sourcesFooter).toContain('class="dt-sources"');
@@ -198,7 +199,7 @@ describe('emitSite', () => {
     // Linkified only when repoUrl is set; plain text otherwise.
     expect(sourcesFooter).toContain('/blob/${source.commit}/${source.file}');
     const chipInjector = await readFile(join(siteRoot, 'src/docstube/DocstubeSectionChips.astro'), 'utf8');
-    expect(chipInjector).toContain('dt-section-guarantees');
+    expect(chipInjector).toContain('dt-section-claims');
     expect(chipInjector).toContain('dt-section-chip');
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain('<DocstubeSources sources={sources} repoUrl={repoUrl} />');

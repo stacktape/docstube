@@ -186,7 +186,7 @@ describe('applyThemeBundle', () => {
     await expect(attempt([{ path: '../outside.txt', content: 'x' }])).rejects.toThrow(ThemeError);
     await expect(attempt([{ path: '/etc/passwd', content: 'x' }])).rejects.toThrow(ThemeError);
     await expect(attempt([{ path: 'src/pages/hijack.mdx', content: 'x' }])).rejects.toThrow(ThemeError);
-    await expect(attempt([{ path: 'src/docstube/DocstubeGuarantee.astro', content: 'x' }])).rejects.toThrow(ThemeError);
+    await expect(attempt([{ path: 'src/docstube/DocstubeClaims.astro', content: 'x' }])).rejects.toThrow(ThemeError);
     await expect(attempt([{ path: 'public/getting-started.md', content: 'x' }])).rejects.toThrow(ThemeError);
     await expect(attempt([{ path: 'package.json', content: '{}' }])).rejects.toThrow(ThemeError);
     await expect(

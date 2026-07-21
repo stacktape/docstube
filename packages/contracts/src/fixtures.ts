@@ -197,16 +197,36 @@ export const buildFixtureProvenanceV2 = (ledger: ClaimLedger): ProvenanceV2 => (
     class: claim.class,
     correctness: claim.correctness,
     disposition: claim.disposition,
-    evidence: claim.evidence.map((evidenceId) => ({
-      evidenceId,
-      ref:
-        claim.correctness === 'checked' && claim.decidingEvidenceId === evidenceId
-          ? { kind: 'codemap-grounding' as const, symbol: fixtureSymbolHash }
-          : { kind: 'source-linked' as const, symbol: fixtureSymbolHash },
-      checkedAt: now,
-      sourceRevision: commit,
-      outcome: 'pass' as const
-    })),
+    evidence: claim.evidence.map((evidenceId) => {
+      const deciding = claim.decidingEvidenceId === evidenceId;
+      // A contradicted claim's deciding record is a FAILED value-predicate comparison — the one
+      // evidence shape whose outcome the schema forces to agree with its payload.
+      if (claim.correctness === 'contradicted' && deciding) {
+        return {
+          evidenceId,
+          ref: {
+            kind: 'value-predicate' as const,
+            symbol: fixtureSymbolHash,
+            valueName: 'attempts',
+            assertedValue: '5',
+            extractedValue: '3'
+          },
+          checkedAt: now,
+          sourceRevision: commit,
+          outcome: 'fail' as const
+        };
+      }
+      return {
+        evidenceId,
+        ref:
+          claim.correctness === 'checked' && deciding
+            ? { kind: 'codemap-grounding' as const, symbol: fixtureSymbolHash }
+            : { kind: 'source-linked' as const, symbol: fixtureSymbolHash },
+        checkedAt: now,
+        sourceRevision: commit,
+        outcome: 'pass' as const
+      };
+    }),
     ...(claim.decidingEvidenceId === undefined ? {} : { decidingEvidenceId: claim.decidingEvidenceId })
   })),
   assessments: { reviews: [], translationFidelity: [], structural: [] }

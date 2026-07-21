@@ -2,13 +2,14 @@
 // Stacktape theme layout — port of the source DocsLayout.astro (theme-spec-stacktape.md §2):
 // fixed 54px header, centered 1580px wrapper with 295px sidebar / flexible main / 305px TOC,
 // view transitions on the main column. Kernel proof primitives (src/docstube/**) are mandatory
-// mounts: the guarantee badge, section chips, sources footer, entity wrapper, and search are a
-// conformance contract, not a theme choice — this layout styles them, it does not decide whether
-// they exist.
+// mounts: the literal claims chip, contradiction warning, section chips, sources footer, entity
+// wrapper, and search are a conformance contract, not a theme choice — this layout styles them,
+// it does not decide whether they exist.
 import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
+import DocstubeClaims from '../docstube/DocstubeClaims.astro';
+import DocstubeContradictions from '../docstube/DocstubeContradictions.astro';
 import DocstubeEntity from '../docstube/DocstubeEntity.astro';
-import DocstubeGuarantee from '../docstube/DocstubeGuarantee.astro';
 import DocstubeSearch from '../docstube/DocstubeSearch.astro';
 import DocstubeSectionChips from '../docstube/DocstubeSectionChips.astro';
 import DocstubeSources from '../docstube/DocstubeSources.astro';
@@ -30,8 +31,11 @@ const headings = Astro.props.headings ?? [];
 const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTitle;
 const description = frontmatter.description || siteDescription;
 const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;
-const guarantee = frontmatter.docstubeGuarantee;
-const guaranteeTitle = `${frontmatter.docstubeClaimsChecked ?? 0} of ${frontmatter.docstubeClaimsTotal ?? 0} claims checked`;
+const claimsChecked = frontmatter.docstubeClaimsChecked ?? 0;
+const claimsTotal = frontmatter.docstubeClaimsTotal ?? 0;
+const claimsContradicted = frontmatter.docstubeClaimsContradicted ?? 0;
+const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
+const reviewedFor = frontmatter.docstubeReviewedFor;
 const locale = frontmatter.docstubeLocale ?? sourceLocale;
 const alternates = frontmatter.docstubeAlternates ?? [];
 const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
@@ -136,9 +140,10 @@ const navGroups = nav.map((group) => ({ label: group.label, entries: group.entri
               </nav>
             ) : null
           }
-          {guarantee ? <DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} /> : null}
+          <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} />
         </div>
-        <DocstubeEntity entityId={frontmatter.docstubePageId} guarantee={guarantee}>
+        <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />
+        <DocstubeEntity entityId={frontmatter.docstubePageId}>
           <article class="mdx-content">
             <slot />
           </article>

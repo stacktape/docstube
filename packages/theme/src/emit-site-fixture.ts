@@ -22,17 +22,21 @@ export type FixtureInputOptions = {
   repoUrl?: string;
   frozenVersions?: string[];
   withTranslation?: boolean;
+  // Adds a CONTRADICTED value claim to the install page's trust spine — the loud-rendering path
+  // (impl-07 finding 4).
+  withContradiction?: boolean;
 };
 
 // A shard carrying the v2 trust spine: one CHECKED claim anchored in the "Requirements" section
-// (its chip projects 'proven') and one unchecked claim on the preamble (so the page-level
-// projection stays 'scored' — 1/2 claims checked, honest partial state).
-const withTrustSpine = (shard: PageShard): PageShard => {
+// and one unchecked claim on the preamble — 1/2 claims checked, honest literal partial state.
+// With `contradicted`, a third claim is a caught lie (failed value-predicate deciding evidence).
+const withTrustSpine = (shard: PageShard, contradicted = false): PageShard => {
   const page = shard.page;
   const revision = entityRevisionSchema.parse('5'.repeat(64));
   const checkedBlockId = page.sections[0]?.blocks[0]?.id ?? page.preamble[0]!.id;
   const uncheckedBlockId = page.preamble[0]?.id ?? checkedBlockId;
   const decidingEvidenceId = mintId(idPrefixes.evidence);
+  const contradictionEvidenceId = mintId(idPrefixes.evidence);
   const ledger: ClaimLedger = {
     schemaVersion: 1,
     pageId: page.id,
@@ -62,7 +66,24 @@ const withTrustSpine = (shard: PageShard): PageShard => {
         evidence: [],
         correctness: 'unchecked',
         disposition: 'maintainer-input-needed'
-      }
+      },
+      ...(contradicted
+        ? [
+            {
+              claimId: mintId(idPrefixes.claim),
+              class: 'value',
+              predicate: 'attempts defaults to 5',
+              anchor: { blockId: checkedBlockId, markerId: 'c3' },
+              quote: '`attempts` defaults to 5.',
+              scope: { entityId: checkedBlockId, revision },
+              subscriptions: [],
+              evidence: [contradictionEvidenceId],
+              correctness: 'contradicted' as const,
+              disposition: null,
+              decidingEvidenceId: contradictionEvidenceId
+            }
+          ]
+        : [])
     ],
     coverageLint: { uncovered: [] }
   };
@@ -111,7 +132,10 @@ export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOption
     index,
     theme: basicThemeBundle,
     pages: [
-      { shard: withTrustSpine(buildFixturePageShard(installPage)), mdx: installMdx },
+      {
+        shard: withTrustSpine(buildFixturePageShard(installPage), options?.withContradiction === true),
+        mdx: installMdx
+      },
       { shard: buildFixturePageShard(setupPage), mdx: setupMdx }
     ],
     ...(options?.withTranslation === true

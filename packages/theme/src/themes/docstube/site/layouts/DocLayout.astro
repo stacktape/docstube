@@ -1,11 +1,13 @@
 ---
 // docstube brand theme layout: header chrome with centered search + theme rail, three-pane shell
 // (sidebar / content / bent-rail TOC) per knowledge/design/theme-spec-docstube.md. Kernel proof
-// primitives (src/docstube/**) are mandatory mounts: the guarantee badge, section chips, sources
-// footer, entity wrapper, and Pagefind search are a conformance contract, not a theme choice.
+// primitives (src/docstube/**) are mandatory mounts: the literal claims chip, contradiction
+// warning, section chips, sources footer, entity wrapper, and Pagefind search are a conformance
+// contract, not a theme choice.
 import '../styles/global.css';
+import DocstubeClaims from '../docstube/DocstubeClaims.astro';
+import DocstubeContradictions from '../docstube/DocstubeContradictions.astro';
 import DocstubeEntity from '../docstube/DocstubeEntity.astro';
-import DocstubeGuarantee from '../docstube/DocstubeGuarantee.astro';
 import DocstubeSearch from '../docstube/DocstubeSearch.astro';
 import DocstubeSectionChips from '../docstube/DocstubeSectionChips.astro';
 import DocstubeSources from '../docstube/DocstubeSources.astro';
@@ -25,8 +27,11 @@ const { frontmatter } = Astro.props;
 const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTitle;
 const description = frontmatter.description || siteDescription;
 const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;
-const guarantee = frontmatter.docstubeGuarantee;
-const guaranteeTitle = `${frontmatter.docstubeClaimsChecked ?? 0} of ${frontmatter.docstubeClaimsTotal ?? 0} claims checked`;
+const claimsChecked = frontmatter.docstubeClaimsChecked ?? 0;
+const claimsTotal = frontmatter.docstubeClaimsTotal ?? 0;
+const claimsContradicted = frontmatter.docstubeClaimsContradicted ?? 0;
+const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
+const reviewedFor = frontmatter.docstubeReviewedFor;
 const locale = frontmatter.docstubeLocale ?? sourceLocale;
 const alternates = frontmatter.docstubeAlternates ?? [];
 const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
@@ -158,9 +163,10 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         <div class="dt-article">
           <div class="dt-page-meta">
             {breadcrumb ? <p class="dt-breadcrumb">{breadcrumb}</p> : null}
-            {guarantee ? <DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} /> : null}
+            <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} />
           </div>
-          <DocstubeEntity entityId={frontmatter.docstubePageId} guarantee={guarantee}>
+          <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />
+          <DocstubeEntity entityId={frontmatter.docstubePageId}>
             <slot />
           </DocstubeEntity>
           <DocstubeSources sources={sources} repoUrl={repoUrl} />
@@ -493,7 +499,7 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
             link.style.paddingLeft = `${xs[index] + 18}px`;
             link.href = `#${heading.id}`;
             const clone = heading.cloneNode(true);
-            for (const chip of clone.querySelectorAll('.dt-guarantee')) chip.remove();
+            for (const chip of clone.querySelectorAll('.dt-section-chip')) chip.remove();
             link.textContent = (clone.textContent || '').trim();
             link.dataset.index = String(index);
             tocBody.append(link);
