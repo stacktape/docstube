@@ -1,11 +1,16 @@
 import {
   buildFixturePage,
   buildFixturePageShard,
+  buildFixtureProvenanceV2,
   docstubeConfigSchema,
+  entityRevisionSchema,
   fixtureConfigInput,
-  manifestIndexSchema
+  gitCommitSchema,
+  idPrefixes,
+  manifestIndexSchema,
+  mintId
 } from '@docstube/contracts';
-import type { PageEntity } from '@docstube/contracts';
+import type { ClaimLedger, PageEntity, PageShard } from '@docstube/contracts';
 import type { EmitSiteInput } from './emit-site.ts';
 import { themeBundle as basicThemeBundle } from './themes/basic/bundle.generated.ts';
 
@@ -17,6 +22,51 @@ export type FixtureInputOptions = {
   repoUrl?: string;
   frozenVersions?: string[];
   withTranslation?: boolean;
+};
+
+// A shard carrying the v2 trust spine: one CHECKED claim anchored in the "Requirements" section
+// (its chip projects 'proven') and one unchecked claim on the preamble (so the page-level
+// projection stays 'scored' — 1/2 claims checked, honest partial state).
+const withTrustSpine = (shard: PageShard): PageShard => {
+  const page = shard.page;
+  const revision = entityRevisionSchema.parse('5'.repeat(64));
+  const checkedBlockId = page.sections[0]?.blocks[0]?.id ?? page.preamble[0]!.id;
+  const uncheckedBlockId = page.preamble[0]?.id ?? checkedBlockId;
+  const decidingEvidenceId = mintId(idPrefixes.evidence);
+  const ledger: ClaimLedger = {
+    schemaVersion: 1,
+    pageId: page.id,
+    sourceRevision: gitCommitSchema.parse('a1b2c3d4e5f60718293a4b5c6d7e8f9012345678'),
+    claims: [
+      {
+        claimId: mintId(idPrefixes.claim),
+        class: 'code-structure',
+        predicate: 'docstube installs globally via npm',
+        anchor: { blockId: checkedBlockId, markerId: 'c1' },
+        quote: 'docstube installs globally via npm',
+        scope: { entityId: checkedBlockId, revision },
+        subscriptions: [],
+        evidence: [decidingEvidenceId],
+        correctness: 'checked',
+        disposition: null,
+        decidingEvidenceId
+      },
+      {
+        claimId: mintId(idPrefixes.claim),
+        class: 'intent-history',
+        predicate: 'the installer exists for no-Node environments',
+        anchor: { blockId: uncheckedBlockId, markerId: 'c2' },
+        quote: 'The installer exists for no-Node environments.',
+        scope: { entityId: uncheckedBlockId, revision },
+        subscriptions: [],
+        evidence: [],
+        correctness: 'unchecked',
+        disposition: 'maintainer-input-needed'
+      }
+    ],
+    coverageLint: { uncovered: [] }
+  };
+  return { ...shard, ledger, provenance: buildFixtureProvenanceV2(ledger) };
 };
 
 export const setupMdx = '---\ndescription: Fixture setup page.\n---\n\n# Setup guide\n\nSome setup prose.\n';
@@ -61,7 +111,7 @@ export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOption
     index,
     theme: basicThemeBundle,
     pages: [
-      { shard: buildFixturePageShard(installPage), mdx: installMdx },
+      { shard: withTrustSpine(buildFixturePageShard(installPage)), mdx: installMdx },
       { shard: buildFixturePageShard(setupPage), mdx: setupMdx }
     ],
     ...(options?.withTranslation === true

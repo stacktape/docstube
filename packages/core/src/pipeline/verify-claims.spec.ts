@@ -385,13 +385,11 @@ describe('verifyClaims — behavior (declared execution coverage only)', () => {
     expect(deciding?.detail).toContain('covers=b1');
   });
 
-  it("the committed console.log case is NEGATIVE: same-section execution without covers= mints nothing", async () => {
+  it('the committed console.log case is NEGATIVE: same-section execution without covers= mints nothing', async () => {
     // The impl-06 probe: a passing `console.log('ok')` block in the claim's own section. Without
     // an explicit covers=b1 declaration it proves nothing about "retry retries the call".
     const page = pageOf();
-    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [
-      snippetPass([codeBlockIdOf(page)])
-    ]);
+    const result = await verify(anchorFixture([behaviorDraft('b1')], page), page, [snippetPass([codeBlockIdOf(page)])]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'execution')).toBe(true);
   });

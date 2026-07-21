@@ -55,13 +55,13 @@ describe('manifest shards', () => {
   });
 });
 
-describe('shard ledger↔ClaimEvidence bijection (commit invariant)', () => {
-  const trustedShard = () => {
-    const page = buildFixturePage();
-    const ledger = buildFixtureClaimLedger(page.id);
-    return { ...buildFixturePageShard(page), ledger, provenance: buildFixtureProvenanceV2(ledger) };
-  };
+const trustedShard = () => {
+  const page = buildFixturePage();
+  const ledger = buildFixtureClaimLedger(page.id);
+  return { ...buildFixturePageShard(page), ledger, provenance: buildFixtureProvenanceV2(ledger) };
+};
 
+describe('shard ledger↔ClaimEvidence bijection (commit invariant)', () => {
   it('accepts a shard whose ledger and ClaimEvidence agree exactly', () => {
     expect(pageShardSchema.safeParse(trustedShard()).success).toBe(true);
   });

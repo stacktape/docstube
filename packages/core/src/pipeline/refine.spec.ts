@@ -89,16 +89,16 @@ describe('runRefine', () => {
     const summary = await runRefine({ repoRoot, runTask: good.runTask, toolDescriptors: [] });
     expect(summary.refined).toHaveLength(1);
     expect(summary.refined[0]).toMatchObject({ slug: 'getting-started', status: 'passed' });
-    expect(summary.refined[0]!.provenBlocksAfter).toBeGreaterThan(summary.refined[0]!.provenBlocksBefore);
+    // The markerless fixture ledger stays empty — claim counts are honest zeros, never invented.
+    expect(summary.refined[0]).toMatchObject({ checkedClaimsBefore: 0, checkedClaimsAfter: 0 });
     expect(summary.outcome).toBe('passed');
 
     const store = createManifestStore(repoRoot, 'latest');
     const index = await store.readIndex();
     const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
     expect(shard?.flags).toEqual([]);
-    // Provable-only roll-up: with every code block passing its provers, the page badge reads
-    // proven — claimless narrative no longer drags it to scored.
-    expect(shard?.page.guarantee).toBe('proven');
+    // The healed page carries its (empty) kernel ledger; trust chips derive from ClaimEvidence.
+    expect(shard?.ledger?.claims).toEqual([]);
   }, 60_000);
 
   it('respects --failed when nothing is flagged and rejects unknown targets', async () => {
@@ -162,7 +162,7 @@ const tiedPage = (slug: string) => ({
   slug,
   shard: { generatedAt: '2026-01-01T00:00:00.000Z' } as PageShard,
   openFlags: 0,
-  provenRatio: 0.5
+  checkedRatio: 0.5
 });
 
 describe('rankPagesForRefinement', () => {

@@ -68,8 +68,8 @@ describe('PR body (verified delta annotation)', () => {
     });
 
     expect(body).toContain('## docstube refresh');
-    expect(body).toContain('| `getting-started/installation` (en) | 2 | 1 | 0 | 1 |');
-    expect(body).toContain('Totals: 2 proven · 1 scored · 0 out-of-domain.');
+    expect(body).toContain('| `getting-started/installation` (en) | 1 | 1 | 0 | 1 |');
+    expect(body).toContain('Totals: 1 checked · 1 unchecked · 0 contradicted claim(s).');
     expect(body).toContain('### Open flags (1)');
     expect(body).toContain('**out-of-domain** — why was legacyInit deprecated?');
     expect(body).toContain('Auto-merge: blocked by 1 open flag.');
@@ -80,7 +80,7 @@ describe('PR body (verified delta annotation)', () => {
     const body = buildPullRequestBody({
       committedPaths: ['docs-site/content/en/index.mdx'],
       decision: decideAutoMerge([]),
-      delta: { changedPages: [], totals: { proven: 0, scored: 0, 'out-of-domain': 0 }, openFlags: [] },
+      delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
       mode: 'generate'
     });
     expect(body).toContain('No open flags. This PR is eligible for auto-merge.');
@@ -163,7 +163,7 @@ describe('job summary', () => {
       autoMerge: 'enabled',
       committedPaths: ['docs-site/content/en/index.mdx'],
       decision: decideAutoMerge([]),
-      delta: { changedPages: [], totals: { proven: 0, scored: 0, 'out-of-domain': 0 }, openFlags: [] },
+      delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
       mode: 'refresh',
       pullRequestUrl: 'https://github.com/stacktape/docstube/pull/12',
       status: 'pull-request'

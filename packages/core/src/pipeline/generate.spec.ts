@@ -181,18 +181,20 @@ describe('runGenerate', () => {
     // provenance (persona + per-criterion outcome + run id), not just deterministic verifications.
     expect(shard?.page.provenance.reviews.length).toBeGreaterThan(0);
     expect(shard?.page.provenance.reviews[0]).toMatchObject({ persona: expect.any(String), runId: expect.any(String) });
-    // The clean ts snippet is proven by code-typecheck-ts.
-    const codeBlock = shard?.page.sections
-      .flatMap((section) => section.blocks)
-      .find((block) => block.blockType === 'code-example');
-    expect(codeBlock?.guarantee).toBe('proven');
-    // The kernel anchored the writer-authored ledger claim to its marker's block and the bridge
-    // derived the legacy view: unchecked ledger claims surface as 'scored' until verification
-    // (wave 2b-ii) flips correctness. No post-hoc extraction task ran on the generate path.
-    const markerBlock = shard?.page.preamble[0];
-    expect(markerBlock?.claims).toHaveLength(1);
-    expect(markerBlock?.claims[0]).toMatchObject({ claimClass: 'code-structure', guarantee: 'scored' });
-    expect(markerBlock?.claims[0]?.id).toMatch(/^cl_/);
+    // The trust spine is the shard's kernel ledger + ClaimEvidence — the legacy per-block
+    // ClaimEntity/guarantee ladder is gone from the live pipeline (wave 2b-iii demolition).
+    expect(shard?.ledger?.claims).toHaveLength(1);
+    expect(shard?.ledger?.claims[0]).toMatchObject({
+      class: 'code-structure',
+      correctness: 'unchecked',
+      disposition: 'no-checker-available'
+    });
+    expect(shard?.ledger?.claims[0]?.claimId).toMatch(/^cl_/);
+    expect(shard?.provenance?.claimEvidence).toHaveLength(1);
+    expect(shard?.provenance?.claimEvidence[0]?.claimId).toBe(shard?.ledger?.claims[0]?.claimId);
+    // Blocks carry no legacy ClaimEntity records anymore.
+    const blocks = [...(shard?.page.preamble ?? []), ...(shard?.page.sections.flatMap((s) => s.blocks) ?? [])];
+    expect(blocks.every((block) => block.claims.length === 0)).toBe(true);
     // The inline marker survives into the shipped MDX (theme rendering is a later wave).
     expect(mdxOnDisk).toContain('<Claim id="c1">');
   }, 60_000);
@@ -386,11 +388,17 @@ describe('runGenerate', () => {
     expect(deShard?.page.sections.map((section) => section.id)).toEqual(
       enShard?.page.sections.map((section) => section.id)
     );
-    // Untranslated code keeps its proven guarantee in the translation.
+    // The code block is byte-identical across locales (alignment invariant); trust lives on the
+    // SOURCE shard's ledger — rendition shards carry no ledger of their own.
     const deCode = deShard?.page.sections
       .flatMap((section) => section.blocks)
       .find((block) => block.blockType === 'code-example');
-    expect(deCode?.guarantee).toBe('proven');
+    const enCode = enShard?.page.sections
+      .flatMap((section) => section.blocks)
+      .find((block) => block.blockType === 'code-example');
+    expect(deCode?.contentHash).toBe(enCode?.contentHash);
+    expect(deShard?.ledger).toBeUndefined();
+    expect(enShard?.ledger?.claims).toHaveLength(1);
     const deMdx = await readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8');
     expect(deMdx).toContain('# Erste Schritte');
   }, 60_000);
@@ -481,11 +489,11 @@ describe('runGenerate', () => {
     expect(shardAfter?.flags.filter((flag) => flag.kind === 'system' && flag.status === 'open')).toHaveLength(1);
   }, 60_000);
 
-  it('regeneration of unchanged MDX keeps the claim id but NEVER carries old trust (review repro)', async () => {
-    // First run establishes the shard, then the stored claim is lifted to 'proven' to simulate a
-    // previous run's trust state (the exact reproduction from the wave 2b-i gate review: a
-    // dependency-triggered regeneration must not ship a second claim identity, must not carry the
-    // old guarantee, and must not let stale proven claims lift the block).
+  it('regeneration of unchanged MDX keeps ONE claim identity and records an exact match', async () => {
+    // A dependency-triggered regeneration of unchanged MDX must not mint a second claim identity:
+    // the fresh ledger claim threads onto the prior ledger's id (identity carries) while its
+    // correctness/disposition are recomputed from THIS run (trust never carries) — and the shard
+    // persists the typed claimMatching record proving the thread was exact.
     const first = await runGenerate({ repoRoot, toolDescriptors: [], runTask: scriptedRunner([goodMdx]).runTask });
     expect(first.outcome).toBe('passed');
 
@@ -493,38 +501,23 @@ describe('runGenerate', () => {
     const index = await store.readIndex();
     const pageId = index?.pages[0]?.id ?? '';
     const shard = await store.readPageShard({ locale: 'en', pageId });
-    const previousClaimId = shard?.page.preamble[0]?.claims[0]?.id;
+    const previousClaimId = shard?.ledger?.claims[0]?.claimId;
     expect(previousClaimId).toMatch(/^cl_/);
-    if (shard === undefined) {
-      throw new Error('expected a shard');
-    }
-    await store.writePageShard({
-      ...shard,
-      page: {
-        ...shard.page,
-        preamble: [
-          {
-            ...shard.page.preamble[0]!,
-            guarantee: 'proven',
-            claims: shard.page.preamble[0]!.claims.map((claim) => ({ ...claim, guarantee: 'proven' as const }))
-          },
-          ...shard.page.preamble.slice(1)
-        ]
-      }
-    });
 
     // Second run: unchanged MDX regenerates (generate always rewrites).
     const second = await runGenerate({ repoRoot, toolDescriptors: [], runTask: scriptedRunner([goodMdx]).runTask });
     expect(second.outcome).toBe('passed');
     const regenerated = await store.readPageShard({ locale: 'en', pageId });
-    const markerBlock = regenerated?.page.preamble[0];
-    // ONE claim identity: the ledger-anchored claim reuses the previous shard's claim id.
-    expect(markerBlock?.claims).toHaveLength(1);
-    expect(markerBlock?.claims[0]?.id).toBe(previousClaimId);
-    // Trust does NOT carry: the claim is back to 'scored' (unchecked), and the stale 'proven'
-    // claim no longer lifts the block.
-    expect(markerBlock?.claims[0]?.guarantee).toBe('scored');
-    expect(markerBlock?.guarantee).toBe('scored');
+    // ONE claim identity across runs, in the freshly recomputed state.
+    expect(regenerated?.ledger?.claims).toHaveLength(1);
+    expect(regenerated?.ledger?.claims[0]?.claimId).toBe(previousClaimId);
+    expect(regenerated?.ledger?.claims[0]).toMatchObject({
+      correctness: 'unchecked',
+      disposition: 'no-checker-available'
+    });
+    // The persisted typed matching record: an exact thread, no drift, no orphans.
+    expect(regenerated?.claimMatching?.matches).toEqual([{ claimId: previousClaimId, confidence: 'exact', drift: [] }]);
+    expect(regenerated?.claimMatching?.orphans).toEqual([]);
   }, 120_000);
 
   it('fails closed when a claim cannot anchor: writer repair, then flagged — never a shrunken ledger', async () => {
@@ -617,20 +610,24 @@ describe('runGenerate', () => {
     };
   };
 
-  it('value-predicate: a correct asserted default ends CHECKED and lifts its block to proven', async () => {
+  it('value-predicate: a correct asserted default ends CHECKED with deciding evidence on the shard', async () => {
     const summary = await runGenerate({ repoRoot, runTask: await valueRunner('3'), toolDescriptors: [] });
     expect(summary.outcome).toBe('passed');
 
     const store = createManifestStore(repoRoot, 'latest');
     const index = await store.readIndex();
     const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
-    const valueBlock = shard?.page.sections
-      .flatMap((section) => section.blocks)
-      .find((block) => block.claims.some((claim) => claim.claimClass === 'value'));
-    // checked → proven is live: the passing value predicate decides the claim, and the block
-    // whose every claim is proven lifts.
-    expect(valueBlock?.claims[0]?.guarantee).toBe('proven');
-    expect(valueBlock?.guarantee).toBe('proven');
+    const valueClaim = shard?.ledger?.claims.find((claim) => claim.class === 'value');
+    expect(valueClaim).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = shard?.provenance?.claimEvidence.find((record) => record.claimId === valueClaim?.claimId);
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.outcome).toBe('pass');
+    expect(deciding?.ref).toMatchObject({
+      kind: 'value-predicate',
+      valueName: 'DEFAULT_RETRIES',
+      assertedValue: '3',
+      extractedValue: '3'
+    });
   }, 120_000);
 
   it('value-predicate: a wrong asserted default is CONTRADICTED — blocking finding, retries, then flagged', async () => {
@@ -654,9 +651,8 @@ describe('runGenerate', () => {
     expect(shard?.flags.some((flag) => flag.status === 'open' && flag.detail?.includes('claim-verification'))).toBe(
       true
     );
-    // The flagged page carries no proven value claim anywhere — nothing bridged a contradiction.
-    const blocks = [...(shard?.page.preamble ?? []), ...(shard?.page.sections.flatMap((s) => s.blocks) ?? [])];
-    expect(blocks.every((block) => block.claims.every((claim) => claim.guarantee !== 'proven'))).toBe(true);
+    // The flagged shard's ledger carries the contradiction explicitly — never a neutral state.
+    expect(shard?.ledger?.claims.some((claim) => claim.correctness === 'contradicted')).toBe(true);
   }, 120_000);
 
   it('first generation with a contradiction persists the contradicted state LOUD in the shard', async () => {

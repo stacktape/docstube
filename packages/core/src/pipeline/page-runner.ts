@@ -23,7 +23,7 @@ import { matchEntityIds } from '../entities/match-entities.ts';
 import type { BlockMatchConfidence } from '../entities/match-entities.ts';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import type { RunJournal } from '../state/run-journal.ts';
-import { assignGuarantees, errorFindings, liftClaimGroundedBlocks, runVerifiers } from './verify-page.ts';
+import { errorFindings, runVerifiers } from './verify-page.ts';
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
 import type { ScoredReview } from './review-page.ts';
@@ -31,7 +31,6 @@ import { assembleProvenanceV2 } from './assemble-provenance.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import { matchClaimIds } from './match-claims.ts';
 import { CLAIM_VERIFICATION_CHECK, verifyClaims } from './verify-claims.ts';
-import { attachLedgerClaims } from './ledger-bridge.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
 import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
 import type { RunCostTracker } from './run-cost.ts';
@@ -318,9 +317,6 @@ export const generatePage = async (
     if (reviewWarnings.length > 0) {
       await ctx.journal.append({ type: 'findings', pageId: page.id, findings: reviewWarnings });
     }
-    const verifiedPage = assignGuarantees(page, results, ctx.host);
-    lastArtifact = { ...artifact, page: verifiedPage };
-
     // Claim verification: the authority table assigns correctness per claim by minting canonical
     // EvidenceRecords (codemap grounding, the minimal value-predicate verifier, declared
     // execution coverage). It runs on EVERY anchored attempt — including the final failing one —
@@ -379,11 +375,6 @@ export const generatePage = async (
       await scheduleRetry();
       continue;
     }
-    // TEMPORARY (removed with the guarantee-ladder demolition): the bridge REPLACES every block's
-    // legacy claims with the verified ledger view; the lift then upgrades blocks whose every
-    // claim is proven. Contradiction cannot reach it — the gate above already failed the attempt.
-    const bridgedPage = attachLedgerClaims(verifiedPage, verified.anchored);
-    lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(bridgedPage) };
     break;
   }
 

@@ -1,6 +1,6 @@
 import type { Flag } from '@docstube/contracts';
 import type { AutoMergeDecision } from './merge-decision.ts';
-import type { GuaranteeCounts, PageDelta, VerifiedDelta } from './verified-delta.ts';
+import type { ClaimCounts, PageDelta, VerifiedDelta } from './verified-delta.ts';
 import { normalizeRepoPath } from './verified-delta.ts';
 
 // Rendering of the verified delta into the three delivery surfaces (PRODUCT decision log —
@@ -36,21 +36,21 @@ const formatFlagLine = (flag: Flag): string => {
   return parts.join('');
 };
 
-const formatCounts = (counts: GuaranteeCounts): string =>
-  `${counts.proven} proven · ${counts.scored} scored · ${counts['out-of-domain']} out-of-domain`;
+const formatCounts = (counts: ClaimCounts): string =>
+  `${counts.checked} checked · ${counts.unchecked} unchecked · ${counts.contradicted} contradicted`;
 
 const formatPageRow = (page: PageDelta): string =>
-  `| \`${page.slug}\` (${page.locale}) | ${page.guarantees.proven} | ${page.guarantees.scored} | ${page.guarantees['out-of-domain']} | ${page.openFlags.length} |`;
+  `| \`${page.slug}\` (${page.locale}) | ${page.claims.checked} | ${page.claims.unchecked} | ${page.claims.contradicted} | ${page.openFlags.length} |`;
 
 const changedPagesSection = (delta: VerifiedDelta): string[] =>
   delta.changedPages.length === 0
     ? ['No page shards changed in this run.']
     : [
-        '| Page | Proven | Scored | Out-of-domain | Open flags |',
+        '| Page | Checked | Unchecked | Contradicted | Open flags |',
         '| --- | ---: | ---: | ---: | ---: |',
         ...delta.changedPages.map(formatPageRow),
         '',
-        `Totals: ${formatCounts(delta.totals)}.`
+        `Totals: ${formatCounts(delta.totals)} claim(s).`
       ];
 
 const flagsSection = (openFlags: readonly Flag[]): string[] =>

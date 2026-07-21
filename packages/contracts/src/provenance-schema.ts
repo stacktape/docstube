@@ -15,23 +15,6 @@ import {
 export const guaranteeLevelSchema = z.enum(['proven', 'scored', 'out-of-domain']);
 export type GuaranteeLevel = z.infer<typeof guaranteeLevelSchema>;
 
-const guaranteeRank: Record<GuaranteeLevel, number> = { proven: 2, scored: 1, 'out-of-domain': 0 };
-
-// Pessimistic roll-up: a parent displays the weakest guarantee among its children. Callers pass
-// only the levels of PROVABLE children (code blocks, claim-bearing prose) — claimless narrative
-// has no deterministic check to pass, so it never drags a parent down, and "proven" on a parent
-// means "everything provable underneath is proven". No provable children ⇒ 'scored' (there is
-// nothing to prove, but also nothing alarming — 'out-of-domain' here read as a red flag).
-export const rollUpGuarantee = (levels: readonly GuaranteeLevel[]): GuaranteeLevel => {
-  let weakest: GuaranteeLevel = 'proven';
-  for (const level of levels) {
-    if (guaranteeRank[level] < guaranteeRank[weakest]) {
-      weakest = level;
-    }
-  }
-  return levels.length === 0 ? 'scored' : weakest;
-};
-
 // Grounding: which source symbol (by normalized hash, never by name) an entity derives from.
 export const sourceRefSchema = z.object({
   symbol: sourceKeySchema,

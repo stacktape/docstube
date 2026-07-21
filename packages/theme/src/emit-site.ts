@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
+import { projectShardProof } from './proof-projection.ts';
 import type { ThemeConflict } from './apply-theme-bundle.ts';
 import { docsMcpReadmeMd, docsMcpServerMjs } from './mcp-server-source.ts';
 import {
@@ -182,14 +183,6 @@ const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } =>
 const frontmatterHasKey = (frontmatter: string, key: string): boolean =>
   new RegExp(`^${key}\\s*:`, 'mu').test(frontmatter);
 
-const blockGuaranteeCounts = (page: PageEntity): { proven: number; total: number } => {
-  const blocks = [...page.preamble, ...page.sections.flatMap((section) => section.blocks)];
-  return {
-    proven: blocks.filter((block) => block.guarantee === 'proven').length,
-    total: blocks.length
-  };
-};
-
 // Visible per-entity citations (PRODUCT §3.2): page-level sources plus every block- and
 // claim-level source on the page, deduplicated, rendered by the layout as the Sources footer.
 const collectPageSources = (page: PageEntity): SourceRef[] => {
@@ -214,11 +207,6 @@ const collectPageSources = (page: PageEntity): SourceRef[] => {
   }
   return sources;
 };
-
-type SectionChip = { anchor: string; title: string; guarantee: string };
-
-const sectionChips = (page: PageEntity): SectionChip[] =>
-  page.sections.map((section) => ({ anchor: section.anchor, title: section.title, guarantee: section.guarantee }));
 
 // The component imports injected into every page route, generated from the theme's renderer map:
 // contract name -> '<site-relative module>[#ExportName]' (export defaults to the contract name).
@@ -252,14 +240,15 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
   const slug = page.shard.page.slug;
   const depth = slug.split('/').length + (isSourceLocale ? 0 : 1);
   const up = '../'.repeat(depth);
-  const counts = blockGuaranteeCounts(page.shard.page);
+  // INTERIM (until the trust-chip wave): verified/reviewed chips derive from claim counts +
+  // assessments via the shard proof projection — never from the removed guarantee ladder.
+  const proof = projectShardProof(page.shard);
   const alternates = context.alternatesBySlug.get(slug) ?? [];
   const sources = collectPageSources(page.shard.page).map((ref) => ({
     file: ref.file,
     ...(ref.span === undefined ? {} : { line: ref.span[0], endLine: ref.span[1] }),
     commit: ref.commit
   }));
-  const chips = sectionChips(page.shard.page);
   const injected = [
     // Every theme bundle ships this exact layout path (validated by applyThemeBundle).
     `layout: ${JSON.stringify(`${up}layouts/DocLayout.astro`)}`,
@@ -269,13 +258,15 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
       : []),
     `docstubeLocale: ${JSON.stringify(locale)}`,
     `docstubePageId: ${JSON.stringify(page.shard.page.id)}`,
-    `docstubeGuarantee: ${JSON.stringify(page.shard.page.guarantee)}`,
-    `docstubeBlocksProven: ${counts.proven}`,
-    `docstubeBlocksTotal: ${counts.total}`,
+    `docstubeGuarantee: ${JSON.stringify(proof.guarantee)}`,
+    `docstubeClaimsChecked: ${proof.checkedClaims}`,
+    `docstubeClaimsTotal: ${proof.totalClaims}`,
+    `docstubeClaimsContradicted: ${proof.contradictedClaims}`,
+    ...(proof.reviewedFor === undefined ? [] : [`docstubeReviewedFor: ${JSON.stringify(proof.reviewedFor)}`]),
     // JSON is valid YAML flow syntax, so these round-trip through Astro's frontmatter parser.
     ...(alternates.length > 1 ? [`docstubeAlternates: ${JSON.stringify(alternates)}`] : []),
     ...(sources.length > 0 ? [`docstubeSources: ${JSON.stringify(sources)}`] : []),
-    ...(chips.length > 0 ? [`docstubeSections: ${JSON.stringify(chips)}`] : [])
+    ...(proof.sections.length > 0 ? [`docstubeSections: ${JSON.stringify(proof.sections)}`] : [])
   ];
   return [
     '---',

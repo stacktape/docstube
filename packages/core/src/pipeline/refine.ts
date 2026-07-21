@@ -41,8 +41,8 @@ export type RefineOptions = {
 export type RefinedPage = {
   slug: string;
   status: 'passed' | 'flagged';
-  provenBlocksBefore: number;
-  provenBlocksAfter: number;
+  checkedClaimsBefore: number;
+  checkedClaimsAfter: number;
   attempts: number;
 };
 
@@ -60,20 +60,18 @@ export type RefineSummary = {
   planUsedPercent?: number;
 };
 
-// Rank on PROVABLE blocks only (code fences, claim-bearing prose): claimless narrative can never
-// become proven, so counting it would make refine chase prose-heavy pages it cannot improve.
-const countBlocks = (shard: PageShard): { total: number; proven: number } => {
-  const blocks = [...shard.page.preamble, ...shard.page.sections.flatMap((section) => section.blocks)].filter(
-    (block) => block.blockType === 'code-example' || block.claims.length > 0
-  );
-  return { total: blocks.length, proven: blocks.filter((block) => block.guarantee === 'proven').length };
+// Rank on the canonical claim ledger (ClaimEvidence): checked claims over total claims. A page
+// with no claims has no checking work for refine to chase.
+const countClaims = (shard: PageShard): { total: number; checked: number } => {
+  const records = shard.provenance?.claimEvidence ?? [];
+  return { total: records.length, checked: records.filter((record) => record.correctness === 'checked').length };
 };
 
 type RankedPage = {
   slug: string;
   shard: PageShard;
   openFlags: number;
-  provenRatio: number;
+  checkedRatio: number;
 };
 
 export const rankPagesForRefinement = (pages: RankedPage[]): RankedPage[] =>
@@ -81,8 +79,8 @@ export const rankPagesForRefinement = (pages: RankedPage[]): RankedPage[] =>
     if (a.openFlags !== b.openFlags) {
       return b.openFlags - a.openFlags;
     }
-    if (a.provenRatio !== b.provenRatio) {
-      return a.provenRatio - b.provenRatio;
+    if (a.checkedRatio !== b.checkedRatio) {
+      return a.checkedRatio - b.checkedRatio;
     }
     if (a.shard.generatedAt !== b.shard.generatedAt) {
       return a.shard.generatedAt < b.shard.generatedAt ? -1 : 1;
@@ -141,14 +139,14 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       if (shard === undefined) {
         continue;
       }
-      const { total, proven } = countBlocks(shard);
+      const { total, checked } = countClaims(shard);
       ranked.push({
         slug: entry.slug,
         shard,
         // Tribal questions are not a quality defect — rewriting the page will not answer them.
         openFlags: shard.flags.filter((flag) => flag.status === 'open' && flag.kind !== 'tribal-knowledge').length,
-        // Nothing provable ⇒ ratio 1: refine has no proving work to chase on that page.
-        provenRatio: total === 0 ? 1 : proven / total
+        // No claims ⇒ ratio 1: refine has no checking work to chase on that page.
+        checkedRatio: total === 0 ? 1 : checked / total
       });
     }
 
@@ -221,7 +219,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
         break;
       }
       const perPageCap = Math.min(options.maxRoundsPerPage ?? 3, remainingRounds ?? Number.MAX_SAFE_INTEGER);
-      const before = countBlocks(candidate.shard);
+      const before = countClaims(candidate.shard);
       const { outcome, artifact, shard } = await generatePage(
         { ...ctx, options: { ...ctx.options, maxAttemptsPerPage: perPageCap } },
         node,
@@ -239,8 +237,8 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       refined.push({
         slug: candidate.slug,
         status: outcome.status,
-        provenBlocksBefore: before.proven,
-        provenBlocksAfter: countBlocks(shard).proven,
+        checkedClaimsBefore: before.checked,
+        checkedClaimsAfter: countClaims(shard).checked,
         attempts: outcome.attempts
       });
     }

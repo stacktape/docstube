@@ -43,16 +43,6 @@ export type ClaimAnchor = z.infer<typeof claimAnchorSchema>;
 
 // Claim classes come from the private failure-mode taxonomy (PRODUCT §3.8) and are extensible.
 export const claimClassSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
-export const knownClaimClasses = [
-  'factual',
-  'api-shape',
-  'behavioral',
-  'code-sample',
-  'structural',
-  'configuration',
-  'tribal'
-] as const;
-
 export const claimEntitySchema = z.object({
   id: claimIdSchema,
   kind: z.literal('claim'),

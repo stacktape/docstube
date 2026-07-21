@@ -25,8 +25,7 @@ export type NormalizedCitedValue = {
 
 const NUMERIC_LITERAL = /^[+-]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d+)?$/;
 
-const quoted = (raw: string, quote: string): boolean =>
-  raw.length >= 2 && raw.startsWith(quote) && raw.endsWith(quote);
+const quoted = (raw: string, quote: string): boolean => raw.length >= 2 && raw.startsWith(quote) && raw.endsWith(quote);
 
 // Normalize a writer-authored asserted value into the canonical scalar form. Writers may emit the
 // value already normalized ("3", '"linear"', "true"), single/backtick-quoted, or as a bare
@@ -90,15 +89,11 @@ export const citedValueOccursInText = (value: NormalizedCitedValue, text: string
   if (value.kind === 'boolean' || value.kind === 'null') {
     return new RegExp(`(?:^|[^A-Za-z0-9_])${value.canonical}(?:[^A-Za-z0-9_]|$)`, 'iu').test(text);
   }
-  const bare = value.bare ?? JSON.parse(value.canonical) as string;
+  const bare = value.bare ?? (JSON.parse(value.canonical) as string);
   if (bare === '') {
     return false;
   }
-  if (
-    text.includes(`"${bare}"`) ||
-    text.includes(`'${bare}'`) ||
-    text.includes(`\`${bare}\``)
-  ) {
+  if (text.includes(`"${bare}"`) || text.includes(`'${bare}'`) || text.includes(`\`${bare}\``)) {
     return true;
   }
   return new RegExp(`(?:^|[^A-Za-z0-9_])${escapeRegExp(bare)}(?:[^A-Za-z0-9_]|$)`, 'u').test(text);

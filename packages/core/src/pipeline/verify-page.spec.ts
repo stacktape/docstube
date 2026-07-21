@@ -2,84 +2,14 @@ import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  buildFixturePage,
-  codemapSchema,
-  contentHash,
-  docstubeConfigSchema,
-  idPrefixes,
-  mintId
-} from '@docstube/contracts';
-import type { BlockEntity, ClaimEntity, PageEntity } from '@docstube/contracts';
+import { buildFixturePage, codemapSchema, docstubeConfigSchema } from '@docstube/contracts';
 import { definePlugin } from '@docstube/plugin-sdk';
 import type { DocstubePlugin, PluginFs } from '@docstube/plugin-sdk';
 import { createPluginHost } from '../plugins/plugin-host.ts';
-import { liftClaimGroundedBlocks, recomputeRollups, runVerifiers } from './verify-page.ts';
+import { runVerifiers } from './verify-page.ts';
 
-const emptyProvenance = { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] };
-
-const proseBlock = (text: string, claims: ClaimEntity[] = []): BlockEntity => ({
-  id: mintId(idPrefixes.block),
-  kind: 'block',
-  blockType: 'paragraph',
-  contentHash: contentHash(text),
-  variants: [],
-  claims,
-  guarantee: 'scored',
-  provenance: emptyProvenance
-});
-
-const claim = (guarantee: ClaimEntity['guarantee']): ClaimEntity => ({
-  id: mintId(idPrefixes.claim),
-  kind: 'claim',
-  text: 'retry stops after the configured attempts',
-  anchor: { quote: 'stops after the configured attempts', prefix: '', suffix: '' },
-  claimClass: 'behavioral',
-  guarantee
-});
-
-const pageWith = (blocks: BlockEntity[]): PageEntity => {
-  const fixture = buildFixturePage();
-  return { ...fixture, preamble: [], sections: [{ ...fixture.sections[0]!, blocks }] };
-};
-
-describe('recomputeRollups (provable-only, founder decision 2026-07-17)', () => {
-  it('claimless narrative never drags a proven code block down', () => {
-    const code = { ...proseBlock('npm install'), blockType: 'code-example' as const, guarantee: 'proven' as const };
-    const page = recomputeRollups(pageWith([proseBlock('Some intro text.'), code]));
-    expect(page.sections[0]?.guarantee).toBe('proven');
-    expect(page.guarantee).toBe('proven');
-  });
-
-  it('an unproven provable block still holds the page at scored', () => {
-    const code = { ...proseBlock('npm install'), blockType: 'code-example' as const, guarantee: 'scored' as const };
-    const page = recomputeRollups(pageWith([code]));
-    expect(page.guarantee).toBe('scored');
-  });
-
-  it('a page with nothing provable is scored, and ODD blocks are excluded from the roll-up', () => {
-    const odd = { ...proseBlock('why we deprecated X', [claim('out-of-domain')]), guarantee: 'out-of-domain' as const };
-    const code = { ...proseBlock('npm install'), blockType: 'code-example' as const, guarantee: 'proven' as const };
-    expect(recomputeRollups(pageWith([proseBlock('Only narrative.')])).guarantee).toBe('scored');
-    expect(recomputeRollups(pageWith([odd, code])).guarantee).toBe('proven');
-  });
-});
-
-describe('liftClaimGroundedBlocks', () => {
-  it('a prose block whose every claim grounded becomes proven and the page follows', () => {
-    const grounded = proseBlock('It stops after the configured attempts.', [claim('proven')]);
-    const page = liftClaimGroundedBlocks(pageWith([grounded, proseBlock('Narrative.')]));
-    expect(page.sections[0]?.blocks[0]?.guarantee).toBe('proven');
-    expect(page.guarantee).toBe('proven');
-  });
-
-  it('one ungrounded claim keeps the block (and page) at scored', () => {
-    const half = proseBlock('Half grounded.', [claim('proven'), claim('scored')]);
-    const page = liftClaimGroundedBlocks(pageWith([half]));
-    expect(page.sections[0]?.blocks[0]?.guarantee).toBe('scored');
-    expect(page.guarantee).toBe('scored');
-  });
-});
+// The guarantee roll-up/lift ladder is gone (wave 2b-iii demolition): trust state lives on the
+// claim ledger (verify-claims.spec.ts); this spec covers the verifier host mechanics only.
 
 const pluginWith = (verify: (fs: PluginFs) => Promise<void>): DocstubePlugin =>
   definePlugin({

@@ -25,3 +25,5 @@ export type {
   ThemeOwnedFile
 } from './apply-theme-bundle.ts';
 export { guaranteeLabels } from './proof-source.ts';
+export { projectShardProof } from './proof-projection.ts';
+export type { SectionProofChip, ShardProofProjection } from './proof-projection.ts';

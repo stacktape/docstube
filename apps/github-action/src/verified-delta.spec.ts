@@ -6,23 +6,29 @@ import {
   buildFixtureWorkspace,
   shardRelativePath
 } from './test-support.ts';
-import { countPageGuarantees, isPageShardPath, loadVerifiedDelta } from './verified-delta.ts';
+import { countShardClaims, isPageShardPath, loadVerifiedDelta } from './verified-delta.ts';
 
 describe('verified delta', () => {
   it('recognizes page shard paths including frozen versions and Windows separators', () => {
-    expect(isPageShardPath('.docstube/manifest/pages/en/pg_00000000000000000000.yml')).toBe(true);
-    expect(isPageShardPath('.docstube/manifest/versions/1.x/pages/en/pg_00000000000000000000.yml')).toBe(true);
-    expect(isPageShardPath('.docstube\\manifest\\pages\\en\\pg_00000000000000000000.yml')).toBe(true);
-    expect(isPageShardPath('.docstube/manifest/manifest.yml')).toBe(false);
+    expect(isPageShardPath('.docstube/manifest/pages/en/pg_00000000000000000000.json')).toBe(true);
+    expect(isPageShardPath('.docstube/manifest/versions/1.x/pages/en/pg_00000000000000000000.json')).toBe(true);
+    expect(isPageShardPath('.docstube\\manifest\\pages\\en\\pg_00000000000000000000.json')).toBe(true);
+    expect(isPageShardPath('.docstube/manifest/manifest.json')).toBe(false);
     expect(isPageShardPath('docs-site/content/en/installation.mdx')).toBe(false);
   });
 
-  it('counts block and claim guarantees per page', () => {
-    // Fixture page: scored preamble block; proven code block with one proven claim.
-    expect(countPageGuarantees(buildFixturePage())).toEqual({ proven: 2, scored: 1, 'out-of-domain': 0 });
+  it('counts claims per shard from the canonical ClaimEvidence records', () => {
+    // Fixture spine: one checked code-structure claim, one unchecked value claim.
+    expect(countShardClaims(buildFixtureShardWithFlags([]))).toEqual({ checked: 1, unchecked: 1, contradicted: 0 });
+    // No trust spine → honest zeros, never invented counts.
+    expect(countShardClaims(buildFixturePageShard(buildFixturePage()))).toEqual({
+      checked: 0,
+      unchecked: 0,
+      contradicted: 0
+    });
   });
 
-  it('computes changed pages, guarantee counts, and open flags from the manifest', async () => {
+  it('computes changed pages, claim counts, and open flags from the manifest', async () => {
     const shard = buildFixtureShardWithFlags([
       buildFixtureFlag({ kind: 'coverage' }),
       buildFixtureFlag({ kind: 'guarantee-downgrade', status: 'resolved' })
@@ -42,10 +48,10 @@ describe('verified delta', () => {
       pageId: shard.page.id,
       slug: 'getting-started/installation',
       locale: 'en',
-      guarantees: { proven: 2, scored: 1, 'out-of-domain': 0 }
+      claims: { checked: 1, unchecked: 1, contradicted: 0 }
     });
     expect(delta?.changedPages[0]?.openFlags.map((flag) => flag.kind)).toEqual(['coverage']);
-    expect(delta?.totals).toEqual({ proven: 2, scored: 1, 'out-of-domain': 0 });
+    expect(delta?.totals).toEqual({ checked: 1, unchecked: 1, contradicted: 0 });
     // The gate input covers ALL open flags: changed shard + untouched shard + index systemFlags;
     // the resolved flag never appears.
     expect(delta?.openFlags.map((flag) => flag.kind).toSorted()).toEqual(['coverage', 'system', 'tribal-knowledge']);

@@ -54,7 +54,6 @@ export type { CitedValueKind, NormalizedCitedValue } from './cited-value-binding
 
 export {
   guaranteeLevelSchema,
-  rollUpGuarantee,
   sourceRefSchema,
   observedReadSchema,
   verificationResultSchema,
@@ -69,7 +68,6 @@ export {
   componentBlockType,
   claimAnchorSchema,
   claimClassSchema,
-  knownClaimClasses,
   claimEntitySchema,
   codeVariantSchema,
   blockEntitySchema,

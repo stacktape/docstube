@@ -1,15 +1,14 @@
-import { parse } from 'yaml';
-import type { Flag, GuaranteeLevel, ManifestIndex, PageEntity, PageShard } from '@docstube/contracts';
+import type { ClaimCorrectness, Flag, ManifestIndex, PageShard } from '@docstube/contracts';
 import { manifestIndexSchema, pageShardSchema } from '@docstube/contracts';
 
 // The verified delta is the honest PR annotation (PRODUCT §3.3): what changed, what proves it.
-// It is computed from the committed manifest (the docs lockfile, ARCHITECTURE §5.1), never from
-// prose in CLI output.
+// It is computed from the committed manifest (the docs lockfile, ARCHITECTURE §5.1) — since wave
+// 2b-iii the counts come from the canonical ClaimEvidence records, one claim = one outcome.
 
-export type GuaranteeCounts = {
-  proven: number;
-  scored: number;
-  'out-of-domain': number;
+export type ClaimCounts = {
+  checked: number;
+  unchecked: number;
+  contradicted: number;
 };
 
 export type PageDelta = {
@@ -18,59 +17,56 @@ export type PageDelta = {
   title: string;
   locale: string;
   shardPath: string;
-  guarantees: GuaranteeCounts;
+  claims: ClaimCounts;
   openFlags: readonly Flag[];
 };
 
 export type VerifiedDelta = {
   changedPages: readonly PageDelta[];
-  totals: GuaranteeCounts;
+  totals: ClaimCounts;
   // Every open flag across all readable shards plus manifest systemFlags — the merge gate input.
   openFlags: readonly Flag[];
 };
 
 export type WorkspaceFileReader = (relativePath: string) => Promise<string | undefined>;
 
-export const manifestIndexRelativePath = '.docstube/manifest/manifest.yml';
+export const manifestIndexRelativePath = '.docstube/manifest/manifest.json';
 
-const shardPathPattern = /^\.docstube\/manifest\/(?:versions\/[^/]+\/)?pages\/[^/]+\/[^/]+\.yml$/;
+const shardPathPattern = /^\.docstube\/manifest\/(?:versions\/[^/]+\/)?pages\/[^/]+\/[^/]+\.json$/;
 
 export const normalizeRepoPath = (path: string): string => path.replaceAll('\\', '/');
 
 export const isPageShardPath = (path: string): boolean => shardPathPattern.test(normalizeRepoPath(path));
 
-const emptyCounts = (): GuaranteeCounts => ({ proven: 0, scored: 0, 'out-of-domain': 0 });
+const emptyCounts = (): ClaimCounts => ({ checked: 0, unchecked: 0, contradicted: 0 });
 
-const addCounts = (target: GuaranteeCounts, level: GuaranteeLevel): void => {
-  target[level] += 1;
+const addCount = (target: ClaimCounts, correctness: ClaimCorrectness): void => {
+  target[correctness] += 1;
 };
 
-// Counts content-bearing entities (blocks and claims); page/section levels are pessimistic
-// roll-ups of these and would double-count.
-export const countPageGuarantees = (page: PageEntity): GuaranteeCounts => {
+// One claim = one outcome, from the ONLY reader-facing record (ClaimEvidence). A shard without a
+// trust spine (rendition shards, pages that never anchored) counts zero claims — honest, never
+// invented.
+export const countShardClaims = (shard: PageShard): ClaimCounts => {
   const counts = emptyCounts();
-  const blocks = [...page.preamble, ...page.sections.flatMap((section) => section.blocks)];
-  for (const block of blocks) {
-    addCounts(counts, block.guarantee);
-    for (const claim of block.claims) {
-      addCounts(counts, claim.guarantee);
-    }
+  for (const record of shard.provenance?.claimEvidence ?? []) {
+    addCount(counts, record.correctness);
   }
   return counts;
 };
 
 export const isOpenFlag = (flag: Flag): boolean => flag.status === 'open';
 
-const parseYamlOrThrow = <T>(input: { path: string; text: string; parseValue: (raw: unknown) => T }): T => {
+const parseJsonOrThrow = <T>(input: { path: string; text: string; parseValue: (raw: unknown) => T }): T => {
   try {
-    return input.parseValue(parse(input.text));
+    return input.parseValue(JSON.parse(input.text));
   } catch (error) {
     throw new Error(`Failed to parse ${input.path}: ${(error as Error).message}`, { cause: error });
   }
 };
 
 const currentShardPaths = (index: ManifestIndex): string[] =>
-  index.locales.flatMap((locale) => index.pages.map((page) => `.docstube/manifest/pages/${locale}/${page.id}.yml`));
+  index.locales.flatMap((locale) => index.pages.map((page) => `.docstube/manifest/pages/${locale}/${page.id}.json`));
 
 // Reads the committed manifest and computes the verified delta for this run's changed files.
 // Returns undefined when no manifest index exists (the CLI run produced no manifest — the caller
@@ -83,7 +79,7 @@ export const loadVerifiedDelta = async (input: {
   if (indexText === undefined) {
     return undefined;
   }
-  const index = parseYamlOrThrow({
+  const index = parseJsonOrThrow({
     path: manifestIndexRelativePath,
     text: indexText,
     parseValue: (raw) => manifestIndexSchema.parse(raw)
@@ -98,7 +94,7 @@ export const loadVerifiedDelta = async (input: {
     if (text === undefined) {
       continue;
     }
-    shards.push({ path, shard: parseYamlOrThrow({ path, text, parseValue: (raw) => pageShardSchema.parse(raw) }) });
+    shards.push({ path, shard: parseJsonOrThrow({ path, text, parseValue: (raw) => pageShardSchema.parse(raw) }) });
   }
 
   const changedPages = shards
@@ -109,16 +105,16 @@ export const loadVerifiedDelta = async (input: {
       title: shard.page.title,
       locale: shard.locale,
       shardPath: path,
-      guarantees: countPageGuarantees(shard.page),
+      claims: countShardClaims(shard),
       openFlags: shard.flags.filter(isOpenFlag)
     }))
     .toSorted((a, b) => (a.slug === b.slug ? a.locale.localeCompare(b.locale) : a.slug.localeCompare(b.slug)));
 
   const totals = emptyCounts();
   for (const page of changedPages) {
-    totals.proven += page.guarantees.proven;
-    totals.scored += page.guarantees.scored;
-    totals['out-of-domain'] += page.guarantees['out-of-domain'];
+    totals.checked += page.claims.checked;
+    totals.unchecked += page.claims.unchecked;
+    totals.contradicted += page.claims.contradicted;
   }
 
   const openFlags = [

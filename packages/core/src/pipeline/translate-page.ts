@@ -5,7 +5,7 @@ import { extractPageEntity } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
 import type { PageRunContext } from './page-runner.ts';
 import { contentRelativePath, unwrapMdxFence } from './page-runner.ts';
-import { errorFindings, recomputeRollups, runVerifiers } from './verify-page.ts';
+import { errorFindings, runVerifiers } from './verify-page.ts';
 
 // The i18n path (PRODUCT §4.1): declared locale list, source locale is truth, locale is an
 // address dimension — a translated entity keeps the SAME id as its source entity (§3.3), so the
@@ -61,21 +61,18 @@ const alignBlocks = (
       return `${where}[${index}]: block type ${translatedBlock?.blockType ?? 'missing'} != ${sourceBlock.blockType}`;
     }
     // Untranslatable blocks (code) must be byte-identical. A mismatch there is a hard alignment
-    // error — retried, then flagged — exactly like a structure mismatch; downgrading it to
-    // 'scored' would ship an altered command.
+    // error — retried, then flagged — never shipped as an altered command.
     if (
       UNTRANSLATABLE_BLOCK_TYPES.has(sourceBlock.blockType) &&
       translatedBlock.contentHash !== sourceBlock.contentHash
     ) {
       return `${where}[${index}]: ${sourceBlock.blockType} content was altered — untranslatable blocks must be byte-identical`;
     }
-    // Translated prose no longer carries the source's verification, so it drops to 'scored'.
-    const guarantee = translatedBlock.contentHash === sourceBlock.contentHash ? sourceBlock.guarantee : 'scored';
+    // Identity carries; trust does not live on blocks anymore (the source shard's claim ledger is
+    // the trust surface, and rendition-level fidelity is its own assessment axis).
     aligned.push({
       ...translatedBlock,
       id: sourceBlock.id,
-      guarantee,
-      claims: translatedBlock.contentHash === sourceBlock.contentHash ? sourceBlock.claims : [],
       provenance: sourceBlock.provenance
     });
   }
@@ -110,21 +107,17 @@ export const alignTranslatedEntities = (
     if (typeof blocks === 'string') {
       return { mismatch: blocks };
     }
-    sections.push({ ...translatedSection, id: sourceSection.id, blocks, guarantee: sourceSection.guarantee });
+    sections.push({ ...translatedSection, id: sourceSection.id, blocks });
   }
-  // Roll-ups recompute from the ALIGNED blocks: translated prose was downgraded to 'scored' above,
-  // so copying the source page/section levels would advertise a guarantee the translation's own
-  // blocks no longer support.
   return {
-    page: recomputeRollups({
+    page: {
       ...translated,
       id: source.id,
       slug: source.slug,
       preamble,
       sections,
-      guarantee: source.guarantee,
       provenance: source.provenance
-    })
+    }
   };
 };
 

@@ -1,6 +1,13 @@
-import { stringify } from 'yaml';
 import type { Flag, FlagKind, ManifestIndex, PageShard } from '@docstube/contracts';
-import { buildFixturePage, buildFixturePageShard, mintId, idPrefixes } from '@docstube/contracts';
+import {
+  buildFixtureClaimLedger,
+  buildFixturePage,
+  buildFixturePageShard,
+  buildFixtureProvenanceV2,
+  canonicalStateJson,
+  mintId,
+  idPrefixes
+} from '@docstube/contracts';
 import { manifestIndexRelativePath } from './verified-delta.ts';
 import type { WorkspaceFileReader } from './verified-delta.ts';
 
@@ -35,7 +42,7 @@ export const buildFixtureManifestIndex = (input: {
 });
 
 export const shardRelativePath = (shard: PageShard): string =>
-  `.docstube/manifest/pages/${shard.locale}/${shard.page.id}.yml`;
+  `.docstube/manifest/pages/${shard.locale}/${shard.page.id}.json`;
 
 export const buildFixtureWorkspace = (input: {
   shards: readonly PageShard[];
@@ -44,15 +51,23 @@ export const buildFixtureWorkspace = (input: {
   const files = new Map<string, string>();
   files.set(
     manifestIndexRelativePath,
-    stringify(buildFixtureManifestIndex({ shards: input.shards, systemFlags: input.systemFlags }))
+    canonicalStateJson(buildFixtureManifestIndex({ shards: input.shards, systemFlags: input.systemFlags }))
   );
   for (const shard of input.shards) {
-    files.set(shardRelativePath(shard), stringify(shard));
+    files.set(shardRelativePath(shard), canonicalStateJson(shard));
   }
   return { files, readWorkspaceFile: async (relativePath) => files.get(relativePath) };
 };
 
-export const buildFixtureShardWithFlags = (flags: readonly Flag[]): PageShard => ({
-  ...buildFixturePageShard(buildFixturePage()),
-  flags: [...flags]
-});
+// A shard with the v2 trust spine attached: two ClaimEvidence records (one checked, one
+// unchecked) so claim-count assertions have honest non-zero inputs.
+export const buildFixtureShardWithFlags = (flags: readonly Flag[]): PageShard => {
+  const page = buildFixturePage();
+  const ledger = buildFixtureClaimLedger(page.id);
+  return {
+    ...buildFixturePageShard(page),
+    ledger,
+    provenance: buildFixtureProvenanceV2(ledger),
+    flags: [...flags]
+  };
+};

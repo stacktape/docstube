@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blockTypeSchema, componentBlockType, listPageEntityIds, pageEntitySchema } from './entity-schema.ts';
 import { buildFixturePage } from './fixtures.ts';
-import { rollUpGuarantee } from './provenance-schema.ts';
 
 describe('entity schema', () => {
   it('round-trips the fixture page', () => {
@@ -28,17 +27,5 @@ describe('entity schema', () => {
   it('rejects a page whose slug is not path-safe', () => {
     const page = { ...buildFixturePage(), slug: 'Getting Started' };
     expect(pageEntitySchema.safeParse(page).success).toBe(false);
-  });
-});
-
-describe('guarantee roll-up', () => {
-  it('is pessimistic', () => {
-    expect(rollUpGuarantee(['proven', 'scored', 'proven'])).toBe('scored');
-    expect(rollUpGuarantee(['proven', 'out-of-domain'])).toBe('out-of-domain');
-    expect(rollUpGuarantee(['proven', 'proven'])).toBe('proven');
-  });
-
-  it('treats an entity with nothing provable as scored, never silently proven', () => {
-    expect(rollUpGuarantee([])).toBe('scored');
   });
 });

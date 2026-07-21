@@ -1,23 +1,15 @@
 import type { PageArtifact, PluginExec, PluginFs, VerifierContext, VerifierDefinition } from '@docstube/plugin-sdk';
-import type {
-  BlockEntity,
-  Codemap,
-  DocstubeConfig,
-  Finding,
-  Glossary,
-  GuaranteeLevel,
-  PageEntity,
-  VerifierRunResult
-} from '@docstube/contracts';
-import { rollUpGuarantee } from '@docstube/contracts';
+import type { Codemap, DocstubeConfig, Finding, Glossary, VerifierRunResult } from '@docstube/contracts';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { spawn } from 'node:child_process';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import { createBlockRegistry } from '../entities/block-registry.ts';
 
-// The verify stage: run every applicable registered verifier over the page artifacts, then assign
-// guarantee levels from the results (computed, never asserted — ARCHITECTURE.md §4).
+// The verify stage: run every applicable registered verifier over the page artifacts. Trust state
+// is owned by the claim ledger (verify-claims.ts assigns per-claim correctness from verifier
+// results); the legacy proven/scored/out-of-domain guarantee ladder is gone from the live
+// pipeline — reader surfaces project claim counts from ClaimEvidence instead.
 
 const createPluginFs = (repoRoot: string, writableRoots: string[]): PluginFs => ({
   readFile: (path) => readFile(join(repoRoot, path), 'utf8'),
@@ -172,86 +164,3 @@ export const runVerifiers = async (input: VerifyStageInput): Promise<VerifierRun
 
 export const errorFindings = (results: VerifierRunResult[]): Finding[] =>
   results.flatMap((result) => result.findings.filter((finding) => finding.severity === 'error'));
-
-// Guarantee assignment: entities covered by a passing PROVING verifier become proven; entities
-// named by an out-of-domain-capping warning stay capped. Everything else keeps 'scored'.
-export const assignGuarantees = (page: PageEntity, results: VerifierRunResult[], host: PluginHost): PageEntity => {
-  const provenIds = new Set<string>();
-  const provingVerifierIds = new Set(
-    host
-      .verifiers()
-      .filter((entry) => entry.definition.proves)
-      .map((entry) => entry.definition.id)
-  );
-  for (const result of results) {
-    if (result.status === 'pass' && provingVerifierIds.has(result.verifier)) {
-      for (const id of result.coveredEntityIds) {
-        provenIds.add(id);
-      }
-    }
-  }
-  // One prover passing never outweighs another failing: an entity named by any error finding is
-  // not proven (e.g. a snippet that executes after type-erasure but fails the typecheck).
-  for (const result of results) {
-    for (const finding of result.findings) {
-      if (finding.severity === 'error' && finding.entity?.entityId !== undefined) {
-        provenIds.delete(finding.entity.entityId);
-      }
-    }
-  }
-
-  const upgradeBlock = (block: BlockEntity): BlockEntity => {
-    const guarantee: GuaranteeLevel = provenIds.has(block.id) ? 'proven' : block.guarantee;
-    return {
-      ...block,
-      guarantee,
-      claims: block.claims.map((claim) => (provenIds.has(claim.id) ? { ...claim, guarantee: 'proven' } : claim))
-    };
-  };
-
-  return recomputeRollups({
-    ...page,
-    preamble: page.preamble.map(upgradeBlock),
-    sections: page.sections.map((section) => ({ ...section, blocks: section.blocks.map(upgradeBlock) }))
-  });
-};
-
-// Provable entities: code fences (verifier domain) and claim-bearing prose (grounding domain).
-// Claimless narrative and declared out-of-domain blocks are excluded from the roll-up, so a
-// parent's "proven" means "everything provable underneath is proven" — the honest reading of the
-// badge (founder decision 2026-07-17). ODD stays visible per-block and through flags.
-const isProvable = (block: BlockEntity): boolean => block.blockType === 'code-example' || block.claims.length > 0;
-
-const provableLevels = (blocks: readonly BlockEntity[]): GuaranteeLevel[] =>
-  blocks.filter((block) => isProvable(block) && block.guarantee !== 'out-of-domain').map((block) => block.guarantee);
-
-export const recomputeRollups = (page: PageEntity): PageEntity => {
-  const sections = page.sections.map((section) => ({
-    ...section,
-    guarantee: rollUpGuarantee(provableLevels(section.blocks))
-  }));
-  return {
-    ...page,
-    sections,
-    guarantee: rollUpGuarantee([
-      ...provableLevels(page.preamble),
-      // Sections with nothing provable are transparent to the page level.
-      ...sections.filter((section) => provableLevels(section.blocks).length > 0).map((section) => section.guarantee)
-    ])
-  };
-};
-
-const liftBlock = (block: BlockEntity): BlockEntity =>
-  block.guarantee === 'scored' && block.claims.length > 0 && block.claims.every((claim) => claim.guarantee === 'proven')
-    ? { ...block, guarantee: 'proven' }
-    : block;
-
-// After the claims stage grounds a page's claims, a prose block whose EVERY claim grounded
-// becomes proven itself (grounding = proven, the deterministic lane). Callers invoke this only on
-// the clean path — no error findings exist, so no demotion cross-check is needed here.
-export const liftClaimGroundedBlocks = (page: PageEntity): PageEntity =>
-  recomputeRollups({
-    ...page,
-    preamble: page.preamble.map(liftBlock),
-    sections: page.sections.map((section) => ({ ...section, blocks: section.blocks.map(liftBlock) }))
-  });

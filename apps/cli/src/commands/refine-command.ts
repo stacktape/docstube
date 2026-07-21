@@ -41,7 +41,7 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
     }
     for (const page of summary.refined) {
       output.info(
-        `  ${page.status === 'passed' ? 'ok  ' : 'FLAG'}  ${page.slug} — proven blocks ${page.provenBlocksBefore} → ${page.provenBlocksAfter} (${page.attempts} attempt(s))`
+        `  ${page.status === 'passed' ? 'ok  ' : 'FLAG'}  ${page.slug} — checked claims ${page.checkedClaimsBefore} → ${page.checkedClaimsAfter} (${page.attempts} attempt(s))`
       );
     }
 

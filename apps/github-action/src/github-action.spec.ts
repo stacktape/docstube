@@ -62,7 +62,7 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
   }
   const changedFiles = options.changedFiles ?? [
     'docs-site/content/en/getting-started/installation.mdx',
-    '.docstube/manifest/manifest.yml',
+    '.docstube/manifest/manifest.json',
     shardPath,
     '.docstube/cache/agent-calls/abc.json'
   ];
@@ -202,7 +202,7 @@ describe('GitHub Action orchestration', () => {
     });
     // One commit, machine-local cache excluded, docs + manifest + shard together.
     expect(harness.operations).toContain(
-      `commit:docs: docstube generate:.docstube/manifest/manifest.yml,${harness.shardPath},docs-site/content/en/getting-started/installation.mdx`
+      `commit:docs: docstube generate:.docstube/manifest/manifest.json,${harness.shardPath},docs-site/content/en/getting-started/installation.mdx`
     );
     expect(harness.operations).toContain('cli:generate:/repo');
     expect(harness.operations).toContain('enable-auto-merge:12');
@@ -214,7 +214,7 @@ describe('GitHub Action orchestration', () => {
     expect(harness.operations.some((op) => op.startsWith('create-issue') || op.startsWith('update-issue'))).toBe(false);
     expect(harness.outputs['auto-merge']).toBe('enabled');
     expect(harness.summaries.join('\n')).toContain('Auto-merge enabled (squash).');
-    expect(harness.summaries.join('\n')).toContain('2 | 1 | 0');
+    expect(harness.summaries.join('\n')).toContain('1 | 1 | 0');
     expect(JSON.stringify({ operations: harness.operations, summaries: harness.summaries })).not.toContain(
       'ghs_secret_token_123456'
     );

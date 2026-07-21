@@ -39,7 +39,7 @@ export type { RunJournal, RunStatusSummary } from './state/run-journal.ts';
 export { cutVersionSnapshot } from './state/version-cut.ts';
 export type { VersionCutResult } from './state/version-cut.ts';
 
-export { runVerifiers, assignGuarantees, errorFindings } from './pipeline/verify-page.ts';
+export { runVerifiers, errorFindings } from './pipeline/verify-page.ts';
 export type { VerifyStageInput } from './pipeline/verify-page.ts';
 export { buildWriterSystemPrompt, buildWriterUserPrompt, buildWritePageTask } from './pipeline/write-page.ts';
 export type { WritePromptInput } from './pipeline/write-page.ts';
@@ -70,8 +70,7 @@ export type {
   RejectedProposal
 } from './pipeline/anchor-ledger.ts';
 export { matchClaimIds } from './pipeline/match-claims.ts';
-export type { MatchClaimIdsInput, MatchedClaimIds } from './pipeline/match-claims.ts';
-export { attachLedgerClaims, guaranteeForCorrectness } from './pipeline/ledger-bridge.ts';
+export type { ClaimMatch, ClaimMatchConfidence, MatchClaimIdsInput, MatchedClaimIds } from './pipeline/match-claims.ts';
 export { translateArtifact, buildTranslatePageTask, alignTranslatedEntities } from './pipeline/translate-page.ts';
 export type { TranslationOutcome } from './pipeline/translate-page.ts';
 export { runRefresh } from './pipeline/maintain.ts';

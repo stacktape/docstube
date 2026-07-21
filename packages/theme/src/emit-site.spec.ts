@@ -105,7 +105,7 @@ describe('emitSite', () => {
     }
   });
 
-  it('renders the guarantee badge as the kernel DocstubeGuarantee primitive with a blocks-proven title', async () => {
+  it('renders the guarantee badge as the kernel DocstubeGuarantee primitive with a claims-checked title', async () => {
     const badge = await readFile(join(siteRoot, 'src/docstube/DocstubeGuarantee.astro'), 'utf8');
     expect(badge).toContain('dt-guarantee--${guarantee}');
     expect(badge).toContain('data-docstube-guarantee={guarantee}');
@@ -114,17 +114,19 @@ describe('emitSite', () => {
     expect(badge).toContain('"out-of-domain":"unverified"');
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain('<DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} />');
-    expect(layout).toContain('blocks proven');
+    expect(layout).toContain('claims checked');
   });
 
   it('writes one route per page at its nested slug path with injected frontmatter', async () => {
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(install).toContain('layout: "../../layouts/DocLayout.astro"');
     expect(install).toContain('title: "Installation"');
-    // The fixture page has 1 proven block out of 2 and rolls up to scored.
+    // The fixture shard's ClaimEvidence has 1 checked claim of 2 — the interim projection keeps
+    // the page at 'scored' (the honest 100% rule) with the literal claim counts alongside.
     expect(install).toContain('docstubeGuarantee: "scored"');
-    expect(install).toContain('docstubeBlocksProven: 1');
-    expect(install).toContain('docstubeBlocksTotal: 2');
+    expect(install).toContain('docstubeClaimsChecked: 1');
+    expect(install).toContain('docstubeClaimsTotal: 2');
+    expect(install).toContain('docstubeClaimsContradicted: 0');
     expect(install).toContain("from '../../components/theme-components.tsx'");
     expect(install).toContain('<Callout tone="info">');
 

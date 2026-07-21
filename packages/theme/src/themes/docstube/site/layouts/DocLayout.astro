@@ -26,7 +26,7 @@ const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTi
 const description = frontmatter.description || siteDescription;
 const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;
 const guarantee = frontmatter.docstubeGuarantee;
-const guaranteeTitle = `${frontmatter.docstubeBlocksProven ?? 0} of ${frontmatter.docstubeBlocksTotal ?? 0} blocks proven`;
+const guaranteeTitle = `${frontmatter.docstubeClaimsChecked ?? 0} of ${frontmatter.docstubeClaimsTotal ?? 0} claims checked`;
 const locale = frontmatter.docstubeLocale ?? sourceLocale;
 const alternates = frontmatter.docstubeAlternates ?? [];
 const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
