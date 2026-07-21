@@ -296,6 +296,42 @@ describe('anchorWriterLedger', () => {
     expect(result.errors.some((issue) => issue.code === 'marker-missing' && issue.markerId === 'h1')).toBe(true);
   });
 
+  it('REJECTS a marker with no ledger entry — exact cardinality both ways (review probe)', () => {
+    // Two markers, one ledger entry: accepting this would ship the c2 assertion outside the trust
+    // denominator. submit_page catches it in-session; anchoring must re-prove it kernel-side.
+    const result = anchorWriterLedger(anchorInput([draft('c1')]));
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toMatchObject({ code: 'marker-unclaimed', kernel: false, markerId: 'c2' });
+  });
+
+  it('REJECTS duplicate marker ids in the accepted MDX', () => {
+    const duplicateMdx = `# Title
+
+Text <Claim id="c1">first assertion.</Claim>
+
+More text <Claim id="c1">second assertion.</Claim>
+`;
+    const page = extractPageEntity({ mdx: duplicateMdx, slug: 'dup' });
+    const result = anchorWriterLedger({
+      mdx: duplicateMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors.some((issue) => issue.code === 'marker-duplicate' && issue.markerId === 'c1')).toBe(true);
+  });
+
   it('classifies post-acceptance grammar-level scan errors as kernel invariant breaches', () => {
     // The page was extracted from the ACCEPTED MDX; the anchoring input was then altered — the
     // exact drift the kernel must refuse to paper over (submit_page guaranteed a clean scan).

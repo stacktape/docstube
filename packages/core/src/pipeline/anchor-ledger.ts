@@ -58,6 +58,8 @@ export type AnchorIssueCode =
   | 'marker-misplaced' // marker in a heading / flow position / JSX expression
   | 'marker-unanchored' // marker maps into no content block
   | 'marker-missing' // ledger claim whose marker is absent from the accepted MDX
+  | 'marker-duplicate' // the same marker id appears more than once in the accepted MDX
+  | 'marker-unclaimed' // marker with no ledger entry — an unclaimed assertion shrinks nothing silently
   | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
   // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
   // post-acceptance means the MDX was altered after acceptance — a kernel bug, never repairable.
@@ -327,6 +329,35 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
     ranges = [];
   }
   const markerByid = new Map(scan.markers.map((marker) => [marker.markerId, marker]));
+
+  // Bijection recheck, kernel-side defense in depth (submit_page proves marker↔ledger cardinality
+  // in-session, but replay/scripted writers can bypass it): EXACT cardinality both ways. The
+  // per-claim loop below covers ledger→marker; here markers→ledger — duplicate marker ids and
+  // markers with no ledger entry REJECT, because accepting them would either fork one anchor
+  // across two spans or ship an asserted span outside the trust denominator.
+  const seenMarkerIds = new Set<string>();
+  for (const marker of scan.markers) {
+    if (seenMarkerIds.has(marker.markerId)) {
+      errors.push({
+        code: 'marker-duplicate',
+        kernel: false,
+        markerId: marker.markerId,
+        message: `marker "${marker.markerId}" appears more than once in the accepted MDX — every marker id is unique; renumber the duplicates and resubmit the matching ledger`
+      });
+    }
+    seenMarkerIds.add(marker.markerId);
+  }
+  const ledgerMarkerIds = new Set(input.writerLedger.claims.map((claim) => claim.markerId));
+  for (const markerId of seenMarkerIds) {
+    if (!ledgerMarkerIds.has(markerId)) {
+      errors.push({
+        code: 'marker-unclaimed',
+        kernel: false,
+        markerId,
+        message: `marker "${markerId}" has no ledger entry — every inline <Claim> marker anchors exactly one claim; add a ledger entry with markerId "${markerId}" or remove the marker`
+      });
+    }
+  }
 
   const anchored: AnchoredClaim[] = [];
   const evidence: EvidenceRecord[] = [];
