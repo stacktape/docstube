@@ -1,5 +1,5 @@
 import { glob as fsGlob, open, readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { contentHash } from '@docstube/contracts';
 import type { ObservedRead, ToolDescriptor } from '@docstube/contracts';
@@ -16,6 +16,7 @@ const GLOB_MAX_MATCHES = 500;
 const GREP_MAX_MATCHES = 200;
 const GREP_MAX_FILE_BYTES = 1_000_000;
 const GREP_MAX_LINE_CHARS = 400;
+const GREP_MAX_CONTEXT_LINES = 5;
 const SKIPPED_DIR_SEGMENTS = new Set(['node_modules', '.git', 'dist', 'coverage']);
 
 export type ObservedReadsCollector = {
@@ -182,20 +183,44 @@ const globDescriptor: ToolDescriptor = {
   }
 };
 
+type GrepMatch = {
+  file: string;
+  line: number;
+  text: string;
+  before?: string[];
+  after?: string[];
+};
+
 const grepParamsSchema = z.object({
   pattern: z.string().min(1),
   path: z.string().min(1).default('.'),
+  glob: z.string().min(1).optional(),
+  ignoreCase: z.boolean().default(false),
+  contextLines: z.number().int().min(0).max(GREP_MAX_CONTEXT_LINES).default(0),
   maxMatches: z.number().int().positive().max(GREP_MAX_MATCHES).default(100)
 });
 
 const grepDescriptor: ToolDescriptor = {
   name: 'grep',
-  description: 'Search file contents with a JavaScript regular expression; returns matching lines with locations.',
+  description:
+    'Search file contents with a JavaScript regular expression; returns matching lines with locations. ' +
+    'Supports case-insensitive matching (ignoreCase), filtering scanned files by glob, and surrounding context lines.',
   paramsJsonSchema: {
     type: 'object',
     properties: {
       pattern: { type: 'string', description: 'JavaScript regular expression to search for.' },
       path: { type: 'string', description: 'Repo-relative directory to search in. Defaults to the repo root.' },
+      glob: {
+        type: 'string',
+        description: 'Glob pattern (e.g. "**/*.ts") relative to the search directory; only matching files are scanned.'
+      },
+      ignoreCase: { type: 'boolean', description: 'Match case-insensitively (regex "i" flag). Defaults to false.' },
+      contextLines: {
+        type: 'integer',
+        minimum: 0,
+        maximum: GREP_MAX_CONTEXT_LINES,
+        description: 'Lines of context to return before and after each match (0-5). Defaults to 0.'
+      },
       maxMatches: { type: 'integer', minimum: 1, maximum: GREP_MAX_MATCHES, description: 'Cap on returned matches.' }
     },
     required: ['pattern']
@@ -306,7 +331,7 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
       const params = parseArgs(grepParamsSchema, 'grep', args);
       let regex: RegExp;
       try {
-        regex = new RegExp(params.pattern);
+        regex = new RegExp(params.pattern, params.ignoreCase ? 'i' : '');
       } catch (error) {
         throw new ToolPolicyError({
           tool: 'grep',
@@ -315,9 +340,10 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
       }
       const { absPath } = await resolveReadPath('grep', options, params.path);
       const dirents = await readdir(absPath, { recursive: true, withFileTypes: true });
-      const matches: { file: string; line: number; text: string }[] = [];
+      const matches: GrepMatch[] = [];
       let truncated = false;
       let filesScanned = 0;
+      const truncateLine = (line: string): string => line.slice(0, GREP_MAX_LINE_CHARS);
       for (const entry of dirents) {
         if (!entry.isFile()) {
           continue;
@@ -325,6 +351,11 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
         const fileAbs = join(entry.parentPath, entry.name);
         const repoRelative = toPosix(relative(options.repoRoot, fileAbs));
         if (isSkippedPath(repoRelative)) {
+          continue;
+        }
+        // Same matcher family as the glob tool: node's minimatch-backed glob semantics, applied to
+        // the path relative to the search directory (matching how glob patterns are anchored).
+        if (params.glob !== undefined && !posix.matchesGlob(toPosix(relative(absPath, fileAbs)), params.glob)) {
           continue;
         }
         let text: string;
@@ -338,6 +369,7 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
         }
         filesScanned += 1;
         const lines = text.split(/\r?\n/);
+        const fileMatchesBefore = matches.length;
         for (let index = 0; index < lines.length; index += 1) {
           const line = lines[index] ?? '';
           if (!regex.test(line)) {
@@ -347,7 +379,18 @@ export const createStandardTools = (options: StandardToolsOptions): ToolImplemen
             truncated = true;
             break;
           }
-          matches.push({ file: repoRelative, line: index + 1, text: line.slice(0, GREP_MAX_LINE_CHARS) });
+          const match: GrepMatch = { file: repoRelative, line: index + 1, text: truncateLine(line) };
+          if (params.contextLines > 0) {
+            match.before = lines.slice(Math.max(0, index - params.contextLines), index).map(truncateLine);
+            match.after = lines.slice(index + 1, index + 1 + params.contextLines).map(truncateLine);
+          }
+          matches.push(match);
+        }
+        // A returned match exposes this file's content to the agent, so it enters provenance exactly
+        // like a full read_file (the full content is already in memory here). Files scanned without
+        // a returned match are NOT observed reads.
+        if (matches.length > fileMatchesBefore) {
+          options.observedReads.record({ file: repoRelative, contentHash: contentHash(text) });
         }
         if (truncated) {
           break;

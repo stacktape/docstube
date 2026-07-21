@@ -9,6 +9,9 @@ import type { ToolImplementation } from './tools.ts';
 
 const RETRY_TS = 'export const retries = 3;\nexport const jitter = true;\n';
 const UTIL_TS = 'export const clamp = (n: number) => Math.max(0, n);\n';
+// A 500-char line before the match proves context lines are truncated to GREP_MAX_LINE_CHARS.
+const LONG_LINE = 'x'.repeat(500);
+const CONTEXT_TXT = `${LONG_LINE}\nneedle line\nafter one\nafter two\n`;
 
 let repoRoot: string;
 
@@ -18,6 +21,7 @@ beforeAll(async () => {
   await mkdir(join(repoRoot, 'secrets'), { recursive: true });
   await writeFile(join(repoRoot, 'src', 'retry.ts'), RETRY_TS, 'utf8');
   await writeFile(join(repoRoot, 'src', 'nested', 'util.ts'), UTIL_TS, 'utf8');
+  await writeFile(join(repoRoot, 'src', 'context.txt'), CONTEXT_TXT, 'utf8');
   await writeFile(join(repoRoot, 'README.md'), '# Fixture\n', 'utf8');
   await writeFile(join(repoRoot, 'secrets', 'token.txt'), 'not-a-real-secret\n', 'utf8');
 });
@@ -142,6 +146,7 @@ describe('list_dir', () => {
     const { get } = buildTools();
     const result = (await get('list_dir').handler({ path: 'src' })) as { entries: { name: string; type: string }[] };
     expect(result.entries).toEqual([
+      { name: 'context.txt', type: 'file' },
       { name: 'nested', type: 'dir' },
       { name: 'retry.ts', type: 'file' }
     ]);
@@ -196,6 +201,74 @@ describe('grep', () => {
     const { get } = buildTools(['src']);
     await expect(get('grep').handler({ pattern: 'secret', path: 'secrets' })).rejects.toThrow(ToolPolicyError);
   });
+
+  it('matches case-sensitively by default and case-insensitively with ignoreCase', async () => {
+    const { get } = buildTools();
+    const sensitive = (await get('grep').handler({ pattern: 'JITTER', path: 'src' })) as { matches: unknown[] };
+    expect(sensitive.matches).toEqual([]);
+    const insensitive = (await get('grep').handler({ pattern: 'JITTER', path: 'src', ignoreCase: true })) as {
+      matches: { file: string; line: number }[];
+    };
+    expect(insensitive.matches).toEqual([{ file: 'src/retry.ts', line: 2, text: 'export const jitter = true;' }]);
+  });
+
+  it('scans only files matching the glob filter', async () => {
+    const { get } = buildTools();
+    const filtered = (await get('grep').handler({ pattern: 'export', glob: '**/util.ts' })) as {
+      matches: { file: string }[];
+    };
+    expect(filtered.matches.map((match) => match.file)).toEqual(['src/nested/util.ts']);
+  });
+
+  it('does not read files excluded by the glob filter', async () => {
+    const { get } = buildTools();
+    const result = (await get('grep').handler({ pattern: 'export', glob: '**/*.md' })) as {
+      matches: unknown[];
+      filesScanned: number;
+    };
+    expect(result.matches).toEqual([]);
+    expect(result.filesScanned).toBe(1);
+  });
+
+  it('returns truncated context lines around each match when contextLines is set', async () => {
+    const { get } = buildTools();
+    const result = (await get('grep').handler({ pattern: 'needle', path: 'src', contextLines: 2 })) as {
+      matches: { file: string; line: number; text: string; before?: string[]; after?: string[] }[];
+    };
+    expect(result.matches).toEqual([
+      {
+        file: 'src/context.txt',
+        line: 2,
+        text: 'needle line',
+        before: [LONG_LINE.slice(0, 400)],
+        after: ['after one', 'after two']
+      }
+    ]);
+  });
+
+  it('omits before/after when contextLines is 0 and rejects contextLines above the cap', async () => {
+    const { get } = buildTools();
+    const result = (await get('grep').handler({ pattern: 'needle', path: 'src' })) as {
+      matches: Record<string, unknown>[];
+    };
+    expect(result.matches[0]).not.toHaveProperty('before');
+    expect(result.matches[0]).not.toHaveProperty('after');
+    await expect(get('grep').handler({ pattern: 'needle', contextLines: 6 })).rejects.toThrow(ToolPolicyError);
+  });
+
+  it('records an observed read only for files that contributed a returned match', async () => {
+    const { observedReads, get } = buildTools();
+    const result = (await get('grep').handler({ pattern: 'jitter', path: 'src' })) as { filesScanned: number };
+    expect(result.filesScanned).toBeGreaterThan(1);
+    expect(observedReads.list()).toEqual([{ file: 'src/retry.ts', contentHash: contentHash(RETRY_TS) }]);
+  });
+
+  it('deduplicates grep observed reads against read_file reads of the same content', async () => {
+    const { observedReads, get } = buildTools();
+    await get('read_file').handler({ path: 'src/retry.ts' });
+    await get('grep').handler({ pattern: 'jitter', path: 'src' });
+    expect(observedReads.list()).toHaveLength(1);
+  });
 });
 
 describe('standardToolDescriptors', () => {
@@ -205,5 +278,13 @@ describe('standardToolDescriptors', () => {
     for (const descriptor of descriptors) {
       expect(descriptor.paramsJsonSchema.type).toBe('object');
     }
+  });
+
+  it('exposes the grep ignoreCase, glob, and contextLines params in the JSON schema', () => {
+    const grep = standardToolDescriptors().find((descriptor) => descriptor.name === 'grep');
+    const properties = grep?.paramsJsonSchema.properties as Record<string, { type: string; maximum?: number }>;
+    expect(properties.ignoreCase).toEqual(expect.objectContaining({ type: 'boolean' }));
+    expect(properties.glob).toEqual(expect.objectContaining({ type: 'string' }));
+    expect(properties.contextLines).toEqual(expect.objectContaining({ type: 'integer', minimum: 0, maximum: 5 }));
   });
 });
