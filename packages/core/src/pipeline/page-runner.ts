@@ -267,6 +267,29 @@ export const generatePage = async (
         anchored: anchoredLedger.anchored,
         previousPage: previousShard?.page
       });
+      // Ambiguous threads (drift markers) and orphaned prior claims are recorded facts, never
+      // silent: they ride the journal now; shard persistence of matching confidence is 2b-iii.
+      const matchingWarnings: Finding[] = [
+        ...matched.matches
+          .filter((match) => match.confidence === 'ambiguous')
+          .map((match) => ({
+            source: 'verifier' as const,
+            check: 'claim-matching',
+            severity: 'warning' as const,
+            message: `claim ${match.priorId} threaded ambiguously (equal candidates) — content changed substantially since its human threads were written; drift marker recorded`,
+            data: { priorId: match.priorId, confidence: match.confidence }
+          })),
+        ...matched.orphans.map((orphanId) => ({
+          source: 'verifier' as const,
+          check: 'claim-matching',
+          severity: 'warning' as const,
+          message: `previous claim ${orphanId} matched nothing in the regenerated page — its threads are orphaned for re-attachment or dismissal`,
+          data: { orphanId }
+        }))
+      ];
+      if (matchingWarnings.length > 0) {
+        await ctx.journal.append({ type: 'findings', pageId: page.id, findings: matchingWarnings });
+      }
       lastLedger = matched.ledger;
       // TEMPORARY (until wave 2b-iii): the bridge REPLACES every block's legacy claims with the
       // ledger-derived view; the lift then upgrades blocks whose every claim is proven (a no-op

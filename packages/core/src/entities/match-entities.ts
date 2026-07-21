@@ -136,9 +136,11 @@ export const matchEntityIds = (fresh: PageEntity, previous: PageEntity): Matched
     }))
   };
 
-  // Claim ids are excluded from the tombstone diff: claim identity is owned by kernel claim
-  // matching (pipeline/match-claims.ts), which may legitimately carry a previous claim id onto
-  // the freshly anchored ledger — listing it tombstoned here would be a lie.
+  // Claim ids are excluded from the tombstone diff because this pass runs BEFORE kernel claim
+  // matching (pipeline/match-claims.ts) and cannot know which previous claim ids will legitimately
+  // thread onto the freshly anchored ledger — listing a carried id tombstoned here would be a lie.
+  // The exclusion is NOT silent loss: matchClaimIds returns every unthreaded previous claim id as
+  // an explicit ORPHAN, which the page runner journals (trust-model-v2 decision 8).
   const carriedIds = new Set(listPageEntityIds(page));
   const tombstonedIds = listPageEntityIds(previous).filter((id) => !id.startsWith('cl_') && !carriedIds.has(id));
   return { page, tombstonedIds };

@@ -138,6 +138,78 @@ describe('matchClaimIds', () => {
     );
   });
 
+  it('reports a confident match as typed metadata: freshId → priorId with confidence exact', () => {
+    const previousPage = extractPageEntity({ mdx, slug: 'p' });
+    const previousWithClaims: PageEntity = {
+      ...previousPage,
+      preamble: [
+        { ...previousPage.preamble[0]!, claims: [previousClaim('`greet` exists.')] },
+        previousPage.preamble[1]!
+      ]
+    };
+    const fresh = matchEntityIds(extractPageEntity({ mdx, slug: 'p' }), previousWithClaims).page;
+    const anchoredLedger = anchorFor(fresh);
+    const freshId = anchoredLedger.ledger.claims[0]?.claimId;
+    const matched = matchClaimIds({
+      ledger: anchoredLedger.ledger,
+      anchored: anchoredLedger.anchored,
+      previousPage: previousWithClaims
+    });
+    expect(matched.matches).toEqual([{ freshId, priorId: `cl_${'9'.repeat(20)}`, confidence: 'exact' }]);
+    expect(matched.orphans).toEqual([]);
+  });
+
+  it('threads through MULTIPLE equal candidates but records the drift marker (confidence ambiguous)', () => {
+    // Two prior claims on the same block are byte-identical (same class, same quote, same text):
+    // the fresh claim cannot distinguish them. The id must still carry — human threads need an
+    // identity — but the match is recorded 'ambiguous' and the unused twin surfaces as an orphan.
+    const twinA = previousClaim('`greet` exists.', { id: `cl_${'7'.repeat(20)}` });
+    const twinB = previousClaim('`greet` exists.', { id: `cl_${'8'.repeat(20)}` });
+    const previousPage = extractPageEntity({ mdx, slug: 'p' });
+    const previousWithClaims: PageEntity = {
+      ...previousPage,
+      preamble: [{ ...previousPage.preamble[0]!, claims: [twinA, twinB] }, previousPage.preamble[1]!]
+    };
+    const fresh = matchEntityIds(extractPageEntity({ mdx, slug: 'p' }), previousWithClaims).page;
+    const anchoredLedger = anchorFor(fresh);
+    const matched = matchClaimIds({
+      ledger: anchoredLedger.ledger,
+      anchored: anchoredLedger.anchored,
+      previousPage: previousWithClaims
+    });
+    // Deterministic pick (document order) with the drift marker recorded on the match result.
+    expect(matched.ledger.claims[0]?.claimId).toBe(twinA.id);
+    expect(matched.matches).toHaveLength(1);
+    expect(matched.matches[0]).toMatchObject({ priorId: twinA.id, confidence: 'ambiguous' });
+    // The unmatched twin is an explicit orphan, never a silent disappearance.
+    expect(matched.orphans).toEqual([twinB.id]);
+  });
+
+  it('surfaces prior claims that matched nothing as orphans', () => {
+    const orphaned = previousClaim('`gone` was removed.', {
+      id: `cl_${'6'.repeat(20)}`,
+      text: 'gone was removed',
+      claimClass: 'intent-history'
+    });
+    const previousPage = extractPageEntity({ mdx, slug: 'p' });
+    const previousWithClaims: PageEntity = {
+      ...previousPage,
+      preamble: [
+        { ...previousPage.preamble[0]!, claims: [previousClaim('`greet` exists.'), orphaned] },
+        previousPage.preamble[1]!
+      ]
+    };
+    const fresh = matchEntityIds(extractPageEntity({ mdx, slug: 'p' }), previousWithClaims).page;
+    const anchoredLedger = anchorFor(fresh);
+    const matched = matchClaimIds({
+      ledger: anchoredLedger.ledger,
+      anchored: anchoredLedger.anchored,
+      previousPage: previousWithClaims
+    });
+    expect(matched.matches).toHaveLength(1);
+    expect(matched.orphans).toEqual([orphaned.id]);
+  });
+
   it('is the identity when there is no previous page', () => {
     const fresh = extractPageEntity({ mdx, slug: 'p' });
     const anchoredLedger = anchorFor(fresh);
@@ -147,5 +219,7 @@ describe('matchClaimIds', () => {
       previousPage: undefined
     });
     expect(matched.ledger).toBe(anchoredLedger.ledger);
+    expect(matched.matches).toEqual([]);
+    expect(matched.orphans).toEqual([]);
   });
 });
