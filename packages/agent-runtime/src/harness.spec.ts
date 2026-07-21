@@ -319,21 +319,53 @@ describe('mdx-ledger output via submit_page', () => {
     ).toBe(true);
   });
 
-  it('reads the accepted submission after session-transport replay (forwarded tools)', async () => {
+  it('repairs and completes through the REAL forwarded-tools path on a session transport', async () => {
+    // Exercises the actual MCP-child code (loadForwardedToolImplementations) instead of invoking
+    // the parent handler directly — the child must return real repair errors in-session, and only
+    // parent replay produces the accepted artifact (the exact gap a direct-handler fake masked).
+    const { appendFile } = await import('node:fs/promises');
+    const { mcpServerEnvVars } = await import('./mcp-stdio-server.ts');
+    const { loadForwardedToolImplementations, prepareForwardedTools } = await import('./transports/forwarded-tools.ts');
     const { spec, tool } = ledgerSpec();
+    const childResponses: Array<{ accepted: boolean; errors?: string[] }> = [];
     const transport: SessionTransport = {
       mode: 'session',
       id: 'fake-session',
       capabilities: { toolInjection: 'mcp', structuredOutput: false },
       runSession: async (input, hooks) => {
-        // Simulates forwarded-tool replay: the real handler runs before runSession returns.
-        const submit = input.tools.find((candidate) => candidate.descriptor.name === 'submit_page');
-        await submit?.handler({ mdx: submittedMdx, ledger: submittedLedger });
+        const session = await prepareForwardedTools(input.tools);
+        try {
+          const childTools = await loadForwardedToolImplementations(
+            session.env[mcpServerEnvVars.extraToolsFile]!,
+            (line) => {
+              void appendFile(session.env[mcpServerEnvVars.toolCallsFile]!, `${line}\n`);
+            }
+          );
+          const childSubmit = childTools.find((candidate) => candidate.descriptor.name === 'submit_page')!;
+          // Invalid first call: the vendor model must see real repair errors while still in-session.
+          childResponses.push(
+            (await childSubmit.handler({ mdx: submittedMdx, ledger: { schemaVersion: 1, claims: [] } })) as {
+              accepted: boolean;
+              errors?: string[];
+            }
+          );
+          childResponses.push(
+            (await childSubmit.handler({ mdx: submittedMdx, ledger: submittedLedger })) as { accepted: boolean }
+          );
+          // Give the fire-and-forget appends a tick before replaying, like a real session end.
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          await session.replay();
+        } finally {
+          await session.cleanup();
+        }
         hooks.onTurn({ role: 'assistant', blocks: [{ type: 'text', text: 'submitted' }] });
         return { finalText: 'submitted', usage: { inputTokens: 5, outputTokens: 5 }, stopReason: 'complete' as const };
       }
     };
     const transcript = await runAgentTask(spec, { transport, model: 'm', repoRoot, extraTools: [tool] });
+    expect(childResponses[0]?.accepted).toBe(false);
+    expect(childResponses[0]?.errors?.some((error) => error.includes('has no ledger entry'))).toBe(true);
+    expect(childResponses[1]?.accepted).toBe(true);
     expect(transcript.result).toMatchObject({ type: 'mdx-ledger', mdx: submittedMdx });
   });
 });

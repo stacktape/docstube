@@ -1,3 +1,10 @@
+import type { Root } from 'mdast';
+import type { MdxJsxAttribute, MdxJsxExpressionAttribute } from 'mdast-util-mdx-jsx';
+import remarkFrontmatter from 'remark-frontmatter';
+import remarkGfm from 'remark-gfm';
+import remarkMdx from 'remark-mdx';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 import { z } from 'zod';
 import { claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
 import type { ToolDescriptor, WriterClaimLedger } from '@docstube/contracts';
@@ -17,65 +24,148 @@ export type ClaimMarker = {
   innerMdx: string;
 };
 
+// Typed scan errors: the kernel (anchor-ledger) classifies placement errors as repair-eligible and
+// grammar errors post-acceptance as kernel invariant breaches; validateSubmission renders every
+// code as a repair instruction for the model.
+export type MarkerScanErrorCode =
+  | 'mdx-parse-error'
+  | 'marker-flow'
+  | 'marker-in-heading'
+  | 'marker-in-expression'
+  | 'marker-missing-id'
+  | 'marker-invalid-id'
+  | 'marker-empty'
+  | 'marker-nested';
+
+export type MarkerScanError = { code: MarkerScanErrorCode; message: string; markerId?: string };
+
 export type MarkerScan = {
   markers: ClaimMarker[];
-  errors: string[];
+  errors: MarkerScanError[];
 };
 
-const OPEN_OR_CLOSE_TAG = /<Claim\b([^>]*?)(\/?)>|<\/Claim\s*>/g;
+// Same plugin set as the kernel's extraction parser (core extract-entities.ts) so marker positions
+// agree byte-for-byte with block source ranges.
+const markerProcessor = unified().use(remarkParse).use(remarkMdx).use(remarkGfm).use(remarkFrontmatter, ['yaml']);
 
-const markerIdOf = (attrs: string): string | undefined => {
-  const match = /\bid\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(attrs);
-  return match?.[1] ?? match?.[2];
+const markerIdOf = (attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>): string | undefined => {
+  for (const attribute of attributes) {
+    if (attribute.type === 'mdxJsxAttribute' && attribute.name === 'id' && typeof attribute.value === 'string') {
+      return attribute.value;
+    }
+  }
+  return undefined;
 };
 
-// Deterministic scan for inline <Claim id="…">…</Claim> markers. Regex + a one-slot stack instead
-// of a full MDX parse: the marker grammar is deliberately flat (no nesting, no self-closing), so
-// malformed markers get exact, repairable messages rather than parser noise.
+type ScanNode = {
+  type?: string;
+  name?: string | null;
+  value?: unknown;
+  children?: unknown[];
+  attributes?: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>;
+  position?: { start?: { offset?: number }; end?: { offset?: number } };
+};
+
+// AST-based scan for inline <Claim id="…">…</Claim> markers. Only an mdxJsxTextElement in
+// translatable content is a marker: literal <Claim> text inside fenced/inline code is plain text
+// (a docs example never counts), flow-level Claim elements and markers inside headings or JSX
+// expressions are precise repair errors — formatting must never change claim or block semantics.
 export const scanClaimMarkers = (mdx: string): MarkerScan => {
   const markers: ClaimMarker[] = [];
-  const errors: string[] = [];
-  let open: { markerId: string; offset: number; contentStart: number } | undefined;
-  for (const match of mdx.matchAll(OPEN_OR_CLOSE_TAG)) {
-    const [full, attrs, selfClosing] = match;
-    if (full.startsWith('</')) {
-      if (open === undefined) {
-        errors.push(`stray </Claim> at offset ${match.index} — no matching <Claim id="…"> opening tag`);
-        continue;
-      }
-      markers.push({
-        markerId: open.markerId,
-        offset: open.offset,
-        innerMdx: mdx.slice(open.contentStart, match.index)
+  const errors: MarkerScanError[] = [];
+  let tree: Root;
+  try {
+    tree = markerProcessor.parse(mdx) as Root;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    errors.push({
+      code: 'mdx-parse-error',
+      message: `the MDX does not parse: ${detail} — fix the syntax (unclosed or stray tags are the usual cause) and resubmit the complete page`
+    });
+    return { markers, errors };
+  }
+
+  const collectClaim = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean }): void => {
+    const offset = node.position?.start?.offset ?? 0;
+    if (context.inHeading) {
+      errors.push({
+        code: 'marker-in-heading',
+        message: `<Claim> at offset ${offset} sits inside a heading — headings cannot carry claims; move the marker into the body prose that states the fact`
       });
-      open = undefined;
-      continue;
+      return;
     }
-    if (selfClosing === '/') {
-      errors.push(
-        `self-closing <Claim/> at offset ${match.index} — a marker must wrap the asserted prose: <Claim id="…">text</Claim>`
-      );
-      continue;
+    if (context.inClaim) {
+      errors.push({
+        code: 'marker-nested',
+        message: `<Claim> at offset ${offset} opens inside another <Claim> — markers must not nest; split into separate sibling markers`
+      });
+      return;
     }
-    const markerId = markerIdOf(attrs ?? '');
+    const markerId = markerIdOf(node.attributes ?? []);
     if (markerId === undefined) {
-      errors.push(`<Claim> at offset ${match.index} has no id attribute — write <Claim id="…">`);
-      continue;
+      errors.push({
+        code: 'marker-missing-id',
+        message: `<Claim> at offset ${offset} has no id attribute — write <Claim id="…">`
+      });
+      return;
     }
     if (!claimMarkerIdSchema.safeParse(markerId).success) {
-      errors.push(`<Claim id="${markerId}"> is not a valid marker id — use letters, digits, "_" or "-"`);
-      continue;
+      errors.push({
+        code: 'marker-invalid-id',
+        markerId,
+        message: `<Claim id="${markerId}"> is not a valid marker id — use letters, digits, "_" or "-"`
+      });
+      return;
     }
-    if (open !== undefined) {
-      errors.push(
-        `<Claim id="${markerId}"> at offset ${match.index} opens inside <Claim id="${open.markerId}"> — markers must not nest`
-      );
-      continue;
+    const children = (node.children ?? []) as ScanNode[];
+    const contentStart = children[0]?.position?.start?.offset;
+    const contentEnd = children[children.length - 1]?.position?.end?.offset;
+    const innerMdx = contentStart === undefined || contentEnd === undefined ? '' : mdx.slice(contentStart, contentEnd);
+    if (innerMdx.trim() === '') {
+      errors.push({
+        code: 'marker-empty',
+        markerId,
+        message: `marker "${markerId}" wraps no prose — a marker must wrap the asserted sentence text: <Claim id="${markerId}">text</Claim>, never be empty or self-closing`
+      });
     }
-    open = { markerId, offset: match.index, contentStart: match.index + full.length };
-  }
-  if (open !== undefined) {
-    errors.push(`<Claim id="${open.markerId}"> is never closed — add </Claim> after the asserted prose`);
+    markers.push({ markerId, offset, innerMdx });
+  };
+
+  const visit = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean }): void => {
+    // Code fences, inline code, and frontmatter are literal text: a <Claim> written there is a
+    // documentation example, never a marker.
+    if (node.type === 'code' || node.type === 'inlineCode' || node.type === 'yaml') {
+      return;
+    }
+    if (node.type === 'mdxFlowExpression' || node.type === 'mdxTextExpression') {
+      if (typeof node.value === 'string' && node.value.includes('<Claim')) {
+        errors.push({
+          code: 'marker-in-expression',
+          message: `a <Claim> marker sits inside a JSX expression at offset ${node.position?.start?.offset ?? 0} — markers must be plain inline MDX in the prose, never inside {…} expressions`
+        });
+      }
+      return;
+    }
+    let childContext = context;
+    if (node.type === 'mdxJsxFlowElement' && node.name === 'Claim') {
+      errors.push({
+        code: 'marker-flow',
+        message: `<Claim> at offset ${node.position?.start?.offset ?? 0} is a flow (block-level) element — write the marker inline inside the sentence, with the opening tag, the wrapped prose, and </Claim> all in the paragraph text`
+      });
+      childContext = { ...context, inClaim: true };
+    } else if (node.type === 'mdxJsxTextElement' && node.name === 'Claim') {
+      collectClaim(node, context);
+      childContext = { ...context, inClaim: true };
+    } else if (node.type === 'heading') {
+      childContext = { ...context, inHeading: true };
+    }
+    for (const child of node.children ?? []) {
+      visit(child as ScanNode, childContext);
+    }
+  };
+
+  for (const node of tree.children) {
+    visit(node as ScanNode, { inHeading: false, inClaim: false });
   }
   return { markers, errors };
 };
@@ -84,6 +174,18 @@ const submitPageArgsSchema = z.object({
   mdx: z.string().min(1, 'mdx must be the complete non-empty page source'),
   ledger: z.unknown()
 });
+
+// The COMPLETE writer-ledger schema rides on the tool descriptor so vendor tool calling sees every
+// claim field and proposal variant instead of an opaque `{type: object}` (avoidable rejection
+// loops otherwise). Generated from the contract's Zod schema — never hand-maintained.
+const writerLedgerJsonSchema = (): Record<string, unknown> => {
+  const schema = z.toJSONSchema(writerClaimLedgerSchema, { io: 'input' }) as Record<string, unknown>;
+  delete schema.$schema;
+  schema.description =
+    'The writer claim ledger — exactly one entry per inline <Claim id="…"> marker in the MDX. Emit ONLY ' +
+    'markerId, class, predicate, proposedEvidence, proposedSubscriptions; every other claim field is kernel-owned.';
+  return schema;
+};
 
 export const submitPageDescriptor: ToolDescriptor = {
   name: 'submit_page',
@@ -98,17 +200,7 @@ export const submitPageDescriptor: ToolDescriptor = {
         type: 'string',
         description: 'The complete page MDX, including frontmatter and every inline <Claim id="…"> marker.'
       },
-      ledger: {
-        type: 'object',
-        description:
-          'The writer claim ledger: { schemaVersion: 1, claims: [{ markerId, class, predicate, proposedEvidence, ' +
-          'proposedSubscriptions }] } — one entry per <Claim> marker in the MDX.',
-        properties: {
-          schemaVersion: { type: 'integer', const: 1 },
-          claims: { type: 'array', items: { type: 'object' } }
-        },
-        required: ['schemaVersion', 'claims']
-      }
+      ledger: writerLedgerJsonSchema()
     },
     required: ['mdx', 'ledger']
   }
@@ -158,7 +250,7 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
     errors.push(...ledgerParse.error.issues.map(ledgerIssueMessage));
   }
   const scan = scanClaimMarkers(shape.data.mdx);
-  errors.push(...scan.errors);
+  errors.push(...scan.errors.map((error) => error.message));
 
   const markerCounts = new Map<string, number>();
   for (const marker of scan.markers) {
@@ -169,11 +261,6 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
       errors.push(
         `marker "${markerId}" appears ${count} times in the MDX — every marker id is unique; renumber the duplicates`
       );
-    }
-  }
-  for (const marker of scan.markers) {
-    if (marker.innerMdx.trim() === '') {
-      errors.push(`marker "${marker.markerId}" wraps no prose — the marker must wrap the asserted sentence text`);
     }
   }
   if (ledgerParse.success) {
@@ -200,6 +287,38 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
   return { accepted: { mdx: shape.data.mdx, ledger: ledgerParse.data }, errors: [] };
 };
 
+export type SubmitPageResponse = {
+  accepted: boolean;
+  errors?: string[];
+  note: string;
+};
+
+// The single evaluation used by BOTH the in-process handler and the MCP-child special case
+// (transports/forwarded-tools.ts): what the model sees in-session is always the real validation
+// outcome, on every transport.
+export const evaluateSubmitPageCall = (
+  args: unknown
+): { response: SubmitPageResponse; accepted: AcceptedSubmission | undefined } => {
+  const outcome = validateSubmission(args);
+  if (outcome.accepted === undefined) {
+    return {
+      accepted: undefined,
+      response: {
+        accepted: false,
+        errors: outcome.errors,
+        note: 'Submission rejected. Fix every listed error and call submit_page again with the complete corrected page and ledger.'
+      }
+    };
+  }
+  return {
+    accepted: outcome.accepted,
+    response: {
+      accepted: true,
+      note: 'Page accepted. You are done — do not call submit_page again unless you need to replace the submission.'
+    }
+  };
+};
+
 export type SubmitPageTool = {
   tool: ToolImplementation;
   accepted: () => AcceptedSubmission | undefined;
@@ -211,20 +330,12 @@ export const createSubmitPageTool = (): SubmitPageTool => {
     tool: {
       descriptor: submitPageDescriptor,
       handler: async (args) => {
-        const outcome = validateSubmission(args);
-        if (outcome.accepted === undefined) {
-          return {
-            accepted: false,
-            errors: outcome.errors,
-            note: 'Submission rejected. Fix every listed error and call submit_page again with the complete corrected page and ledger.'
-          };
-        }
+        const outcome = evaluateSubmitPageCall(args);
         // Last accepted submission wins — a re-call intentionally replaces the artifact.
-        accepted = outcome.accepted;
-        return {
-          accepted: true,
-          note: 'Page accepted. You are done — do not call submit_page again unless you need to replace the submission.'
-        };
+        if (outcome.accepted !== undefined) {
+          accepted = outcome.accepted;
+        }
+        return outcome.response;
       },
       taskResult: () => (accepted === undefined ? undefined : { type: 'mdx-ledger', ...accepted })
     },

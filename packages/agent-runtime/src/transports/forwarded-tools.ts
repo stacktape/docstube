@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toolDescriptorSchema } from '@docstube/contracts';
 import { mcpServerEnvVars } from '../mcp-stdio-server.ts';
+import { evaluateSubmitPageCall } from '../submit-page.ts';
 import { standardToolDescriptors } from '../tools.ts';
 import type { ToolImplementation } from '../tools.ts';
 
@@ -11,8 +12,15 @@ import type { ToolImplementation } from '../tools.ts';
 // record-style: the child advertises the descriptor, acks every call with a generic "recorded"
 // response, and appends {name, args} to a JSONL sink. After the session, the parent replays the
 // recorded calls through the real handlers so collectors (e.g. flag_question) observe them.
-// Request-response extra tools (where the model needs the real result) still require a loop
-// transport — documented at the TaskRunner seam.
+//
+// submit_page is the one special case: its validator is pure and shippable, so the child runs it
+// IN-SESSION and returns real repair errors / accepted:true to the vendor model — an invalid first
+// submission must be repairable while the model is still there (ARCHITECTURE §8.1/§8.3). The call
+// is still recorded; parent replay re-validates through the real handler, which is what actually
+// produces the accepted task artifact. Generic bidirectional request/response forwarding (for
+// future context-dependent tools such as validate_page_draft, whose handlers need parent-process
+// state) is deliberately NOT built here — that remains a loop-transport capability until a real
+// forwarding channel exists, documented at the TaskRunner seam.
 
 export type ForwardedToolsSession = {
   env: Record<string, string>;
@@ -77,6 +85,18 @@ export const loadForwardedToolImplementations = async (
   const raw = JSON.parse(await readFile(descriptorsFile, 'utf8')) as unknown[];
   return raw.map((entry) => {
     const descriptor = toolDescriptorSchema.parse(entry);
+    if (descriptor.name === 'submit_page') {
+      // In-session validation: the vendor model gets the REAL repair errors (or accepted:true)
+      // while it can still fix them. Every call is recorded regardless — the parent replay through
+      // the real handler is what mints the accepted artifact.
+      return {
+        descriptor,
+        handler: async (args: unknown) => {
+          appendCall(JSON.stringify({ name: descriptor.name, args }));
+          return evaluateSubmitPageCall(args).response;
+        }
+      };
+    }
     return {
       descriptor,
       handler: async (args: unknown) => {

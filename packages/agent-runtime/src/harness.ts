@@ -316,9 +316,11 @@ const runVendorSession = async (
   }
   const finalText = (outcome.finalText ?? '').trim();
   if (spec.output.type === 'mdx-ledger') {
-    // On session transports the submit_page call reaches the real handler via forwarded-tool
-    // replay (transports/forwarded-tools.ts), which has already run by the time runSession
-    // returns — the provider holds the accepted artifact here. No mid-session repair is possible.
+    // On session transports submit_page is validated IN-SESSION by the MCP child (the forwarded
+    // submit_page special case in transports/forwarded-tools.ts), so the vendor model repairs
+    // invalid submissions while it is still there. The real handler runs via forwarded-tool
+    // replay, which has already happened by the time runSession returns — the provider holds the
+    // accepted artifact here.
     const delivered = toolDeliveredResult(tools);
     return delivered !== undefined
       ? { turns, usage: outcome.usage, stopReason: 'complete', result: delivered }

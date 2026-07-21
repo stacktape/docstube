@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { mcpServerEnvVars } from '../mcp-stdio-server.ts';
+import { createSubmitPageTool } from '../submit-page.ts';
 import { runSubprocess } from '../subprocess.ts';
 import { createObservedReadsCollector, createStandardTools } from '../tools.ts';
 import type { ToolImplementation } from '../tools.ts';
@@ -116,6 +117,68 @@ describe('mcp-stdio-server-bin with forwarded tools', () => {
     expect(sink).toContain('Why does the queue retry three times?');
     expect(await session.replay()).toBe(1);
     expect(captured).toEqual([{ question: 'Why does the queue retry three times?' }]);
+    await session.cleanup();
+  }, 60_000);
+
+  it('validates submit_page IN-SESSION: invalid call gets repair errors, corrected call gets accepted, parent replay mints the artifact', async () => {
+    const submitPage = createSubmitPageTool();
+    const session = await prepareForwardedTools([submitPage.tool]);
+    const binPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'mcp-stdio-server-bin.ts');
+    const goodMdx = '---\ntitle: "Retry"\n---\n\n# Retry\n\n<Claim id="c1">`retries` defaults to 3.</Claim>\n';
+    const goodLedger = {
+      schemaVersion: 1,
+      claims: [{ markerId: 'c1', class: 'value', predicate: 'retries defaults to 3' }]
+    };
+    const requests = [
+      { jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18' } },
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        // Invalid first submission: the marker has no ledger entry.
+        params: { name: 'submit_page', arguments: { mdx: goodMdx, ledger: { schemaVersion: 1, claims: [] } } }
+      },
+      {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: 'submit_page', arguments: { mdx: goodMdx, ledger: goodLedger } }
+      }
+    ];
+    const result = await runSubprocess({
+      command: process.execPath,
+      args: ['--conditions=docstube-source', binPath],
+      cwd: process.cwd(),
+      input: `${requests.map((request) => JSON.stringify(request)).join('\n')}\n`,
+      timeoutMs: 30_000,
+      env: { [mcpServerEnvVars.readRoots]: JSON.stringify(['.']), ...session.env }
+    });
+    expect(result.timedOut).toBe(false);
+    expect(result.exitCode).toBe(0);
+
+    const responses = new Map(
+      result.stdout
+        .split(/\r?\n/)
+        .filter((line) => line.trim().length > 0)
+        .map((line) => JSON.parse(line) as { id?: number; result?: { content?: Array<{ text?: string }> } })
+        .map((response) => [response.id, response] as const)
+    );
+    // The vendor model saw the REAL validation outcome in-session, not a generic ack.
+    const firstBody = JSON.parse(responses.get(1)?.result?.content?.[0]?.text ?? '{}') as {
+      accepted: boolean;
+      errors?: string[];
+    };
+    expect(firstBody.accepted).toBe(false);
+    expect(firstBody.errors?.some((error) => error.includes('has no ledger entry'))).toBe(true);
+    const secondBody = JSON.parse(responses.get(2)?.result?.content?.[0]?.text ?? '{}') as { accepted: boolean };
+    expect(secondBody.accepted).toBe(true);
+
+    // The artifact only exists after parent replay through the real handler.
+    expect(submitPage.accepted()).toBeUndefined();
+    expect(await session.replay()).toBe(2);
+    expect(submitPage.accepted()).toMatchObject({ mdx: goodMdx });
+    expect(submitPage.tool.taskResult?.()).toMatchObject({ type: 'mdx-ledger', mdx: goodMdx });
     await session.cleanup();
   }, 60_000);
 });
