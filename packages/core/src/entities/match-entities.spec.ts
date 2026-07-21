@@ -62,6 +62,35 @@ const a = 1;
     expect(page.sections[0]?.blocks[0]?.id).toBe(previous.sections[0]?.blocks[0]?.id);
   });
 
+  it('never carries claim trust state — identity carries, claims are rebuilt from the ledger', () => {
+    const previous = extractPageEntity({ mdx: v1, slug: 'guide' });
+    const previousWithClaims = {
+      ...previous,
+      preamble: [
+        {
+          ...previous.preamble[0]!,
+          claims: [
+            {
+              id: `cl_${'0'.repeat(20)}`,
+              kind: 'claim' as const,
+              text: 'stale proven claim',
+              anchor: { quote: 'Intro paragraph.', prefix: '', suffix: '' },
+              claimClass: 'code-structure',
+              guarantee: 'proven' as const
+            }
+          ]
+        }
+      ]
+    };
+    const fresh = extractPageEntity({ mdx: v1, slug: 'guide' });
+    const { page, tombstonedIds } = matchEntityIds(fresh, previousWithClaims);
+    // The block id carries; the old ClaimEntity (with its proven guarantee) does NOT.
+    expect(page.preamble[0]?.id).toBe(previousWithClaims.preamble[0]?.id);
+    expect(page.preamble[0]?.claims).toEqual([]);
+    // The claim id is not tombstoned either — kernel claim matching owns claim identity.
+    expect(tombstonedIds).toEqual([]);
+  });
+
   it('tombstones ids of removed content and never reuses them', () => {
     const previous = extractPageEntity({ mdx: v1, slug: 'guide' });
     const shrunk = `# Guide

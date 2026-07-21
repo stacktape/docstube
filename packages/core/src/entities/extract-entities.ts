@@ -105,6 +105,14 @@ const blockTypeFor = (
       if (jsx.name === null || jsx.name === undefined) {
         return { blockType: 'raw' };
       }
+      // The inline Claim marker is claim vocabulary, NOT a component: it must never change the
+      // owning block's semantic type. A writer who formats the marker across lines produces a
+      // flow element wrapping the same prose — the block stays a paragraph so block matching and
+      // structural snapshots are formatting-insensitive. (submit_page rejects flow markers on the
+      // generation path; this keeps audit extraction of foreign docs consistent too.)
+      if (jsx.name === 'Claim') {
+        return { blockType: 'paragraph' };
+      }
       return { blockType: componentBlockType(jsx.name), metadata: jsxAttributesToMetadata(jsx.attributes) };
     }
     default:

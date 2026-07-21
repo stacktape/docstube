@@ -115,19 +115,14 @@ export const matchEntityIds = (fresh: PageEntity, previous: PageEntity): Matched
   const previousBlocks = locateBlocks(previous, (sectionId) => sectionId);
   const blockMapping = matchBlocks(freshBlocks, previousBlocks);
 
-  const previousBlocksById = new Map(previousBlocks.map((entry) => [entry.block.id, entry.block]));
-
   const remapBlock = (block: BlockEntity): BlockEntity => {
     const previousId = blockMapping.get(block.id);
-    if (previousId === undefined) {
-      return block;
-    }
-    const previousBlock = previousBlocksById.get(previousId);
-    // Claims are agent-produced; carry forward claims whose anchor quote still exists in the
-    // matched block (same content ⇒ same claims), otherwise drop — they will be re-extracted.
-    const claims =
-      previousBlock && previousBlock.contentHash === block.contentHash ? previousBlock.claims : block.claims;
-    return { ...block, id: previousId, claims };
+    // ONLY identity carries. Claims are trust state and are never copied from the previous shard —
+    // even for content-identical blocks: the kernel ledger rebuilds every claim from the current
+    // run and claim matching (pipeline/match-claims.ts) reuses the previous claim ID for a
+    // continuing assertion. Copying old ClaimEntity records here resurrected stale guarantees
+    // ("identity may carry; trust never carries", trust-model-v2 decision 8).
+    return previousId === undefined ? block : { ...block, id: previousId };
   };
 
   const page: PageEntity = {
@@ -141,7 +136,10 @@ export const matchEntityIds = (fresh: PageEntity, previous: PageEntity): Matched
     }))
   };
 
+  // Claim ids are excluded from the tombstone diff: claim identity is owned by kernel claim
+  // matching (pipeline/match-claims.ts), which may legitimately carry a previous claim id onto
+  // the freshly anchored ledger — listing it tombstoned here would be a lie.
   const carriedIds = new Set(listPageEntityIds(page));
-  const tombstonedIds = listPageEntityIds(previous).filter((id) => !carriedIds.has(id));
+  const tombstonedIds = listPageEntityIds(previous).filter((id) => !id.startsWith('cl_') && !carriedIds.has(id));
   return { page, tombstonedIds };
 };

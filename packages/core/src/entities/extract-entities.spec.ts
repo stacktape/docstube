@@ -59,6 +59,23 @@ describe('extractPageEntity', () => {
     expect(page.sections.map((section) => section.anchor)).toEqual(['usage', 'usage-2']);
   });
 
+  it('treats the inline Claim marker as transparent — the owning block type never changes', () => {
+    const inline = extractPageEntity({
+      mdx: '# T\n\nIntro <Claim id="c1">`retries` defaults to 3.</Claim> outro.\n',
+      slug: 'x'
+    });
+    expect(inline.preamble.map((block) => block.blockType)).toEqual(['paragraph']);
+
+    // A multiline-formatted marker parses as a flow element, but Claim is claim vocabulary, not a
+    // component: the block stays a paragraph so formatting never changes structural snapshots.
+    const flow = extractPageEntity({
+      mdx: '# T\n\n<Claim id="c1">\n  `retries` defaults to 3.\n</Claim>\n',
+      slug: 'x'
+    });
+    expect(flow.preamble.map((block) => block.blockType)).toEqual(['paragraph']);
+    expect(flow.preamble[0]?.blockType).not.toBe('component:Claim');
+  });
+
   it('survives invalid frontmatter YAML and still recovers title/description leniently', () => {
     // Live regression: an unquoted description containing ": " is invalid YAML; extraction must
     // not crash on model output — the mdx-compile verifier owns reporting the syntax error.
