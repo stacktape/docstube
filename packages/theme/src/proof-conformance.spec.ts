@@ -118,4 +118,22 @@ describe('proof conformance (basic theme)', () => {
     // Section counts surface the contradiction where it lives.
     expect(page).toContain('"contradicted":1');
   });
+
+  it('renders a page WITHOUT a trust spine LOUDLY unverified — never a silent 0/0 (impl-08)', async () => {
+    // The setup fixture page persists with no ledger/provenance (the failed first-generation
+    // anchoring shape): its route must carry the explicit unverified frontmatter, and the chip
+    // primitive must render the visible warning from it.
+    const bare = await readFile(join(siteRoot, 'src/pages/guides/setup.mdx'), 'utf8');
+    expect(bare).toContain('docstubeUnverified: true');
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('unverifiedPage ? (');
+    expect(chip).toContain('This page could not be verified');
+    expect(chip).toContain('data-docstube-unverified="true"');
+    const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
+    expect(layout).toContain('unverifiedPage={unverifiedPage}');
+    expect(layout).toContain('frontmatter.docstubeUnverified === true');
+    // The verified install page must NOT carry the unverified marker.
+    const verified = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(verified).not.toContain('docstubeUnverified');
+  });
 });

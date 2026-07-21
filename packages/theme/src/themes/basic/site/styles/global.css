@@ -145,6 +145,15 @@ pre {
   border-color: #b6dfc4;
   color: var(--success);
 }
+.dt-unverified-warning {
+  background: #fff4e0;
+  border: 1px solid #e8c98f;
+  border-radius: 999px;
+  color: #8a5a00;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+}
 .dt-contradictions {
   background: #fdeaea;
   border: 1px solid #eec1c1;

@@ -36,6 +36,7 @@ const claimsTotal = frontmatter.docstubeClaimsTotal ?? 0;
 const claimsContradicted = frontmatter.docstubeClaimsContradicted ?? 0;
 const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
 const reviewedFor = frontmatter.docstubeReviewedFor;
+const unverifiedPage = frontmatter.docstubeUnverified === true;
 const locale = frontmatter.docstubeLocale ?? sourceLocale;
 const alternates = frontmatter.docstubeAlternates ?? [];
 const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
@@ -140,7 +141,7 @@ const navGroups = nav.map((group) => ({ label: group.label, entries: group.entri
               </nav>
             ) : null
           }
-          <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} />
+          <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} />
         </div>
         <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />
         <DocstubeEntity entityId={frontmatter.docstubePageId}>

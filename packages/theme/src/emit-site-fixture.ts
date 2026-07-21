@@ -32,9 +32,13 @@ export type FixtureInputOptions = {
 // With `contradicted`, a third claim is a caught lie (failed value-predicate deciding evidence).
 const withTrustSpine = (shard: PageShard, contradicted = false): PageShard => {
   const page = shard.page;
-  const revision = entityRevisionSchema.parse('5'.repeat(64));
-  const checkedBlockId = page.sections[0]?.blocks[0]?.id ?? page.preamble[0]!.id;
-  const uncheckedBlockId = page.preamble[0]?.id ?? checkedBlockId;
+  const checkedBlock = page.sections[0]?.blocks[0] ?? page.preamble[0]!;
+  const uncheckedBlock = page.preamble[0] ?? checkedBlock;
+  const checkedBlockId = checkedBlock.id;
+  const uncheckedBlockId = uncheckedBlock.id;
+  // Scope revision is the scoped block's content hash — the shard schema rejects anything else.
+  const checkedRevision = entityRevisionSchema.parse(checkedBlock.contentHash);
+  const uncheckedRevision = entityRevisionSchema.parse(uncheckedBlock.contentHash);
   const decidingEvidenceId = mintId(idPrefixes.evidence);
   const contradictionEvidenceId = mintId(idPrefixes.evidence);
   const ledger: ClaimLedger = {
@@ -48,7 +52,7 @@ const withTrustSpine = (shard: PageShard, contradicted = false): PageShard => {
         predicate: 'docstube installs globally via npm',
         anchor: { blockId: checkedBlockId, markerId: 'c1' },
         quote: 'docstube installs globally via npm',
-        scope: { entityId: checkedBlockId, revision },
+        scope: { entityId: checkedBlockId, revision: checkedRevision },
         subscriptions: [],
         evidence: [decidingEvidenceId],
         correctness: 'checked',
@@ -61,7 +65,7 @@ const withTrustSpine = (shard: PageShard, contradicted = false): PageShard => {
         predicate: 'the installer exists for no-Node environments',
         anchor: { blockId: uncheckedBlockId, markerId: 'c2' },
         quote: 'The installer exists for no-Node environments.',
-        scope: { entityId: uncheckedBlockId, revision },
+        scope: { entityId: uncheckedBlockId, revision: uncheckedRevision },
         subscriptions: [],
         evidence: [],
         correctness: 'unchecked',
@@ -75,7 +79,7 @@ const withTrustSpine = (shard: PageShard, contradicted = false): PageShard => {
               predicate: 'attempts defaults to 5',
               anchor: { blockId: checkedBlockId, markerId: 'c3' },
               quote: '`attempts` defaults to 5.',
-              scope: { entityId: checkedBlockId, revision },
+              scope: { entityId: checkedBlockId, revision: checkedRevision },
               subscriptions: [],
               evidence: [contradictionEvidenceId],
               correctness: 'contradicted' as const,

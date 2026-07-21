@@ -26,7 +26,7 @@ const review = (overrides: Partial<PersonaReview>): PersonaReview => ({
   entityId: installShard().page.id,
   scoredBy: 'model',
   completion: 'completed',
-  criteria: [],
+  criteria: [{ id: 'audience-fit', outcome: 'met' }],
   ...overrides
 });
 
@@ -34,6 +34,7 @@ describe('projectShardProof', () => {
   it('projects literal claim counts with no guarantee field at all', () => {
     const projection = projectShardProof(installShard());
     expect(projection).toMatchObject({
+      state: 'verified',
       checkedClaims: 1,
       totalClaims: 2,
       contradictedClaims: 0,
@@ -62,13 +63,17 @@ describe('projectShardProof', () => {
     expect(projectShardProof(withReviews(shard, [review({ completion: 'failed' })])).reviewedFor).toBeUndefined();
     // A completed SECONDARY review never masquerades as the primary label.
     expect(projectShardProof(withReviews(shard, [review({ role: 'secondary-advisory' })])).reviewedFor).toBeUndefined();
-    // Only the genuinely completed primary review earns the label.
+    // A "completed" review with NO evaluated criteria proves nothing was evaluated — label
+    // withheld (impl-08 new defect; the schema also rejects such records at parse time).
+    expect(projectShardProof(withReviews(shard, [review({ criteria: [] })])).reviewedFor).toBeUndefined();
+    // Only the genuinely completed primary review (with criteria outcomes) earns the label.
     expect(projectShardProof(withReviews(shard, [review({})])).reviewedFor).toBe('app-developer');
   });
 
-  it('projects zero counts (and renders nothing loud) for a shard without a trust spine', () => {
+  it("projects the EXPLICIT 'unverified' state for a shard without a trust spine — never a silent 0/0 (impl-08)", () => {
     const bare = buildFixtureInput('unused-root').pages[1]!.shard;
     expect(projectShardProof(bare)).toMatchObject({
+      state: 'unverified',
       checkedClaims: 0,
       totalClaims: 0,
       contradictedClaims: 0,

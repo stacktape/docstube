@@ -174,19 +174,32 @@ export const reviewCompletionSchema = z.enum(['completed', 'pending', 'failed'])
 // subset (trust-model-v2 decision 4). Criteria outcomes are recorded per entity.
 export const personaReviewRoleSchema = z.enum(['primary-gating', 'secondary-advisory']);
 
-export const personaReviewSchema = z.object({
-  persona: z.string().min(1),
-  role: personaReviewRoleSchema,
-  // The entity the review targeted.
-  entityId: z.union([pageIdSchema, sectionIdSchema, blockIdSchema]),
-  // Model id that scored the review.
-  scoredBy: z.string().min(1),
-  completion: reviewCompletionSchema,
-  criteria: z
-    .array(z.object({ id: z.string().min(1), version: z.string().optional(), outcome: criterionOutcomeSchema }))
-    .default([]),
-  at: isoTimestampSchema.optional()
-});
+export const personaReviewSchema = z
+  .object({
+    persona: z.string().min(1),
+    role: personaReviewRoleSchema,
+    // The entity the review targeted.
+    entityId: z.union([pageIdSchema, sectionIdSchema, blockIdSchema]),
+    // Model id that scored the review.
+    scoredBy: z.string().min(1),
+    completion: reviewCompletionSchema,
+    criteria: z
+      .array(z.object({ id: z.string().min(1), version: z.string().optional(), outcome: criterionOutcomeSchema }))
+      .default([]),
+    at: isoTimestampSchema.optional()
+  })
+  .superRefine((review, ctx) => {
+    // A COMPLETED review must carry evaluated criteria (impl-08 new defect): "completed" with
+    // zero criterion outcomes proves nothing was evaluated — such a record must not parse, so the
+    // "reviewed for <persona>" label can never be earned by a structurally hollow review.
+    if (review.completion === 'completed' && review.criteria.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['criteria'],
+        message: 'a completed review must record at least one evaluated criterion outcome'
+      });
+    }
+  });
 export type PersonaReview = z.infer<typeof personaReviewSchema>;
 
 // One evidence-fed risk critic per page (harness-state-v2 decision 4): hunts misleading framing,

@@ -494,6 +494,42 @@ describe('assessments', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it('rejects a COMPLETED review with empty criteria — completion must prove evaluation (impl-08)', () => {
+    const hollow = personaReviewSchema.safeParse({
+      persona: 'app-developer',
+      role: 'primary-gating',
+      entityId: pageId,
+      scoredBy: 'model-x',
+      completion: 'completed',
+      criteria: []
+    });
+    expect(hollow.success).toBe(false);
+    expect(JSON.stringify(hollow.error?.issues)).toContain('at least one evaluated criterion');
+    // Pending and failed reviews may legitimately carry no criteria.
+    for (const completion of ['pending', 'failed']) {
+      expect(
+        personaReviewSchema.safeParse({
+          persona: 'app-developer',
+          role: 'primary-gating',
+          entityId: pageId,
+          scoredBy: 'model-x',
+          completion,
+          criteria: []
+        }).success
+      ).toBe(true);
+    }
+    expect(
+      personaReviewSchema.safeParse({
+        persona: 'app-developer',
+        role: 'primary-gating',
+        entityId: pageId,
+        scoredBy: 'model-x',
+        completion: 'completed',
+        criteria: [{ id: 'audience-fit', outcome: 'met' }]
+      }).success
+    ).toBe(true);
+  });
 });
 
 describe('translation fidelity lifecycle', () => {

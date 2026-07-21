@@ -18,12 +18,17 @@ export type SectionClaimsChip = {
 };
 
 export type ShardProofProjection = {
+  // EXPLICIT unverified state (impl-08 new defect): a persisted page WITHOUT a ledger/provenance
+  // trust spine (a failed first-generation anchoring) is 'unverified' and must render a LOUD
+  // warning — never a silent 0/0 that reads as ordinary content.
+  state: 'verified' | 'unverified';
   checkedClaims: number;
   totalClaims: number;
   contradictedClaims: number;
   uncheckedClaims: number;
-  // Persona id when a primary-gating review genuinely completed; the "reviewed for <persona>"
-  // label is withheld otherwise (harness-state-v2 decision 3) — there is NO fallback-to-reviewed.
+  // Persona id when a primary-gating review genuinely completed WITH at least one evaluated
+  // criterion; the "reviewed for <persona>" label is withheld otherwise (harness-state-v2
+  // decision 3) — there is NO fallback-to-reviewed.
   reviewedFor: string | undefined;
   // Marker ids of contradicted claims — the per-claim contradicted marks the theme renders on the
   // inline <Claim> elements.
@@ -32,6 +37,7 @@ export type ShardProofProjection = {
 };
 
 export const projectShardProof = (shard: PageShard): ShardProofProjection => {
+  const unverified = shard.ledger === undefined || shard.provenance === undefined;
   const records = shard.provenance?.claimEvidence ?? [];
   const checkedClaims = records.filter((record) => record.correctness === 'checked').length;
   const contradictedClaims = records.filter((record) => record.correctness === 'contradicted').length;
@@ -60,11 +66,15 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
     };
   });
 
+  // A completed review must carry evaluated criteria (impl-08 new defect): completion alone does
+  // not prove required criteria were evaluated — an empty-criteria "completed" review earns no
+  // label (the schema also rejects it at parse time; this guards pre-schema records).
   const completedPrimaryReview = shard.provenance?.assessments.reviews.find(
-    (review) => review.role === 'primary-gating' && review.completion === 'completed'
+    (review) => review.role === 'primary-gating' && review.completion === 'completed' && review.criteria.length > 0
   );
 
   return {
+    state: unverified ? 'unverified' : 'verified',
     checkedClaims,
     totalClaims,
     contradictedClaims,

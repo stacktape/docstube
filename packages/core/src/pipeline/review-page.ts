@@ -94,7 +94,10 @@ export type ScoredReview = ReviewResult & {
 const reviewFromTranscript = (persona: Persona, transcript: Transcript): ReviewResult & { completed: boolean } => {
   if (transcript.result?.type === 'structured') {
     const parsed = reviewResultSchema.safeParse(transcript.result.value);
-    if (parsed.success) {
+    // A review with ZERO criterion outcomes evaluated nothing — it must never count as completed
+    // (impl-08 new defect: the "reviewed" label requires nonempty evaluated criteria; the
+    // personaReview schema rejects completed-with-empty-criteria at parse time too).
+    if (parsed.success && parsed.data.criteria.length > 0) {
       return { ...parsed.data, completed: true };
     }
   }

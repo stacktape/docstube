@@ -263,6 +263,8 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
     `docstubeClaimsChecked: ${proof.checkedClaims}`,
     `docstubeClaimsTotal: ${proof.totalClaims}`,
     `docstubeClaimsContradicted: ${proof.contradictedClaims}`,
+    // A page without a persisted trust spine renders a LOUD unverified warning (impl-08).
+    ...(proof.state === 'unverified' ? ['docstubeUnverified: true'] : []),
     ...(proof.contradictedMarkers.length > 0
       ? [`docstubeContradictedClaims: ${JSON.stringify(proof.contradictedMarkers)}`]
       : []),
