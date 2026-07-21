@@ -22,8 +22,8 @@ describe('atomic commit path selection', () => {
   it('ships docs, manifest shards, criteria, and instructions together and excludes machine-local state', () => {
     const paths = selectCommitPaths([
       'docs-site/content/en/installation.mdx',
-      '.docstube/manifest/manifest.yml',
-      '.docstube\\manifest\\pages\\en\\pg_00000000000000000000.yml',
+      '.docstube/manifest/manifest.json',
+      '.docstube\\manifest\\pages\\en\\pg_00000000000000000000.json',
       '.docstube/criteria/audience-fit.md',
       '.docstube/instructions/tone.md',
       '.docstube/knowledge/ts-abc.md',
@@ -37,15 +37,15 @@ describe('atomic commit path selection', () => {
       '.docstube/criteria/audience-fit.md',
       '.docstube/instructions/tone.md',
       '.docstube/knowledge/ts-abc.md',
-      '.docstube/manifest/manifest.yml',
-      '.docstube/manifest/pages/en/pg_00000000000000000000.yml',
+      '.docstube/manifest/manifest.json',
+      '.docstube/manifest/pages/en/pg_00000000000000000000.json',
       'docs-site/content/en/installation.mdx'
     ]);
   });
 });
 
 describe('PR body (verified delta annotation)', () => {
-  it('renders guarantee counts per page and the flags section from manifest fixtures', async () => {
+  it('renders claim counts per page and the flags section from manifest fixtures', async () => {
     const shard = buildFixtureShardWithFlags([
       buildFixtureFlag({
         kind: 'out-of-domain',
