@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import type { PageArtifact } from '@docstube/plugin-sdk';
 import { createSubmitPageTool, submitPageDescriptor } from '@docstube/agent-runtime';
 import type {
@@ -103,8 +105,11 @@ export const generatePage = async (
   artifact: PageArtifact;
   shard: PageShard;
   ledger?: ClaimLedger;
-  // Provenance v2 for the page that passed the gate (in-memory this wave; persistence is 2b-iii).
+  // The final attempt's ProvenanceV2 (also embedded on the shard).
   provenance?: ProvenanceV2;
+  // True when the candidate was REJECTED after retry exhaustion and the previously published page
+  // was retained byte-for-byte (impl-06 finding 3; anticipates staged-atomic publish).
+  retainedPrior?: boolean;
 }> => {
   // Clamped to at least one attempt — a non-positive cap would skip the loop entirely and crash
   // below with a misleading 'produced no artifact'.
@@ -415,11 +420,70 @@ export const generatePage = async (
   });
 
   // Gate: clean → passed; findings after bounded retries → flag and ship the flagged state.
-  // Never silently wrong (PRODUCT §3.5 stage 6). The shard embeds the trust spine of the FINAL
-  // attempt — kernel ledger, ProvenanceV2 (ClaimEvidence), and the claim-matching records — in
-  // its true final state: a contradicted claim persists as contradicted, loud and
-  // machine-readable, never as a bare flag over clean-looking prose (impl-06 finding 3).
+  // Never silently wrong (PRODUCT §3.5 stage 6).
   const passed = findings.length === 0;
+
+  // FAILED-ATTEMPT PUBLICATION ROUTE (impl-06 finding 3, anticipating pipeline-v2 staged-atomic
+  // publish): when the final retry still carries blocking CLAIM findings (a contradiction, a
+  // value-binding violation, an unanchorable ledger) and a previously published page exists, the
+  // candidate is DISCARDED and the prior page is retained byte-for-byte — its shard (page,
+  // ledger, evidence, matching) carries forward unchanged, with an open flag referencing the
+  // rejected candidate attempt. Publishing prose whose claims the kernel just refuted would be
+  // shipping a known lie under a clean layout.
+  const claimFindings = findings.filter(
+    (finding) => finding.check === CLAIM_VERIFICATION_CHECK || finding.check === 'claim-anchoring'
+  );
+  if (!passed && claimFindings.length > 0 && previousShard !== undefined) {
+    const priorMdxPath = join(ctx.repoRoot, ctx.config.outDir, contentRelativePath(ctx.locale, node.slug));
+    let priorMdx: string | undefined;
+    try {
+      priorMdx = await readFile(priorMdxPath, 'utf8');
+    } catch {
+      priorMdx = undefined;
+    }
+    if (priorMdx !== undefined) {
+      const rejectionFlag = {
+        id: mintId(idPrefixes.flag),
+        kind: 'system' as const,
+        status: 'open' as const,
+        summary: `regeneration of "${node.slug}" rejected — claim verification failed; previous published page retained`,
+        detail: [
+          `the candidate from run ${ctx.journal.runId} (${attemptsUsed} attempt(s)) was discarded:`,
+          ...findings.map((finding) => `[${finding.check}] ${finding.message}`)
+        ].join('\n'),
+        entity: { version: ctx.version, locale: ctx.locale, pageId: previousShard.page.id },
+        runId: ctx.journal.runId,
+        createdAt: new Date().toISOString()
+      };
+      // Callers journal flag-raised when they persist the shard (as for every other flag).
+      return {
+        outcome: {
+          pageId: previousShard.page.id,
+          slug: node.slug,
+          status: 'flagged',
+          findings,
+          attempts: attemptsUsed
+        },
+        artifact: {
+          page: previousShard.page,
+          mdx: priorMdx,
+          mdxPath: contentRelativePath(ctx.locale, node.slug),
+          locale: ctx.locale,
+          version: ctx.version
+        },
+        // The prior shard byte-for-byte, plus the rejection flag and any new writer questions.
+        shard: { ...previousShard, flags: [...previousShard.flags, ...questionFlags, rejectionFlag] },
+        ...(previousShard.ledger === undefined ? {} : { ledger: previousShard.ledger }),
+        ...(previousShard.provenance === undefined ? {} : { provenance: previousShard.provenance }),
+        retainedPrior: true
+      };
+    }
+  }
+
+  // The shard embeds the trust spine of the FINAL attempt — kernel ledger, ProvenanceV2
+  // (ClaimEvidence), and the claim-matching records — in its true final state: on a first
+  // generation with no prior page, a contradicted claim persists AS contradicted, loud and
+  // machine-readable, never a bare system flag over clean-looking prose (impl-06 finding 3).
   const shard: PageShard = {
     schemaVersion: 2,
     locale: ctx.locale,

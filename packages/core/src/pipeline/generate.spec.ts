@@ -629,6 +629,64 @@ describe('runGenerate', () => {
     expect(blocks.every((block) => block.claims.every((claim) => claim.guarantee !== 'proven'))).toBe(true);
   }, 120_000);
 
+  it('first generation with a contradiction persists the contradicted state LOUD in the shard', async () => {
+    // No prior page exists: the page ships flagged WITH its final kernel ledger + ClaimEvidence,
+    // the contradiction explicit and machine-readable — never a bare flag over clean prose.
+    const runTask = await valueRunner('5');
+    await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    const contradicted = shard?.ledger?.claims.find((claim) => claim.correctness === 'contradicted');
+    expect(contradicted).toBeDefined();
+    expect(contradicted?.disposition).toBeNull();
+    const evidence = shard?.provenance?.claimEvidence.find((record) => record.claimId === contradicted?.claimId);
+    expect(evidence?.correctness).toBe('contradicted');
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.outcome).toBe('fail');
+    expect(deciding?.ref).toMatchObject({ kind: 'value-predicate', assertedValue: '5', extractedValue: '3' });
+    expect(shard?.flags.some((flag) => flag.status === 'open')).toBe(true);
+  }, 120_000);
+
+  it('RETAINS the previously published page byte-for-byte when a regeneration is contradicted', async () => {
+    // Run 1: a clean, checked page publishes.
+    const first = await runGenerate({ repoRoot, runTask: await valueRunner('3'), toolDescriptors: [] });
+    expect(first.outcome).toBe('passed');
+    const mdxPath = join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx');
+    const publishedMdx = await readFile(mdxPath, 'utf8');
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const pageId = index?.pages[0]?.id ?? '';
+    const publishedShard = await store.readPageShard({ locale: 'en', pageId });
+    const publishedClaimIds = publishedShard?.ledger?.claims.map((claim) => claim.claimId);
+
+    // Run 2: the writer asserts a wrong value on every attempt — after retry exhaustion the
+    // candidate is DISCARDED: the published MDX and the shard's trust spine stay byte-for-byte,
+    // and an open flag references the rejected candidate.
+    const second = await runGenerate({
+      repoRoot,
+      runTask: await valueRunner('5'),
+      toolDescriptors: [],
+      maxAttemptsPerPage: 2
+    });
+    expect(second.outcome).toBe('flagged');
+    expect(second.pages[0]?.status).toBe('flagged');
+
+    const mdxAfter = await readFile(mdxPath, 'utf8');
+    expect(mdxAfter).toBe(publishedMdx);
+    const shardAfter = await store.readPageShard({ locale: 'en', pageId });
+    // The retained trust spine: same claims, same correctness — no contradicted state leaked in.
+    expect(shardAfter?.ledger?.claims.map((claim) => claim.claimId)).toEqual(publishedClaimIds);
+    expect(shardAfter?.ledger?.claims.every((claim) => claim.correctness !== 'contradicted')).toBe(true);
+    const rejection = shardAfter?.flags.find(
+      (flag) => flag.status === 'open' && flag.summary.includes('previous published page retained')
+    );
+    expect(rejection).toBeDefined();
+    expect(rejection?.detail).toContain('CONTRADICTED');
+    expect(rejection?.detail).toContain(second.runId);
+  }, 180_000);
+
   it('flags the page instead of shipping silently when defects persist', async () => {
     const { runTask } = scriptedRunner([badMdx, badMdx]);
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });
