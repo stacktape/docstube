@@ -281,6 +281,10 @@ const ledgerClaimObjectSchema = z.object({
   predicate: z.string().min(1),
   // Claims are authored inline: the anchor is the owning block plus the marker id, never offsets.
   anchor: z.object({ blockId: blockIdSchema, markerId: claimMarkerIdSchema }),
+  // The raw MDX the inline marker wrapped — the VISIBLE asserted prose. Canonical: value binding
+  // proves the asserted scalar appears here, claim-identity matching threads on it, and reader
+  // surfaces render it. Never empty (submit_page rejects empty markers).
+  quote: z.string().min(1),
   // Which content-derived entity revision the claim was minted against (never a git commit).
   scope: z.object({
     entityId: z.union([pageIdSchema, sectionIdSchema, blockIdSchema]),

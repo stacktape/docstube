@@ -24,3 +24,9 @@ export const hashValue = (value: unknown): string => sha256Hex(canonicalJson(val
 // Content hash for text artifacts (MDX blocks, read files). Line endings are normalized so the
 // same content hashes identically across platforms.
 export const contentHash = (text: string): string => sha256Hex(text.replaceAll('\r\n', '\n'));
+
+// Canonical serialization for MACHINE-OWNED committed state (harness-state-v2 decision 12):
+// sorted-key compact JSON + trailing newline, LF-only. Callers serialize the PARSED schema output
+// (defaults materialized — the 'latest'-default rule), so semantically-unchanged content is
+// byte-stable and git diffs stay minimal. Human-owned files stay YAML and never use this.
+export const canonicalStateJson = (value: unknown): string => `${canonicalJson(value)}\n`;

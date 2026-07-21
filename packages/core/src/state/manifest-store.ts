@@ -1,19 +1,19 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { parse, stringify } from 'yaml';
 import type { ManifestIndex, PageShard } from '@docstube/contracts';
-import { manifestIndexSchema, pageShardRelativePath, pageShardSchema } from '@docstube/contracts';
+import { canonicalStateJson, manifestIndexSchema, pageShardRelativePath, pageShardSchema } from '@docstube/contracts';
 import { CoreError } from '../errors.ts';
 
-// The committed manifest — sharded one file per page per locale (ARCHITECTURE.md §5.1). All YAML,
-// deterministic serialization (schemas define key order), merge-tolerant by construction.
+// The committed manifest — sharded one file per page per locale (ARCHITECTURE.md §5.1). Machine-
+// owned committed state is canonical sorted-key JSON (harness-state-v2 decision 12): compact,
+// byte-stable when content is unchanged, serialized from the PARSED schema output so defaults are
+// always materialized identically. Human-owned files (docstube.yml, ia.yml, …) stay YAML. There is
+// no YAML→JSON migration: manifests are pre-release state — regenerate.
 
 const manifestDir = (repoRoot: string): string => join(repoRoot, '.docstube', 'manifest');
-const indexPath = (repoRoot: string): string => join(manifestDir(repoRoot), 'manifest.yml');
+const indexPath = (repoRoot: string): string => join(manifestDir(repoRoot), 'manifest.json');
 
-const toYaml = (value: unknown): string => stringify(value, { lineWidth: 0 });
-
-const readYamlFile = async <T>(path: string, parseValue: (raw: unknown) => T): Promise<T | undefined> => {
+const readJsonFile = async <T>(path: string, parseValue: (raw: unknown) => T): Promise<T | undefined> => {
   let text: string;
   try {
     text = await readFile(path, 'utf8');
@@ -24,7 +24,7 @@ const readYamlFile = async <T>(path: string, parseValue: (raw: unknown) => T): P
     throw error;
   }
   try {
-    return parseValue(parse(text));
+    return parseValue(JSON.parse(text));
   } catch (error) {
     throw new CoreError('state-corrupt', `failed to parse ${path}: ${(error as Error).message}`, { path });
   }
@@ -46,24 +46,26 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
     join(manifestDir(repoRoot), pageShardRelativePath({ ...input, currentVersion }));
 
   return {
-    readIndex: () => readYamlFile(indexPath(repoRoot), (raw) => manifestIndexSchema.parse(raw)),
+    readIndex: () => readJsonFile(indexPath(repoRoot), (raw) => manifestIndexSchema.parse(raw)),
     writeIndex: async (index) => {
       const validated = manifestIndexSchema.parse(index);
       await mkdir(manifestDir(repoRoot), { recursive: true });
-      await writeFile(indexPath(repoRoot), toYaml(validated), 'utf8');
+      await writeFile(indexPath(repoRoot), canonicalStateJson(validated), 'utf8');
     },
-    readPageShard: (input) => readYamlFile(shardPath(input), (raw) => pageShardSchema.parse(raw)),
+    readPageShard: (input) => readJsonFile(shardPath(input), (raw) => pageShardSchema.parse(raw)),
     writePageShard: async (shard) => {
+      // Serialize the PARSED output: schema defaults materialize before hashing/serialization, so
+      // a semantically-unchanged shard is byte-stable regardless of how the caller built it.
       const validated = pageShardSchema.parse(shard);
       const path = shardPath({ locale: validated.locale, pageId: validated.page.id, version: validated.version });
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, toYaml(validated), 'utf8');
+      await writeFile(path, canonicalStateJson(validated), 'utf8');
     },
     listShardPageIds: async (locale) => {
       const dir = join(manifestDir(repoRoot), 'pages', locale);
       try {
         const entries = await readdir(dir);
-        return entries.filter((name) => name.endsWith('.yml')).map((name) => name.slice(0, -'.yml'.length));
+        return entries.filter((name) => name.endsWith('.json')).map((name) => name.slice(0, -'.json'.length));
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
           return [];
@@ -89,7 +91,7 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
           throw error;
         }
         for (const name of entries) {
-          const pageId = name.endsWith('.yml') ? name.slice(0, -'.yml'.length) : undefined;
+          const pageId = name.endsWith('.json') ? name.slice(0, -'.json'.length) : undefined;
           if (pageId !== undefined && !keep.has(pageId)) {
             await rm(join(dir, name), { force: true });
             pruned.push(`${locale}/${pageId}`);

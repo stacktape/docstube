@@ -23,6 +23,7 @@ const kernelClaim = (overrides: Record<string, unknown>) => ({
   class: 'value',
   predicate: 'retry attempts default to 3',
   anchor: { blockId: 'bl_00000000000000000000', markerId: 'c1' },
+  quote: 'Retry attempts default to 3.',
   scope: { entityId: 'bl_00000000000000000000', revision: hash },
   subscriptions: [],
   evidence: [],

@@ -425,6 +425,9 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       class: draft.class,
       predicate: draft.predicate,
       anchor: { blockId: block.id, markerId: draft.markerId },
+      // The visible asserted prose the marker wrapped — canonical on the committed claim (value
+      // binding, identity threading, and reader rendering all consume it).
+      quote: marker.innerMdx,
       // The content-derived block revision — never a git commit (trust-model-v2).
       scope: { entityId: block.id, revision: entityRevisionSchema.parse(block.contentHash) },
       subscriptions,

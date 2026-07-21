@@ -69,7 +69,7 @@ describe('cutVersionSnapshot', () => {
       '1.x',
       'pages',
       'en',
-      `${shard.page.id}.yml`
+      `${shard.page.id}.json`
     );
     expect((await stat(frozenPath)).isFile()).toBe(true);
 

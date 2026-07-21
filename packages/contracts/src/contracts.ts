@@ -47,7 +47,10 @@ export type {
   SymbolSourceKey
 } from './primitives.ts';
 
-export { sha256Hex, canonicalJson, hashValue, contentHash } from './hashing.ts';
+export { sha256Hex, canonicalJson, canonicalStateJson, hashValue, contentHash } from './hashing.ts';
+
+export { normalizeCitedValue, citedValueOccursInText, citedValueBindsToTexts } from './cited-value-binding.ts';
+export type { CitedValueKind, NormalizedCitedValue } from './cited-value-binding.ts';
 
 export {
   guaranteeLevelSchema,
@@ -118,10 +121,21 @@ export {
   manifestVersionSchema,
   coverageStatsSchema,
   manifestIndexSchema,
+  claimMatchDriftReasonSchema,
+  claimMatchRecordSchema,
+  claimOrphanRecordSchema,
+  claimMatchingSchema,
   pageShardSchema,
   pageShardRelativePath
 } from './manifest-schema.ts';
-export type { ManifestIndex, PageShard } from './manifest-schema.ts';
+export type {
+  ManifestIndex,
+  ClaimMatchDriftReason,
+  ClaimMatchRecord,
+  ClaimOrphanRecord,
+  ClaimMatching,
+  PageShard
+} from './manifest-schema.ts';
 
 export {
   docTypeSchema,
@@ -399,6 +413,7 @@ export type {
 export {
   buildFixturePage,
   buildFixturePageShard,
+  buildFixtureProvenanceV2,
   fixtureConfigInput,
   buildFixtureWriterClaimLedger,
   buildFixtureClaimLedger,

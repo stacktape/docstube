@@ -221,7 +221,7 @@ export const translateArtifact = async (
     }
     const passed = findings.length === 0;
     const shard: PageShard = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       locale: targetLocale,
       version: ctx.version,
       sourceCommit: ctx.commit,

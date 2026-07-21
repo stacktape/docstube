@@ -28,6 +28,7 @@ const ledger = claimLedgerSchema.parse({
     class: 'code-structure',
     predicate: 'greet exists',
     anchor: { blockId: BLOCK, markerId: claimId.slice(-2) },
+    quote: 'greet exists',
     scope: { entityId: BLOCK, revision: HASH },
     // Both claims share ONE dependency — assembly must dedupe it to a single invalidation edge.
     subscriptions: [subscription],

@@ -13,6 +13,7 @@ import type { docstubeConfigSchema } from './config-schema.ts';
 import type { PageEntity } from './entity-schema.ts';
 import type { KnowledgeFact, KnowledgeNeed } from './knowledge-schema.ts';
 import type { PageShard } from './manifest-schema.ts';
+import type { ProvenanceV2 } from './provenance-v2-schema.ts';
 import type { PublicationDecision } from './publication-schema.ts';
 import type { StructuralFinding } from './structural-finding-schema.ts';
 
@@ -97,7 +98,7 @@ export const buildFixturePage = (): PageEntity => ({
 });
 
 export const buildFixturePageShard = (page: PageEntity): PageShard => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   locale: 'en',
   version: 'latest',
   sourceCommit: commit,
@@ -156,6 +157,7 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
         class: 'code-structure',
         predicate: 'there is a function retry(options)',
         anchor: { blockId, markerId: 'c1' },
+        quote: 'The library exposes a `retry(options)` function.',
         scope: { entityId: blockId, revision: fixtureEntityRevision },
         subscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }],
         evidence: [groundingEvidenceId],
@@ -168,6 +170,7 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
         class: 'value',
         predicate: 'retry attempts default to 3',
         anchor: { blockId, markerId: 'c2' },
+        quote: 'Retry attempts default to 3.',
         scope: { entityId: blockId, revision: fixtureEntityRevision },
         subscriptions: [{ kind: 'cited-value', symbolHash: fixtureSymbolHash, valueName: 'attempts', citedValue: '3' }],
         evidence: [sourceLinkEvidenceId],
@@ -178,6 +181,34 @@ export const buildFixtureClaimLedger = (pageId: string = mintId(idPrefixes.page)
     coverageLint: { uncovered: [] }
   };
 };
+
+// A ProvenanceV2 record in exact bijection with the given kernel ledger (the shard commit
+// invariant): one ClaimEvidence per ledger claim, agreeing on class/correctness/disposition/
+// deciding id, with every ledger evidence handle resolving to a canonical record.
+export const buildFixtureProvenanceV2 = (ledger: ClaimLedger): ProvenanceV2 => ({
+  schemaVersion: 1,
+  lineage: { models: [], prompts: [], transcripts: [], seedContext: [], observedReads: [] },
+  dependencies: { subscriptions: [], consumed: [] },
+  claimEvidence: ledger.claims.map((claim) => ({
+    schemaVersion: 1,
+    claimId: claim.claimId,
+    class: claim.class,
+    correctness: claim.correctness,
+    disposition: claim.disposition,
+    evidence: claim.evidence.map((evidenceId) => ({
+      evidenceId,
+      ref:
+        claim.correctness === 'checked' && claim.decidingEvidenceId === evidenceId
+          ? { kind: 'codemap-grounding' as const, symbol: fixtureSymbolHash }
+          : { kind: 'source-linked' as const, symbol: fixtureSymbolHash },
+      checkedAt: now,
+      sourceRevision: commit,
+      outcome: 'pass' as const
+    })),
+    ...(claim.decidingEvidenceId === undefined ? {} : { decidingEvidenceId: claim.decidingEvidenceId })
+  })),
+  assessments: { reviews: [], translationFidelity: [], structural: [] }
+});
 
 export const buildFixtureKnowledgeNeed = (): KnowledgeNeed => ({
   schemaVersion: 1,

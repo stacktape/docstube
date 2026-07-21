@@ -399,7 +399,7 @@ export const generatePage = async (
   // Never silently wrong (PRODUCT §3.5 stage 6).
   const passed = findings.length === 0;
   const shard: PageShard = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     locale: ctx.locale,
     version: ctx.version,
     sourceCommit: ctx.commit,
