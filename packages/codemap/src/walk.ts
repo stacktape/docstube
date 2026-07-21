@@ -7,8 +7,9 @@ const skippedDirectories = new Set(['node_modules', 'dist', 'build', 'coverage',
 
 export type WalkOptions = {
   repoRoot: string;
-  // File extensions to collect, with the leading dot: ['.ts', '.tsx'].
-  extensions: string[];
+  // File extensions to collect, with the leading dot: ['.ts', '.tsx']. Absent = every file (the
+  // fingerprint whole-file fallback needs the full tree, not one pack's slice).
+  extensions?: string[];
   // Repo-relative POSIX paths (exact files or directory prefixes) to skip, e.g. ['test-fixtures'].
   ignore?: string[];
 };
@@ -36,7 +37,10 @@ export const walkRepoFiles = async (options: WalkOptions): Promise<string[]> => 
         if (isIgnored(relativePath, ignore)) {
           continue;
         }
-        if (options.extensions.some((extension) => entry.name.endsWith(extension))) {
+        if (
+          options.extensions === undefined ||
+          options.extensions.some((extension) => entry.name.endsWith(extension))
+        ) {
           results.push(relativePath);
         }
       }

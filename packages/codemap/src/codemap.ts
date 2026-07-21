@@ -12,3 +12,11 @@ export type { WalkOptions } from './walk.ts';
 export { buildCodemap, InvalidSymbolRecordError } from './build-codemap.ts';
 export type { BuildCodemapOptions } from './build-codemap.ts';
 export { diffSymbols } from './diff-symbols.ts';
+export { buildFingerprintSnapshot, InvalidSymbolFingerprintError } from './build-fingerprints.ts';
+export type {
+  BuildFingerprintSnapshotOptions,
+  FingerprintCapablePack,
+  PackFingerprints
+} from './build-fingerprints.ts';
+export { diffFingerprints } from './diff-fingerprints.ts';
+export type { FingerprintDiff, FingerprintedCodemap, SymbolFacetChange } from './diff-fingerprints.ts';
