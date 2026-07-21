@@ -207,6 +207,23 @@ export type DependencySubscription = z.infer<typeof dependencySubscriptionSchema
 // The id attribute of the inline <Claim id> marker in the MDX (harness-state-v2 decision 5).
 export const claimMarkerIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/);
 
+// The writer-side subscription PROPOSAL shape: identical to the committed subscription except that
+// a file-content proposal needs no contentHash — the writer cannot know content hashes, so the
+// kernel resolves the authoritative hash (fingerprint snapshot or observed reads) during
+// anchoring. A writer-supplied hash is accepted syntactically and ignored.
+export const proposedSubscriptionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('signature'), symbolHash: symbolSourceKeySchema }),
+  z.object({
+    kind: z.literal('cited-value'),
+    symbolHash: symbolSourceKeySchema,
+    valueName: z.string().min(1),
+    citedValue: z.string()
+  }),
+  z.object({ kind: z.literal('body'), symbolHash: symbolSourceKeySchema }),
+  z.object({ kind: z.literal('file-content'), file: repoPathSchema, contentHash: contentHashSchema.optional() })
+]);
+export type ProposedSubscription = z.infer<typeof proposedSubscriptionSchema>;
+
 // What the writer may point at as proposed grounding — lightweight handles the kernel resolves
 // into real evidence during anchoring/verification. Never verified evidence itself.
 export const proposedEvidenceSchema = z.discriminatedUnion('kind', [
@@ -232,7 +249,7 @@ export const draftClaimSchema = z.strictObject({
   // The asserted predicate text, stripped of surrounding prose.
   predicate: z.string().min(1),
   proposedEvidence: z.array(proposedEvidenceSchema).default([]),
-  proposedSubscriptions: z.array(dependencySubscriptionSchema).default([])
+  proposedSubscriptions: z.array(proposedSubscriptionSchema).default([])
 });
 export type DraftClaim = z.infer<typeof draftClaimSchema>;
 

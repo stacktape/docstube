@@ -7,6 +7,7 @@ import {
   isBuiltinClaimClass,
   isOwnerAttested,
   ledgerClaimSchema,
+  proposedSubscriptionSchema,
   writerClaimLedgerSchema
 } from './claim-ledger-schema.ts';
 import { buildFixtureClaimLedger, buildFixtureWriterClaimLedger } from './fixtures.ts';
@@ -290,6 +291,16 @@ describe('dependency subscriptions', () => {
     expect(
       dependencySubscriptionSchema.safeParse({ kind: 'file-content', file: '/etc/passwd', contentHash: hash }).success
     ).toBe(false);
+  });
+
+  it('writer file-content PROPOSALS need no content hash — the committed subscription always does', () => {
+    // The writer cannot know content hashes; the kernel resolves the authoritative one during
+    // anchoring (conservative dependency fallback). The kernel-ledger shape stays hash-required.
+    expect(proposedSubscriptionSchema.safeParse({ kind: 'file-content', file: 'package.json' }).success).toBe(true);
+    expect(dependencySubscriptionSchema.safeParse({ kind: 'file-content', file: 'package.json' }).success).toBe(false);
+    // Symbol-facet proposals keep the committed shape exactly.
+    expect(proposedSubscriptionSchema.safeParse({ kind: 'signature', symbolHash: symbol }).success).toBe(true);
+    expect(proposedSubscriptionSchema.safeParse({ kind: 'body' }).success).toBe(false);
   });
 });
 
