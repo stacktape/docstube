@@ -51,6 +51,9 @@ export type AnchoredClaim = {
   markerId: string;
   // Raw MDX the marker wrapped — the bridge derives the legacy quote anchor from it.
   quote: string;
+  // Check names the writer proposed as evidence ({ kind: 'check' }) — the claim-verification
+  // stage consumes them for conservative execution coverage of behavior claims.
+  proposedChecks: string[];
 };
 
 export type AnchorIssueCode =
@@ -73,10 +76,21 @@ export type AnchorIssue = {
   message: string;
 };
 
+// Why a proposal was refused. 'unknown-symbol' is the missing-identifier class — a hallucinated
+// or stale symbol reference — which the claim-verification stage escalates to a HARD DEFECT for
+// every claim class (trust-model-v2 decision 3: killing hallucinated references stays).
+export type RejectedProposalCode =
+  | 'unknown-symbol' // symbol hash absent from the fingerprint snapshot
+  | 'unknown-value' // known symbol, unknown cited-value name
+  | 'missing-facet' // known symbol without the subscribed signature/body print
+  | 'unknown-file' // file in neither the snapshot nor the page's observed reads
+  | 'location-mismatch'; // writer-supplied file/span disagrees with the codemap record
+
 // A proposal the kernel refused to resolve into canonical state — recorded, never silently gone.
 export type RejectedProposal = {
   markerId: string;
   proposal: 'evidence' | 'subscription';
+  code: RejectedProposalCode;
   reason: string;
 };
 
@@ -158,8 +172,8 @@ const authoritativeFileHash = (ctx: ResolutionContext, file: string): ContentHas
 
 const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): DependencySubscription[] => {
   const symbolByHash = new Map(ctx.fingerprints.symbols.map((symbol) => [symbol.symbolHash as string, symbol]));
-  const reject = (reason: string): void => {
-    ctx.rejectedProposals.push({ markerId: claim.markerId, proposal: 'subscription', reason });
+  const reject = (code: RejectedProposalCode, reason: string): void => {
+    ctx.rejectedProposals.push({ markerId: claim.markerId, proposal: 'subscription', code, reason });
   };
   const resolved: DependencySubscription[] = [];
   for (const subscription of claim.proposedSubscriptions) {
@@ -168,6 +182,7 @@ const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): Depend
       const contentHash = authoritativeFileHash(ctx, subscription.file);
       if (contentHash === undefined) {
         reject(
+          'unknown-file',
           `file-content subscription to "${subscription.file}" — the file is in neither the fingerprint snapshot nor the page's observed reads`
         );
         continue;
@@ -178,20 +193,22 @@ const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): Depend
     const symbol = symbolByHash.get(subscription.symbolHash as string);
     if (symbol === undefined) {
       reject(
+        'unknown-symbol',
         `${subscription.kind} subscription — symbol ${subscription.symbolHash} is not in the fingerprint snapshot`
       );
       continue;
     }
     if (subscription.kind === 'signature' && symbol.signaturePrint === undefined) {
-      reject(`signature subscription — symbol ${subscription.symbolHash} has no signature print`);
+      reject('missing-facet', `signature subscription — symbol ${subscription.symbolHash} has no signature print`);
       continue;
     }
     if (subscription.kind === 'body' && symbol.bodyPrint === undefined) {
-      reject(`body subscription — symbol ${subscription.symbolHash} has no body print`);
+      reject('missing-facet', `body subscription — symbol ${subscription.symbolHash} has no body print`);
       continue;
     }
     if (subscription.kind === 'cited-value' && symbol.valuePrints[subscription.valueName] === undefined) {
       reject(
+        'unknown-value',
         `cited-value subscription — symbol ${subscription.symbolHash} has no value named "${subscription.valueName}"`
       );
       continue;
@@ -259,6 +276,7 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
       ctx.rejectedProposals.push({
         markerId: claim.markerId,
         proposal: 'evidence',
+        code: 'unknown-symbol',
         reason: `symbol evidence — symbol ${proposal.symbol} is not in the fingerprint snapshot`
       });
       continue;
@@ -270,6 +288,7 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
       ctx.rejectedProposals.push({
         markerId: claim.markerId,
         proposal: 'evidence',
+        code: 'location-mismatch',
         reason: `writer-supplied location "${proposal.file}" for symbol ${proposal.symbol} mismatches the codemap record ("${codemapRecord.file}") — using the codemap location`
       });
     }
@@ -281,6 +300,7 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
       ctx.rejectedProposals.push({
         markerId: claim.markerId,
         proposal: 'evidence',
+        code: 'location-mismatch',
         reason: `writer-supplied span [${proposal.span.join(', ')}] for symbol ${proposal.symbol} mismatches the codemap record — using the codemap span`
       });
     }
@@ -412,7 +432,12 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       correctness: 'unchecked',
       disposition: draft.class === 'intent-history' ? 'maintainer-input-needed' : 'no-checker-available'
     };
-    anchored.push({ claim, markerId: draft.markerId, quote: marker.innerMdx });
+    anchored.push({
+      claim,
+      markerId: draft.markerId,
+      quote: marker.innerMdx,
+      proposedChecks: draft.proposedEvidence.filter((proposal) => proposal.kind === 'check').map((p) => p.check)
+    });
   }
 
   warnings.push(

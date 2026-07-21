@@ -6,24 +6,27 @@ import type { AnchoredClaim } from './anchor-ledger.ts';
 //
 // The kernel claim ledger is now the source of truth for what a page asserts, but the downstream
 // stages (verify-page's guarantee roll-ups/lifts, shard storage, status, refresh scoping) still
-// consume the legacy per-block ClaimEntity records and their guarantee levels. Until 2b-ii
-// migrates verification onto the ledger and 2b-iii migrates the shards, this module derives the
-// minimal faithful legacy view FROM the kernel ledger:
-//   correctness 'checked'      → guarantee 'proven'  (the deterministic lane — lifts blocks)
+// consume the legacy per-block ClaimEntity records and their guarantee levels. Until 2b-iii
+// migrates the shards, this module derives the minimal faithful legacy view FROM the verified
+// kernel ledger:
+//   correctness 'checked'      → guarantee 'proven'  (LIVE since 2b-ii: claim verification mints
+//                                checked for grounded code-structure claims, passing value
+//                                predicates, and legitimately execution-covered behavior claims —
+//                                liftClaimGroundedBlocks then lifts fully-proven blocks)
 //   correctness 'unchecked'    → guarantee 'scored'  (assessed by review, not mechanically proven)
-//   correctness 'contradicted' → KERNEL INVARIANT ERROR (see below)
-// In this wave every anchored claim is 'unchecked', so bridged pages behave exactly like the old
-// "prose claims → scored" path; nothing downstream can mistake an unverified claim for a proven one.
+//   correctness 'contradicted' → NEVER PROJECTED (see below)
 
 export const guaranteeForCorrectness = (correctness: ClaimCorrectness): GuaranteeLevel => {
   if (correctness === 'contradicted') {
-    // KERNEL INVARIANT (wave 2b-i): contradiction is unreachable — anchoring mints every claim
-    // 'unchecked' and verification does not exist yet. Wave 2b-ii MUST replace this throw with a
-    // gating error finding BEFORE enabling verification: a contradicted claim projected as
-    // neutral 'scored' content would ship a caught lie as ordinary prose.
+    // CONTRADICTION GATES UPSTREAM (wave 2b-ii): verifyClaims turns every contradicted claim into
+    // a blocking 'claim-verification' error finding, so the page FAILS the attempt and re-enters
+    // the bounded retry loop — the bridge only ever runs on the clean path, after the gate held.
+    // A contradicted claim reaching this projection therefore means a caller bridged an UNGATED
+    // ledger — a kernel sequencing bug. It must hard-fail: there is no legacy guarantee level that
+    // can express "caught lie", and projecting 'scored' would ship one as neutral prose.
     throw new CoreError(
       'pipeline-failed',
-      'kernel invariant violated: the legacy ledger bridge received a contradicted claim — contradiction must gate, never render as scored content'
+      'kernel invariant violated: the legacy ledger bridge received a contradicted claim — contradictions gate through claim-verification findings BEFORE bridging and must never render as content'
     );
   }
   return correctness === 'checked' ? 'proven' : 'scored';

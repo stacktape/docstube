@@ -6,6 +6,7 @@ import { access } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { FingerprintCapablePack } from '@docstube/codemap';
 import { definePlugin } from '@docstube/plugin-sdk';
+import { extractCitedValues } from './cited-values.ts';
 import { extractFingerprints } from './extract-fingerprints.ts';
 import { extractSymbols } from './extract-symbols.ts';
 import { typecheckSnippet } from './snippet-typecheck.ts';
@@ -17,8 +18,12 @@ const exists = (path: string): Promise<boolean> =>
   );
 
 // FingerprintCapablePack = the plugin-sdk pack shape plus the additive typed-fingerprint
-// capability hosted by @docstube/codemap (ARCHITECTURE.md §7.2).
-export const typescriptLanguagePack: FingerprintCapablePack = {
+// capability hosted by @docstube/codemap (ARCHITECTURE.md §7.2). `extractCitedValues` is a second
+// additive capability, duck-typed by the kernel's claim-verification stage (core
+// pipeline/verify-claims.ts): the 0.1.0 minimal value-predicate verifier calls it at verify time
+// to compare a claim's asserted value against the code, with EXACTLY the normalization the
+// valuePrints facet hashes.
+export const typescriptLanguagePack: FingerprintCapablePack & { extractCitedValues: typeof extractCitedValues } = {
   id: 'typescript',
   displayName: 'TypeScript',
   fileExtensions: ['.ts', '.tsx', '.mts', '.cts'],
@@ -26,6 +31,7 @@ export const typescriptLanguagePack: FingerprintCapablePack = {
     (await exists(join(repoRoot, 'tsconfig.json'))) || (await exists(join(repoRoot, 'package.json'))),
   extractSymbols,
   extractFingerprints,
+  extractCitedValues,
   snippetToolchain: { typecheck: typecheckSnippet }
 };
 

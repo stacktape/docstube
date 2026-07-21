@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { codemapSchema, fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import {
+  codemapSchema,
+  fingerprintSnapshotSchema,
+  symbolSourceKeySchema,
+  writerClaimLedgerSchema
+} from '@docstube/contracts';
 import type { Codemap, DraftClaim, FingerprintSnapshot, ObservedRead } from '@docstube/contracts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import type { AnchorLedgerResult } from './anchor-ledger.ts';
 
 const COMMIT = 'a'.repeat(40);
-const KNOWN_SYMBOL = `ts:${'1'.repeat(64)}`;
-const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
+const KNOWN_SYMBOL = symbolSourceKeySchema.parse(`ts:${'1'.repeat(64)}`);
+const UNKNOWN_SYMBOL = symbolSourceKeySchema.parse(`ts:${'2'.repeat(64)}`);
 const PRINT = '3'.repeat(64);
 const FILE_HASH = '4'.repeat(64);
 const READ_HASH = '5'.repeat(64);

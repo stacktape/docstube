@@ -50,8 +50,10 @@ describe('guaranteeForCorrectness', () => {
   });
 
   it('THROWS on contradicted — a caught lie must never project as neutral scored content', () => {
-    // 2b-ii must replace this kernel invariant with a gating error finding before enabling
-    // verification; until then contradiction reaching the bridge is a kernel bug.
+    // Since 2b-ii, contradictions gate UPSTREAM: verifyClaims emits blocking claim-verification
+    // findings, so the bridge only runs on the clean path. A contradicted claim reaching this
+    // projection means someone bridged an ungated ledger — a kernel sequencing bug that must
+    // hard-fail, because no legacy guarantee level can express "caught lie".
     expect(() => guaranteeForCorrectness('contradicted')).toThrowError(CoreError);
     expect(() => guaranteeForCorrectness('contradicted')).toThrowError(/contradicted/);
   });

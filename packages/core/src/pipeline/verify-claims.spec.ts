@@ -1,0 +1,354 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { typescriptLanguagePack } from '@docstube/lang-typescript';
+import { codemapSchema, fingerprintSnapshotSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import type { Codemap, FingerprintSnapshot, ObservedRead, VerifierRunResult } from '@docstube/contracts';
+import { extractPageEntity } from '../entities/extract-entities.ts';
+import { anchorWriterLedger } from './anchor-ledger.ts';
+import type { AnchorLedgerResult } from './anchor-ledger.ts';
+import { verifyClaims } from './verify-claims.ts';
+
+const COMMIT = 'f'.repeat(40);
+const KNOWN_SYMBOL = `ts:${'1'.repeat(64)}`;
+const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
+const PRINT = '3'.repeat(64);
+const READ_HASH = '5'.repeat(64);
+
+// The snapshot advertises GONE as a cited value so its subscription anchors, but the source on
+// disk does not define it — the exact snapshot/disk drift the verifier must treat as
+// "unresolvable at verify time", never as a guess.
+const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
+  schemaVersion: 1,
+  commit: COMMIT,
+  symbols: [
+    {
+      symbolHash: KNOWN_SYMBOL,
+      signaturePrint: PRINT,
+      valuePrints: { DEFAULT_RETRIES: PRINT, GONE: PRINT },
+      bodyPrint: PRINT
+    }
+  ],
+  unparsedFiles: []
+});
+
+const codemap: Codemap = codemapSchema.parse({
+  schemaVersion: 1,
+  commit: COMMIT,
+  symbols: [
+    { hash: KNOWN_SYMBOL, lang: 'ts', kind: 'variable', name: 'DEFAULT_RETRIES', file: 'src/retry.ts', span: [1, 1] }
+  ]
+});
+
+const observedReads: ObservedRead[] = [{ file: 'src/retry.ts', contentHash: READ_HASH }];
+
+const mdx = `---
+title: "Retry"
+---
+
+# Retry
+
+<Claim id="v1">\`DEFAULT_RETRIES\` is 3.</Claim>
+
+## Usage
+
+Prose first. <Claim id="b1">\`retry\` retries the call.</Claim>
+
+\`\`\`ts
+console.log('ok');
+\`\`\`
+
+## Other
+
+Elsewhere. <Claim id="b2">\`retry\` also logs.</Claim>
+`;
+
+let repoRoot: string;
+
+beforeAll(async () => {
+  repoRoot = await mkdtemp(join(tmpdir(), 'docstube-verify-claims-'));
+  await mkdir(join(repoRoot, 'src'), { recursive: true });
+  await writeFile(join(repoRoot, 'src', 'retry.ts'), 'export const DEFAULT_RETRIES = 3;\n');
+});
+
+afterAll(async () => {
+  await rm(repoRoot, { recursive: true, force: true });
+});
+
+const FIXTURE_MARKERS = ['v1', 'b1', 'b2'];
+
+const anchorFixture = (
+  claims: Array<{ markerId: string } & Record<string, unknown>>,
+  // Anchoring and verification must see the SAME extracted page — block ids are minted per
+  // extraction, and execution-coverage containment is keyed on them.
+  page: ReturnType<typeof extractPageEntity> = extractPageEntity({ mdx, slug: 'retry' })
+): Extract<AnchorLedgerResult, { ok: true }> => {
+  // Anchoring enforces exact marker/ledger cardinality: pad the markers a test does not exercise
+  // with inert intent-history entries (the test's claim stays first, so [0] addresses it).
+  const padded = [
+    ...claims,
+    ...FIXTURE_MARKERS.filter((markerId) => !claims.some((claim) => claim.markerId === markerId)).map((markerId) => ({
+      markerId,
+      class: 'intent-history',
+      predicate: 'fixture filler'
+    }))
+  ];
+  const result = anchorWriterLedger({
+    mdx,
+    writerLedger: writerClaimLedgerSchema.parse({ schemaVersion: 1, claims: padded }),
+    page,
+    fingerprints,
+    codemap,
+    observedReads,
+    commit: COMMIT
+  });
+  if (!result.ok) {
+    throw new Error(`fixture anchoring failed: ${result.errors.map((issue) => issue.message).join('; ')}`);
+  }
+  return result;
+};
+
+const pageOf = () => extractPageEntity({ mdx, slug: 'retry' });
+
+const codeBlockIdOf = (page: ReturnType<typeof pageOf>): string => {
+  const block = page.sections
+    .flatMap((section) => section.blocks)
+    .find((candidate) => candidate.blockType === 'code-example');
+  if (block === undefined) {
+    throw new Error('fixture has no code block');
+  }
+  return block.id;
+};
+
+const snippetPass = (coveredEntityIds: string[]): VerifierRunResult => ({
+  verifier: 'snippet-exec',
+  plugin: '@docstube/verifiers',
+  status: 'pass',
+  findings: [],
+  coveredEntityIds
+});
+
+const verify = (
+  anchoredResult: Extract<AnchorLedgerResult, { ok: true }>,
+  page: ReturnType<typeof pageOf>,
+  verifierResults: VerifierRunResult[] = []
+) =>
+  verifyClaims({
+    ledger: anchoredResult.ledger,
+    anchored: anchoredResult.anchored,
+    anchorEvidence: anchoredResult.evidence,
+    rejectedProposals: anchoredResult.rejectedProposals,
+    codemap,
+    packs: [typescriptLanguagePack],
+    repoRoot,
+    verifierResults,
+    page,
+    commit: COMMIT
+  });
+
+const valueDraft = (citedValue: string, valueName = 'DEFAULT_RETRIES') => ({
+  markerId: 'v1',
+  class: 'value',
+  predicate: `DEFAULT_RETRIES is ${citedValue}`,
+  proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+  proposedSubscriptions: [{ kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName, citedValue }]
+});
+
+describe('verifyClaims — value (the minimal value-predicate verifier)', () => {
+  it('checks a value claim whose asserted value matches the extracted value byte-wise', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([valueDraft('3')]), page);
+
+    expect(result.findings).toEqual([]);
+    const claim = result.ledger.claims[0];
+    expect(claim).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    expect(evidence?.correctness).toBe('checked');
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({
+      kind: 'value-predicate',
+      valueName: 'DEFAULT_RETRIES',
+      assertedValue: '3',
+      extractedValue: '3'
+    });
+    expect(deciding?.outcome).toBe('pass');
+    // The anchoring-minted source-linked record rides along as non-deciding evidence.
+    expect(evidence?.evidence.some((record) => record.ref.kind === 'source-linked')).toBe(true);
+  });
+
+  it('CONTRADICTS a value claim whose asserted value mismatches — with a blocking finding carrying the detail', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([valueDraft('5')]), page);
+
+    const claim = result.ledger.claims[0];
+    expect(claim).toMatchObject({ correctness: 'contradicted', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.outcome).toBe('fail');
+    expect(deciding?.ref).toMatchObject({ kind: 'value-predicate', assertedValue: '5', extractedValue: '3' });
+    // The blocking finding names the predicate and both values — the retry prompt needs them.
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ check: 'claim-verification', severity: 'error' });
+    expect(result.findings[0]?.message).toContain('CONTRADICTED');
+    expect(result.findings[0]?.message).toContain('DEFAULT_RETRIES is 5');
+    expect(result.findings[0]?.message).toContain('asserted as 5');
+    expect(result.findings[0]?.message).toContain('extracts 3');
+  });
+
+  it('leaves a value claim unchecked when the value name is unresolvable at verify time — never guesses', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([valueDraft('3', 'GONE')]), page);
+
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    // No value-predicate record is fabricated for an unresolvable name.
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+});
+
+describe('verifyClaims — code-structure and grounding', () => {
+  it('checks a code-structure claim whose grounding symbol resolves in the codemap', async () => {
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'v1',
+          class: 'code-structure',
+          predicate: 'DEFAULT_RETRIES exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page
+    );
+
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: KNOWN_SYMBOL, file: 'src/retry.ts' });
+    expect(deciding?.outcome).toBe('pass');
+  });
+
+  it('leaves a code-structure claim with only a whole-file dependency unchecked', async () => {
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'v1',
+          class: 'code-structure',
+          predicate: 'something exists',
+          proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+        }
+      ]),
+      page
+    );
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+
+  it('escalates a missing identifier to a hard defect — for every claim class', async () => {
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'v1',
+          class: 'value',
+          predicate: 'phantom is 3',
+          // The unknown symbol is a hallucinated/stale reference; the resolvable file-content
+          // subscription keeps anchoring green so THIS stage owns the defect.
+          proposedEvidence: [{ kind: 'symbol', symbol: UNKNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+        }
+      ]),
+      page
+    );
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ check: 'claim-verification', severity: 'error' });
+    expect(result.findings[0]?.message).toContain('grounding failure');
+    expect(result.findings[0]?.message).toContain(UNKNOWN_SYMBOL);
+  });
+});
+
+describe('verifyClaims — behavior (conservative execution coverage)', () => {
+  const behaviorDraft = (markerId: string, withCheck: boolean) => ({
+    markerId,
+    class: 'behavior',
+    predicate: 'retry retries the call',
+    proposedEvidence: withCheck
+      ? [
+          { kind: 'symbol', symbol: KNOWN_SYMBOL },
+          { kind: 'check', check: 'snippet-exec' }
+        ]
+      : [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+    proposedSubscriptions: [{ kind: 'body', symbolHash: KNOWN_SYMBOL }]
+  });
+
+  it('checks a behavior claim when its section snippet executed AND the claim proposed that check', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([behaviorDraft('b1', true)], page), page, [
+      snippetPass([codeBlockIdOf(page)])
+    ]);
+
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'execution', check: 'snippet-exec' });
+  });
+
+  it('stays unchecked without the proposed check — execution coverage is never stretched', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([behaviorDraft('b1', false)], page), page, [
+      snippetPass([codeBlockIdOf(page)])
+    ]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+
+  it('stays unchecked when the executed snippet lives in a DIFFERENT section', async () => {
+    // b2 sits in the "Other" section; the executed code block is in "Usage".
+    const page = pageOf();
+    const result = await verify(anchorFixture([behaviorDraft('b2', true)], page), page, [
+      snippetPass([codeBlockIdOf(page)])
+    ]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+
+  it('stays unchecked when no snippet executed at all', async () => {
+    const page = pageOf();
+    const result = await verify(anchorFixture([behaviorDraft('b1', true)]), page, []);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+});
+
+describe('verifyClaims — intent-history and unknown classes', () => {
+  it('keeps intent-history unchecked/maintainer-input-needed (KnowledgeFact wiring is a later wave)', async () => {
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        { markerId: 'v1', class: 'intent-history', predicate: 'retries were added for flaky registries' }
+      ]),
+      page
+    );
+    expect(result.ledger.claims[0]).toMatchObject({
+      correctness: 'unchecked',
+      disposition: 'maintainer-input-needed'
+    });
+    expect(result.claimEvidence[0]?.disposition).toBe('maintainer-input-needed');
+  });
+
+  it('routes unknown claim classes to unchecked/no-checker-available', async () => {
+    const page = pageOf();
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'v1',
+          class: 'performance',
+          predicate: 'retry is O(1)',
+          proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+        }
+      ]),
+      page
+    );
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+  });
+});

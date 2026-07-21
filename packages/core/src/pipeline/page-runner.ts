@@ -24,6 +24,7 @@ import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import { matchClaimIds } from './match-claims.ts';
+import { verifyClaims } from './verify-claims.ts';
 import { attachLedgerClaims } from './ledger-bridge.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
 import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
@@ -290,11 +291,39 @@ export const generatePage = async (
       if (matchingWarnings.length > 0) {
         await ctx.journal.append({ type: 'findings', pageId: page.id, findings: matchingWarnings });
       }
-      lastLedger = matched.ledger;
+      // Claim verification (wave 2b-ii): the authority table assigns correctness per claim by
+      // minting canonical EvidenceRecords (codemap grounding, the minimal value-predicate
+      // verifier, conservative execution coverage). Contradictions and grounding failures come
+      // back as BLOCKING error findings and take the exact same path as verifier findings:
+      // journal → bounded retry with the precise detail → flagged after retries, never shipped
+      // as neutral content.
+      const verified = await verifyClaims({
+        ledger: matched.ledger,
+        anchored: matched.anchored,
+        anchorEvidence: anchoredLedger.evidence,
+        rejectedProposals: anchoredLedger.rejectedProposals,
+        codemap: ctx.codemap,
+        packs: ctx.host.languagePacks().map((entry) => entry.definition),
+        repoRoot: ctx.repoRoot,
+        verifierResults: results,
+        page: verifiedPage,
+        commit: ctx.commit
+      });
+      if (verified.findings.length > 0) {
+        findings = verified.findings;
+        await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
+        if (attempt < maxAttempts) {
+          await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
+          await ctx.journal.append({ type: 'retry-scheduled', pageId: page.id, attempt: attempt + 1, maxAttempts });
+        }
+        continue;
+      }
+      lastLedger = verified.ledger;
       // TEMPORARY (until wave 2b-iii): the bridge REPLACES every block's legacy claims with the
-      // ledger-derived view; the lift then upgrades blocks whose every claim is proven (a no-op
-      // while everything is 'unchecked' — verification is wave 2b-ii).
-      const bridgedPage = attachLedgerClaims(verifiedPage, matched.anchored);
+      // verified ledger view (checked → proven, unchecked → scored; contradiction cannot reach it
+      // — the gate above already failed the attempt); the lift then upgrades blocks whose every
+      // claim is proven.
+      const bridgedPage = attachLedgerClaims(verifiedPage, verified.anchored);
       lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(bridgedPage) };
       break;
     }

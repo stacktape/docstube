@@ -35,6 +35,17 @@ describe('typescriptLanguagePack', () => {
   it('exposes a snippet typecheck toolchain', () => {
     expect(typeof typescriptLanguagePack.snippetToolchain?.typecheck).toBe('function');
   });
+
+  it('exposes the cited-value capability the kernel value-predicate verifier duck-types', () => {
+    // The REGISTERED pack object must carry extractCitedValues (not just the module export):
+    // core's verify-claims stage discovers the capability on the pack it gets from the host.
+    expect(typeof typescriptLanguagePack.extractCitedValues).toBe('function');
+    const values = typescriptLanguagePack.extractCitedValues({
+      file: 'src/mod.ts',
+      content: 'export const DEFAULT_RETRIES = 3;\n'
+    });
+    expect(values).toEqual({ DEFAULT_RETRIES: '3' });
+  });
 });
 
 describe('default plugin export', () => {

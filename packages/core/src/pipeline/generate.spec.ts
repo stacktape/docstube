@@ -3,6 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
+import { buildCodemap } from '@docstube/codemap';
+import { typescriptLanguagePack } from '@docstube/lang-typescript';
+import { writerClaimLedgerSchema } from '@docstube/contracts';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
@@ -36,6 +39,8 @@ const fixtureSource = `export type GreetOptions = {
   name: string;
   loud?: boolean;
 };
+
+export const DEFAULT_RETRIES = 3;
 
 export const greet = (options: GreetOptions): string => {
   const base = \`Hello, \${options.name}!\`;
@@ -535,6 +540,93 @@ describe('runGenerate', () => {
     const index = await store.readIndex();
     const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
     expect(shard?.flags.some((flag) => flag.status === 'open' && flag.detail?.includes('claim-anchoring'))).toBe(true);
+  }, 120_000);
+
+  // The value-predicate e2e pair (wave 2b-ii): the writer asserts a default; the kernel compares
+  // it against the language pack's extracted value. Right value → checked → the block lifts to
+  // proven. Wrong value → CONTRADICTED → blocking finding → retries → flagged, never neutral.
+  const valueMdx = `${goodMdx}
+<Claim id="v1">\`DEFAULT_RETRIES\` defaults to 3.</Claim>
+`;
+
+  const valueRunner = async (citedValue: string) => {
+    // The scripted writer proposes the REAL symbol hash, exactly like a cooperating writer that
+    // read the API surface list.
+    const codemap = await buildCodemap({
+      repoRoot,
+      commit: 'a'.repeat(40),
+      packs: [typescriptLanguagePack],
+      logger: { info: () => {}, warn: () => {} }
+    });
+    const symbolHash = codemap.symbols.find((symbol) => symbol.name === 'DEFAULT_RETRIES')?.hash;
+    if (symbolHash === undefined) {
+      throw new Error('fixture symbol DEFAULT_RETRIES not in the codemap');
+    }
+    const ledger: WriterClaimLedger = writerClaimLedgerSchema.parse({
+      schemaVersion: 1,
+      claims: [
+        ...ledgerFor(valueMdx).claims.filter((claim) => claim.markerId !== 'v1'),
+        {
+          markerId: 'v1',
+          class: 'value',
+          predicate: `DEFAULT_RETRIES defaults to ${citedValue}`,
+          proposedEvidence: [{ kind: 'symbol', symbol: symbolHash }],
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'DEFAULT_RETRIES', citedValue }]
+        }
+      ]
+    });
+    return async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: valueMdx }] }],
+        result: { type: 'mdx-ledger', mdx: valueMdx, ledger }
+      };
+    };
+  };
+
+  it('value-predicate: a correct asserted default ends CHECKED and lifts its block to proven', async () => {
+    const summary = await runGenerate({ repoRoot, runTask: await valueRunner('3'), toolDescriptors: [] });
+    expect(summary.outcome).toBe('passed');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    const valueBlock = shard?.page.sections
+      .flatMap((section) => section.blocks)
+      .find((block) => block.claims.some((claim) => claim.claimClass === 'value'));
+    // checked → proven is live: the passing value predicate decides the claim, and the block
+    // whose every claim is proven lifts.
+    expect(valueBlock?.claims[0]?.guarantee).toBe('proven');
+    expect(valueBlock?.guarantee).toBe('proven');
+  }, 120_000);
+
+  it('value-predicate: a wrong asserted default is CONTRADICTED — blocking finding, retries, then flagged', async () => {
+    const runTask = await valueRunner('5');
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], maxAttemptsPerPage: 2 });
+
+    // The contradiction gates: the page never passes, retries burn down, the shard ships flagged
+    // with the precise asserted-vs-extracted detail — a caught lie is never neutral content.
+    expect(summary.outcome).toBe('flagged');
+    expect(summary.pages[0]?.status).toBe('flagged');
+    expect(summary.pages[0]?.attempts).toBe(2);
+    const contradiction = summary.pages[0]?.findings.find((finding) => finding.check === 'claim-verification');
+    expect(contradiction?.severity).toBe('error');
+    expect(contradiction?.message).toContain('CONTRADICTED');
+    expect(contradiction?.message).toContain('asserted as 5');
+    expect(contradiction?.message).toContain('extracts 3');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard?.flags.some((flag) => flag.status === 'open' && flag.detail?.includes('claim-verification'))).toBe(
+      true
+    );
+    // The flagged page carries no proven value claim anywhere — nothing bridged a contradiction.
+    const blocks = [...(shard?.page.preamble ?? []), ...(shard?.page.sections.flatMap((s) => s.blocks) ?? [])];
+    expect(blocks.every((block) => block.claims.every((claim) => claim.guarantee !== 'proven'))).toBe(true);
   }, 120_000);
 
   it('flags the page instead of shipping silently when defects persist', async () => {
