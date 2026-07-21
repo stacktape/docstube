@@ -142,3 +142,78 @@ describe('bindCitedValue (the ONE binding rule, shared by submit_page and verifi
     ).toBe(true);
   });
 });
+
+describe('typed value binding (impl-08 finding 1: the asserted TYPE must match the prose form)', () => {
+  it("REJECTS numeric 3 against the quoted string form (Sol's probe: '\"3\" (a string)')", () => {
+    const result = bindCitedValue('3', {
+      markerText: '`mode` defaults to "3" (a string).',
+      predicate: 'the mode option defaults to the string "3"'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toContain('missing-in-marker');
+  });
+
+  it('rejects numeric 3 in the predicate when the predicate only states the quoted string form', () => {
+    const result = bindCitedValue('3', {
+      markerText: 'Retries default to 3.',
+      predicate: 'retries defaults to "3"'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(['missing-in-predicate']);
+  });
+
+  it('accepts the string "3" against quoted prose, and REJECTS it against a bare numeric token (vice versa)', () => {
+    expect(
+      bindCitedValue('"3"', {
+        markerText: '`mode` defaults to "3" (a string).',
+        predicate: 'the mode option defaults to the string "3"'
+      }).ok
+    ).toBe(true);
+    const bare = bindCitedValue('"3"', {
+      markerText: 'Retries default to 3.',
+      predicate: 'retries defaults to 3'
+    });
+    expect(bare.ok).toBe(false);
+    expect(bare.issues.map((issue) => issue.code).toSorted()).toEqual(['missing-in-marker', 'missing-in-predicate']);
+  });
+
+  it('accepts numeric 3 against unquoted prose that also mentions no other candidates', () => {
+    expect(bindCitedValue('3', { markerText: 'Retries default to 3.', predicate: 'retries defaults to 3' }).ok).toBe(
+      true
+    );
+  });
+
+  it('keeps boolean/string discipline: boolean true never binds "true" (quoted), string "true" never binds bare true', () => {
+    const boolAgainstQuoted = bindCitedValue('true', {
+      markerText: '`flag` defaults to "true" (a string).',
+      predicate: 'flag defaults to the string "true"'
+    });
+    expect(boolAgainstQuoted.ok).toBe(false);
+    expect(boolAgainstQuoted.issues.map((issue) => issue.code)).toContain('missing-in-marker');
+    const stringAgainstBare = bindCitedValue('"true"', {
+      markerText: '`flag` defaults to true.',
+      predicate: 'flag defaults to true'
+    });
+    expect(stringAgainstBare.ok).toBe(false);
+    expect(stringAgainstBare.issues.map((issue) => issue.code).toSorted()).toEqual([
+      'missing-in-marker',
+      'missing-in-predicate'
+    ]);
+    // Semantic strings keep binding bare delimited occurrences — only other-scalar-shaped
+    // contents require quoting.
+    expect(
+      bindCitedValue('linear', { markerText: 'backoff is linear.', predicate: 'backoff mode is linear' }).ok
+    ).toBe(true);
+  });
+
+  it('a quoted "3" in prose is not a numeric ambiguity candidate', () => {
+    // The marker states ONE number (5) plus the string "3": no ambiguous-marker for numeric 5.
+    expect(
+      bindCitedValue('5', {
+        markerText: 'Retries default to 5; `mode` defaults to "3".',
+        predicate: 'retries defaults to 5'
+      }).ok
+    ).toBe(true);
+    expect(lexNumericTokens('Retries default to 5; `mode` defaults to "3".')).toEqual([5]);
+  });
+});

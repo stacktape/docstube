@@ -65,6 +65,23 @@ export const normalizeCitedValue = (raw: string): NormalizedCitedValue => {
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const QUOTE_CHARS = new Set(['"', "'", '`']);
+
+// TYPE-AWARE occurrence discipline (impl-08 finding 1): a token wrapped in matching quotes is the
+// prose form of a STRING, never of a number/boolean/null — so numeric 3 must not bind the quoted
+// string "3" ('"3" (a string)' is Sol's probe), and vice versa a string whose content merely looks
+// like a scalar of another type ("3", "true", "null") binds ONLY through a quoted occurrence.
+const isQuoteWrapped = (text: string, start: number, end: number): boolean => {
+  const before = start > 0 ? text[start - 1] : undefined;
+  const after = end < text.length ? text[end] : undefined;
+  return before !== undefined && QUOTE_CHARS.has(before) && after === before;
+};
+
+// True when a string's bare content is lexically a scalar of ANOTHER type — such a string can
+// never bind through a bare token (the bare token IS the other type's prose form).
+const bareLooksLikeOtherScalar = (bare: string): boolean =>
+  bare === 'true' || bare === 'false' || bare === 'null' || NUMERIC_LITERAL.test(bare);
+
 // Real LEXICAL number tokenization (impl-07 finding 1): a numeric literal token must stand on its
 // own word boundary —
 //   - never inside an identifier: "retry3", "v3", "sha256" contribute NO tokens;
@@ -75,9 +92,11 @@ const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\
 const NUMERIC_TOKEN =
   /(?<![A-Za-z0-9_.])[+-]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d+)?(?![A-Za-z0-9_]|\.\d)/gu;
 
-// Every lexically valid numeric token in the text, as canonicalized numbers.
+// Every lexically valid numeric token in the text, as canonicalized numbers. Quote-wrapped tokens
+// are excluded: "3" in prose is the string form, not a numeric candidate (impl-08 finding 1).
 export const lexNumericTokens = (text: string): number[] =>
   [...text.matchAll(NUMERIC_TOKEN)]
+    .filter((match) => !isQuoteWrapped(text, match.index, match.index + match[0].length))
     .map((match) => Number(match[0].replaceAll('_', '')))
     .filter((value) => Number.isFinite(value));
 
@@ -92,17 +111,30 @@ const WINDOW = 32;
 const negatedAt = (text: string, index: number): boolean =>
   NEGATION_CUE.test(text.slice(Math.max(0, index - WINDOW), index));
 
-// Match positions of the value's occurrences in the text (empty when it never occurs).
+// Match positions of the value's TYPE-MATCHING occurrences in the text (empty when it never
+// occurs in the asserted type's prose form). Binding is type-aware (impl-08 finding 1):
+//   number       an UNQUOTED lexical numeric token — the quoted string "3" never binds numeric 3;
+//   boolean/null an UNQUOTED word occurrence — the quoted string "true" never binds boolean true;
+//   string       a QUOTED occurrence always binds; a bare delimited occurrence binds ONLY when the
+//                content is a semantic string ("linear") — a string whose content lexes as a
+//                number/boolean/null ("3", "true") must appear quoted, or it would be
+//                indistinguishable from the other type's prose form.
 const occurrenceIndexes = (value: NormalizedCitedValue, text: string): number[] => {
   if (value.kind === 'number') {
     const target = Number(value.canonical);
     return [...text.matchAll(NUMERIC_TOKEN)]
-      .filter((match) => Number(match[0].replaceAll('_', '')) === target)
+      .filter(
+        (match) =>
+          Number(match[0].replaceAll('_', '')) === target &&
+          !isQuoteWrapped(text, match.index, match.index + match[0].length)
+      )
       .map((match) => match.index);
   }
   if (value.kind === 'boolean' || value.kind === 'null') {
     const pattern = new RegExp(`(?:^|[^A-Za-z0-9_])(${value.canonical})(?:[^A-Za-z0-9_]|$)`, 'giu');
-    return [...text.matchAll(pattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''));
+    return [...text.matchAll(pattern)]
+      .map((match) => match.index + match[0].indexOf(match[1] ?? ''))
+      .filter((index) => !isQuoteWrapped(text, index, index + value.canonical.length));
   }
   const bare = value.bare ?? (JSON.parse(value.canonical) as string);
   if (bare === '') {
@@ -110,11 +142,12 @@ const occurrenceIndexes = (value: NormalizedCitedValue, text: string): number[] 
   }
   const escaped = escapeRegExp(bare);
   const quotedPattern = new RegExp(`["'\`]${escaped}["'\`]`, 'gu');
+  const quotedIndexes = [...text.matchAll(quotedPattern)].map((match) => match.index + 1);
+  if (bareLooksLikeOtherScalar(bare)) {
+    return quotedIndexes;
+  }
   const barePattern = new RegExp(`(?:^|[^A-Za-z0-9_])(${escaped})(?:[^A-Za-z0-9_]|$)`, 'gu');
-  return [
-    ...[...text.matchAll(quotedPattern)].map((match) => match.index + 1),
-    ...[...text.matchAll(barePattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''))
-  ];
+  return [...quotedIndexes, ...[...text.matchAll(barePattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''))];
 };
 
 // Deterministic value→text occurrence (finding 1): does the normalized scalar provably appear in
@@ -161,7 +194,7 @@ export const bindCitedValue = (
   if (markerOccurrences.length === 0) {
     issues.push({
       code: 'missing-in-marker',
-      message: `the asserted value ${value.canonical} does not appear in the visible marked prose — the sentence the reader sees must state the exact value the ledger asserts`
+      message: `the asserted ${value.kind} ${value.canonical} does not appear in the visible marked prose as a ${value.kind} — the sentence the reader sees must state the exact value the ledger asserts, in the asserted TYPE's form (numbers/booleans/null unquoted; strings quoted when their content looks like another scalar)`
     });
   } else {
     if (value.kind === 'number') {
@@ -184,7 +217,7 @@ export const bindCitedValue = (
   if (predicateOccurrences.length === 0) {
     issues.push({
       code: 'missing-in-predicate',
-      message: `the asserted value ${value.canonical} does not appear in the claim predicate — the atomic predicate must restate the exact asserted value`
+      message: `the asserted ${value.kind} ${value.canonical} does not appear in the claim predicate as a ${value.kind} — the atomic predicate must restate the exact asserted value in its asserted type's form`
     });
   } else if (predicateOccurrences.some((index) => negatedAt(texts.predicate, index))) {
     issues.push({
