@@ -1,7 +1,10 @@
 import type { PageArtifact } from '@docstube/plugin-sdk';
+import { createSubmitPageTool, submitPageDescriptor } from '@docstube/agent-runtime';
 import type {
+  ClaimLedger,
   Codemap,
   Finding,
+  FingerprintSnapshot,
   IaNode,
   PageShard,
   ReviewResult,
@@ -19,7 +22,8 @@ import type { RunJournal } from '../state/run-journal.ts';
 import { assignGuarantees, errorFindings, liftClaimGroundedBlocks, runVerifiers } from './verify-page.ts';
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
-import { attachExtractedClaims } from './claims-stage.ts';
+import { anchorWriterLedger } from './anchor-ledger.ts';
+import { attachLedgerClaims } from './ledger-bridge.ts';
 import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
 import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
 import type { RunCostTracker } from './run-cost.ts';
@@ -50,6 +54,8 @@ export type PageRunContext = {
   repoRoot: string;
   host: PluginHost;
   codemap: Codemap;
+  // The typed-fingerprint snapshot claim subscriptions resolve against (ARCHITECTURE §7.2).
+  fingerprints: FingerprintSnapshot;
   journal: RunJournal;
   options: PageRunOptions;
   config: ConfigFamily['config'];
@@ -86,7 +92,7 @@ export const generatePage = async (
   ctx: PageRunContext,
   node: IaNode,
   previousShard: PageShard | undefined
-): Promise<{ outcome: PageOutcome; artifact: PageArtifact; shard: PageShard }> => {
+): Promise<{ outcome: PageOutcome; artifact: PageArtifact; shard: PageShard; ledger?: ClaimLedger }> => {
   // Clamped to at least one attempt — a non-positive cap would skip the loop entirely and crash
   // below with a misleading 'produced no artifact'.
   const maxAttempts = Math.max(1, ctx.options.maxAttemptsPerPage ?? 3);
@@ -96,11 +102,14 @@ export const generatePage = async (
   let lastTranscript: Transcript | undefined;
   let lastReviews: ReviewResult[] = [];
   let attemptsUsed = 0;
+  let lastLedger: ClaimLedger | undefined;
   // One collector across attempts: retries re-asking the same question stay a single flag.
   const questionCollector = createQuestionCollector();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     attemptsUsed = attempt;
+    // Fresh per attempt: a retry must not inherit the previous attempt's accepted submission.
+    const submitPage = createSubmitPageTool();
     const task = buildWritePageTask({
       config: ctx.config,
       glossary: ctx.glossary,
@@ -111,19 +120,20 @@ export const generatePage = async (
       enabledComponents: ctx.config.components,
       instructions: ctx.instructions,
       knowledge: ctx.knowledge,
-      toolDescriptors: [...ctx.options.toolDescriptors, flagQuestionDescriptor]
+      toolDescriptors: [...ctx.options.toolDescriptors, submitPageDescriptor, flagQuestionDescriptor]
     });
     await ctx.journal.append({ type: 'task-started', taskId: task.id });
-    const transcript = await ctx.options.runTask(task, [questionCollector.tool]);
+    const transcript = await ctx.options.runTask(task, [submitPage.tool, questionCollector.tool]);
     await ctx.journal.append({ type: 'task-completed', taskId: task.id, usage: transcript.usage });
     ctx.costTracker.add(transcript.usage);
     lastTranscript = transcript;
-    if (transcript.result?.type !== 'mdx') {
+    if (transcript.result?.type !== 'mdx-ledger') {
       throw new CoreError(
         'pipeline-failed',
-        `write-page task for "${node.slug}" returned no MDX (stop: ${transcript.stopReason})`
+        `write-page task for "${node.slug}" returned no accepted submission (stop: ${transcript.stopReason})`
       );
     }
+    const writerLedger = transcript.result.ledger;
     const mdx = unwrapMdxFence(transcript.result.mdx);
     // On retry the writer edits THIS draft (with the findings attached), not a fresh rewrite.
     priorDraft = mdx;
@@ -199,44 +209,33 @@ export const generatePage = async (
     const verifiedPage = assignGuarantees(page, results, ctx.host);
     lastArtifact = { ...artifact, page: verifiedPage };
     if (findings.length === 0) {
-      // Claims stage on the passing path only: extract checkable claims (same machinery as
-      // `audit`), ground them against the codemap, and gate on stale references like any other
-      // error finding. One agent call per shipped page, cache-keyed by content.
-      const claimsResult = await attachExtractedClaims({
-        artifact: { ...artifact, page: verifiedPage },
-        codemap: ctx.codemap,
-        runTask: ctx.options.runTask,
-        journal: ctx.journal,
-        costTracker: ctx.costTracker
+      // Kernel anchoring on the passing path: the accepted writer ledger becomes the committed
+      // kernel ledger (marker → block anchors, minted claim/evidence ids, subscriptions resolved
+      // against the fingerprint snapshot). The post-hoc claim extractor is gone from this path —
+      // it survives only inside `docstube audit` for foreign docs.
+      const anchoredLedger = anchorWriterLedger({
+        mdx,
+        writerLedger,
+        page: verifiedPage,
+        fingerprints: ctx.fingerprints,
+        commit: ctx.commit
       });
-      findings = claimsResult.findings;
-      const claimWarnings: Finding[] = [];
-      if (claimsResult.warning !== undefined) {
-        claimWarnings.push({
-          source: 'verifier',
-          check: 'claim-extraction',
-          severity: 'warning',
-          message: claimsResult.warning
-        });
-      }
-      if (claimsResult.unanchored > 0) {
-        claimWarnings.push({
+      lastLedger = anchoredLedger.ledger;
+      if (anchoredLedger.warnings.length > 0) {
+        const claimWarnings: Finding[] = anchoredLedger.warnings.map((warning) => ({
           source: 'verifier',
           check: 'claim-anchoring',
           severity: 'warning',
-          message: `${claimsResult.unanchored} extracted claim(s) could not be anchored to the page text and were dropped`
-        });
-      }
-      if (claimWarnings.length > 0) {
+          message: warning
+        }));
         await ctx.journal.append({ type: 'findings', pageId: page.id, findings: claimWarnings });
       }
-      if (findings.length === 0) {
-        // Grounded claims lift their prose blocks to proven, then rolls-ups recompute — this must
-        // run AFTER the claims stage (assignGuarantees ran before claims existed).
-        lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(claimsResult.page) };
-        break;
-      }
-      await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
+      // TEMPORARY (until wave 2b-iii): the bridge derives the legacy per-block ClaimEntity view
+      // from the kernel ledger; the lift then upgrades blocks whose every claim is proven (a
+      // no-op while everything is 'unchecked' — verification is wave 2b-ii).
+      const bridgedPage = attachLedgerClaims(verifiedPage, anchoredLedger.anchored);
+      lastArtifact = { ...artifact, page: liftClaimGroundedBlocks(bridgedPage) };
+      break;
     }
     if (attempt < maxAttempts) {
       await ctx.journal.append({ type: 'page-status', pageId: page.id, status: 'retrying' });
@@ -317,6 +316,9 @@ export const generatePage = async (
       attempts: attemptsUsed
     },
     artifact: lastArtifact,
-    shard
+    shard,
+    // The committed kernel ledger for the shipped page (undefined when the page shipped flagged
+    // without ever passing the gate). Shard persistence of the ledger is wave 2b-iii.
+    ...(lastLedger === undefined ? {} : { ledger: lastLedger })
   };
 };

@@ -60,8 +60,9 @@ export {
   writeKnowledgeAnswer
 } from './pipeline/tribal-knowledge.ts';
 export type { CapturedQuestion, KnowledgeEntry } from './pipeline/tribal-knowledge.ts';
-export { attachExtractedClaims } from './pipeline/claims-stage.ts';
-export type { ClaimsStageResult } from './pipeline/claims-stage.ts';
+export { anchorWriterLedger } from './pipeline/anchor-ledger.ts';
+export type { AnchoredClaim, AnchorLedgerInput, AnchorLedgerResult } from './pipeline/anchor-ledger.ts';
+export { attachLedgerClaims, guaranteeForCorrectness } from './pipeline/ledger-bridge.ts';
 export { translateArtifact, buildTranslatePageTask, alignTranslatedEntities } from './pipeline/translate-page.ts';
 export type { TranslationOutcome } from './pipeline/translate-page.ts';
 export { runRefresh } from './pipeline/maintain.ts';

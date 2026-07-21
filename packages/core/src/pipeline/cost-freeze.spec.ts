@@ -16,13 +16,13 @@ import {
 
 // Cap-freeze behavior (PRODUCT §3.5): usage caps are approximate — the run freezes with margin
 // at 85% of agents.budgets.maxRunUsd, between pages only. Scripted task costs make the freeze
-// point deterministic: write $0.50 + review $0.20 + claims $0.10 = $0.80 per page, so with a
-// $0.90 cap (threshold $0.765) page 1 ships and the freeze lands before page 2.
+// point deterministic: write $0.60 + review $0.20 = $0.80 per page (claim anchoring is kernel
+// work now — no extraction task, no task cost), so with a $0.90 cap (threshold $0.765) page 1
+// ships and the freeze lands before page 2.
 
-const WRITE_COST = 0.5;
+const WRITE_COST = 0.6;
 const REVIEW_COST = 0.2;
-const CLAIMS_COST = 0.1;
-const PAGE_COST = WRITE_COST + REVIEW_COST + CLAIMS_COST;
+const PAGE_COST = WRITE_COST + REVIEW_COST;
 
 describe('createRunCostTracker', () => {
   it('freezes at the margin threshold, not at the cap itself', () => {
@@ -194,19 +194,11 @@ const scriptedRunner = () => {
         }
       };
     }
-    if (spec.kind === 'audit-extract-claims') {
-      return {
-        ...baseTranscript(spec, CLAIMS_COST),
-        observedReads: [],
-        turns: [],
-        result: { type: 'structured', value: { claims: [] } }
-      };
-    }
     writeCalls.push(spec);
     return {
       ...baseTranscript(spec, WRITE_COST),
       turns: [{ role: 'assistant', blocks: [{ type: 'text', text: goodMdx }] }],
-      result: { type: 'mdx', mdx: goodMdx }
+      result: { type: 'mdx-ledger', mdx: goodMdx, ledger: { schemaVersion: 1, claims: [] } }
     };
   };
   return { runTask, writeCalls };

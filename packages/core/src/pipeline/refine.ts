@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { PageShard, ToolDescriptor } from '@docstube/contracts';
 import { hashValue, idPrefixes, mintId, walkIaNodes } from '@docstube/contracts';
-import { buildCodemap } from '@docstube/codemap';
+import { buildCodemap, buildFingerprintSnapshot } from '@docstube/codemap';
 import { loadConfigFamily } from '../config/config-io.ts';
 import { CoreError } from '../errors.ts';
 import { createPluginHost } from '../plugins/plugin-host.ts';
@@ -123,11 +123,10 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     const commit = await resolveCommit(repoRoot);
     await journal.append({ type: 'run-started', mode: 'refine', commit });
 
-    const codemap = await buildCodemap({
-      repoRoot,
-      commit,
-      packs: host.languagePacks().map((entry) => entry.definition)
-    });
+    const packs = host.languagePacks().map((entry) => entry.definition);
+    const codemap = await buildCodemap({ repoRoot, commit, packs });
+    // Claim subscriptions resolve against the typed-fingerprint snapshot during anchoring.
+    const fingerprints = await buildFingerprintSnapshot({ repoRoot, commit, packs });
 
     const pageIds = index.pages.map((entry) => entry.id);
     const locales = [locale, ...config.locales.targets];
@@ -180,6 +179,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       repoRoot,
       host,
       codemap,
+      fingerprints,
       journal,
       options: {
         runTask: options.runTask,

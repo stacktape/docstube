@@ -2,14 +2,19 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
+import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { contentHash } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { runGenerate } from './generate.ts';
 import { runRefresh } from './maintain.ts';
 
 // Maintain/refresh over a real temp repo: generate first (scripted writer + passing reviewers),
-// then refresh and assert which pages regenerate. CI never calls a live model.
+// then refresh and assert which pages regenerate. CI never calls a live model. Writer tasks
+// return the wave 2b-i artifact: MDX plus a writer claim ledger (markerless pages carry an
+// empty ledger).
+
+const emptyLedger: WriterClaimLedger = { schemaVersion: 1, claims: [] };
+const writeResult = (mdx: string): Transcript['result'] => ({ type: 'mdx-ledger', mdx, ledger: emptyLedger });
 
 let repoRoot: string;
 
@@ -94,14 +99,6 @@ const scriptedRunner = (writeResponses: string[], observedContent: string) => {
   const writeCalls: AgentTaskSpec[] = [];
   const reviewCalls: AgentTaskSpec[] = [];
   const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
-    if (spec.kind === 'audit-extract-claims') {
-      return {
-        ...baseTranscript(spec, observedContent),
-        observedReads: [],
-        turns: [],
-        result: { type: 'structured', value: { claims: [] } }
-      };
-    }
     if (spec.kind === 'review-page') {
       reviewCalls.push(spec);
       return passingReview(spec, observedContent);
@@ -114,7 +111,7 @@ const scriptedRunner = (writeResponses: string[], observedContent: string) => {
     return {
       ...baseTranscript(spec, observedContent),
       turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
-      result: { type: 'mdx', mdx }
+      result: writeResult(mdx)
     };
   };
   return { runTask, writeCalls, reviewCalls };
@@ -293,14 +290,6 @@ tree:
     // Generate with a persistently failing persona review: the page ships flagged with an OPEN
     // flag while its MDX passes every deterministic verifier.
     const failingReviewTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
-      if (spec.kind === 'audit-extract-claims') {
-        return {
-          ...baseTranscript(spec, fixtureSource),
-          observedReads: [],
-          turns: [],
-          result: { type: 'structured', value: { claims: [] } }
-        };
-      }
       if (spec.kind === 'review-page') {
         return {
           ...baseTranscript(spec, fixtureSource),
@@ -326,7 +315,7 @@ tree:
       return {
         ...baseTranscript(spec, fixtureSource),
         turns: [{ role: 'assistant', blocks: [{ type: 'text', text: goodMdx }] }],
-        result: { type: 'mdx', mdx: goodMdx }
+        result: writeResult(goodMdx)
       };
     };
     const generated = await runGenerate({

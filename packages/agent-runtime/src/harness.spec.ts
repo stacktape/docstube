@@ -314,9 +314,9 @@ describe('mdx-ledger output via submit_page', () => {
     expect(transcript.stopReason).toBe('error');
     expect(transcript.error).toContain('without an accepted submit_page call');
     // The repair nudge was actually sent before giving up.
-    expect(transport.calls.at(-1)?.messages.some((message) => 'text' in message && /submit_page/.test(message.text ?? ''))).toBe(
-      true
-    );
+    expect(
+      transport.calls.at(-1)?.messages.some((message) => 'text' in message && /submit_page/.test(message.text ?? ''))
+    ).toBe(true);
   });
 
   it('reads the accepted submission after session-transport replay (forwarded tools)', async () => {

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AgentTaskSpec, PageShard, Transcript } from '@docstube/contracts';
+import type { AgentTaskSpec, PageShard, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate } from './generate.ts';
@@ -30,6 +30,10 @@ const message: string = 'hello';
 
 const badMdx = goodMdx.replace("const message: string = 'hello';", "const message: number = 'hello';");
 
+// Wave 2b-i writer artifact: MDX plus a writer claim ledger (markerless fixtures carry an empty one).
+const emptyLedger: WriterClaimLedger = { schemaVersion: 1, claims: [] };
+const writeResult = (mdx: string): Transcript['result'] => ({ type: 'mdx-ledger', mdx, ledger: emptyLedger });
+
 const makeRunner = (writeMdx: () => string) => {
   const writeCalls: string[] = [];
   const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
@@ -47,12 +51,9 @@ const makeRunner = (writeMdx: () => string) => {
     if (spec.kind === 'review-page') {
       return { ...base, result: { type: 'structured', value: { persona: 'dev', criteria: [], findings: [] } } };
     }
-    if (spec.kind === 'audit-extract-claims') {
-      return { ...base, result: { type: 'structured', value: { claims: [] } } };
-    }
     const mdx = writeMdx();
     writeCalls.push(spec.userPrompt);
-    return { ...base, result: { type: 'mdx', mdx } };
+    return { ...base, result: writeResult(mdx) };
   };
   return { runTask, writeCalls };
 };
@@ -139,10 +140,7 @@ describe('runRefine', () => {
       if (spec.kind === 'review-page') {
         return { ...base, result: { type: 'structured', value: { persona: 'dev', criteria: [], findings: [] } } };
       }
-      if (spec.kind === 'audit-extract-claims') {
-        return { ...base, result: { type: 'structured', value: { claims: [] } } };
-      }
-      return { ...base, result: { type: 'mdx', mdx: goodMdx } };
+      return { ...base, result: writeResult(goodMdx) };
     };
     const summary = await runRefine({ repoRoot, runTask: planTask, toolDescriptors: [] });
 

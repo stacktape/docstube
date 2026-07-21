@@ -39,9 +39,6 @@ const runWith = async (onWritePrompt?: (spec: AgentTaskSpec) => void, question: 
       usage: { inputTokens: 1, outputTokens: 1, cacheHit: false },
       stopReason: 'complete'
     };
-    if (spec.kind === 'audit-extract-claims') {
-      return { ...base, result: { type: 'structured', value: { claims: [] } } };
-    }
     if (spec.kind === 'review-page') {
       return {
         ...base,
@@ -62,7 +59,7 @@ const runWith = async (onWritePrompt?: (spec: AgentTaskSpec) => void, question: 
       };
       expect(response.recorded).toBe(true);
     }
-    return { ...base, result: { type: 'mdx', mdx } };
+    return { ...base, result: { type: 'mdx-ledger', mdx, ledger: { schemaVersion: 1, claims: [] } } };
   };
   return runGenerate({ repoRoot, runTask, toolDescriptors: [] });
 };

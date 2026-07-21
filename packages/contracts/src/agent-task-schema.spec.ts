@@ -92,6 +92,6 @@ describe('transcript schema', () => {
         claims: [{ markerId: 'c1', class: 'value', predicate: 'p', correctness: 'checked' }]
       }
     };
-    expect(() => transcriptSchema.parse({ ...transcript, result: smuggled })).toThrow();
+    expect(() => transcriptSchema.parse({ ...transcript, result: smuggled })).toThrow(/unrecognized/iu);
   });
 });

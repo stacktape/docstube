@@ -13,7 +13,7 @@ import type {
   ToolDescriptor
 } from '@docstube/contracts';
 import { contentHash, hashValue, idPrefixes, mintId, walkIaNodes } from '@docstube/contracts';
-import { buildCodemap } from '@docstube/codemap';
+import { buildCodemap, buildFingerprintSnapshot } from '@docstube/codemap';
 import { loadConfigFamily } from '../config/config-io.ts';
 import { docstubeVersion } from '../version.ts';
 import { CoreError } from '../errors.ts';
@@ -175,11 +175,10 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
 
     await journal.append({ type: 'stage-started', stage: 'codemap' });
     const codemapStarted = Date.now();
-    const codemap = await buildCodemap({
-      repoRoot,
-      commit,
-      packs: host.languagePacks().map((entry) => entry.definition)
-    });
+    const packs = host.languagePacks().map((entry) => entry.definition);
+    const codemap = await buildCodemap({ repoRoot, commit, packs });
+    // Claim subscriptions resolve against the typed-fingerprint snapshot during anchoring.
+    const fingerprints = await buildFingerprintSnapshot({ repoRoot, commit, packs });
     await journal.append({
       type: 'stage-completed',
       stage: 'codemap',
@@ -224,6 +223,7 @@ export const runRefresh = async (options: RefreshOptions): Promise<RefreshSummar
       repoRoot,
       host,
       codemap,
+      fingerprints,
       journal,
       options: {
         runTask: options.runTask,

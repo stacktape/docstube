@@ -2,14 +2,31 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
+import { scanClaimMarkers } from '@docstube/agent-runtime';
+import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate, unwrapMdxFence } from './generate.ts';
 
 // End-to-end pipeline test over a real temp repo with the real builtin plugins (verifiers +
 // lang-typescript). The writer and reviewers are a scripted TaskRunner — CI never calls a live
-// model.
+// model. Writer tasks return the wave 2b-i artifact shape: MDX with inline <Claim> markers plus
+// the writer claim ledger, exactly what an accepted submit_page call produces.
+
+// Derives a marker-consistent writer ledger from the scripted MDX, the way a cooperating writer
+// would author one (one code-structure claim per marker).
+const ledgerFor = (mdx: string): WriterClaimLedger => ({
+  schemaVersion: 1,
+  claims: scanClaimMarkers(mdx).markers.map((marker) => ({
+    markerId: marker.markerId,
+    class: 'code-structure',
+    predicate: marker.innerMdx,
+    proposedEvidence: [],
+    proposedSubscriptions: []
+  }))
+});
+
+const writeResult = (mdx: string): Transcript['result'] => ({ type: 'mdx-ledger', mdx, ledger: ledgerFor(mdx) });
 
 let repoRoot: string;
 
@@ -48,7 +65,7 @@ description: Install and greet.
 
 # Getting started
 
-The library exposes a single \`greet\` function.
+<Claim id="c1">The library exposes a single \`greet\` function.</Claim>
 
 ## Usage
 
@@ -101,27 +118,6 @@ const scriptedRunner = (writeResponses: string[]) => {
       reviewCalls.push(spec);
       return passingReview(spec);
     }
-    if (spec.kind === 'audit-extract-claims') {
-      const base = baseTranscript(spec);
-      return {
-        ...base,
-        observedReads: [],
-        turns: [],
-        result: {
-          type: 'structured',
-          value: {
-            claims: [
-              {
-                text: 'The library exposes a single greet function.',
-                anchor: { quote: 'exposes a single `greet` function' },
-                claimClass: 'api-shape',
-                identifiers: ['greet']
-              }
-            ]
-          }
-        }
-      };
-    }
     writeCalls.push(spec);
     const mdx = remaining.shift();
     if (mdx === undefined) {
@@ -130,7 +126,7 @@ const scriptedRunner = (writeResponses: string[]) => {
     return {
       ...baseTranscript(spec),
       turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
-      result: { type: 'mdx', mdx }
+      result: writeResult(mdx)
     };
   };
   return { runTask, writeCalls, reviewCalls };
@@ -183,11 +179,15 @@ describe('runGenerate', () => {
       .flatMap((section) => section.blocks)
       .find((block) => block.blockType === 'code-example');
     expect(codeBlock?.guarantee).toBe('proven');
-    // The claims stage anchored the extracted claim to its paragraph and proved it via the
-    // codemap (identifier `greet` exists).
-    const paragraph = shard?.page.preamble[0];
-    expect(paragraph?.claims).toHaveLength(1);
-    expect(paragraph?.claims[0]).toMatchObject({ claimClass: 'api-shape', guarantee: 'proven' });
+    // The kernel anchored the writer-authored ledger claim to its marker's block and the bridge
+    // derived the legacy view: unchecked ledger claims surface as 'scored' until verification
+    // (wave 2b-ii) flips correctness. No post-hoc extraction task ran on the generate path.
+    const markerBlock = shard?.page.preamble[0];
+    expect(markerBlock?.claims).toHaveLength(1);
+    expect(markerBlock?.claims[0]).toMatchObject({ claimClass: 'code-structure', guarantee: 'scored' });
+    expect(markerBlock?.claims[0]?.id).toMatch(/^cl_/);
+    // The inline marker survives into the shipped MDX (theme rendering is a later wave).
+    expect(mdxOnDisk).toContain('<Claim id="c1">');
   }, 60_000);
 
   it('retries on verifier findings and passes with the fixed draft', async () => {
@@ -248,18 +248,10 @@ describe('runGenerate', () => {
           result: { type: 'structured', value: { nonsense: true } }
         };
       }
-      if (spec.kind === 'audit-extract-claims') {
-        return {
-          ...baseTranscript(spec),
-          observedReads: [],
-          turns: [],
-          result: { type: 'structured', value: { claims: [] } }
-        };
-      }
       return {
         ...baseTranscript(spec),
         turns: [{ role: 'assistant', blocks: [{ type: 'text', text: goodMdx }] }],
-        result: { type: 'mdx', mdx: goodMdx }
+        result: writeResult(goodMdx)
       };
     };
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [], runId });
@@ -304,14 +296,6 @@ describe('runGenerate', () => {
         }
         return passingReview(spec);
       }
-      if (spec.kind === 'audit-extract-claims') {
-        return {
-          ...baseTranscript(spec),
-          observedReads: [],
-          turns: [],
-          result: { type: 'structured', value: { claims: [] } }
-        };
-      }
       const mdx = remaining.shift();
       if (mdx === undefined) {
         throw new Error('exhausted');
@@ -319,7 +303,7 @@ describe('runGenerate', () => {
       return {
         ...baseTranscript(spec),
         turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
-        result: { type: 'mdx', mdx }
+        result: writeResult(mdx)
       };
     };
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
@@ -343,19 +327,11 @@ describe('runGenerate', () => {
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
-      if (spec.kind === 'audit-extract-claims') {
-        return {
-          ...baseTranscript(spec),
-          observedReads: [],
-          turns: [],
-          result: { type: 'structured', value: { claims: [] } }
-        };
-      }
       const mdx = spec.kind === 'translate-page' ? germanMdx : goodMdx;
       return {
         ...baseTranscript(spec),
         turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
-        result: { type: 'mdx', mdx }
+        result: spec.kind === 'translate-page' ? { type: 'mdx', mdx } : writeResult(mdx)
       };
     };
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
@@ -390,19 +366,11 @@ describe('runGenerate', () => {
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
-      if (spec.kind === 'audit-extract-claims') {
-        return {
-          ...baseTranscript(spec),
-          observedReads: [],
-          turns: [],
-          result: { type: 'structured', value: { claims: [] } }
-        };
-      }
       const mdx = spec.kind === 'translate-page' ? brokenTranslation : goodMdx;
       return {
         ...baseTranscript(spec),
         turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
-        result: { type: 'mdx', mdx }
+        result: spec.kind === 'translate-page' ? { type: 'mdx', mdx } : writeResult(mdx)
       };
     };
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
@@ -432,19 +400,11 @@ describe('runGenerate', () => {
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
-      if (spec.kind === 'audit-extract-claims') {
-        return {
-          ...baseTranscript(spec),
-          observedReads: [],
-          turns: [],
-          result: { type: 'structured', value: { claims: [] } }
-        };
-      }
       const mdx = spec.kind === 'translate-page' ? alteredCodeTranslation : goodMdx;
       return {
         ...baseTranscript(spec),
         turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
-        result: { type: 'mdx', mdx }
+        result: spec.kind === 'translate-page' ? { type: 'mdx', mdx } : writeResult(mdx)
       };
     };
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });

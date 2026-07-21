@@ -23,16 +23,47 @@ export type WritePromptInput = {
 
 const symbolSummary = (codemap: Codemap, cap = 200): string => {
   const publicSymbols = codemap.symbols.filter((symbol) => symbol.visibility === 'public');
+  // The symbol hash rides along because claim ledgers reference symbols by hash, never by name.
   const lines = publicSymbols
     .slice(0, cap)
     .map(
       (symbol) =>
-        `- ${symbol.kind} \`${[...symbol.containerPath, symbol.name].join('.')}\` (${symbol.file}:${symbol.span[0]})`
+        `- ${symbol.kind} \`${[...symbol.containerPath, symbol.name].join('.')}\` (${symbol.file}:${symbol.span[0]}) hash=${symbol.hash}`
     );
   const truncated =
     publicSymbols.length > cap ? `\n…and ${publicSymbols.length - cap} more (use tools to explore)` : '';
   return lines.join('\n') + truncated;
 };
+
+// The claim-aware authorship contract (ARCHITECTURE §4.1): every assertion carries an inline
+// marker plus a ledger entry, and the page is delivered ONLY through submit_page.
+const claimAuthorshipRules = [
+  'Claim-aware authorship (required):',
+  '- Wrap every assertion-shaped statement — a fact about the code a reader could rely on (an API exists, a default',
+  '  value, a runtime behavior, a why/history fact) — in an inline marker: <Claim id="c1">`greet` returns a',
+  '  string.</Claim>. Marker ids are short page-unique tokens (c1, c2, …). Markers must wrap the asserted prose,',
+  '  never be empty or self-closing, and never nest.',
+  '- Deliver the page by calling the `submit_page` tool with { mdx, ledger }. Never print the page as chat text.',
+  '  If submit_page reports errors, fix exactly what it lists and call it again with the full corrected page.',
+  '- The ledger holds one entry per marker: { markerId, class, predicate, proposedEvidence, proposedSubscriptions }.',
+  '  Emit ONLY those fields — claim ids, anchors, correctness, and evidence records are minted by the kernel.',
+  "- class: 'code-structure' (a named API/config exists or has a shape), 'value' (a concrete value: default,",
+  "  constant, limit), 'behavior' (what the code does at runtime), 'intent-history' (why/when — only when",
+  '  maintainer-provided knowledge backs it).',
+  '- predicate: the asserted fact restated as ONE standalone checkable sentence, stripped of surrounding prose.',
+  '- proposedEvidence: where a verifier should look — { kind: "symbol", symbol: "<hash from the API surface list>" },',
+  '  { kind: "file", file: "repo/relative/path" }, { kind: "url", url: "https://…" }, or { kind: "check", check: "<name>" }.',
+  '- proposedSubscriptions: the exact code facets whose change invalidates the claim:',
+  '  { kind: "signature", symbolHash } when the claim depends on a declaration shape;',
+  '  { kind: "cited-value", symbolHash, valueName, citedValue } for every value claim — valueName uses the',
+  '  cited-value grammar: an exported const name ("DEFAULT_RETRIES"), a dot path into an exported object literal',
+  '  ("retryDefaults.backoff.factor"), an enum member ("LogLevel.Warn"), or a parameter default',
+  '  ("createClient.param.timeout.default"); citedValue is the asserted value normalized (strings JSON-quoted,',
+  '  plain numbers, true/false, null);',
+  '  { kind: "body", symbolHash } when the claim depends on implementation details beyond the signature.',
+  '  Use symbol hashes from the API surface list or from tool results — never invent a hash, and skip the',
+  '  subscription when you have no real hash for it.'
+].join('\n');
 
 export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
   const personas = input.config.personas.map((persona) => `- ${persona.id}: ${persona.description}`).join('\n');
@@ -52,13 +83,15 @@ export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
     '',
     'Hard rules:',
     '- Read the actual source with the provided tools before describing behavior. Base every claim on code you read.',
-    '- Output pure MDX: frontmatter (title, description), then content. Exactly one H1. No entity ids, no HTML comments.',
+    '- The page is pure MDX: frontmatter (title, description), then content. Exactly one H1. No entity ids, no HTML comments.',
     '- Frontmatter must be valid YAML: double-quote the title and description values.',
     '- Never write import/export statements and never set a `layout` frontmatter key — the site build provides both.',
-    `- ${components}`,
+    `- ${components} The inline <Claim id> marker is always available — it is part of the claim contract, not a theme component.`,
     '- Code examples must be complete and correct — they are compiled and executed.',
     '- If something cannot be known from the code (intent, history, "why"), use the `flag_question` tool to ask the',
     '  maintainers, then keep writing with what IS knowable. Never block on it; never invent the answer.',
+    '',
+    claimAuthorshipRules,
     '',
     `Project: ${input.config.projectContext || input.config.site.title}`,
     `Audience personas:\n${personas}`,
@@ -91,7 +124,7 @@ export const buildWriterUserPrompt = (input: WritePromptInput): string => {
         : [
             '',
             'Your previous draft FAILED verification. Edit the draft below to fix every finding; change nothing',
-            'that was not flagged. Output the complete corrected page.',
+            'that was not flagged. Submit the complete corrected page (with its claim ledger) via submit_page.',
             '',
             '--- PREVIOUS DRAFT START ---',
             input.priorDraft,
@@ -126,5 +159,5 @@ export const buildWritePageTask = (
       maxTurns: input.config.agents.budgets.maxTurnsPerTask,
       maxToolCalls: input.config.agents.budgets.maxToolCallsPerTask
     },
-    output: { type: 'mdx' }
+    output: { type: 'mdx-ledger' }
   });

@@ -43,7 +43,11 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
         errors.push(`stray </Claim> at offset ${match.index} — no matching <Claim id="…"> opening tag`);
         continue;
       }
-      markers.push({ markerId: open.markerId, offset: open.offset, innerMdx: mdx.slice(open.contentStart, match.index) });
+      markers.push({
+        markerId: open.markerId,
+        offset: open.offset,
+        innerMdx: mdx.slice(open.contentStart, match.index)
+      });
       open = undefined;
       continue;
     }
@@ -140,9 +144,7 @@ const ledgerIssueMessage = (issue: z.core.$ZodIssue): string => {
 export type AcceptedSubmission = { mdx: string; ledger: WriterClaimLedger };
 
 // Every problem in one pass, phrased as an instruction the model can act on directly.
-export const validateSubmission = (
-  args: unknown
-): { accepted: AcceptedSubmission | undefined; errors: string[] } => {
+export const validateSubmission = (args: unknown): { accepted: AcceptedSubmission | undefined; errors: string[] } => {
   const shape = submitPageArgsSchema.safeParse(args ?? {});
   if (!shape.success) {
     return {
@@ -164,7 +166,9 @@ export const validateSubmission = (
   }
   for (const [markerId, count] of markerCounts) {
     if (count > 1) {
-      errors.push(`marker "${markerId}" appears ${count} times in the MDX — every marker id is unique; renumber the duplicates`);
+      errors.push(
+        `marker "${markerId}" appears ${count} times in the MDX — every marker id is unique; renumber the duplicates`
+      );
     }
   }
   for (const marker of scan.markers) {

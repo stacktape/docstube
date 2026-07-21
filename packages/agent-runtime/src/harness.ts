@@ -130,8 +130,7 @@ const toolDeliveredResult = (tools: Map<string, ToolImplementation>): TaskResult
   return undefined;
 };
 
-const MISSING_SUBMISSION_ERROR =
-  'task completed without an accepted submit_page call — the page was never submitted';
+const MISSING_SUBMISSION_ERROR = 'task completed without an accepted submit_page call — the page was never submitted';
 
 const resolveToolImplementations = (
   spec: AgentTaskSpec,
