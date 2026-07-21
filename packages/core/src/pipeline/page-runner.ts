@@ -2,6 +2,7 @@ import type { PageArtifact } from '@docstube/plugin-sdk';
 import { createSubmitPageTool, submitPageDescriptor } from '@docstube/agent-runtime';
 import type {
   ClaimLedger,
+  ClaimMatching,
   Codemap,
   Finding,
   FingerprintSnapshot,
@@ -17,6 +18,7 @@ import type { ConfigFamily } from '../config/config-io.ts';
 import { CoreError } from '../errors.ts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { matchEntityIds } from '../entities/match-entities.ts';
+import type { BlockMatchConfidence } from '../entities/match-entities.ts';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import type { RunJournal } from '../state/run-journal.ts';
 import { assignGuarantees, errorFindings, liftClaimGroundedBlocks, runVerifiers } from './verify-page.ts';
@@ -115,6 +117,7 @@ export const generatePage = async (
   let attemptsUsed = 0;
   let lastLedger: ClaimLedger | undefined;
   let lastProvenance: ProvenanceV2 | undefined;
+  let lastMatching: ClaimMatching | undefined;
   // One collector across attempts: retries re-asking the same question stay a single flag.
   const questionCollector = createQuestionCollector();
 
@@ -151,8 +154,12 @@ export const generatePage = async (
     priorDraft = mdx;
 
     let page = extractPageEntity({ mdx, slug: node.slug, fallbackTitle: node.title });
+    // Carried block id → thread confidence; claim matching refuses 'exact' over inexact threads.
+    let blockConfidence: ReadonlyMap<string, BlockMatchConfidence> = new Map();
     if (previousShard) {
-      page = matchEntityIds(page, previousShard.page).page;
+      const matchedPage = matchEntityIds(page, previousShard.page);
+      page = matchedPage.page;
+      blockConfidence = matchedPage.blockConfidence;
     }
     // Page-level source attribution: the symbols living in files the writer actually read.
     // Claim-level attribution is a later stage; this grounds coverage and refresh scoping now.
@@ -239,13 +246,15 @@ export const generatePage = async (
       continue;
     }
     // Claim identity matching (trust-model-v2 decision 8): a continuing assertion on a matched
-    // block reuses the previous shard's claim id — identity carries, while predicate, anchor,
-    // subscriptions, evidence, and trust state all come from the CURRENT ledger.
+    // block reuses the previous kernel ledger's claim id — identity carries, while predicate,
+    // anchor, subscriptions, evidence, and trust state all come from the CURRENT ledger.
     const matched = matchClaimIds({
       ledger: anchoredLedger.ledger,
       anchored: anchoredLedger.anchored,
-      previousPage: previousShard?.page
+      previousLedger: previousShard?.ledger,
+      blockConfidence
     });
+    lastMatching = matched.matching;
     // Ambiguous threads (drift markers) and orphaned prior claims are recorded facts, never
     // silent: they ride the journal and the shard's claimMatching records.
     const matchingWarnings: Finding[] = [
@@ -255,8 +264,8 @@ export const generatePage = async (
           source: 'verifier' as const,
           check: 'claim-matching',
           severity: 'warning' as const,
-          message: `claim ${match.priorId} threaded ambiguously (equal candidates) — content changed substantially since its human threads were written; drift marker recorded`,
-          data: { priorId: match.priorId, confidence: match.confidence }
+          message: `claim ${match.priorId} threaded ambiguously (${match.drift.join(', ')}) — content changed substantially since its human threads were written; drift marker recorded`,
+          data: { priorId: match.priorId, confidence: match.confidence, drift: match.drift }
         })),
       ...matched.orphans.map((orphanId) => ({
         source: 'verifier' as const,
@@ -406,7 +415,10 @@ export const generatePage = async (
   });
 
   // Gate: clean → passed; findings after bounded retries → flag and ship the flagged state.
-  // Never silently wrong (PRODUCT §3.5 stage 6).
+  // Never silently wrong (PRODUCT §3.5 stage 6). The shard embeds the trust spine of the FINAL
+  // attempt — kernel ledger, ProvenanceV2 (ClaimEvidence), and the claim-matching records — in
+  // its true final state: a contradicted claim persists as contradicted, loud and
+  // machine-readable, never as a bare flag over clean-looking prose (impl-06 finding 3).
   const passed = findings.length === 0;
   const shard: PageShard = {
     schemaVersion: 2,
@@ -415,6 +427,10 @@ export const generatePage = async (
     sourceCommit: ctx.commit,
     generatedAt: new Date().toISOString(),
     page: lastArtifact.page,
+    ...(lastLedger === undefined || lastProvenance === undefined
+      ? {}
+      : { ledger: lastLedger, provenance: lastProvenance }),
+    ...(lastMatching === undefined ? {} : { claimMatching: lastMatching }),
     flags: passed
       ? [...carriedFlags, ...questionFlags]
       : [

@@ -8,6 +8,7 @@ import type {
   Transcript
 } from '@docstube/contracts';
 import { canonicalJson, contentHash, hashValue, provenanceV2Schema } from '@docstube/contracts';
+import { CoreError } from '../errors.ts';
 import type { KnowledgeEntry } from './tribal-knowledge.ts';
 import type { ScoredReview } from './review-page.ts';
 
@@ -42,6 +43,39 @@ const fragmentOf = (kind: 'instruction' | 'criteria', text: string) => {
 };
 
 export const assembleProvenanceV2 = (input: AssembleProvenanceInput): ProvenanceV2 => {
+  // Kernel commit validator (impl-06 finding 5): the ledger and its ClaimEvidence records are one
+  // artifact in two projections — assembly REFUSES a partial or disagreeing pair instead of
+  // parsing it into committed state. The shard schema re-proves this at every parse; failing here
+  // names the bug at its source.
+  const evidenceByClaimId = new Map(input.claimEvidence.map((record) => [record.claimId, record]));
+  for (const claim of input.ledger.claims) {
+    const record = evidenceByClaimId.get(claim.claimId);
+    if (record === undefined) {
+      throw new CoreError(
+        'pipeline-failed',
+        `provenance assembly: ledger claim "${claim.claimId}" has no ClaimEvidence record — the ledger↔evidence bijection is broken`
+      );
+    }
+    evidenceByClaimId.delete(claim.claimId);
+    if (
+      record.class !== claim.class ||
+      record.correctness !== claim.correctness ||
+      record.disposition !== claim.disposition ||
+      record.decidingEvidenceId !== claim.decidingEvidenceId
+    ) {
+      throw new CoreError(
+        'pipeline-failed',
+        `provenance assembly: ledger claim "${claim.claimId}" disagrees with its ClaimEvidence record on class/correctness/disposition/decidingEvidenceId`
+      );
+    }
+  }
+  const stray = [...evidenceByClaimId.keys()];
+  if (stray.length > 0) {
+    throw new CoreError(
+      'pipeline-failed',
+      `provenance assembly: ClaimEvidence record(s) ${stray.join(', ')} have no ledger claim — the ledger↔evidence bijection is broken`
+    );
+  }
   // Explicit subscriptions only — the union of every ledger claim's typed subscriptions, deduped
   // by canonical shape (two claims sharing a dependency is one invalidation edge).
   const seenSubscriptions = new Set<string>();

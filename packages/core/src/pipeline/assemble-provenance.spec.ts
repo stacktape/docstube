@@ -38,16 +38,16 @@ const ledger = claimLedgerSchema.parse({
   }))
 });
 
-const claimEvidence = [
+const claimEvidence = [CLAIM_A, CLAIM_B].map((claimId) =>
   claimEvidenceSchema.parse({
     schemaVersion: 1,
-    claimId: CLAIM_A,
+    claimId,
     class: 'code-structure',
     correctness: 'unchecked',
     disposition: 'no-checker-available',
     evidence: []
   })
-];
+);
 
 const transcript = transcriptSchema.parse({
   schemaVersion: 1,
@@ -94,11 +94,11 @@ const reviews = [
   }
 ];
 
-const assemble = () =>
+const assemble = (evidence = claimEvidence) =>
   assembleProvenanceV2({
     pageId: PAGE,
     ledger,
-    claimEvidence,
+    claimEvidence: evidence,
     transcript,
     writeTask,
     reviews,
@@ -115,8 +115,28 @@ describe('assembleProvenanceV2', () => {
     // are enforced by the schema, so an invalid assembly can never leave the function.
     const provenance = assemble();
     expect(provenance.schemaVersion).toBe(1);
-    expect(provenance.claimEvidence).toHaveLength(1);
+    expect(provenance.claimEvidence).toHaveLength(2);
     expect(provenance.claimEvidence[0]?.claimId).toBe(CLAIM_A);
+  });
+
+  it('REFUSES a ledger↔ClaimEvidence pair that is not a bijection (impl-06 finding 5)', () => {
+    // Two ledger claims, one evidence record: assembly must throw, never parse into state.
+    expect(() => assemble(claimEvidence.slice(0, 1))).toThrow(/no ClaimEvidence record/);
+    // A stray evidence record with no ledger claim is equally corrupt.
+    const stray = claimEvidenceSchema.parse({
+      schemaVersion: 1,
+      claimId: `cl_${'9'.repeat(20)}`,
+      class: 'code-structure',
+      correctness: 'unchecked',
+      disposition: 'no-checker-available',
+      evidence: []
+    });
+    expect(() => assemble([...claimEvidence, stray])).toThrow(/no ledger claim/);
+    // Field disagreement (here: class) is corrupt even when the id sets match.
+    const disagreeing = claimEvidence.map((record, index) =>
+      index === 0 ? claimEvidenceSchema.parse({ ...record, class: 'value' }) : record
+    );
+    expect(() => assemble(disagreeing)).toThrow(/disagrees/);
   });
 
   it('lineage carries models, prompt revisions, transcript pointers, and observed reads', () => {

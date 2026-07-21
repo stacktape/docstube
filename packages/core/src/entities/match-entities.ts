@@ -6,9 +6,18 @@ import { listPageEntityIds } from '@docstube/contracts';
 // keep the freshly minted ones; previous ids that matched nothing are tombstoned (feedback
 // attached to them is surfaced, never silently dropped). Ids are never reused.
 
+// How confidently a block thread carried (trust-model-v2 decision 8, impl-06 finding 4):
+//   'exact'      unique (blockType, contentHash) match — the same bytes, provably the same block;
+//   'positional' same section/type/ordinal with CHANGED content — a plausible thread, not proof.
+// Claim matching consumes this: a claim on a positionally-threaded block is never recorded as an
+// exact identity thread, no matter how unique its own candidate set is.
+export type BlockMatchConfidence = 'exact' | 'positional';
+
 export type MatchedPage = {
   page: PageEntity;
   tombstonedIds: string[];
+  // Keyed by the CARRIED block id (the previous id now living on the fresh block).
+  blockConfidence: Map<string, BlockMatchConfidence>;
 };
 
 const matchSections = (fresh: SectionEntity[], previous: SectionEntity[]): Map<string, string> => {
@@ -65,8 +74,13 @@ const locateBlocks = (page: PageEntity, sectionKeyOf: (sectionId: string) => str
   return located;
 };
 
-const matchBlocks = (fresh: LocatedBlock[], previous: LocatedBlock[]): Map<string, string> => {
+const matchBlocks = (
+  fresh: LocatedBlock[],
+  previous: LocatedBlock[]
+): { mapping: Map<string, string>; confidence: Map<string, BlockMatchConfidence> } => {
   const mapping = new Map<string, string>();
+  // Keyed by the PREVIOUS (carried) block id.
+  const confidence = new Map<string, BlockMatchConfidence>();
   const usedPrevious = new Set<string>();
 
   // Pass 1: unique (blockType, contentHash) match anywhere on the page — moved content keeps id.
@@ -79,10 +93,12 @@ const matchBlocks = (fresh: LocatedBlock[], previous: LocatedBlock[]): Map<strin
     );
     if (candidates.length === 1 && candidates[0]) {
       mapping.set(block.id, candidates[0].block.id);
+      confidence.set(candidates[0].block.id, 'exact');
       usedPrevious.add(candidates[0].block.id);
     }
   }
-  // Pass 2: same section, same blockType, same ordinal among unmatched — edited content keeps id.
+  // Pass 2: same section, same blockType, same ordinal among unmatched — edited content keeps id,
+  // but only as a POSITIONAL thread: the content changed, so the identity is plausible, not proven.
   const freshBySection = new Map<string, LocatedBlock[]>();
   for (const entry of fresh) {
     if (mapping.has(entry.block.id)) {
@@ -100,11 +116,12 @@ const matchBlocks = (fresh: LocatedBlock[], previous: LocatedBlock[]): Map<strin
       const candidate = previousInSection[index];
       if (candidate && candidate.block.blockType === entry.block.blockType) {
         mapping.set(entry.block.id, candidate.block.id);
+        confidence.set(candidate.block.id, 'positional');
         usedPrevious.add(candidate.block.id);
       }
     }
   }
-  return mapping;
+  return { mapping, confidence };
 };
 
 export const matchEntityIds = (fresh: PageEntity, previous: PageEntity): MatchedPage => {
@@ -113,14 +130,13 @@ export const matchEntityIds = (fresh: PageEntity, previous: PageEntity): Matched
   // Blocks in matched sections compare within that section identity; others by preamble/self key.
   const freshBlocks = locateBlocks(fresh, (sectionId) => sectionMapping.get(sectionId) ?? sectionId);
   const previousBlocks = locateBlocks(previous, (sectionId) => sectionId);
-  const blockMapping = matchBlocks(freshBlocks, previousBlocks);
+  const { mapping: blockMapping, confidence: blockConfidence } = matchBlocks(freshBlocks, previousBlocks);
 
   const remapBlock = (block: BlockEntity): BlockEntity => {
     const previousId = blockMapping.get(block.id);
     // ONLY identity carries. Claims are trust state and are never copied from the previous shard —
-    // even for content-identical blocks: the kernel ledger rebuilds every claim from the current
-    // run and claim matching (pipeline/match-claims.ts) reuses the previous claim ID for a
-    // continuing assertion. Copying old ClaimEntity records here resurrected stale guarantees
+    // the kernel ledger rebuilds every claim from the current run and claim matching
+    // (pipeline/match-claims.ts) reuses the previous claim ID for a continuing assertion
     // ("identity may carry; trust never carries", trust-model-v2 decision 8).
     return previousId === undefined ? block : { ...block, id: previousId };
   };
@@ -140,8 +156,8 @@ export const matchEntityIds = (fresh: PageEntity, previous: PageEntity): Matched
   // matching (pipeline/match-claims.ts) and cannot know which previous claim ids will legitimately
   // thread onto the freshly anchored ledger — listing a carried id tombstoned here would be a lie.
   // The exclusion is NOT silent loss: matchClaimIds returns every unthreaded previous claim id as
-  // an explicit ORPHAN, which the page runner journals (trust-model-v2 decision 8).
+  // an explicit ORPHAN, which the page runner journals and persists (trust-model-v2 decision 8).
   const carriedIds = new Set(listPageEntityIds(page));
   const tombstonedIds = listPageEntityIds(previous).filter((id) => !id.startsWith('cl_') && !carriedIds.has(id));
-  return { page, tombstonedIds };
+  return { page, tombstonedIds, blockConfidence };
 };
