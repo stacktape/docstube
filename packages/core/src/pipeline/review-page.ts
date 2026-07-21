@@ -85,11 +85,20 @@ export type ReviewPageInput = {
   costTracker?: RunCostTracker | undefined;
 };
 
-const reviewFromTranscript = (persona: Persona, transcript: Transcript): ReviewResult => {
+// A review result plus the execution metadata provenance-v2 assessments need: which model scored
+// it, the review task id (transcript pointer into the run journal), and whether the reviewer
+// actually completed (invalid output = a recorded 'failed' review, never a missing record).
+export type ScoredReview = ReviewResult & {
+  scoredBy: string;
+  taskId: string;
+  completed: boolean;
+};
+
+const reviewFromTranscript = (persona: Persona, transcript: Transcript): ReviewResult & { completed: boolean } => {
   if (transcript.result?.type === 'structured') {
     const parsed = reviewResultSchema.safeParse(transcript.result.value);
     if (parsed.success) {
-      return parsed.data;
+      return { ...parsed.data, completed: true };
     }
   }
   // A broken reviewer must not kill the run or silently pass: surface it as a warning finding.
@@ -103,13 +112,14 @@ const reviewFromTranscript = (persona: Persona, transcript: Transcript): ReviewR
         severity: 'warning',
         message: `reviewer for persona "${persona.id}" returned no valid review (stop: ${transcript.stopReason}); page shipped without this persona's review`
       }
-    ]
+    ],
+    completed: false
   };
 };
 
-export const reviewPage = async (input: ReviewPageInput): Promise<ReviewResult[]> => {
+export const reviewPage = async (input: ReviewPageInput): Promise<ScoredReview[]> => {
   const criteria = input.criteria.length > 0 ? input.criteria : [...defaultReviewCriteria];
-  const reviews: ReviewResult[] = [];
+  const reviews: ScoredReview[] = [];
   for (const persona of input.config.personas) {
     const task = buildReviewPageTask({
       persona,
@@ -127,7 +137,7 @@ export const reviewPage = async (input: ReviewPageInput): Promise<ReviewResult[]
       usage: transcript.usage
     });
     input.costTracker?.add(transcript.usage);
-    reviews.push(reviewFromTranscript(persona, transcript));
+    reviews.push({ ...reviewFromTranscript(persona, transcript), scoredBy: transcript.model, taskId: task.id });
   }
   return reviews;
 };

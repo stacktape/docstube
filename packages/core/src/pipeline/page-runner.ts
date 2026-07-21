@@ -7,7 +7,7 @@ import type {
   FingerprintSnapshot,
   IaNode,
   PageShard,
-  ReviewResult,
+  ProvenanceV2,
   ToolDescriptor,
   Transcript
 } from '@docstube/contracts';
@@ -22,6 +22,8 @@ import type { RunJournal } from '../state/run-journal.ts';
 import { assignGuarantees, errorFindings, liftClaimGroundedBlocks, runVerifiers } from './verify-page.ts';
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
+import type { ScoredReview } from './review-page.ts';
+import { assembleProvenanceV2 } from './assemble-provenance.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import { matchClaimIds } from './match-claims.ts';
 import { verifyClaims } from './verify-claims.ts';
@@ -94,7 +96,14 @@ export const generatePage = async (
   ctx: PageRunContext,
   node: IaNode,
   previousShard: PageShard | undefined
-): Promise<{ outcome: PageOutcome; artifact: PageArtifact; shard: PageShard; ledger?: ClaimLedger }> => {
+): Promise<{
+  outcome: PageOutcome;
+  artifact: PageArtifact;
+  shard: PageShard;
+  ledger?: ClaimLedger;
+  // Provenance v2 for the page that passed the gate (in-memory this wave; persistence is 2b-iii).
+  provenance?: ProvenanceV2;
+}> => {
   // Clamped to at least one attempt — a non-positive cap would skip the loop entirely and crash
   // below with a misleading 'produced no artifact'.
   const maxAttempts = Math.max(1, ctx.options.maxAttemptsPerPage ?? 3);
@@ -102,9 +111,10 @@ export const generatePage = async (
   let priorDraft: string | undefined;
   let lastArtifact: PageArtifact | undefined;
   let lastTranscript: Transcript | undefined;
-  let lastReviews: ReviewResult[] = [];
+  let lastReviews: ScoredReview[] = [];
   let attemptsUsed = 0;
   let lastLedger: ClaimLedger | undefined;
+  let lastProvenance: ProvenanceV2 | undefined;
   // One collector across attempts: retries re-asking the same question stay a single flag.
   const questionCollector = createQuestionCollector();
 
@@ -319,6 +329,21 @@ export const generatePage = async (
         continue;
       }
       lastLedger = verified.ledger;
+      // Provenance v2 for the gated page: lineage / dependencies / claimEvidence / assessments,
+      // validated by parse. In-memory on the page result this wave; shard persistence is 2b-iii.
+      lastProvenance = assembleProvenanceV2({
+        pageId: page.id,
+        ledger: verified.ledger,
+        claimEvidence: verified.claimEvidence,
+        transcript,
+        writeTask: task,
+        reviews,
+        instructions: ctx.instructions,
+        criteria: ctx.criteria,
+        glossary: ctx.glossary,
+        config: ctx.config,
+        knowledge: ctx.knowledge
+      });
       // TEMPORARY (until wave 2b-iii): the bridge REPLACES every block's legacy claims with the
       // verified ledger view (checked → proven, unchecked → scored; contradiction cannot reach it
       // — the gate above already failed the attempt); the lift then upgrades blocks whose every
@@ -407,8 +432,9 @@ export const generatePage = async (
     },
     artifact: lastArtifact,
     shard,
-    // The committed kernel ledger for the shipped page (undefined when the page shipped flagged
-    // without ever passing the gate). Shard persistence of the ledger is wave 2b-iii.
-    ...(lastLedger === undefined ? {} : { ledger: lastLedger })
+    // The committed kernel ledger and its provenance v2 for the shipped page (undefined when the
+    // page shipped flagged without ever passing the gate). Shard persistence is wave 2b-iii.
+    ...(lastLedger === undefined ? {} : { ledger: lastLedger }),
+    ...(lastProvenance === undefined ? {} : { provenance: lastProvenance })
   };
 };
