@@ -13,7 +13,9 @@ export const idPrefixes = {
   flag: 'fl',
   run: 'run',
   task: 'tk',
-  context: 'ctx'
+  context: 'ctx',
+  knowledgeNeed: 'kn',
+  knowledgeFact: 'kf'
 } as const;
 
 export type IdPrefix = (typeof idPrefixes)[keyof typeof idPrefixes];
@@ -37,6 +39,8 @@ export const claimIdSchema = idSchema(idPrefixes.claim);
 export const flagIdSchema = idSchema(idPrefixes.flag);
 export const runIdSchema = idSchema(idPrefixes.run);
 export const taskIdSchema = idSchema(idPrefixes.task);
+export const knowledgeNeedIdSchema = idSchema(idPrefixes.knowledgeNeed);
+export const knowledgeFactIdSchema = idSchema(idPrefixes.knowledgeFact);
 
 export const semverSchema = z
   .string()
@@ -68,6 +72,9 @@ export const repoPathSchema = z
   );
 
 export const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/);
+
+// Abbreviated through full git object ids: SHA-1 (7..40 hex) and SHA-256 (64 hex) repositories.
+export const gitShaSchema = z.string().regex(/^[0-9a-f]{7,64}$/);
 
 // Content-derived keys namespaced by producer: "ts:<sha256>", "py:<sha256>", "openapi:<sha256>".
 export const sourceKeySchema = z.string().regex(/^[a-z][a-z0-9-]*:[0-9a-f]{64}$/);

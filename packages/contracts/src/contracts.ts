@@ -13,12 +13,15 @@ export {
   flagIdSchema,
   runIdSchema,
   taskIdSchema,
+  knowledgeNeedIdSchema,
+  knowledgeFactIdSchema,
   semverSchema,
   isoTimestampSchema,
   localeCodeSchema,
   versionLabelSchema,
   repoPathSchema,
   sha256HexSchema,
+  gitShaSchema,
   sourceKeySchema,
   severitySchema,
   lineSpanSchema
@@ -163,5 +166,156 @@ export type { PluginPermissions, PluginCapabilityKind, PluginManifest } from './
 
 export { docstubeConfigJsonSchema, iaJsonSchema, glossaryJsonSchema } from './config-json-schema.ts';
 
+// v2 contract schemas (the 0.1.0 redesign program). Additive: they coexist with the v1 schemas
+// above until downstream packages migrate in later waves.
+
+export {
+  claimClassV2Schema,
+  executionEnvironmentSchema,
+  evidenceKindSchema,
+  evidenceRefSchema,
+  uncheckedReasonSchema,
+  claimDispositionSchema,
+  isOwnerAttested,
+  fingerprintSubscriptionSchema,
+  claimMarkerIdSchema,
+  ledgerClaimSchema,
+  coverageLintSpanSchema,
+  claimLedgerSchema
+} from './claim-ledger-schema.ts';
+export type {
+  ClaimClassV2,
+  ExecutionEnvironment,
+  EvidenceKind,
+  EvidenceRef,
+  ClaimDisposition,
+  FingerprintSubscription,
+  LedgerClaim,
+  CoverageLintSpan,
+  ClaimLedger
+} from './claim-ledger-schema.ts';
+
+export { symbolFingerprintSchema, fileFingerprintSchema, fingerprintSnapshotSchema } from './fingerprint-schema.ts';
+export type { SymbolFingerprint, FileFingerprint, FingerprintSnapshot } from './fingerprint-schema.ts';
+
+export {
+  generationLineageSchema,
+  consumedFragmentKindSchema,
+  consumedFragmentSchema,
+  dependenciesSchema,
+  claimEvidenceSchema,
+  criterionOutcomeSchema,
+  reviewCompletionSchema,
+  personaReviewSchema,
+  riskCriticResultSchema,
+  translationFidelitySchema,
+  structuralAssessmentSchema,
+  assessmentsSchema,
+  provenanceV2Schema
+} from './provenance-v2-schema.ts';
+export type {
+  GenerationLineage,
+  ConsumedFragment,
+  Dependencies,
+  ClaimEvidence,
+  PersonaReview,
+  RiskCriticResult,
+  TranslationFidelity,
+  StructuralAssessment,
+  Assessments,
+  ProvenanceV2
+} from './provenance-v2-schema.ts';
+
+export {
+  knowledgeNeedKindSchema,
+  knowledgeNeedStatusSchema,
+  knowledgeNeedSchema,
+  knowledgeFactOriginSchema,
+  factEvidenceRefSchema,
+  knowledgeFactScopeSchema,
+  knowledgeFactStatusSchema,
+  knowledgeFactSchema
+} from './knowledge-schema.ts';
+export type {
+  KnowledgeNeedKind,
+  KnowledgeNeed,
+  FactEvidenceRef,
+  KnowledgeFactScope,
+  KnowledgeFact
+} from './knowledge-schema.ts';
+
+export {
+  structuralDetectorSchema,
+  structuralScopeSchema,
+  structuralFindingStatusSchema,
+  structuralImpactSchema,
+  structuralEvidenceItemSchema,
+  structuralFindingSchema
+} from './structural-finding-schema.ts';
+export type {
+  StructuralDetector,
+  StructuralScope,
+  StructuralFindingStatus,
+  StructuralFinding
+} from './structural-finding-schema.ts';
+
+export { consistencyModeSchema, iaNodeV2Schema, iaV2Schema, walkIaV2Nodes, convertIaToV2 } from './ia-v2-schema.ts';
+export type { IaGroupConsistency, IaGroupNodeV2, IaPageNodeV2, IaNodeV2, IaV2 } from './ia-v2-schema.ts';
+
+export {
+  publicationExecutionSchema,
+  publicationRegressionKindSchema,
+  publicationRegressionSchema,
+  blockingDispositionSchema,
+  coverageDeltaSchema,
+  reasonCodeSchema,
+  publicationDecisionSchema,
+  outputInventorySchema,
+  waiverScopeSchema,
+  waiverSchema
+} from './publication-schema.ts';
+export type { PublicationRegression, PublicationDecision, OutputInventory, Waiver } from './publication-schema.ts';
+
+export {
+  supportLevelSchema,
+  supportMatrixSchema,
+  publicationRuleSchema,
+  claimClassPolicySchema,
+  assuranceProfileSchema
+} from './assurance-schema.ts';
+export type { SupportLevel, SupportMatrix, AssuranceProfile } from './assurance-schema.ts';
+
+export {
+  archetypeSchema,
+  visibilitySchema,
+  productKindSchema,
+  coveragePolicySchema,
+  archetypeDefaultsSchema,
+  defaultsForArchetype
+} from './archetype-schema.ts';
+export type { Archetype, Visibility, ProductKind, CoveragePolicy, ArchetypeDefaults } from './archetype-schema.ts';
+
+export {
+  localizationStateSchema,
+  localizationPublicationStateSchema,
+  localizationPageStateSchema,
+  translationMemoryUnitKeySchema
+} from './localization-state-schema.ts';
+export type {
+  LocalizationState,
+  LocalizationPublicationState,
+  LocalizationPageState,
+  TranslationMemoryUnitKey
+} from './localization-state-schema.ts';
+
 // Deterministic fixtures shared by downstream package tests.
-export { buildFixturePage, buildFixturePageShard, fixtureConfigInput } from './fixtures.ts';
+export {
+  buildFixturePage,
+  buildFixturePageShard,
+  fixtureConfigInput,
+  buildFixtureClaimLedger,
+  buildFixtureKnowledgeNeed,
+  buildFixtureKnowledgeFact,
+  buildFixtureStructuralFinding,
+  buildFixturePublicationDecision
+} from './fixtures.ts';
