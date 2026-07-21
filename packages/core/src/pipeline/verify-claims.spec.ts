@@ -53,6 +53,10 @@ title: "Retry"
 
 <Claim id="v1">\`DEFAULT_RETRIES\` is 3.</Claim>
 
+<Claim id="v5">\`DEFAULT_RETRIES\` is 5.</Claim>
+
+<Claim id="m1">\`MODE\` defaults to linear.</Claim>
+
 ## Usage
 
 Prose first. <Claim id="b1">\`retry\` retries the call.</Claim>
@@ -81,7 +85,7 @@ afterAll(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
-const FIXTURE_MARKERS = ['v1', 'b1', 'b2'];
+const FIXTURE_MARKERS = ['v1', 'v5', 'm1', 'b1', 'b2'];
 
 const anchorFixture = (
   claims: Array<{ markerId: string } & Record<string, unknown>>,
@@ -154,8 +158,8 @@ const verify = (
     commit: COMMIT
   });
 
-const valueDraft = (citedValue: string, valueName = 'DEFAULT_RETRIES') => ({
-  markerId: 'v1',
+const valueDraft = (citedValue: string, valueName = 'DEFAULT_RETRIES', markerId = 'v1') => ({
+  markerId,
   class: 'value',
   predicate: `DEFAULT_RETRIES is ${citedValue}`,
   proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
@@ -185,8 +189,9 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
   });
 
   it('CONTRADICTS a value claim whose asserted value mismatches — with a blocking finding carrying the detail', async () => {
+    // The v5 marker's VISIBLE prose asserts 5 (so binding holds); the source says 3 — a caught lie.
     const page = pageOf();
-    const result = await verify(anchorFixture([valueDraft('5')]), page);
+    const result = await verify(anchorFixture([valueDraft('5', 'DEFAULT_RETRIES', 'v5')]), page);
 
     const claim = result.ledger.claims[0];
     expect(claim).toMatchObject({ correctness: 'contradicted', disposition: null });
@@ -214,11 +219,10 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
   });
 
   it('REJECTS value laundering: correct citedValue over prose asserting something else (impl-06 probe)', async () => {
-    // The prose (marker v1 wraps "`DEFAULT_RETRIES` is 3.") is fine, but a laundering writer would
-    // pair wrong prose with the right ledger value. Simulate it with a predicate + citedValue pair
-    // whose value never appears in EITHER text: citedValue 7 vs "is 3." prose and an off-value
-    // predicate — the binding must fail closed with a blocking finding, and 'checked' must not
-    // mint even though nothing contradicts either.
+    // A laundering writer pairs wrong prose with the right ledger value. Simulate it with a
+    // predicate + citedValue pair whose value never appears in EITHER text: citedValue 7 vs
+    // "is 3." prose and an off-value predicate — the binding must fail closed with blocking
+    // findings, and 'checked' must not mint even though nothing contradicts either.
     const page = pageOf();
     const result = await verify(
       anchorFixture([
@@ -234,13 +238,28 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
       ]),
       page
     );
-    expect(result.findings).toHaveLength(1);
-    expect(result.findings[0]?.severity).toBe('error');
-    expect(result.findings[0]?.message).toContain('appears in NEITHER');
-    expect(result.findings[0]?.message).toContain('v1');
-    expect(result.findings[0]?.message).toContain('7');
+    // Bidirectional binding: the marker side AND the predicate side each fail, precisely.
+    expect(result.findings).toHaveLength(2);
+    expect(result.findings.every((finding) => finding.severity === 'error')).toBe(true);
+    expect(result.findings.every((finding) => finding.message.includes('v1'))).toBe(true);
+    expect(result.findings.some((finding) => finding.message.includes('visible marked prose'))).toBe(true);
+    expect(result.findings.some((finding) => finding.message.includes('predicate'))).toBe(true);
     expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
     // No value-predicate comparison ran on an unbound value.
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('REJECTS wrong prose riding a correct predicate — Sol impl-07 probe, verification side', async () => {
+    // The marker's VISIBLE prose says 5 while the ledger asserts (the correct) 3 and the predicate
+    // restates 3: under the old either-side rule this laundered into a value comparison; the
+    // bidirectional rule fails it closed with a repair finding naming the marker side.
+    const page = pageOf();
+    const result = await verify(anchorFixture([valueDraft('3', 'DEFAULT_RETRIES', 'v5')]), page);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.severity).toBe('error');
+    expect(result.findings[0]?.message).toContain('visible marked prose');
+    expect((result.findings[0]?.data as { bindingIssue?: string }).bindingIssue).toBe('missing-in-marker');
+    expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 
@@ -251,7 +270,7 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
     const result = await verify(
       anchorFixture([
         {
-          markerId: 'v1',
+          markerId: 'm1',
           class: 'value',
           predicate: 'MODE defaults to linear',
           proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],

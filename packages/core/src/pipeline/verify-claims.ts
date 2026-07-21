@@ -12,7 +12,7 @@ import type {
   VerifierRunResult
 } from '@docstube/contracts';
 import {
-  citedValueBindsToTexts,
+  bindCitedValue,
   claimEvidenceSchema,
   claimLedgerSchema,
   evidenceRecordSchema,
@@ -205,9 +205,11 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
       // subscription resolved and passed; ANY mismatch contradicts; anything unresolvable at
       // verify time leaves the claim unchecked — the kernel never guesses. Two deterministic
       // preconditions guard every comparison:
-      //   1. VALUE BINDING (defense in depth behind submit_page): the asserted value must appear
-      //      in the visible marked prose or the predicate — otherwise the ledger asserts a value
-      //      the reader never sees and 'checked' would launder wrong prose. Blocking finding.
+      //   1. VALUE BINDING (defense in depth behind submit_page, impl-07 finding 1): the asserted
+      //      value must appear in BOTH the AST-derived visible marker text AND the predicate,
+      //      unambiguously and un-negated — the SAME shared contracts rule submit_page enforces.
+      //      Otherwise the ledger asserts a value the reader never sees and 'checked' would
+      //      launder wrong prose. Blocking finding.
       //   2. SNAPSHOT AGREEMENT (impl-06 finding 7): the re-extracted value's hash must equal the
       //      fingerprint snapshot's valuePrint. A mismatch means the working tree moved mid-run —
       //      the claim stays unchecked with a warning; evidence is NEVER minted from bytes the
@@ -222,23 +224,29 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         // numeric spellings agree) — the committed subscription is already canonical from
         // anchoring; re-normalizing keeps replayed/legacy ledgers honest too.
         const asserted = normalizeCitedValue(subscription.citedValue).canonical;
-        if (!citedValueBindsToTexts(subscription.citedValue, [claim.quote, claim.predicate])) {
+        const binding = bindCitedValue(subscription.citedValue, {
+          markerText: entry.visibleText,
+          predicate: claim.predicate
+        });
+        if (!binding.ok) {
           bindingViolated = true;
-          findings.push({
-            source: 'verifier',
-            check: CLAIM_VERIFICATION_CHECK,
-            severity: 'error',
-            message:
-              `claim "${entry.markerId}": the asserted value ${asserted} (cited-value "${subscription.valueName}") ` +
-              `appears in NEITHER the marked prose ("${claim.quote}") nor the predicate — the visible sentence must ` +
-              'state the exact value the ledger asserts. Fix the prose or the citedValue so they agree',
-            data: {
-              markerId: entry.markerId,
-              kind: 'value-binding',
-              valueName: subscription.valueName,
-              assertedValue: asserted
-            }
-          });
+          for (const issue of binding.issues) {
+            findings.push({
+              source: 'verifier',
+              check: CLAIM_VERIFICATION_CHECK,
+              severity: 'error',
+              message:
+                `claim "${entry.markerId}" (cited-value "${subscription.valueName}", visible prose ` +
+                `"${entry.visibleText}"): ${issue.message}. Fix the prose or the citedValue/predicate so they agree`,
+              data: {
+                markerId: entry.markerId,
+                kind: 'value-binding',
+                bindingIssue: issue.code,
+                valueName: subscription.valueName,
+                assertedValue: asserted
+              }
+            });
+          }
           continue;
         }
         const symbol = symbolByHash.get(subscription.symbolHash as string);

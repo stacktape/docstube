@@ -6,7 +6,7 @@ import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { z } from 'zod';
-import { citedValueBindsToTexts, claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import { bindCitedValue, claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
 import type { ToolDescriptor, WriterClaimLedger } from '@docstube/contracts';
 import type { ToolImplementation } from './tools.ts';
 
@@ -22,6 +22,10 @@ export type ClaimMarker = {
   offset: number;
   // Raw MDX between the opening and closing tag.
   innerMdx: string;
+  // AST-derived RENDERED text content of the marker (impl-07 finding 1): text and inline-code
+  // values, link/image labels — never link URLs, JSX attributes, or {…} expressions. Value
+  // binding proves the asserted scalar against THIS, so a value hidden in an href cannot bind.
+  visibleText: string;
 };
 
 // Typed scan errors: the kernel (anchor-ledger) classifies placement errors as repair-eligible and
@@ -61,9 +65,29 @@ type ScanNode = {
   type?: string;
   name?: string | null;
   value?: unknown;
+  alt?: unknown;
   children?: unknown[];
   attributes?: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>;
   position?: { start?: { offset?: number }; end?: { offset?: number } };
+};
+
+// Rendered text content of an inline subtree: what the reader actually SEES. Link and image
+// destinations, JSX attributes, and MDX expressions contribute nothing; inline code and image alt
+// text are visible and contribute their value.
+const visibleTextOf = (node: ScanNode): string => {
+  if (node.type === 'text' || node.type === 'inlineCode') {
+    return typeof node.value === 'string' ? node.value : '';
+  }
+  if (node.type === 'image' || node.type === 'imageReference') {
+    return typeof node.alt === 'string' ? node.alt : '';
+  }
+  if (node.type === 'mdxTextExpression' || node.type === 'mdxFlowExpression' || node.type === 'html') {
+    return '';
+  }
+  if (node.type === 'break') {
+    return ' ';
+  }
+  return ((node.children ?? []) as ScanNode[]).map(visibleTextOf).join('');
 };
 
 // AST-based scan for inline <Claim id="…">…</Claim> markers. Only an mdxJsxTextElement in
@@ -128,7 +152,7 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
         message: `marker "${markerId}" wraps no prose — a marker must wrap the asserted sentence text: <Claim id="${markerId}">text</Claim>, never be empty or self-closing`
       });
     }
-    markers.push({ markerId, offset, innerMdx });
+    markers.push({ markerId, offset, innerMdx, visibleText: children.map(visibleTextOf).join('') });
   };
 
   const visit = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean }): void => {
@@ -324,27 +348,30 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
         );
       }
     }
-    // VALUE ASSERTION BINDING (deterministic, in-session — impl-06 finding 1): a value claim's
-    // asserted citedValue must be provably present in the VISIBLE marked prose or in the claim's
-    // own predicate. Without this, a writer could wrap wrong prose while smuggling the correct
-    // value through the ledger and the value verifier would launder it into 'checked'. Both sides
-    // normalize through the ONE shared helper, so bare vs JSON-quoted string spellings agree.
-    const markerTextById = new Map(scan.markers.map((marker) => [marker.markerId, marker.innerMdx]));
+    // VALUE ASSERTION BINDING (deterministic, in-session — impl-07 finding 1): a value claim's
+    // asserted citedValue must be provably present in BOTH the AST-derived VISIBLE marker text
+    // (rendered prose — link URLs and attributes excluded) AND the claim's atomic predicate, with
+    // one unambiguous numeric candidate and no explicit negation. Either-side occurrence let a
+    // writer wrap wrong prose while smuggling the correct value through the ledger; the shared
+    // contracts helper enforces the identical rule here and in claim verification.
+    const markerById = new Map(scan.markers.map((marker) => [marker.markerId, marker]));
     for (const claim of ledgerParse.data.claims) {
-      const markerText = markerTextById.get(claim.markerId);
-      if (markerText === undefined) {
+      const marker = markerById.get(claim.markerId);
+      if (marker === undefined) {
         continue; // already reported as a missing marker above
       }
       for (const subscription of claim.proposedSubscriptions) {
         if (subscription.kind !== 'cited-value') {
           continue;
         }
-        if (!citedValueBindsToTexts(subscription.citedValue, [markerText, claim.predicate])) {
+        const binding = bindCitedValue(subscription.citedValue, {
+          markerText: marker.visibleText,
+          predicate: claim.predicate
+        });
+        for (const issue of binding.issues) {
           errors.push(
-            `claim "${claim.markerId}": the asserted value ${subscription.citedValue} (cited-value ` +
-              `"${subscription.valueName}") appears in NEITHER the prose the marker wraps nor the predicate — ` +
-              'the visible sentence must state the exact value the ledger asserts. Fix the wrapped prose ' +
-              '(or the citedValue, if the prose is right) so they agree, and resubmit'
+            `claim "${claim.markerId}" (cited-value "${subscription.valueName}"): ${issue.message}. ` +
+              'Fix the wrapped prose (or the citedValue/predicate, if the prose is right) so they agree, and resubmit'
           );
         }
       }

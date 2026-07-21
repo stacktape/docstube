@@ -566,13 +566,15 @@ describe('runGenerate', () => {
   }, 120_000);
 
   // The value-predicate e2e pair (wave 2b-ii): the writer asserts a default; the kernel compares
-  // it against the language pack's extracted value. Right value → checked → the block lifts to
-  // proven. Wrong value → CONTRADICTED → blocking finding → retries → flagged, never neutral.
-  const valueMdx = `${goodMdx}
-<Claim id="v1">\`DEFAULT_RETRIES\` defaults to 3.</Claim>
+  // it against the language pack's extracted value. Right value → checked. Wrong value: the
+  // VISIBLE prose states the same wrong value (bidirectional binding holds — this is a lie, not a
+  // laundering attempt) → CONTRADICTED → blocking finding → retries → flagged, never neutral.
+  const valueMdxWith = (citedValue: string) => `${goodMdx}
+<Claim id="v1">\`DEFAULT_RETRIES\` defaults to ${citedValue}.</Claim>
 `;
 
   const valueRunner = async (citedValue: string) => {
+    const valueMdx = valueMdxWith(citedValue);
     // The scripted writer proposes the REAL symbol hash, exactly like a cooperating writer that
     // read the API surface list.
     const codemap = await buildCodemap({

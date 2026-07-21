@@ -65,44 +65,130 @@ export const normalizeCitedValue = (raw: string): NormalizedCitedValue => {
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const NUMERIC_TOKEN = /[+-]?\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?/g;
+// Real LEXICAL number tokenization (impl-07 finding 1): a numeric literal token must stand on its
+// own word boundary —
+//   - never inside an identifier: "retry3", "v3", "sha256" contribute NO tokens;
+//   - never a fragment of a larger literal: ".5" is the single token 0.5 (its "5" is not a
+//     token), "13" is 13 (not 1 and 3), "1.2.3" is a version string and yields NO token;
+//   - trailing sentence punctuation is fine ("defaults to 3." tokenizes 3), but a literal glued
+//     to trailing identifier characters ("3px") is unit/identifier text, not a bindable number.
+const NUMERIC_TOKEN = /(?<![A-Za-z0-9_.])[+-]?(?:\d[\d_]*(?:\.\d[\d_]*)?|\.\d[\d_]*)(?:[eE][+-]?\d+)?(?![A-Za-z0-9_]|\.\d)/gu;
 
-// Deterministic value→prose binding (finding 1): does the normalized scalar provably appear in
+// Every lexically valid numeric token in the text, as canonicalized numbers.
+export const lexNumericTokens = (text: string): number[] =>
+  [...text.matchAll(NUMERIC_TOKEN)]
+    .map((match) => Number(match[0].replaceAll('_', '')))
+    .filter((value) => Number.isFinite(value));
+
+// Explicit negation shortly before an occurrence of the value ("not 3", "no longer defaults to
+// 3", "rather than 3"): the sentence names the value only to DENY it — binding must fail.
+// Deliberately CONSERVATIVE: a negation cue anywhere in the short window rejects, and the writer
+// gets a repair error demanding one plainly asserted value.
+const NEGATION_CUE = /\b(?:not|never|cannot|no longer|rather than|instead of)\b|n't\b/iu;
+
+const WINDOW = 32;
+
+const negatedAt = (text: string, index: number): boolean => NEGATION_CUE.test(text.slice(Math.max(0, index - WINDOW), index));
+
+// Match positions of the value's occurrences in the text (empty when it never occurs).
+const occurrenceIndexes = (value: NormalizedCitedValue, text: string): number[] => {
+  if (value.kind === 'number') {
+    const target = Number(value.canonical);
+    return [...text.matchAll(NUMERIC_TOKEN)]
+      .filter((match) => Number(match[0].replaceAll('_', '')) === target)
+      .map((match) => match.index);
+  }
+  if (value.kind === 'boolean' || value.kind === 'null') {
+    const pattern = new RegExp(`(?:^|[^A-Za-z0-9_])(${value.canonical})(?:[^A-Za-z0-9_]|$)`, 'giu');
+    return [...text.matchAll(pattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''));
+  }
+  const bare = value.bare ?? (JSON.parse(value.canonical) as string);
+  if (bare === '') {
+    return [];
+  }
+  const escaped = escapeRegExp(bare);
+  const quotedPattern = new RegExp(`["'\`]${escaped}["'\`]`, 'gu');
+  const barePattern = new RegExp(`(?:^|[^A-Za-z0-9_])(${escaped})(?:[^A-Za-z0-9_]|$)`, 'gu');
+  return [
+    ...[...text.matchAll(quotedPattern)].map((match) => match.index + 1),
+    ...[...text.matchAll(barePattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''))
+  ];
+};
+
+// Deterministic value→text occurrence (finding 1): does the normalized scalar provably appear in
 // the given text?
-//   numbers      any numeric literal in the text that equals the value after Number()
-//                canonicalization ("3", "3.0", "1_000", "1e3" all bind 1000/3 as appropriate);
+//   numbers      a LEXICAL numeric token equal to the value after Number() canonicalization
+//                ("3", "3.0", "1_000", "1e3" bind 3/1000 as appropriate; "retry3" and ".5" never
+//                bind 3 and 5);
 //   booleans     word occurrence of true/false (case-insensitive — prose says "True" freely);
 //   null         word occurrence of null;
 //   strings      a quoted occurrence ("x", 'x', `x`) or a bare occurrence delimited by
 //                non-identifier characters (so "linear" binds inside "backoff is linear." and
 //                inside "`linear`", but never inside "nonlinear").
-export const citedValueOccursInText = (value: NormalizedCitedValue, text: string): boolean => {
-  if (value.kind === 'number') {
-    const target = Number(value.canonical);
-    for (const token of text.match(NUMERIC_TOKEN) ?? []) {
-      if (Number(token.replaceAll('_', '')) === target) {
-        return true;
+export const citedValueOccursInText = (value: NormalizedCitedValue, text: string): boolean =>
+  occurrenceIndexes(value, text).length > 0;
+
+export type CitedValueBindingIssueCode =
+  | 'missing-in-marker'
+  | 'missing-in-predicate'
+  | 'ambiguous-marker'
+  | 'negated-in-marker'
+  | 'negated-in-predicate';
+
+export type CitedValueBindingIssue = { code: CitedValueBindingIssueCode; message: string };
+
+export type CitedValueBindingResult = { ok: boolean; issues: CitedValueBindingIssue[] };
+
+// THE binding rule (impl-07 finding 1), shared verbatim by submit_page (in-session) and claim
+// verification: the asserted value must be provably present in BOTH the VISIBLE marker text (the
+// rendered prose the reader sees — link URLs and attributes excluded, derived from the marker
+// AST) AND the claim's atomic predicate. Presence alone is not enough:
+//   - a marker whose visible text contains MULTIPLE distinct numeric candidates cannot bind a
+//     number unambiguously ("5, not 3", "3 retries within 15 seconds") — repair error demanding
+//     one unambiguous value;
+//   - explicit negation right before the value ("not 3", "no longer 3") denies it — binding fails
+//     on whichever side carries the negation.
+// Either-side occurrence (the old rule) let wrong prose ride a correct predicate into 'checked'.
+export const bindCitedValue = (
+  raw: string,
+  texts: { markerText: string; predicate: string }
+): CitedValueBindingResult => {
+  const value = normalizeCitedValue(raw);
+  const issues: CitedValueBindingIssue[] = [];
+  const markerOccurrences = occurrenceIndexes(value, texts.markerText);
+  if (markerOccurrences.length === 0) {
+    issues.push({
+      code: 'missing-in-marker',
+      message: `the asserted value ${value.canonical} does not appear in the visible marked prose — the sentence the reader sees must state the exact value the ledger asserts`
+    });
+  } else {
+    if (value.kind === 'number') {
+      const distinct = new Set(lexNumericTokens(texts.markerText));
+      if (distinct.size > 1) {
+        issues.push({
+          code: 'ambiguous-marker',
+          message: `the visible marked prose contains ${distinct.size} distinct numeric values (${[...distinct].join(', ')}) — a value claim must wrap prose stating ONE unambiguous value; split the sentence or narrow the marker`
+        });
       }
     }
-    return false;
+    if (markerOccurrences.some((index) => negatedAt(texts.markerText, index))) {
+      issues.push({
+        code: 'negated-in-marker',
+        message: `the visible marked prose NEGATES the asserted value ${value.canonical} ("not ${value.canonical}"-style) — the prose denies the very value the ledger asserts; fix one of them`
+      });
+    }
   }
-  if (value.kind === 'boolean' || value.kind === 'null') {
-    return new RegExp(`(?:^|[^A-Za-z0-9_])${value.canonical}(?:[^A-Za-z0-9_]|$)`, 'iu').test(text);
+  const predicateOccurrences = occurrenceIndexes(value, texts.predicate);
+  if (predicateOccurrences.length === 0) {
+    issues.push({
+      code: 'missing-in-predicate',
+      message: `the asserted value ${value.canonical} does not appear in the claim predicate — the atomic predicate must restate the exact asserted value`
+    });
+  } else if (predicateOccurrences.some((index) => negatedAt(texts.predicate, index))) {
+    issues.push({
+      code: 'negated-in-predicate',
+      message: `the claim predicate NEGATES the asserted value ${value.canonical} — the predicate must assert the value, not deny it`
+    });
   }
-  const bare = value.bare ?? (JSON.parse(value.canonical) as string);
-  if (bare === '') {
-    return false;
-  }
-  if (text.includes(`"${bare}"`) || text.includes(`'${bare}'`) || text.includes(`\`${bare}\``)) {
-    return true;
-  }
-  return new RegExp(`(?:^|[^A-Za-z0-9_])${escapeRegExp(bare)}(?:[^A-Za-z0-9_]|$)`, 'u').test(text);
-};
-
-// The full binding rule: the asserted value must be provably present in the VISIBLE marked prose
-// or in the claim's own predicate (the atomic restatement of the same fact). Texts are checked in
-// order; any occurrence binds.
-export const citedValueBindsToTexts = (raw: string, texts: readonly string[]): boolean => {
-  const normalized = normalizeCitedValue(raw);
-  return texts.some((text) => citedValueOccursInText(normalized, text));
+  return { ok: issues.length === 0, issues };
 };

@@ -49,8 +49,14 @@ export type {
 
 export { sha256Hex, canonicalJson, canonicalStateJson, hashValue, contentHash } from './hashing.ts';
 
-export { normalizeCitedValue, citedValueOccursInText, citedValueBindsToTexts } from './cited-value-binding.ts';
-export type { CitedValueKind, NormalizedCitedValue } from './cited-value-binding.ts';
+export { normalizeCitedValue, citedValueOccursInText, bindCitedValue, lexNumericTokens } from './cited-value-binding.ts';
+export type {
+  CitedValueKind,
+  NormalizedCitedValue,
+  CitedValueBindingIssue,
+  CitedValueBindingIssueCode,
+  CitedValueBindingResult
+} from './cited-value-binding.ts';
 
 export {
   guaranteeLevelSchema,

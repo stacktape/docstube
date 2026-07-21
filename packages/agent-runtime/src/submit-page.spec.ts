@@ -136,37 +136,42 @@ describe('validateSubmission', () => {
       ])
     });
     expect(outcome.accepted).toBeUndefined();
-    expect(outcome.errors).toHaveLength(1);
-    expect(outcome.errors[0]).toContain('c1');
-    expect(outcome.errors[0]).toContain('appears in NEITHER');
-    expect(outcome.errors[0]).toContain('retries.default');
+    // Bidirectional binding: both the marker side and the predicate side fail, precisely.
+    expect(outcome.errors).toHaveLength(2);
+    expect(outcome.errors.every((error) => error.includes('c1') && error.includes('retries.default'))).toBe(true);
+    expect(outcome.errors.some((error) => error.includes('visible marked prose'))).toBe(true);
+    expect(outcome.errors.some((error) => error.includes('predicate'))).toBe(true);
   });
 
   it('binds cited values through the shared normalization: bare, quoted, and numeric spellings agree', () => {
     const symbolHash = `ts:${'a'.repeat(64)}`;
-    const withValue = (prose: string, citedValue: string) =>
+    const withValue = (prose: string, citedValue: string, predicate: string) =>
       validateSubmission({
         mdx: mdxWith(`<Claim id="c1">${prose}</Claim>`),
         ledger: ledgerWith([
           claim('c1', {
-            predicate: 'the backoff mode has a default',
+            predicate,
             proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'mode', citedValue }]
           })
         ])
       });
     // Bare semantic string in prose, JSON-quoted citedValue (and vice versa): both bind.
-    expect(withValue('backoff defaults to `linear`.', '"linear"').errors).toEqual([]);
-    expect(withValue('backoff defaults to "linear".', 'linear').errors).toEqual([]);
+    expect(withValue('backoff defaults to `linear`.', '"linear"', 'backoff mode defaults to linear').errors).toEqual(
+      []
+    );
+    expect(withValue('backoff defaults to "linear".', 'linear', 'backoff mode defaults to linear').errors).toEqual([]);
     // Numeric spellings normalize through Number().
-    expect(withValue('the cap is 1_000 ms.', '1000').errors).toEqual([]);
+    expect(withValue('the cap is 1_000 ms.', '1000', 'the cap defaults to 1000').errors).toEqual([]);
     // A substring is never a binding.
-    expect(withValue('backoff is nonlinear.', 'linear').errors).toHaveLength(1);
+    expect(withValue('backoff is nonlinear.', 'linear', 'backoff mode defaults to linear').errors).toHaveLength(1);
   });
 
-  it('accepts a citedValue stated only in the predicate (prose paraphrases, predicate is exact)', () => {
+  it('REJECTS a citedValue stated only in the predicate — the visible sentence must state it too (impl-07)', () => {
+    // The impl-07 must-now-reject case: right predicate, paraphrasing prose. The reader-facing
+    // sentence is the claim; a value the reader never sees cannot bind.
     const symbolHash = `ts:${'a'.repeat(64)}`;
     const outcome = validateSubmission({
-      mdx: mdxWith('<Claim id="c1">`retries` defaults to 3.</Claim>'),
+      mdx: mdxWith('<Claim id="c1">`retries` has a sensible default.</Claim>'),
       ledger: ledgerWith([
         claim('c1', {
           predicate: 'retries defaults to 3',
@@ -174,7 +179,67 @@ describe('validateSubmission', () => {
         })
       ])
     });
-    expect(outcome.errors).toEqual([]);
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors).toHaveLength(1);
+    expect(outcome.errors[0]).toContain('visible marked prose');
+  });
+
+  it('binds against RENDERED text only: a value hidden in a link URL never binds (Sol probe)', () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">see [the retries docs](/v3/retries) for the default.</Claim>'),
+      ledger: ledgerWith([
+        claim('c1', {
+          predicate: 'retries defaults to 3',
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'retries.default', citedValue: '3' }]
+        })
+      ])
+    });
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors.some((error) => error.includes('visible marked prose'))).toBe(true);
+  });
+
+  it('tokenizes numbers lexically: ".5" is 0.5 and identifier-glued digits never bind (Sol probes)', () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const withValue = (prose: string, citedValue: string, predicate: string) =>
+      validateSubmission({
+        mdx: mdxWith(`<Claim id="c1">${prose}</Claim>`),
+        ledger: ledgerWith([
+          claim('c1', {
+            predicate,
+            proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'v', citedValue }]
+          })
+        ])
+      });
+    // ".5" is the number 0.5, never 5.
+    expect(withValue('the factor defaults to .5 exactly.', '5', 'the factor defaults to 5').errors).toHaveLength(1);
+    expect(withValue('the factor defaults to .5 exactly.', '0.5', 'the factor defaults to 0.5').errors).toEqual([]);
+    // "3" inside "retry3" is an identifier, not the number 3.
+    expect(withValue('call `retry3` to retry.', '3', 'retries defaults to 3').errors).toHaveLength(1);
+  });
+
+  it('rejects conflicting or negated values in the visible prose with a repair error', () => {
+    const symbolHash = `ts:${'a'.repeat(64)}`;
+    const withProse = (prose: string) =>
+      validateSubmission({
+        mdx: mdxWith(`<Claim id="c1">${prose}</Claim>`),
+        ledger: ledgerWith([
+          claim('c1', {
+            predicate: 'retries defaults to 3',
+            proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'retries.default', citedValue: '3' }]
+          })
+        ])
+      });
+    // "5, not 3": multiple distinct candidates AND explicit negation — both named.
+    const negated = withProse('`retries` defaults to 5, not 3.');
+    expect(negated.accepted).toBeUndefined();
+    expect(negated.errors.some((error) => error.includes('ONE unambiguous value'))).toBe(true);
+    expect(negated.errors.some((error) => error.includes('NEGATES'))).toBe(true);
+    // Two distinct numbers without negation still cannot bind unambiguously.
+    const conflicted = withProse('`retries` defaults to 3 within 15 seconds.');
+    expect(conflicted.accepted).toBeUndefined();
+    expect(conflicted.errors).toHaveLength(1);
+    expect(conflicted.errors[0]).toContain('ONE unambiguous value');
   });
 
   it('accepts covers= declarations naming existing behavior claims (the coverage grammar)', () => {

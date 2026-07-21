@@ -52,6 +52,9 @@ export type AnchoredClaim = {
   markerId: string;
   // Raw MDX the marker wrapped — the bridge derives the legacy quote anchor from it.
   quote: string;
+  // AST-derived rendered text of the marker (link URLs/attributes excluded) — the text value
+  // binding proves the asserted scalar against, identically to submit_page (impl-07 finding 1).
+  visibleText: string;
   // Check names the writer proposed as evidence ({ kind: 'check' }) — the claim-verification
   // stage consumes them for conservative execution coverage of behavior claims.
   proposedChecks: string[];
@@ -447,6 +450,7 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       claim,
       markerId: draft.markerId,
       quote: marker.innerMdx,
+      visibleText: marker.visibleText,
       proposedChecks: draft.proposedEvidence.filter((proposal) => proposal.kind === 'check').map((p) => p.check)
     });
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citedValueBindsToTexts, citedValueOccursInText, normalizeCitedValue } from './cited-value-binding.ts';
+import { bindCitedValue, citedValueOccursInText, lexNumericTokens, normalizeCitedValue } from './cited-value-binding.ts';
 
 describe('normalizeCitedValue', () => {
   it('normalizes numeric spellings to one canonical form', () => {
@@ -30,7 +30,7 @@ describe('normalizeCitedValue', () => {
 });
 
 describe('citedValueOccursInText', () => {
-  it('binds numbers through any equal numeric literal in the text', () => {
+  it('binds numbers through any equal LEXICAL numeric token in the text', () => {
     const three = normalizeCitedValue('3');
     expect(citedValueOccursInText(three, 'Retries default to 3.')).toBe(true);
     expect(citedValueOccursInText(three, 'Retries default to 3.0 attempts.')).toBe(true);
@@ -38,6 +38,18 @@ describe('citedValueOccursInText', () => {
     expect(citedValueOccursInText(three, 'Retries default to 5.')).toBe(false);
     // "13" contains the digit 3 but is not the number 3 — token equality, not substring.
     expect(citedValueOccursInText(three, 'Retries default to 13.')).toBe(false);
+  });
+
+  it('lexes real numeric tokens: ".5" is 0.5, digits inside identifiers never tokenize (Sol probes)', () => {
+    // The direct impl-07 probes: ".5" was read as 5; "3" was found inside "retry3" and "v3".
+    expect(citedValueOccursInText(normalizeCitedValue('5'), 'the factor is .5 by default')).toBe(false);
+    expect(citedValueOccursInText(normalizeCitedValue('0.5'), 'the factor is .5 by default')).toBe(true);
+    expect(citedValueOccursInText(normalizeCitedValue('3'), 'call retry3 to retry')).toBe(false);
+    expect(citedValueOccursInText(normalizeCitedValue('3'), 'since v3 of the API')).toBe(false);
+    // Version strings and unit-glued digits are not numeric literals.
+    expect(lexNumericTokens('upgrade from 1.2.3 today')).toEqual([]);
+    expect(lexNumericTokens('a 3px border')).toEqual([]);
+    expect(lexNumericTokens('retries default to 3, factor .5')).toEqual([3, 0.5]);
   });
 
   it('binds strings via quoted or bare delimited occurrence, never substrings', () => {
@@ -56,14 +68,72 @@ describe('citedValueOccursInText', () => {
   });
 });
 
-describe('citedValueBindsToTexts', () => {
-  it('accepts a value present in the marker prose OR the predicate', () => {
-    expect(citedValueBindsToTexts('3', ['Retries default to 3.', 'irrelevant'])).toBe(true);
-    expect(citedValueBindsToTexts('3', ['is totally-wrong', 'the retries option defaults to 3'])).toBe(true);
+describe('bindCitedValue (the ONE binding rule, shared by submit_page and verification)', () => {
+  it('accepts a value stated in BOTH the visible marker text and the predicate', () => {
+    expect(bindCitedValue('3', { markerText: 'Retries default to 3.', predicate: 'retries defaults to 3' })).toEqual({
+      ok: true,
+      issues: []
+    });
+    expect(
+      bindCitedValue('linear', { markerText: 'backoff is `linear`.', predicate: 'backoff mode is linear' }).ok
+    ).toBe(true);
   });
 
-  it('rejects the value-laundering case: correct citedValue, wrong visible prose', () => {
-    // The impl-06 probe: prose asserts "totally-wrong", the ledger smuggles the correct value.
-    expect(citedValueBindsToTexts('3', ['`retries` is totally-wrong.', 'retries is totally-wrong'])).toBe(false);
+  it('REJECTS wrong prose riding a correct predicate (the impl-07 must-now-reject case)', () => {
+    // The previously committed OR-rule accepted this pair; binding is bidirectional now.
+    const result = bindCitedValue('3', {
+      markerText: '`retries` is totally-wrong.',
+      predicate: 'the retries option defaults to 3'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(['missing-in-marker']);
+  });
+
+  it('rejects a correct marker riding a predicate that never states the value', () => {
+    const result = bindCitedValue('3', { markerText: 'Retries default to 3.', predicate: 'retries have a default' });
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(['missing-in-predicate']);
+  });
+
+  it('rejects the value-laundering case entirely: correct citedValue, wrong prose AND predicate', () => {
+    const result = bindCitedValue('3', {
+      markerText: '`retries` is totally-wrong.',
+      predicate: 'retries is totally-wrong'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code).toSorted()).toEqual(['missing-in-marker', 'missing-in-predicate']);
+  });
+
+  it('rejects multiple distinct numeric candidates in the visible prose (Sol conflict probe)', () => {
+    const result = bindCitedValue('3', {
+      markerText: 'Retries default to 3 within 15 seconds.',
+      predicate: 'retries defaults to 3'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual(['ambiguous-marker']);
+    expect(result.issues[0]?.message).toContain('ONE unambiguous value');
+  });
+
+  it('rejects explicit negation around the value ("5, not 3") on either side', () => {
+    const marker = bindCitedValue('3', {
+      markerText: 'Retries default to 5, not 3.',
+      predicate: 'retries defaults to 3'
+    });
+    expect(marker.ok).toBe(false);
+    // Two distinct candidates AND a negated occurrence: both defects are named.
+    expect(marker.issues.map((issue) => issue.code).toSorted()).toEqual(['ambiguous-marker', 'negated-in-marker']);
+
+    const predicate = bindCitedValue('3', {
+      markerText: 'Retries default to 3.',
+      predicate: 'retries no longer defaults to 3'
+    });
+    expect(predicate.ok).toBe(false);
+    expect(predicate.issues.map((issue) => issue.code)).toEqual(['negated-in-predicate']);
+  });
+
+  it('accepts a single negated-free repetition of the same number (one distinct candidate)', () => {
+    expect(
+      bindCitedValue('3', { markerText: 'Retries default to 3 (yes, 3).', predicate: 'retries defaults to 3' }).ok
+    ).toBe(true);
   });
 });
