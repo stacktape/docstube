@@ -36,7 +36,7 @@ import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
 import type { RunCostTracker } from './run-cost.ts';
 
 // The per-page generation loop: write ⇄ (review ∥ verify) → gate, bounded retries, flag instead
-// of silent shipping. Reused by generate (all pages) and maintain/refresh (affected pages only).
+// of silent shipping. Reused by generate (all pages) and maintain/refine (affected pages only).
 //
 // Cost accounting: every task-completed usage feeds ctx.costTracker, but the cap-freeze check
 // deliberately does NOT happen inside this loop — only the callers check, between pages. Freezing
@@ -180,7 +180,7 @@ export const generatePage = async (
       blockConfidence = matchedPage.blockConfidence;
     }
     // Page-level source attribution: the symbols living in files the writer actually read.
-    // Claim-level attribution is a later stage; this grounds coverage and refresh scoping now.
+    // Claim-level attribution is a later stage; this grounds coverage and maintain scoping now.
     const readFiles = new Set(transcript.observedReads.map((read) => read.file));
     const sources = ctx.codemap.symbols
       .filter((symbol) => readFiles.has(symbol.file))

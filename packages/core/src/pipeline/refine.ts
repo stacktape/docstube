@@ -209,7 +209,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     for (const candidate of selected) {
       const node = nodesBySlug.get(candidate.slug);
       if (node === undefined) {
-        // Structure changes are refresh's job; refine never invents pages.
+        // Structure changes are maintain's job; refine never invents pages.
         continue;
       }
       // Cap-freeze (PRODUCT §3.5): checked only before starting a candidate — never mid-page, so a

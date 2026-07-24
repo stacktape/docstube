@@ -243,8 +243,7 @@ export const proposedEvidenceSchema = z.discriminatedUnion('kind', [
     span: lineSpanSchema.optional()
   }),
   z.object({ kind: z.literal('file'), file: repoPathSchema, span: lineSpanSchema.optional() }),
-  z.object({ kind: z.literal('url'), url: z.url() }),
-  z.object({ kind: z.literal('check'), check: z.string().min(1) })
+  z.object({ kind: z.literal('url'), url: z.url() })
 ]);
 export type ProposedEvidence = z.infer<typeof proposedEvidenceSchema>;
 

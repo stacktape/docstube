@@ -88,10 +88,12 @@ describe('submitPageDescriptor', () => {
     for (const field of ['markerId', 'class', 'predicate', 'proposedEvidence', 'proposedSubscriptions']) {
       expect(serialized).toContain(`"${field}"`);
     }
-    // The proposal unions are spelled out, not `{type: object}`.
-    for (const kind of ['symbol', 'file', 'url', 'check', 'signature', 'cited-value', 'body', 'file-content']) {
+    // The proposal unions are spelled out, not `{type: object}`. The behavior-execution
+    // {kind:'check'} affordance is gone (scope correction — nothing ever consumed it).
+    for (const kind of ['symbol', 'file', 'url', 'signature', 'cited-value', 'body', 'file-content']) {
       expect(serialized).toContain(`"${kind}"`);
     }
+    expect(serialized).not.toContain('"check"');
     expect(serialized).not.toContain('$schema');
   });
 });

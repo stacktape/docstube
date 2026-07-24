@@ -35,7 +35,7 @@ import {
 } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
-// The maintain/refresh stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
+// The maintain stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
 // affected pages regenerate. Bias rule: uncertain provenance ⇒ regenerate, never assume. A
 // topology pass (site-scope verifiers over ALL pages) restores cross-page consistency after
 // partial regeneration.
@@ -150,7 +150,7 @@ const openFlag = (input: {
 });
 
 // A carried (not regenerated) shard can still be shipping open flags from previous runs; ignoring
-// them would let a no-op refresh report 'passed' over standing defects — and the auto-merge gate
+// them would let a no-op maintain run report 'passed' over standing defects — and the auto-merge gate
 // reads that outcome. Tribal questions are excluded: they are a human queue, not a quality defect
 // (same rule as refine's ranking).
 const shardHasOpenFlags = (shard: PageShard): boolean =>
@@ -202,14 +202,14 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
 
     // Tribal-knowledge lifecycle (same as generate): persist answered flags, then load answers and
     // open-question keys for ask-once dedup during regeneration.
-    const refreshPageIds = previousIndex.pages.map((entry) => entry.id);
-    const refreshLocales = [locale, ...config.locales.targets];
-    await applyFlagAnswers({ repoRoot, store, locales: refreshLocales, pageIds: refreshPageIds });
+    const maintainPageIds = previousIndex.pages.map((entry) => entry.id);
+    const maintainLocales = [locale, ...config.locales.targets];
+    await applyFlagAnswers({ repoRoot, store, locales: maintainLocales, pageIds: maintainPageIds });
     const knowledge = await loadKnowledge(repoRoot);
     const openQuestions = await collectOpenQuestions({
       store,
-      locales: refreshLocales,
-      pageIds: refreshPageIds,
+      locales: maintainLocales,
+      pageIds: maintainPageIds,
       knowledge
     });
 
@@ -263,7 +263,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
     let carriedShardFlagged = false;
     let frozen = false;
 
-    // System-flag conditions re-derive on every refresh, so an unfixed condition would stack an
+    // System-flag conditions re-derive on every maintain run, so an unfixed condition would stack an
     // identical flag per run. raiseSystemFlag dedups against OPEN previous flags with the same
     // kind + summary; raisedSystemFlagKeys records every condition observed this run (pre-dedup)
     // so the stale-resolution pass below can tell healed conditions from persisting ones.
@@ -287,13 +287,13 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       const node = nodesBySlug.get(entry.slug);
 
       if (node === undefined) {
-        // The IA node vanished (or lost its brief): a structural change. Never delete on refresh —
+        // The IA node vanished (or lost its brief): a structural change. Never delete on maintain —
         // humans decide structure. Flag it and keep shipping the existing page untouched.
         const flag = openFlag({
           kind: 'structural-change',
           summary: `page "${entry.slug}" is no longer in ia.yml`,
           detail:
-            `the generated page "${entry.slug}" has no matching IA node with a brief — refresh kept it as-is. ` +
+            `the generated page "${entry.slug}" has no matching IA node with a brief — maintain kept it as-is. ` +
             'Remove it from the manifest or restore the node in ia.yml to resolve.',
           runId: journal.runId,
           entity: { version, locale, pageId: entry.id }
@@ -374,7 +374,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       });
     }
 
-    // IA nodes without a generated page are not refresh's job (generate owns new pages) — surface
+    // IA nodes without a generated page are not maintain's job (generate owns new pages) — surface
     // them instead of silently skipping.
     const indexedSlugs = new Set(previousIndex.pages.map((entry) => entry.slug));
     const newNodeWarnings = [...nodesBySlug.keys()]

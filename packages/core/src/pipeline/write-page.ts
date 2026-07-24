@@ -66,7 +66,7 @@ const claimAuthorshipRules = [
   '  maintainer-provided knowledge backs it).',
   '- predicate: the asserted fact restated as ONE standalone checkable sentence, stripped of surrounding prose.',
   '- proposedEvidence: where a verifier should look — { kind: "symbol", symbol: "<hash from the API surface list>" },',
-  '  { kind: "file", file: "repo/relative/path" }, { kind: "url", url: "https://…" }, or { kind: "check", check: "<name>" }.',
+  '  { kind: "file", file: "repo/relative/path" }, or { kind: "url", url: "https://…" }.',
   '  Report file/span only as you actually saw them — the kernel resolves the canonical location from the codemap',
   '  and rejects mismatching locations.',
   '- proposedSubscriptions: the exact code facets whose change invalidates the claim:',

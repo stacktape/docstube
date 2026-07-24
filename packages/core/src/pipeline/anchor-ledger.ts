@@ -56,9 +56,6 @@ export type AnchoredClaim = {
   // AST-derived rendered text of the marker (link URLs/attributes excluded) — the text value
   // binding proves the asserted scalar against, identically to submit_page (impl-07 finding 1).
   visibleText: string;
-  // Check names the writer proposed as evidence ({ kind: 'check' }) — the claim-verification
-  // stage consumes them for conservative execution coverage of behavior claims.
-  proposedChecks: string[];
 };
 
 export type AnchorIssueCode =
@@ -275,7 +272,7 @@ const conservativeFallback = (claim: DraftClaim, ctx: ResolutionContext): Depend
 
 // Minted grounding for resolved symbol proposals: 'source-linked' asserts only that the subject
 // is real (trust-model-v2 decision 3) — it never decides correctness, so the claims stay
-// unchecked. file/url/check proposals mint nothing here: they are verifier input (wave 2b-ii).
+// unchecked. file/url proposals mint nothing here: they are verifier input (wave 2b-ii).
 // file/span on the minted record come from the CODEMAP record for the symbol, never from the
 // writer: a writer-supplied location that mismatches the codemap is a rejected proposal.
 const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: string): EvidenceRecord[] => {
@@ -518,8 +515,7 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       claim,
       markerId: draft.markerId,
       quote: marker.innerMdx,
-      visibleText: marker.visibleText,
-      proposedChecks: draft.proposedEvidence.filter((proposal) => proposal.kind === 'check').map((p) => p.check)
+      visibleText: marker.visibleText
     });
   }
 
