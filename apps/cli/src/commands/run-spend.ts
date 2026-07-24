@@ -1,6 +1,6 @@
 import type { CliOutput } from '../cli-output.ts';
 
-// One spend line for generate/refresh/refine: when any task's cost had to be estimated from
+// One spend line for generate/maintain/refine: when any task's cost had to be estimated from
 // tokens (transports that report no costUsd), the total is labeled as partly estimated so the
 // number is never mistaken for a vendor-reported bill.
 export const reportRunSpend = (

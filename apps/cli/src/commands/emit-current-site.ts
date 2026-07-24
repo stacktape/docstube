@@ -9,7 +9,7 @@ import type { EmitSitePage, ThemeBundle } from '@docstube/theme';
 
 const execFileAsync = promisify(execFile);
 
-// Shared assemble step for generate/refresh/refine: read the committed state back and emit the
+// Shared assemble step for generate/maintain/refine: read the committed state back and emit the
 // self-contained site — source pages, verified translations, frozen-version labels, and a repo
 // URL (from the git remote) so provenance citations linkify.
 

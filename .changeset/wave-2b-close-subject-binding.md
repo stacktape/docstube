@@ -1,0 +1,5 @@
+---
+"docstube": patch
+---
+
+Wave 2b close hardening. Claims are now SUBJECT-BOUND: evidence mints only when the visible prose or the predicate names — as a case-sensitive identifier token — the codemap display name of the symbol the evidence points at (for value claims, any identifier segment of the cited-value path also binds, e.g. `retries` for `createClient.param.retries.default`; the grammar keywords `param`/`default` never bind). Anchoring rejects violations with the repair-eligible `subject-unbound` error and verification re-checks the same rule, minting nothing on violation — "`inventedFunction` exists" can no longer ride an unrelated real symbol into checked, and "`INVENTED_DEFAULT` is 3" can no longer launder through an equal-valued real name. Generated sites now mark UNCHECKED claims individually inline (quiet dotted-underline + title, distinct from the contradiction alarm) across all three themes, and the local review UI shows the same distinction. `docstube refine` runs the same end-of-run dirty-tree recheck as generate/maintain, marking the shards it wrote when the tree mutated mid-run. The dead `{kind:"check"}` writer-evidence affordance is gone.
