@@ -31,7 +31,15 @@ export const symbolRecordSchema = z.object({
   containerPath: z.array(z.string()).default([]),
   file: repoPathSchema,
   span: lineSpanSchema,
-  visibility: z.enum(['public', 'internal', 'private']).default('public'),
+  // The pack's AFFIRMATIVE exposure statement — the field the 'is exported' canonical claim is
+  // decided from (wave 2b close final): 'public' = part of the exported, documentable API
+  // surface; 'internal'/'private' = affirmatively NOT exported surface (an 'is exported' claim
+  // over such a record is CONTRADICTED); absent = the pack did not state exposure, so
+  // exportedness is unknowable and the claim stays unchecked. Deliberately NO default: presence
+  // in the codemap alone never implies exportedness — a hand-built or third-party-pack record
+  // must say so itself. (The built-in TS/Python packs walk only exported declarations and stamp
+  // 'public' explicitly.)
+  visibility: z.enum(['public', 'internal', 'private']).optional(),
   // Normalized signature/declaration text the hash was computed over (debugging + citations).
   signature: z.string().optional(),
   // Multi-project (monorepo) dimension; single-project repos use the default.

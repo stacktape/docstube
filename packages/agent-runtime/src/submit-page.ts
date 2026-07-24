@@ -36,6 +36,7 @@ export type MarkerScanErrorCode =
   | 'marker-flow'
   | 'marker-in-heading'
   | 'marker-in-expression'
+  | 'marker-expression'
   | 'marker-missing-id'
   | 'marker-invalid-id'
   | 'marker-empty'
@@ -90,6 +91,14 @@ const visibleTextOf = (node: ScanNode): string => {
   return ((node.children ?? []) as ScanNode[]).map(visibleTextOf).join('');
 };
 
+// A marker containing ANY MDX expression node is invalid (wave 2b close final): {'never '}
+// renders text the reader sees but the kernel's visible-text extraction cannot — the exact
+// laundering channel the exact canonical visible match exists to close.
+const containsMdxExpression = (node: ScanNode): boolean =>
+  node.type === 'mdxTextExpression' || node.type === 'mdxFlowExpression'
+    ? true
+    : ((node.children ?? []) as ScanNode[]).some(containsMdxExpression);
+
 // AST-based scan for inline <Claim id="…">…</Claim> markers. Only an mdxJsxTextElement in
 // translatable content is a marker: literal <Claim> text inside fenced/inline code is plain text
 // (a docs example never counts), flow-level Claim elements and markers inside headings or JSX
@@ -142,6 +151,17 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       return;
     }
     const children = (node.children ?? []) as ScanNode[];
+    if (children.some(containsMdxExpression)) {
+      errors.push({
+        code: 'marker-expression',
+        markerId,
+        message:
+          `marker "${markerId}" contains an MDX expression ({…}) — expressions render text the kernel cannot ` +
+          'see, so the visible assertion and the checked assertion could differ; write the prose literally ' +
+          'inside the marker and resubmit'
+      });
+      return;
+    }
     const contentStart = children[0]?.position?.start?.offset;
     const contentEnd = children[children.length - 1]?.position?.end?.offset;
     const innerMdx = contentStart === undefined || contentEnd === undefined ? '' : mdx.slice(contentStart, contentEnd);

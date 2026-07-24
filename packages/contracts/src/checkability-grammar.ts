@@ -17,15 +17,31 @@
 //               (the '… is exported from <module>' variant is REMOVED: the module side was never
 //               verified by any evidence, so "exported from `fiction`" could mint checked. v1.x
 //               may reintroduce it with a codemap-verified module binding.)
-//   value:      <subject-or-bound-value-path> (is set to | defaults to | equals | is) <value>
+//   value:      <bound-value-path-subject> (is set to | defaults to | equals | is) <value>
 //               (longest-first alternation so 'is' never swallows 'is set to'; <value> must
 //               normalize — via the shared cited-value normalization — to EXACTLY the claim's
 //               bound citedValue: same kind, same canonical bytes.)
 //
-// MINIMAL COSMETIC NORMALIZATION, both sides: Unicode NFC, backticks stripped (prose backticks
-// identifiers and values; the assertion is compared bare), whitespace collapsed to single
+// VALUE-PATH SUBJECT (wave 2b close final, impl-14): the value assertion's subject must be the
+// FULL bound cited-value path in its ONE documented rendering — renderValuePathSubject below:
+//   - object properties / enum members: the dot-joined path itself ('configFileNames.config',
+//     'retryDefaults.backoff.factor', 'LogLevel.Warn');
+//   - parameter defaults ('owner.param.<name>.default'): 'owner(<name>)' — e.g.
+//     'createClient(retries) defaults to 3'. The raw grammar path spells structural keywords
+//     ('param', 'default') that read as prose stutter ("….default defaults to 3"), so the
+//     call-shaped rendering is the one canonical spelling.
+// The ROOT OBJECT alone NEVER substitutes for a bound path: 'configFileNames is docstube.yml'
+// asserts a value for the whole object while the evidence proves only the .config leaf — an
+// evidence/prose subject mismatch the reader cannot see. Const names whose value path IS the
+// root ('DEFAULT_RETRIES defaults to 3') are unchanged.
+//
+// MINIMAL COSMETIC NORMALIZATION, both sides: Unicode NFC, whitespace collapsed to single
 // spaces, one optional trailing period dropped. Nothing else — no case folding on identifiers,
-// no punctuation tolerance, no stemming.
+// no punctuation tolerance, no stemming, and NO backtick stripping: the marker side is
+// AST-derived rendered text where inline-code formatting already contributed its bare content,
+// so any backtick still present (an escaped \` in the source) is LITERAL content and must fail
+// the exact match ('greet ex`ists' is not 'greet exists'). The predicate side is plain ledger
+// text and must spell identifiers bare.
 //
 // The documented COST of fail-closed: wordy-but-true positives ("`greet`, added in v2, exists")
 // ship honestly unchecked. The writer prompt teaches the fix — the marker wraps ONLY the
@@ -43,19 +59,28 @@ import type { NormalizedCitedValue } from './cited-value-binding.ts';
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// The one cosmetic normalization both sides pass through before the exact comparison.
+// The one cosmetic normalization both sides pass through before the exact comparison. NO
+// backtick handling: AST-derived visible text is already bare, so a surviving backtick is
+// literal content and must break the match.
 export const canonicalizeAssertionText = (text: string): string => {
-  const collapsed = text.normalize('NFC').replaceAll('`', '').replace(/\s+/gu, ' ').trim();
+  const collapsed = text.normalize('NFC').replace(/\s+/gu, ' ').trim();
   return collapsed.endsWith('.') ? collapsed.slice(0, -1) : collapsed;
 };
 
-// The four canonical existence assertions for a bound subject — nothing else exists to match.
-const canonicalExistenceAssertions = (subject: string): string[] => [
-  `${subject} exists`,
-  `${subject} is defined`,
-  `${subject} is available`,
-  `${subject} is exported`
-];
+export const existenceAssertionForms = ['exists', 'is defined', 'is available', 'is exported'] as const;
+export type ExistenceAssertionForm = (typeof existenceAssertionForms)[number];
+
+// The ONE documented rendering of a bound cited-value path as an assertion subject (see header):
+// parameter defaults render call-shaped ('createClient(retries)'); every other path renders as
+// the dot-joined path itself. This is the only accepted subject spelling for the bound value —
+// the root object alone never substitutes.
+export const renderValuePathSubject = (valueName: string): string => {
+  const parameterDefault = valueName.match(/^(?<owner>.+)\.param\.(?<param>[^.]+)\.default$/u);
+  if (parameterDefault?.groups !== undefined) {
+    return `${parameterDefault.groups.owner}(${parameterDefault.groups.param})`;
+  }
+  return valueName;
+};
 
 // Longest alternative first: JS alternation is ordered, and a bare 'is' matching ahead of
 // 'is set to' would leave 'set to …' glued onto the value.
@@ -100,7 +125,10 @@ export type CheckabilityInput = {
 };
 
 export type CheckabilityAssessment =
-  | { checkable: true }
+  // `form` reports WHICH canonical existence assertion matched (undefined for value claims):
+  // claim verification needs it because 'is exported' additionally requires the symbol record to
+  // affirmatively indicate exportedness before grounding may decide the claim.
+  | { checkable: true; form?: ExistenceAssertionForm }
   | { checkable: false; gate: 'canonical-predicate' | 'canonical-visible'; reason: string };
 
 const notCheckable = (gate: 'canonical-predicate' | 'canonical-visible', reason: string): CheckabilityAssessment => ({
@@ -117,37 +145,47 @@ export const assessClaimCheckability = (input: CheckabilityInput): CheckabilityA
   const predicate = canonicalizeAssertionText(input.predicate);
 
   if (input.style === 'existence') {
-    const assertions = canonicalExistenceAssertions(subject);
-    if (!assertions.includes(predicate)) {
+    const matchedForm = existenceAssertionForms.find((form) => predicate === `${subject} ${form}`);
+    if (matchedForm === undefined) {
       return notCheckable(
         'canonical-predicate',
         `the predicate "${input.predicate}" is not a canonical existence assertion about "${subject}" — ` +
-          `canonical forms: ${assertions.map((assertion) => `"${assertion}"`).join(', ')}`
+          `canonical forms: ${existenceAssertionForms.map((form) => `"${subject} ${form}"`).join(', ')}`
       );
     }
     if (visible !== predicate) {
       return notCheckable(
         'canonical-visible',
         `the visible marked prose "${input.markerText}" is not exactly the canonical assertion ` +
-          `"${predicate}" — the marker must wrap ONLY the canonical assertion (backticks, whitespace, and one ` +
-          'trailing period are tolerated); every other word goes outside the marker'
+          `"${predicate}" — the marker must wrap ONLY the canonical assertion (whitespace and one trailing ` +
+          'period are tolerated; a literal backtick is content and breaks the match); every other word goes ' +
+          'outside the marker'
       );
     }
-    return { checkable: true };
+    return { checkable: true, form: matchedForm };
   }
 
   if (input.citedValue === undefined) {
     return notCheckable('canonical-predicate', 'a value claim with no bound citedValue is never checkable');
   }
   const bound = normalizeCitedValue(input.citedValue);
-  const subjectPaths = [subject, ...(input.valueNames ?? [])].filter((path, index, all) => all.indexOf(path) === index);
+  // FULL VALUE-PATH SUBJECT: when cited-value paths are bound, ONLY their rendered spellings are
+  // accepted subjects — the root object alone never substitutes ('configFileNames' never stands
+  // in for 'configFileNames.config'). A const whose path IS the root keeps working because the
+  // rendered path equals it. Without bound paths (defensive: verification always binds them),
+  // the codemap display name is the only subject there is.
+  const renderedPaths = (input.valueNames ?? [])
+    .map((name) => renderValuePathSubject(name))
+    .filter((path, index, all) => all.indexOf(path) === index);
+  const subjectPaths = renderedPaths.length > 0 ? renderedPaths : [subject];
   const spellsBoundValue = (spelling: string): boolean => {
     const normalized: NormalizedCitedValue = normalizeCitedValue(spelling);
     return normalized.kind === bound.kind && normalized.canonical === bound.canonical;
   };
   const canonicalShape =
-    `"<subject> is set to|defaults to|equals|is ${bound.canonical}" where <subject> is "${subject}" or a bound ` +
-    `value path (${(input.valueNames ?? []).map((name) => `"${name}"`).join(', ') || 'none bound'})`;
+    `"<subject> is set to|defaults to|equals|is ${bound.canonical}" where <subject> is EXACTLY the rendered ` +
+    `bound value path (${subjectPaths.map((name) => `"${name}"`).join(', ')}) — the root object name alone ` +
+    'never substitutes for a nested path';
 
   const predicateAssertion = parseValueAssertion(subjectPaths, predicate);
   if (predicateAssertion === undefined || !spellsBoundValue(predicateAssertion.valueSpelling)) {

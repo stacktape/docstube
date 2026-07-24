@@ -24,7 +24,10 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
     {
       symbolHash: KNOWN_SYMBOL,
       signaturePrint: PRINT,
-      valuePrints: { DEFAULT_RETRIES: PRINT },
+      // 'retries' is the canonical const-name path the default fixture claim cites (the visible
+      // subject must be the FULL bound value path — wave 2b close final); DEFAULT_RETRIES stays
+      // as a DIFFERENT value path for the subject-binding and leaf-substitution probes.
+      valuePrints: { retries: PRINT, DEFAULT_RETRIES: PRINT },
       bodyPrint: PRINT
     }
   ],
@@ -70,10 +73,9 @@ const draft = (markerId: string, overrides: Partial<DraftClaim> = {}): unknown =
   class: 'value',
   predicate: 'retries defaults to 3',
   // A resolvable default so value claims pass the fail-closed dependency requirement; tests that
-  // exercise resolution/fallback override this.
-  proposedSubscriptions: [
-    { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'DEFAULT_RETRIES', citedValue: '3' }
-  ],
+  // exercise resolution/fallback override this. The value path 'retries' equals the visible
+  // subject, keeping the default claim canonically checkable.
+  proposedSubscriptions: [{ kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'retries', citedValue: '3' }],
   ...overrides
 });
 
@@ -125,7 +127,7 @@ describe('anchorWriterLedger', () => {
     const input = anchorInput([
       draft('c1', {
         proposedSubscriptions: [
-          { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'DEFAULT_RETRIES', citedValue: '3' },
+          { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'retries', citedValue: '3' },
           { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'NOT_A_VALUE', citedValue: '3' },
           { kind: 'signature', symbolHash: UNKNOWN_SYMBOL },
           { kind: 'file-content', file: 'package.json', contentHash: '0'.repeat(64) },
@@ -138,7 +140,7 @@ describe('anchorWriterLedger', () => {
 
     const subscriptions = result.ledger.claims[0]?.subscriptions ?? [];
     expect(subscriptions).toHaveLength(2);
-    expect(subscriptions[0]).toMatchObject({ kind: 'cited-value', valueName: 'DEFAULT_RETRIES' });
+    expect(subscriptions[0]).toMatchObject({ kind: 'cited-value', valueName: 'retries' });
     // The snapshot's hash is authoritative for whole-file subscriptions — never the writer's.
     expect(subscriptions[1]).toMatchObject({ kind: 'file-content', file: 'package.json', contentHash: FILE_HASH });
     expect(result.rejectedProposals).toHaveLength(3);
@@ -629,7 +631,7 @@ More text <Claim id="c1">second assertion.</Claim>
 
   it('keeps genuine aliasing passing: prose names the codemap record name, not the proposal text', () => {
     // The c1 prose says `retries`; the evidence points at the symbol whose CODEMAP name is
-    // 'retries' even though the cited-value path is DEFAULT_RETRIES — the record name binds.
+    // 'retries' — the record name binds, never writer-proposed text.
     const result = expectOk(
       anchorWriterLedger(
         anchorInput([draft('c1'), draft('c2', { class: 'intent-history', proposedSubscriptions: [] })])
@@ -658,5 +660,32 @@ More text <Claim id="c1">second assertion.</Claim>
       return;
     }
     expect(result.errors.some((issue) => issue.code === 'marker-scan-invalid' && issue.kernel)).toBe(true);
+  });
+
+  it('re-checks the MDX-expression prohibition: an expression inside a marker post-acceptance is a kernel breach', () => {
+    // submit_page rejects markers containing {…} expressions in-session ('marker-expression'), so
+    // one appearing in the anchoring input means the MDX was altered after acceptance — a kernel
+    // invariant breach, never a writer repair.
+    const acceptedMdx = `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n`;
+    const alteredMdx = `# Title\n\nText <Claim id="c1">\`retries\` {'never '}defaults to 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: acceptedMdx, slug: 'h' });
+    const result = anchorWriterLedger({
+      mdx: alteredMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(
+      result.errors.some(
+        (issue) => issue.code === 'marker-scan-invalid' && issue.kernel && issue.message.includes('marker-expression')
+      )
+    ).toBe(true);
   });
 });

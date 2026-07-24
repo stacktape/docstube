@@ -26,6 +26,7 @@ import {
   idPrefixes,
   mintId,
   normalizeCitedValue,
+  renderValuePathSubject,
   symbolSourceKeySchema
 } from '@docstube/contracts';
 import { blockSourceRanges } from '../entities/extract-entities.ts';
@@ -478,26 +479,38 @@ const checkabilityHints = (draft: DraftClaim, visibleText: string, codemap: Code
     return first.assessment.checkable ? [] : [hint(first.record.name, first.assessment.reason)];
   }
   if (draft.class === 'value') {
-    for (const subscription of draft.proposedSubscriptions) {
+    const assessments = draft.proposedSubscriptions.flatMap((subscription) => {
       if (subscription.kind !== 'cited-value') {
-        continue;
+        return [];
       }
       const record = recordFor(subscription.symbolHash as string);
       if (record === undefined) {
-        continue;
+        return [];
       }
-      const assessment = assessClaimCheckability({
-        style: 'value',
-        subjectName: record.name,
-        valueNames: [subscription.valueName],
-        citedValue: subscription.citedValue,
-        markerText: visibleText,
-        predicate: draft.predicate
-      });
-      if (!assessment.checkable) {
-        // One hint per claim is enough — the writer fixes the phrasing once.
-        return [hint(record.name, assessment.reason)];
-      }
+      return [
+        {
+          valueName: subscription.valueName,
+          assessment: assessClaimCheckability({
+            style: 'value',
+            subjectName: record.name,
+            valueNames: [subscription.valueName],
+            citedValue: subscription.citedValue,
+            markerText: visibleText,
+            predicate: draft.predicate
+          })
+        }
+      ];
+    });
+    // Mirror the code-structure branch: any checkable subscription means the claim is not
+    // destined-unchecked (a stray unresolvable proposal is rejected separately, not hinted).
+    if (assessments.length === 0 || assessments.some(({ assessment }) => assessment.checkable)) {
+      return [];
+    }
+    const first = assessments[0]!;
+    if (!first.assessment.checkable) {
+      // One hint per claim is enough — the writer fixes the phrasing once. The teachable
+      // subject for a value claim is the RENDERED bound value path, never the bare root.
+      return [hint(renderValuePathSubject(first.valueName), first.assessment.reason)];
     }
   }
   return [];

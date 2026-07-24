@@ -71,8 +71,18 @@ export {
 } from './subject-binding.ts';
 export type { SubjectBindingInput, SubjectBindingResult } from './subject-binding.ts';
 
-export { assessClaimCheckability, canonicalizeAssertionText } from './checkability-grammar.ts';
-export type { CheckabilityAssessment, CheckabilityInput, CheckabilityStyle } from './checkability-grammar.ts';
+export {
+  assessClaimCheckability,
+  canonicalizeAssertionText,
+  existenceAssertionForms,
+  renderValuePathSubject
+} from './checkability-grammar.ts';
+export type {
+  CheckabilityAssessment,
+  CheckabilityInput,
+  CheckabilityStyle,
+  ExistenceAssertionForm
+} from './checkability-grammar.ts';
 
 export {
   sourceRefSchema,

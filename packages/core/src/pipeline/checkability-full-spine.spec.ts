@@ -30,6 +30,8 @@ import { verifyClaims } from './verify-claims.ts';
 const COMMIT = 'b'.repeat(40);
 const GREET_SYMBOL = `ts:${'7'.repeat(64)}`;
 const MODE_SYMBOL = `ts:${'6'.repeat(64)}`;
+const HIDDEN_SYMBOL = `ts:${'5'.repeat(64)}`;
+const NESTED_SYMBOL = `ts:${'4'.repeat(64)}`;
 const PRINT = '8'.repeat(64);
 const READ_HASH = '9'.repeat(64);
 
@@ -38,7 +40,14 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
   commit: COMMIT,
   symbols: [
     { symbolHash: GREET_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT },
-    { symbolHash: MODE_SYMBOL, signaturePrint: PRINT, valuePrints: { MODE: sha256Hex('"linear"') }, bodyPrint: PRINT }
+    { symbolHash: MODE_SYMBOL, signaturePrint: PRINT, valuePrints: { MODE: sha256Hex('"linear"') }, bodyPrint: PRINT },
+    { symbolHash: HIDDEN_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT },
+    {
+      symbolHash: NESTED_SYMBOL,
+      signaturePrint: PRINT,
+      valuePrints: { 'retryDefaults.backoff.factor': sha256Hex('2') },
+      bodyPrint: PRINT
+    }
   ],
   unparsedFiles: []
 });
@@ -47,8 +56,35 @@ const codemap: Codemap = codemapSchema.parse({
   schemaVersion: 1,
   commit: COMMIT,
   symbols: [
-    { hash: GREET_SYMBOL, lang: 'ts', kind: 'function', name: 'greet', file: 'src/greet.ts', span: [1, 3] },
-    { hash: MODE_SYMBOL, lang: 'ts', kind: 'variable', name: 'MODE', file: 'src/mode.ts', span: [1, 1] }
+    // greet affirms exportedness the way the built-in packs do ('public'); hidden affirms the
+    // opposite; MODE/retryDefaults state none (existence/value forms never need it).
+    {
+      hash: GREET_SYMBOL,
+      lang: 'ts',
+      kind: 'function',
+      name: 'greet',
+      file: 'src/greet.ts',
+      span: [1, 3],
+      visibility: 'public'
+    },
+    { hash: MODE_SYMBOL, lang: 'ts', kind: 'variable', name: 'MODE', file: 'src/mode.ts', span: [1, 1] },
+    {
+      hash: HIDDEN_SYMBOL,
+      lang: 'ts',
+      kind: 'function',
+      name: 'hidden',
+      file: 'src/greet.ts',
+      span: [5, 7],
+      visibility: 'private'
+    },
+    {
+      hash: NESTED_SYMBOL,
+      lang: 'ts',
+      kind: 'variable',
+      name: 'retryDefaults',
+      file: 'src/mode.ts',
+      span: [2, 2]
+    }
   ]
 });
 
@@ -62,7 +98,10 @@ let repoRoot: string;
 beforeAll(async () => {
   repoRoot = await mkdtemp(join(tmpdir(), 'docstube-full-spine-'));
   await mkdir(join(repoRoot, 'src'), { recursive: true });
-  await writeFile(join(repoRoot, 'src', 'mode.ts'), "export const MODE = 'linear';\n");
+  await writeFile(
+    join(repoRoot, 'src', 'mode.ts'),
+    "export const MODE = 'linear';\nexport const retryDefaults = { backoff: { factor: 2 } };\n"
+  );
 });
 
 afterAll(async () => {
@@ -78,7 +117,7 @@ title: "Greet"
 <Claim id="g1">${claimProse}</Claim>
 `;
 
-const existenceLedger = (predicate: string): WriterClaimLedger =>
+const existenceLedger = (predicate: string, symbol = GREET_SYMBOL): WriterClaimLedger =>
   writerClaimLedgerSchema.parse({
     schemaVersion: 1,
     claims: [
@@ -86,13 +125,18 @@ const existenceLedger = (predicate: string): WriterClaimLedger =>
         markerId: 'g1',
         class: 'code-structure',
         predicate,
-        proposedEvidence: [{ kind: 'symbol', symbol: GREET_SYMBOL }],
-        proposedSubscriptions: [{ kind: 'signature', symbolHash: GREET_SYMBOL }]
+        proposedEvidence: [{ kind: 'symbol', symbol }],
+        proposedSubscriptions: [{ kind: 'signature', symbolHash: symbol }]
       }
     ]
   });
 
-const valueLedger = (predicate: string, citedValue: string): WriterClaimLedger =>
+const valueLedger = (
+  predicate: string,
+  citedValue: string,
+  symbol = MODE_SYMBOL,
+  valueName = 'MODE'
+): WriterClaimLedger =>
   writerClaimLedgerSchema.parse({
     schemaVersion: 1,
     claims: [
@@ -100,8 +144,8 @@ const valueLedger = (predicate: string, citedValue: string): WriterClaimLedger =
         markerId: 'g1',
         class: 'value',
         predicate,
-        proposedEvidence: [{ kind: 'symbol', symbol: MODE_SYMBOL }],
-        proposedSubscriptions: [{ kind: 'cited-value', symbolHash: MODE_SYMBOL, valueName: 'MODE', citedValue }]
+        proposedEvidence: [{ kind: 'symbol', symbol }],
+        proposedSubscriptions: [{ kind: 'cited-value', symbolHash: symbol, valueName, citedValue }]
       }
     ]
   });
@@ -258,6 +302,74 @@ describe('full-spine probes: submit → anchor → verify → shard', () => {
       assertedValue: '"linear"',
       extractedValue: '"linear"'
     });
+  });
+
+  it("Sol's escaped-backtick probe: '`greet` ex\\`ists.' persists UNCHECKED — a literal backtick is content", async () => {
+    // The MDX escape \` renders a LITERAL backtick: the reader sees 'greet ex`ists.'. The old
+    // normalizer deleted backticks and minted checked; backticks are no longer cosmetic.
+    const spine = await runSpine('`greet` ex\\`ists.', existenceLedger('greet exists'));
+    expect(spine.verified.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expectUnchecked(spine);
+  });
+
+  it("Sol's expression probe: <Claim>greet {'never '}exists.</Claim> is REJECTED at submit_page — the spine never starts", () => {
+    // The expression renders 'greet never exists' while the scan sees 'greet exists' — the exact
+    // laundering channel; markers containing MDX expressions are invalid outright.
+    const submission = evaluateSubmitPageCall({
+      mdx: pageMdx("greet {'never '}exists."),
+      ledger: existenceLedger('greet exists')
+    });
+    expect(submission.response.accepted).toBe(false);
+    expect(submission.response.errors?.some((error) => error.includes('MDX expression'))).toBe(true);
+  });
+
+  it("Sol's root-substitution probe: '`retryDefaults` is 2.' against the nested leaf persists UNCHECKED", async () => {
+    const spine = await runSpine(
+      '`retryDefaults` is 2.',
+      valueLedger('retryDefaults is 2', '2', NESTED_SYMBOL, 'retryDefaults.backoff.factor')
+    );
+    expect(spine.verified.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expectUnchecked(spine);
+    const records = spine.shard.provenance?.claimEvidence ?? [];
+    expect(records[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it("the FULL value path '`retryDefaults.backoff.factor` is 2.' still mints CHECKED end to end", async () => {
+    const { verified, shard } = await runSpine(
+      '`retryDefaults.backoff.factor` is 2.',
+      valueLedger('retryDefaults.backoff.factor is 2', '2', NESTED_SYMBOL, 'retryDefaults.backoff.factor')
+    );
+    expect(verified.findings).toEqual([]);
+    const record = shard.provenance?.claimEvidence[0];
+    expect(record).toMatchObject({ correctness: 'checked', disposition: null });
+    const deciding = record?.evidence.find((entry) => entry.evidenceId === record.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'value-predicate', assertedValue: '2', extractedValue: '2' });
+  });
+
+  it("'`greet` is exported.' mints CHECKED end to end — the record affirms exportedness ('public')", async () => {
+    const { verified, shard } = await runSpine('`greet` is exported.', existenceLedger('greet is exported'));
+    expect(verified.findings).toEqual([]);
+    const record = shard.provenance?.claimEvidence[0];
+    expect(record).toMatchObject({ correctness: 'checked', disposition: null });
+    const deciding = record?.evidence.find((entry) => entry.evidenceId === record.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: GREET_SYMBOL });
+    expect(deciding?.detail).toContain('exportedness affirmed');
+  });
+
+  it("Sol's private-symbol probe: '`hidden` is exported.' persists CONTRADICTED end to end — never checked", async () => {
+    const { verified, shard } = await runSpine(
+      '`hidden` is exported.',
+      existenceLedger('hidden is exported', HIDDEN_SYMBOL)
+    );
+    expect(verified.findings).toHaveLength(1);
+    expect(verified.findings[0]?.message).toContain('CONTRADICTED');
+    expect(verified.findings[0]?.message).toContain("'private'");
+    const record = shard.provenance?.claimEvidence[0];
+    expect(record).toMatchObject({ correctness: 'contradicted', disposition: null });
+    const deciding = record?.evidence.find((entry) => entry.evidenceId === record.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: HIDDEN_SYMBOL });
+    expect(deciding?.outcome).toBe('fail');
+    expect(shard.ledger?.claims[0]).toMatchObject({ correctness: 'contradicted', disposition: null });
   });
 
   it("the canonical LIE '`MODE` defaults to cubic.' still mints CONTRADICTED end to end — a caught lie, gating", async () => {

@@ -72,6 +72,26 @@ describe('scanClaimMarkers', () => {
     expect(badId.errors[0]?.code).toBe('marker-invalid-id');
   });
 
+  it("rejects markers containing MDX expressions — Sol's {'never '} probe (wave 2b close final)", () => {
+    // <Claim>greet {'never '}exists.</Claim> renders "greet never exists" but the visible-text
+    // scan sees "greet exists" — expressions render text the kernel cannot see, so the marker is
+    // invalid outright.
+    const probe = scanClaimMarkers('Fact: <Claim id="g1">greet {\'never \'}exists.</Claim>\n');
+    expect(probe.errors[0]?.code).toBe('marker-expression');
+    expect(probe.errors[0]?.markerId).toBe('g1');
+    expect(probe.errors[0]?.message).toContain('cannot');
+    expect(probe.markers).toEqual([]);
+
+    // Also caught when the expression hides inside nested inline formatting.
+    const nested = scanClaimMarkers('Fact: <Claim id="g2">greet *really {1 + 2}* exists.</Claim>\n');
+    expect(nested.errors[0]?.code).toBe('marker-expression');
+
+    // A marker with only literal prose is untouched.
+    const clean = scanClaimMarkers('Fact: <Claim id="g3">greet exists.</Claim>\n');
+    expect(clean.errors).toEqual([]);
+    expect(clean.markers).toHaveLength(1);
+  });
+
   it('turns malformed marker syntax into an mdx-parse-error repair message, never a crash', () => {
     const unclosed = scanClaimMarkers('Text <Claim id="a">never closed.');
     expect(unclosed.errors[0]?.code).toBe('mdx-parse-error');
@@ -308,6 +328,15 @@ describe('validateSubmission', () => {
     });
     expect(flow.accepted).toBeUndefined();
     expect(flow.errors.some((error) => error.includes('inline inside the sentence'))).toBe(true);
+  });
+
+  it('rejects a submission whose marker contains an MDX expression with a repair error', () => {
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">greet {\'never \'}exists.</Claim>'),
+      ledger: ledgerWith([claim('c1', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors.some((error) => error.includes('MDX expression'))).toBe(true);
   });
 
   it('rejects an orphan marker with no ledger entry', () => {

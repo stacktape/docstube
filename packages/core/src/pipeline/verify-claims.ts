@@ -206,7 +206,8 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
               })
             : undefined
       }));
-      const grounded = assessed.find(({ checkability }) => checkability?.checkable === true)?.record;
+      const groundedEntry = assessed.find(({ checkability }) => checkability?.checkable === true);
+      const grounded = groundedEntry?.record;
       if (grounded === undefined && resolved.length > 0) {
         const negated = bindings.find(({ binding }) => binding.ok && binding.negated);
         const mismatch = bindings.find(({ binding }) => !binding.ok && binding.code === 'polarity-mismatch');
@@ -243,7 +244,69 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           );
         }
       }
-      if (grounded !== undefined) {
+      // 'is exported' CHECKS EXPORTEDNESS (wave 2b close final): codemap presence proves that a
+      // symbol EXISTS — the built-in packs emit only exported declarations, but the schema admits
+      // records from any pack, so presence alone never proves exportedness. The claim is decided
+      // from the record's affirmative visibility field:
+      //   'public'              → exported: grounding passes, checked (as for the other forms);
+      //   'internal'/'private'  → the record affirmatively says NOT exported surface →
+      //                           CONTRADICTED (outcome-fail grounding evidence, blocking finding);
+      //   absent                → exportedness unknowable → unchecked with a journaled warning.
+      // The other forms (exists/is defined/is available) need only presence, which the record is.
+      const groundedForm =
+        groundedEntry?.checkability?.checkable === true ? groundedEntry.checkability.form : undefined;
+      const exportedness =
+        groundedForm !== 'is exported' || grounded === undefined
+          ? 'not-required'
+          : grounded.visibility === 'public'
+            ? 'affirmed'
+            : grounded.visibility === undefined
+              ? 'unknown'
+              : 'denied';
+      if (grounded !== undefined && exportedness === 'unknown') {
+        warnings.push(
+          `claim "${entry.markerId}": the claim asserts "${grounded.name} is exported", but the codemap record ` +
+            `carries no visibility — presence proves the symbol exists, never that it is exported, so no ` +
+            'grounding evidence is minted; the claim stays unchecked (no-checker-available)'
+        );
+      } else if (grounded !== undefined && exportedness === 'denied') {
+        const record = evidenceRecordSchema.parse({
+          evidenceId: mintId(idPrefixes.evidence),
+          ref: {
+            kind: 'codemap-grounding',
+            symbol: symbolSourceKeySchema.parse(grounded.hash),
+            file: grounded.file,
+            span: grounded.span,
+            commit
+          },
+          checkedAt: now,
+          sourceRevision: commit,
+          outcome: 'fail',
+          detail:
+            `docs assert ${grounded.name} is exported; the codemap record marks it '${grounded.visibility}' ` +
+            `(${grounded.file}:${grounded.span[0]}) — not part of the exported surface`
+        });
+        minted.push(record);
+        correctness = 'contradicted';
+        disposition = null;
+        decidingEvidenceId = record.evidenceId;
+        findings.push({
+          source: 'verifier',
+          check: CLAIM_VERIFICATION_CHECK,
+          severity: 'error',
+          message:
+            `claim "${entry.markerId}" is CONTRADICTED by the codemap — predicate: "${claim.predicate}"; ` +
+            `the symbol "${grounded.name}" resolves but its record marks visibility '${grounded.visibility}' ` +
+            `(${grounded.file}:${grounded.span[0]}), so it is not exported. Remove or correct the assertion`,
+          file: grounded.file,
+          data: {
+            markerId: entry.markerId,
+            kind: 'contradiction',
+            symbol: grounded.hash,
+            visibility: grounded.visibility
+          }
+        });
+      } else if (grounded !== undefined) {
         const record = evidenceRecordSchema.parse({
           evidenceId: mintId(idPrefixes.evidence),
           ref: {
@@ -256,7 +319,11 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           checkedAt: now,
           sourceRevision: commit,
           outcome: 'pass',
-          detail: `symbol ${grounded.name} resolves in the verified codemap (${grounded.file}:${grounded.span[0]})`
+          detail:
+            groundedForm === 'is exported'
+              ? `symbol ${grounded.name} resolves in the verified codemap with visibility 'public' ` +
+                `(${grounded.file}:${grounded.span[0]}) — exportedness affirmed by the record`
+              : `symbol ${grounded.name} resolves in the verified codemap (${grounded.file}:${grounded.span[0]})`
         });
         minted.push(record);
         // Grounding decides ONLY canonically phrased existence claims (decision 3 narrowed by

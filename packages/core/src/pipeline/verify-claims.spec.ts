@@ -15,6 +15,10 @@ const KNOWN_SYMBOL = `ts:${'1'.repeat(64)}`;
 const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
 const RETRY_SYMBOL = `ts:${'4'.repeat(64)}`;
 const MODE_SYMBOL = `ts:${'6'.repeat(64)}`;
+const NESTED_SYMBOL = `ts:${'7'.repeat(64)}`;
+const EXPORTED_SYMBOL = `ts:${'8'.repeat(64)}`;
+const PRIVATE_SYMBOL = `ts:${'9'.repeat(64)}`;
+const MYSTERY_SYMBOL = `ts:${'a'.repeat(64)}`;
 const PRINT = '3'.repeat(64);
 const READ_HASH = '5'.repeat(64);
 
@@ -35,7 +39,16 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
       bodyPrint: PRINT
     },
     { symbolHash: RETRY_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT },
-    { symbolHash: MODE_SYMBOL, signaturePrint: PRINT, valuePrints: { MODE: sha256Hex('"linear"') }, bodyPrint: PRINT }
+    { symbolHash: MODE_SYMBOL, signaturePrint: PRINT, valuePrints: { MODE: sha256Hex('"linear"') }, bodyPrint: PRINT },
+    {
+      symbolHash: NESTED_SYMBOL,
+      signaturePrint: PRINT,
+      valuePrints: { 'retryDefaults.backoff.factor': sha256Hex('2') },
+      bodyPrint: PRINT
+    },
+    { symbolHash: EXPORTED_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT },
+    { symbolHash: PRIVATE_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT },
+    { symbolHash: MYSTERY_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT }
   ],
   unparsedFiles: []
 });
@@ -49,7 +62,30 @@ const codemap: Codemap = codemapSchema.parse({
     { hash: RETRY_SYMBOL, lang: 'ts', kind: 'function', name: 'retry', file: 'src/retry.ts', span: [3, 4] },
     // The MODE value claim binds through its OWN symbol record (value names root at the owning
     // symbol — the root identifier must appear in prose and predicate, impl-10 finding 2).
-    { hash: MODE_SYMBOL, lang: 'ts', kind: 'variable', name: 'MODE', file: 'src/retry.ts', span: [2, 2] }
+    { hash: MODE_SYMBOL, lang: 'ts', kind: 'variable', name: 'MODE', file: 'src/retry.ts', span: [2, 2] },
+    // Full value-path fixtures (wave 2b close final): the nested object whose leaf is cited.
+    { hash: NESTED_SYMBOL, lang: 'ts', kind: 'variable', name: 'retryDefaults', file: 'src/retry.ts', span: [3, 3] },
+    // Exportedness fixtures: 'public' affirms exported, 'private' affirms not-exported, an
+    // absent visibility leaves exportedness unknowable.
+    {
+      hash: EXPORTED_SYMBOL,
+      lang: 'ts',
+      kind: 'function',
+      name: 'publicApi',
+      file: 'src/retry.ts',
+      span: [5, 6],
+      visibility: 'public'
+    },
+    {
+      hash: PRIVATE_SYMBOL,
+      lang: 'ts',
+      kind: 'function',
+      name: 'secretHelper',
+      file: 'src/retry.ts',
+      span: [8, 9],
+      visibility: 'private'
+    },
+    { hash: MYSTERY_SYMBOL, lang: 'ts', kind: 'function', name: 'mysteryThing', file: 'src/retry.ts', span: [11, 12] }
   ]
 });
 
@@ -88,6 +124,10 @@ Bypass. <Claim id="a1">\`DEFAULT_RETRIES\` is absent.</Claim>
 Wordy. <Claim id="wd1">\`retry\`, added in v2, exists.</Claim>
 
 Long. <Claim id="lw1">\`retry\` is available as the value of the option of the key that is not defined.</Claim>
+
+Paths. <Claim id="rd1">\`retryDefaults\` is 2.</Claim> <Claim id="rd2">\`retryDefaults.backoff.factor\` is 2.</Claim>
+
+Exports. <Claim id="x1">\`publicApi\` is exported.</Claim> <Claim id="x2">\`secretHelper\` is exported.</Claim> <Claim id="x3">\`mysteryThing\` is exported.</Claim>
 `;
 
 let repoRoot: string;
@@ -97,7 +137,8 @@ beforeAll(async () => {
   await mkdir(join(repoRoot, 'src'), { recursive: true });
   await writeFile(
     join(repoRoot, 'src', 'retry.ts'),
-    "export const DEFAULT_RETRIES = 3;\nexport const MODE = 'linear';\n"
+    "export const DEFAULT_RETRIES = 3;\nexport const MODE = 'linear';\n" +
+      'export const retryDefaults = { backoff: { factor: 2 } };\n'
   );
 });
 
@@ -105,7 +146,25 @@ afterAll(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
-const FIXTURE_MARKERS = ['v1', 'v5', 'm1', 'e1', 'b1', 's1', 'b2', 'n1', 'w1', 'a1', 'wd1', 'lw1'];
+const FIXTURE_MARKERS = [
+  'v1',
+  'v5',
+  'm1',
+  'e1',
+  'b1',
+  's1',
+  'b2',
+  'n1',
+  'w1',
+  'a1',
+  'wd1',
+  'lw1',
+  'rd1',
+  'rd2',
+  'x1',
+  'x2',
+  'x3'
+];
 
 const anchorFixture = (
   claims: Array<{ markerId: string } & Record<string, unknown>>,
@@ -754,11 +813,144 @@ describe('verifyClaims — checkability grammar (impl-13, exact canonical visibl
     // '`DEFAULT_RETRIES` exists.' → checked by grounding; '`DEFAULT_RETRIES` is 3.' → checked by
     // the value comparison (both covered by their own suites); the canonical LIE still
     // contradicts (v5 suite). Here: the canonical value form 'defaults to'.
+    // Tampered visible text mirrors REAL AST-derived rendering: bare, no backticks.
     const result = await verify(
-      tamper(anchorFixture([valueDraft('3')]), '`DEFAULT_RETRIES` defaults to 3.', 'DEFAULT_RETRIES defaults to 3')
+      tamper(anchorFixture([valueDraft('3')]), 'DEFAULT_RETRIES defaults to 3.', 'DEFAULT_RETRIES defaults to 3')
     );
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+  });
+
+  it("Sol's escaped-backtick probe: a literal backtick in the rendered prose stays unchecked (backticks are content)", async () => {
+    // MDX '`DEFAULT_RETRIES` defa\`ults to 3.' renders 'DEFAULT_RETRIES defa`ults to 3.' — the
+    // old normalizer deleted the backtick and minted checked; backticks are literal content now.
+    const result = await verify(
+      tamper(anchorFixture([valueDraft('3')]), 'DEFAULT_RETRIES defa`ults to 3.', 'DEFAULT_RETRIES defaults to 3')
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+});
+
+// FULL VALUE-PATH SUBJECT (wave 2b close final): the canonical value assertion's subject must be
+// EXACTLY the rendered bound value path — the root object never substitutes for a nested leaf.
+describe('verifyClaims — full value-path subject', () => {
+  const nestedDraft = (markerId: string, predicate: string) => ({
+    markerId,
+    class: 'value',
+    predicate,
+    proposedEvidence: [{ kind: 'symbol', symbol: NESTED_SYMBOL }],
+    proposedSubscriptions: [
+      { kind: 'cited-value', symbolHash: NESTED_SYMBOL, valueName: 'retryDefaults.backoff.factor', citedValue: '2' }
+    ]
+  });
+
+  it("Sol's root-substitution probe: '`retryDefaults` is 2.' against the .backoff.factor leaf stays UNCHECKED", async () => {
+    // The prose asserts a value for the whole OBJECT; the evidence proves only the leaf. Under
+    // the old subject list the bare root was an accepted spelling and this minted checked.
+    const result = await verify(anchorFixture([nestedDraft('rd1', 'retryDefaults is 2')]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes('never substitutes'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('the FULL dotted path mints checked end to end', async () => {
+    const result = await verify(anchorFixture([nestedDraft('rd2', 'retryDefaults.backoff.factor is 2')]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({
+      kind: 'value-predicate',
+      valueName: 'retryDefaults.backoff.factor',
+      assertedValue: '2',
+      extractedValue: '2'
+    });
+  });
+});
+
+const exportDraft = (markerId: string, name: string, symbol: string) => ({
+  markerId,
+  class: 'code-structure',
+  predicate: `${name} is exported`,
+  proposedEvidence: [{ kind: 'symbol', symbol }],
+  proposedSubscriptions: [{ kind: 'signature', symbolHash: symbol }]
+});
+
+// 'is exported' CHECKS EXPORTEDNESS (wave 2b close final): codemap presence proves existence;
+// exportedness is decided ONLY from the record's affirmative visibility field.
+describe("verifyClaims — 'is exported' exportedness", () => {
+  it("mints checked when the record affirms exportedness (visibility 'public')", async () => {
+    const result = await verify(anchorFixture([exportDraft('x1', 'publicApi', EXPORTED_SYMBOL)]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: EXPORTED_SYMBOL });
+    expect(deciding?.outcome).toBe('pass');
+    expect(deciding?.detail).toContain('exportedness affirmed');
+  });
+
+  it("Sol's private-symbol probe: '`secretHelper` is exported.' over a 'private' record is CONTRADICTED", async () => {
+    const result = await verify(anchorFixture([exportDraft('x2', 'secretHelper', PRIVATE_SYMBOL)]));
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'contradicted', disposition: null });
+    const evidence = result.claimEvidence[0];
+    expect(evidence?.correctness).toBe('contradicted');
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: PRIVATE_SYMBOL, file: 'src/retry.ts' });
+    expect(deciding?.outcome).toBe('fail');
+    expect(deciding?.detail).toContain("'private'");
+    // The blocking finding carries the detail for the retry prompt.
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ check: 'claim-verification', severity: 'error' });
+    expect(result.findings[0]?.message).toContain('CONTRADICTED');
+    expect(result.findings[0]?.message).toContain('secretHelper');
+    expect(result.findings[0]?.message).toContain("'private'");
+  });
+
+  it('leaves the claim UNCHECKED when the record carries no visibility — exportedness is unknowable', async () => {
+    const result = await verify(anchorFixture([exportDraft('x3', 'mysteryThing', MYSTERY_SYMBOL)]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('no visibility'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("presence still decides 'exists' on a record without visibility — only 'is exported' needs the field", async () => {
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'x3',
+          class: 'code-structure',
+          predicate: 'mysteryThing exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: MYSTERY_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: MYSTERY_SYMBOL }]
+        }
+      ])
+    );
+    // The x3 marker wraps 'is exported' prose, so this claim is outside the grammar for 'exists'
+    // — tamper the visible text to the canonical 'exists' assertion instead.
+    const tampered = await verify(
+      tamper(
+        anchorFixture([
+          {
+            markerId: 'x3',
+            class: 'code-structure',
+            predicate: 'mysteryThing exists',
+            proposedEvidence: [{ kind: 'symbol', symbol: MYSTERY_SYMBOL }],
+            proposedSubscriptions: [{ kind: 'signature', symbolHash: MYSTERY_SYMBOL }]
+          }
+        ]),
+        'mysteryThing exists.',
+        'mysteryThing exists'
+      )
+    );
+    expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
+    expect(tampered.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
   });
 });
 
