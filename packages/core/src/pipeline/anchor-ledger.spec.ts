@@ -39,7 +39,8 @@ const codemap: Codemap = codemapSchema.parse({
       hash: KNOWN_SYMBOL,
       lang: 'ts',
       kind: 'function',
-      name: 'retry',
+      // Named 'retries' so the fixture prose ("`retries` defaults to 3") subject-binds.
+      name: 'retries',
       file: 'src/retry.ts',
       span: [3, 9]
     }
@@ -335,6 +336,81 @@ More text <Claim id="c1">second assertion.</Claim>
       return;
     }
     expect(result.errors.some((issue) => issue.code === 'marker-duplicate' && issue.markerId === 'c1')).toBe(true);
+  });
+
+  it("REJECTS Sol's subject probe 1: '`inventedFunction` exists' riding an unrelated real symbol", () => {
+    // The symbol resolves (it is real) but the visible prose and predicate name a DIFFERENT
+    // identifier — accepting it would let verification mint codemap-grounding evidence for a
+    // hallucinated subject. Repair-eligible: fix the prose or drop the wrong symbol.
+    const probeMdx = `# Title\n\nText <Claim id="p1">\`inventedFunction\` exists.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p1',
+          class: 'code-structure',
+          predicate: 'inventedFunction exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]).toMatchObject({ code: 'subject-unbound', kernel: false, markerId: 'p1' });
+    expect(result.errors[0]?.message).toContain('"retries"');
+    expect(result.errors[0]?.message).toContain('inventedFunction');
+  });
+
+  it("REJECTS Sol's subject probe 2: '`INVENTED_DEFAULT` is 3' against an unrelated equal-valued name", () => {
+    // The cited value resolves and equals 3 — scalar binding alone would pass. The subject rule
+    // rejects it: neither the record name nor any valueName segment is spelled by the sentence.
+    const probeMdx = `# Title\n\nText <Claim id="p2">\`INVENTED_DEFAULT\` is 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p2',
+          class: 'value',
+          predicate: 'INVENTED_DEFAULT is 3',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [
+            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'DEFAULT_RETRIES', citedValue: '3' }
+          ]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors.every((issue) => issue.code === 'subject-unbound')).toBe(true);
+    expect(result.errors.some((issue) => issue.message.includes('"DEFAULT_RETRIES"'))).toBe(true);
+  });
+
+  it('keeps genuine aliasing passing: prose names the codemap record name, not the proposal text', () => {
+    // The c1 prose says `retries`; the evidence points at the symbol whose CODEMAP name is
+    // 'retries' even though the cited-value path is DEFAULT_RETRIES — the record name binds.
+    const result = expectOk(
+      anchorWriterLedger(
+        anchorInput([draft('c1'), draft('c2', { class: 'intent-history', proposedSubscriptions: [] })])
+      )
+    );
+    expect(result.ledger.claims).toHaveLength(2);
   });
 
   it('classifies post-acceptance grammar-level scan errors as kernel invariant breaches', () => {

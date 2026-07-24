@@ -16,6 +16,7 @@ import type {
   WriterClaimLedger
 } from '@docstube/contracts';
 import {
+  bindClaimSubject,
   claimLedgerSchema,
   contentHashSchema,
   entityRevisionSchema,
@@ -67,6 +68,7 @@ export type AnchorIssueCode =
   | 'marker-missing' // ledger claim whose marker is absent from the accepted MDX
   | 'marker-duplicate' // the same marker id appears more than once in the accepted MDX
   | 'marker-unclaimed' // marker with no ledger entry — an unclaimed assertion shrinks nothing silently
+  | 'subject-unbound' // neither the visible prose nor the predicate names the referenced symbol
   | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
   // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
   // post-acceptance means the MDX was altered after acceptance — a kernel bug, never repairable.
@@ -335,6 +337,65 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
   return records;
 };
 
+// SUBJECT BINDING at anchoring (impl-09 finding 1): every symbol the claim references that
+// RESOLVES in the codemap must be named — as an identifier token — by the visible marker prose or
+// the predicate. The comparison uses the CODEMAP record's display name (plus the cited-value name
+// path segments for value subscriptions), never the writer's proposal text, so genuine aliasing
+// keeps passing while "`inventedFunction` exists" can no longer ride an unrelated real symbol.
+// Repair-eligible: the writer fixes the prose or drops the wrong symbol. Verification re-checks
+// the same rule (defense in depth) and refuses to mint evidence on violation.
+const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: Codemap): AnchorIssue[] => {
+  // Cited-value name paths per symbol: their identifier segments extend the bindable name set for
+  // EVERY reference to that symbol on this claim (the subject of a value claim is the value).
+  const valueNamesByHash = new Map<string, string[]>();
+  for (const subscription of draft.proposedSubscriptions) {
+    if (subscription.kind === 'cited-value') {
+      const hash = subscription.symbolHash as string;
+      valueNamesByHash.set(hash, [...(valueNamesByHash.get(hash) ?? []), subscription.valueName]);
+    }
+  }
+  const referencedHashes = [
+    ...draft.proposedEvidence.flatMap((proposal) => (proposal.kind === 'symbol' ? [proposal.symbol as string] : [])),
+    ...draft.proposedSubscriptions.flatMap((subscription) =>
+      subscription.kind === 'file-content' ? [] : [subscription.symbolHash as string]
+    )
+  ];
+  const issues: AnchorIssue[] = [];
+  const checked = new Set<string>();
+  for (const symbolHash of referencedHashes) {
+    if (checked.has(symbolHash)) {
+      continue;
+    }
+    checked.add(symbolHash);
+    const record = codemap.symbols.find((symbol) => symbol.hash === symbolHash);
+    if (record === undefined) {
+      // Unresolvable symbols are the unknown-symbol rejection path — nothing to bind against.
+      continue;
+    }
+    const valueNames = valueNamesByHash.get(symbolHash) ?? [];
+    const binding = bindClaimSubject({
+      subjectName: record.name,
+      valueNames,
+      markerText: visibleText,
+      predicate: draft.predicate
+    });
+    if (!binding.ok) {
+      issues.push({
+        code: 'subject-unbound',
+        kernel: false,
+        markerId: draft.markerId,
+        message:
+          `claim "${draft.markerId}" is SUBJECT-UNBOUND — its evidence points at the symbol "${record.name}"` +
+          `${valueNames.length === 0 ? '' : ` (cited value ${valueNames.map((name) => `"${name}"`).join(', ')})`}, ` +
+          `but neither the visible prose ("${visibleText}") nor the predicate ("${draft.predicate}") names ` +
+          `${binding.candidates.map((name) => `"${name}"`).join(' or ')} as an identifier. ` +
+          'Name the real subject in the wrapped sentence (or the predicate), or drop/replace the wrong symbol reference'
+      });
+    }
+  }
+  return issues;
+};
+
 export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult => {
   const warnings: string[] = [];
   const errors: AnchorIssue[] = [];
@@ -414,6 +475,13 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
         markerId: draft.markerId,
         message: `claim "${draft.markerId}" cannot anchor — its marker does not sit inside any content block (headings and frontmatter cannot carry claims); move the marker into the body prose`
       });
+      continue;
+    }
+    // Subject binding gates before any evidence mints: an unbound claim contributes no
+    // source-linked records and fails the page with a repair-eligible error.
+    const subjectIssues = subjectBindingIssues(draft, marker.visibleText, input.codemap);
+    if (subjectIssues.length > 0) {
+      errors.push(...subjectIssues);
       continue;
     }
     const claimEvidence = mintSymbolEvidence(draft, ctx, input.commit);

@@ -13,6 +13,7 @@ import { verifyClaims } from './verify-claims.ts';
 const COMMIT = 'f'.repeat(40);
 const KNOWN_SYMBOL = `ts:${'1'.repeat(64)}`;
 const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
+const RETRY_SYMBOL = `ts:${'4'.repeat(64)}`;
 const PRINT = '3'.repeat(64);
 const READ_HASH = '5'.repeat(64);
 
@@ -28,9 +29,11 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
     {
       symbolHash: KNOWN_SYMBOL,
       signaturePrint: PRINT,
-      valuePrints: { DEFAULT_RETRIES: sha256Hex('3'), MODE: sha256Hex('"linear"'), GONE: PRINT },
+      // 'mode' anchors but never resolves on disk; GONE anchors but is not spelled by any marker.
+      valuePrints: { DEFAULT_RETRIES: sha256Hex('3'), MODE: sha256Hex('"linear"'), GONE: PRINT, mode: PRINT },
       bodyPrint: PRINT
-    }
+    },
+    { symbolHash: RETRY_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT }
   ],
   unparsedFiles: []
 });
@@ -39,7 +42,9 @@ const codemap: Codemap = codemapSchema.parse({
   schemaVersion: 1,
   commit: COMMIT,
   symbols: [
-    { hash: KNOWN_SYMBOL, lang: 'ts', kind: 'variable', name: 'DEFAULT_RETRIES', file: 'src/retry.ts', span: [1, 1] }
+    { hash: KNOWN_SYMBOL, lang: 'ts', kind: 'variable', name: 'DEFAULT_RETRIES', file: 'src/retry.ts', span: [1, 1] },
+    // Behavior fixtures subject-bind through this record: the prose says `retry`.
+    { hash: RETRY_SYMBOL, lang: 'ts', kind: 'function', name: 'retry', file: 'src/retry.ts', span: [3, 4] }
   ]
 });
 
@@ -259,7 +264,9 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
           predicate: 'the mode option defaults to the string "3"',
           proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
           proposedSubscriptions: [
-            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'GONE', citedValue: '"3"' }
+            // 'mode' subject-binds through the s1 prose ("`mode` defaults to …") and anchors
+            // against the snapshot, but never resolves on disk.
+            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'mode', citedValue: '"3"' }
           ]
         }
       ])
@@ -385,8 +392,8 @@ describe('verifyClaims — behavior (deliberately unchecked in 0.1.0)', () => {
     markerId,
     class: 'behavior',
     predicate: 'retry retries the call',
-    proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
-    proposedSubscriptions: [{ kind: 'body', symbolHash: KNOWN_SYMBOL }]
+    proposedEvidence: [{ kind: 'symbol', symbol: RETRY_SYMBOL }],
+    proposedSubscriptions: [{ kind: 'body', symbolHash: RETRY_SYMBOL }]
   });
 
   it('a behavior claim is ALWAYS unchecked/no-checker-available — no execution evidence exists to mint (scope correction)', async () => {
@@ -405,6 +412,49 @@ describe('verifyClaims — behavior (deliberately unchecked in 0.1.0)', () => {
     expect(evidence?.correctness).toBe('unchecked');
     expect(evidence?.evidence.some((record) => record.ref.kind === 'source-linked')).toBe(true);
     expect(evidence?.decidingEvidenceId).toBeUndefined();
+  });
+});
+
+// Anchoring already rejects these as 'subject-unbound'; verification re-proves the same rule on
+// its own inputs, because replayed/scripted writers can reach it with anchored state anchoring
+// never blessed. Tampering the anchored entries post-anchoring simulates exactly that bypass.
+const tamper = (
+  anchoredResult: Extract<AnchorLedgerResult, { ok: true }>,
+  visibleText: string,
+  predicate: string
+): Extract<AnchorLedgerResult, { ok: true }> => ({
+  ...anchoredResult,
+  anchored: anchoredResult.anchored.map((entry, index) =>
+    index === 0 ? { ...entry, visibleText, claim: { ...entry.claim, predicate } } : entry
+  )
+});
+
+describe('verifyClaims — subject binding (impl-09 finding 1, defense in depth)', () => {
+  it("Sol probe 1: '`inventedFunction` exists' riding a real symbol mints NO grounding evidence", async () => {
+    const anchoredResult = anchorFixture([
+      {
+        markerId: 'v1',
+        class: 'code-structure',
+        predicate: 'DEFAULT_RETRIES exists',
+        proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+        proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+      }
+    ]);
+    const result = await verify(tamper(anchoredResult, '`inventedFunction` exists.', 'inventedFunction exists'));
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('subject-unbound'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("Sol probe 2: '`INVENTED_DEFAULT` is 3' against an equal-valued real name mints NO value evidence", async () => {
+    // Scalar binding alone passes (3 appears in both texts) — the subject rule is what refuses.
+    const result = await verify(
+      tamper(anchorFixture([valueDraft('3')]), '`INVENTED_DEFAULT` is 3.', 'INVENTED_DEFAULT is 3')
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('subject-unbound'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 });
 

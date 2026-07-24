@@ -12,6 +12,7 @@ import type {
 } from '@docstube/contracts';
 import {
   bindCitedValue,
+  bindClaimSubject,
   claimEvidenceSchema,
   claimLedgerSchema,
   evidenceRecordSchema,
@@ -160,7 +161,25 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           subscription.kind === 'file-content' ? [] : [subscription.symbolHash as string]
         )
       ];
-      const grounded = candidateSymbols.map((hash) => symbolByHash.get(hash)).find((record) => record !== undefined);
+      const resolved = candidateSymbols
+        .map((hash) => symbolByHash.get(hash))
+        .filter((record): record is SymbolRecord => record !== undefined);
+      // SUBJECT BINDING re-check (impl-09 finding 1, defense in depth behind anchoring): grounding
+      // may only mint from a symbol the visible prose or predicate actually NAMES — otherwise
+      // "`inventedFunction` exists" would launder through any real symbol's hash. Resolved but
+      // unbound symbols mint nothing; the claim stays unchecked with a journaled warning.
+      const grounded = resolved.find(
+        (record) =>
+          bindClaimSubject({ subjectName: record.name, markerText: entry.visibleText, predicate: claim.predicate }).ok
+      );
+      if (grounded === undefined && resolved.length > 0) {
+        warnings.push(
+          `claim "${entry.markerId}": grounding symbol ${resolved
+            .map((record) => `"${record.name}"`)
+            .join(', ')} resolved but is never named by the visible prose ("${entry.visibleText}") or the ` +
+            'predicate (subject-unbound) — no grounding evidence minted; the claim stays unchecked'
+        );
+      }
       if (grounded !== undefined) {
         const record = evidenceRecordSchema.parse({
           evidenceId: mintId(idPrefixes.evidence),
@@ -187,8 +206,8 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
     } else if (claim.class === 'value') {
       // The minimal value-predicate verifier. A value claim is checked only when EVERY cited-value
       // subscription resolved and passed; ANY mismatch contradicts; anything unresolvable at
-      // verify time leaves the claim unchecked — the kernel never guesses. Two deterministic
-      // preconditions guard every comparison:
+      // verify time leaves the claim unchecked — the kernel never guesses. Three deterministic
+      // preconditions guard every comparison (value binding, subject binding, snapshot agreement):
       //   1. VALUE BINDING (defense in depth behind submit_page, impl-07 finding 1): the asserted
       //      value must appear in BOTH the AST-derived visible marker text AND the predicate,
       //      unambiguously and un-negated — the SAME shared contracts rule submit_page enforces.
@@ -234,6 +253,27 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           continue;
         }
         const symbol = symbolByHash.get(subscription.symbolHash as string);
+        if (symbol !== undefined) {
+          // SUBJECT BINDING re-check (impl-09 finding 1): the value comparison may only run when
+          // the prose/predicate names the subject the subscription points at (the codemap record's
+          // name or a valueName path segment) — otherwise "`INVENTED_DEFAULT` is 3" would launder
+          // through any real value that happens to equal 3. No evidence minted; warning journaled.
+          const subjectBinding = bindClaimSubject({
+            subjectName: symbol.name,
+            valueNames: [subscription.valueName],
+            markerText: entry.visibleText,
+            predicate: claim.predicate
+          });
+          if (!subjectBinding.ok) {
+            unresolvable = true;
+            warnings.push(
+              `claim "${entry.markerId}": the cited value "${subscription.valueName}" points at symbol ` +
+                `"${symbol.name}", but neither the visible prose ("${entry.visibleText}") nor the predicate names ` +
+                'it (subject-unbound) — no value evidence minted; the claim stays unchecked'
+            );
+            continue;
+          }
+        }
         const content = symbol === undefined ? undefined : await readRepoFile(symbol.file);
         const extractor = symbol === undefined ? undefined : citedValueExtractorFor(input.packs, symbol.file);
         if (symbol === undefined || content === undefined || extractor === undefined) {
