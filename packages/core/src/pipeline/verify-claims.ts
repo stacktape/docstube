@@ -11,6 +11,7 @@ import type {
   SymbolRecord
 } from '@docstube/contracts';
 import {
+  assessClaimCheckability,
   bindCitedValue,
   bindClaimSubject,
   claimEvidenceSchema,
@@ -31,9 +32,13 @@ import type { AnchoredClaim, RejectedProposal } from './anchor-ledger.ts';
 // the class/evidence AUTHORITY TABLE by minting canonical EvidenceRecords. State is computed,
 // never asserted:
 //
-//   code-structure  codemap grounding suffices — the grounding symbol resolves in the codemap →
-//                   'codemap-grounding' evidence, outcome pass → checked. A missing identifier is
-//                   a HARD DEFECT for every class (the stale-naming hallucination class).
+//   code-structure  codemap grounding decides ONLY canonically phrased existence claims (the
+//                   fail-closed checkability grammar, impl-12): the grounding symbol resolves in
+//                   the codemap AND the claim sits inside the canonical grammar →
+//                   'codemap-grounding' evidence, outcome pass → checked. Arbitrary prose outside
+//                   the grammar stays unchecked with a journaled note — never argued with. A
+//                   missing identifier is still a HARD DEFECT for every class (the stale-naming
+//                   hallucination class).
 //   value           the 0.1.0 MINIMAL VALUE-PREDICATE VERIFIER: each cited-value subscription is
 //                   compared byte-wise against the language pack's extractCitedValues output for
 //                   the claim's symbol — both sides normalized by the SAME value-name grammar the
@@ -181,11 +186,39 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           predicate: claim.predicate
         })
       }));
-      const grounded = bindings.find(({ binding }) => binding.ok && !binding.negated)?.record;
+      // CHECKABILITY GRAMMAR (wave 2b close FINAL, impl-12 — the fail-closed backstop behind the
+      // negation-cue fast paths): a bound positive subject alone is NOT enough. Grounding evidence
+      // may only DECIDE a claim whose predicate is a canonical existence assertion AND whose
+      // visible window contains only allowlisted vocabulary — "`greet` is absent" over predicate
+      // "greet exists" passes every cue detector but is unknown vocabulary here, so it stays
+      // honestly unchecked instead of minting 'checked'.
+      const assessed = bindings.map((bound) => ({
+        ...bound,
+        checkability:
+          bound.binding.ok && !bound.binding.negated
+            ? assessClaimCheckability({
+                style: 'existence',
+                subjectName: bound.record.name,
+                markerText: entry.visibleText,
+                predicate: claim.predicate
+              })
+            : undefined
+      }));
+      const grounded = assessed.find(({ checkability }) => checkability?.checkable === true)?.record;
       if (grounded === undefined && resolved.length > 0) {
         const negated = bindings.find(({ binding }) => binding.ok && binding.negated);
         const mismatch = bindings.find(({ binding }) => !binding.ok && binding.code === 'polarity-mismatch');
-        if (negated !== undefined) {
+        const outsideGrammar = assessed.find(
+          ({ checkability }) => checkability !== undefined && !checkability.checkable
+        );
+        if (outsideGrammar?.checkability !== undefined && !outsideGrammar.checkability.checkable) {
+          warnings.push(
+            `claim "${entry.markerId}": OUTSIDE THE CANONICAL CHECKABLE GRAMMAR — ` +
+              `${outsideGrammar.checkability.reason}. Existence evidence only decides canonically phrased claims ` +
+              `("${outsideGrammar.record.name} exists"-style, tight marker span); no grounding evidence minted — ` +
+              'the claim stays unchecked (no-checker-available)'
+          );
+        } else if (negated !== undefined) {
           warnings.push(
             `claim "${entry.markerId}": the prose and predicate assert a NEGATIVE fact about ` +
               `"${negated.record.name}" ("${claim.predicate}") — codemap grounding proves presence, never absence, ` +
@@ -224,7 +257,8 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           detail: `symbol ${grounded.name} resolves in the verified codemap (${grounded.file}:${grounded.span[0]})`
         });
         minted.push(record);
-        // Grounding suffices as checked for the existence/shape class ONLY (decision 3).
+        // Grounding decides ONLY canonically phrased existence claims (decision 3 narrowed by
+        // the impl-12 checkability grammar).
         correctness = 'checked';
         disposition = null;
         decidingEvidenceId = record.evidenceId;
@@ -318,6 +352,27 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
                 `("${claim.predicate}") — the value-predicate verifier proves what a value IS, never an absence or ` +
                 'non-behavior, so no value evidence is minted; the claim stays unchecked (no-checker-available). ' +
                 'Negative assertions cannot be mechanically checked in 0.1.0'
+            );
+            continue;
+          }
+          // CHECKABILITY GRAMMAR (impl-12, the fail-closed backstop): the value comparison may
+          // only DECIDE a canonically phrased claim. Non-canonical prose/predicates skip the
+          // comparison entirely and stay unchecked — the kernel never argues with prose the
+          // grammar cannot vouch for.
+          const checkability = assessClaimCheckability({
+            style: 'value',
+            subjectName: symbol.name,
+            valueNames: [subscription.valueName],
+            citedValue: subscription.citedValue,
+            markerText: entry.visibleText,
+            predicate: claim.predicate
+          });
+          if (!checkability.checkable) {
+            unresolvable = true;
+            warnings.push(
+              `claim "${entry.markerId}": OUTSIDE THE CANONICAL CHECKABLE GRAMMAR — ${checkability.reason}. ` +
+                `Value evidence only decides canonically phrased claims ("${symbol.name} defaults to <value>"-style, ` +
+                'tight marker span); no value evidence minted — the claim stays unchecked (no-checker-available)'
             );
             continue;
           }

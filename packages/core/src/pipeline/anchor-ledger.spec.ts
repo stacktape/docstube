@@ -552,6 +552,58 @@ More text <Claim id="c1">second assertion.</Claim>
     expect(result.ok).toBe(true);
   });
 
+  it('journals a NON-BLOCKING destined-unchecked hint for phrasing outside the checkability grammar (impl-12)', () => {
+    // The claim anchors fine (subject bound, polarity agreed), but 'returns a number' is outside
+    // the canonical existence grammar — verification will refuse to decide it. Anchoring only
+    // HINTS (warning), never errors: unchecked is a legal outcome, not a repair spiral.
+    const probeMdx = `# Title\n\nText <Claim id="p8">Unlike \`shout\`, \`retries\` returns a number — not a string.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p8',
+          class: 'code-structure',
+          predicate: 'retries returns a number',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.warnings.some((warning) => warning.includes('destined to ship UNCHECKED'))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes('p8'))).toBe(true);
+    // Canonically phrased claims produce NO hint (the first test's empty-warnings assertion
+    // covers the value form; here the existence form).
+    const canonicalMdx = `# Title\n\nText <Claim id="p9">\`retries\` exists.</Claim>\n`;
+    const canonical = anchorWriterLedger({
+      mdx: canonicalMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p9',
+          class: 'code-structure',
+          predicate: 'retries exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page: extractPageEntity({ mdx: canonicalMdx, slug: 'probe' }),
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(expectOk(canonical).warnings).toEqual([]);
+  });
+
   it('ACCEPTS an agreed negative assertion — the ledger takes it; verification leaves it unchecked', () => {
     const probeMdx = `# Title\n\nText <Claim id="p7">\`retries\` never mutates its input.</Claim>\n`;
     const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });

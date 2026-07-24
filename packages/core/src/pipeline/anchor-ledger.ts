@@ -16,6 +16,7 @@ import type {
   WriterClaimLedger
 } from '@docstube/contracts';
 import {
+  assessClaimCheckability,
   bindClaimSubject,
   claimLedgerSchema,
   contentHashSchema,
@@ -434,6 +435,73 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
   return issues;
 };
 
+// DESTINED-UNCHECKED HINTS (impl-12): the checkability grammar is enforced at VERIFICATION (the
+// evidence decision); anchoring only journals a NON-BLOCKING note when a code-structure/value
+// claim that subject-binds cleanly is nonetheless phrased outside the canonical grammar — the
+// bounded retry loop can improve the phrasing opportunistically, but unchecked is a legal outcome
+// and must never spiral into repairs.
+const checkabilityHints = (draft: DraftClaim, visibleText: string, codemap: Codemap): string[] => {
+  const recordFor = (symbolHash: string): SymbolRecord | undefined =>
+    codemap.symbols.find((symbol) => symbol.hash === symbolHash);
+  const hint = (subjectName: string, reason: string): string =>
+    `claim "${draft.markerId}" is destined to ship UNCHECKED — ${reason}. Non-blocking: unchecked is a legal ` +
+    `outcome. To make it checkable, phrase the assertion canonically ("\`${subjectName}\` exists", ` +
+    `"\`${subjectName}\` defaults to 3") with the marker wrapped tightly around it — extra context goes outside ` +
+    'the marker';
+  if (draft.class === 'code-structure') {
+    const referenced = [
+      ...draft.proposedEvidence.flatMap((proposal) => (proposal.kind === 'symbol' ? [proposal.symbol as string] : [])),
+      ...draft.proposedSubscriptions.flatMap((subscription) =>
+        subscription.kind === 'file-content' ? [] : [subscription.symbolHash as string]
+      )
+    ];
+    const records = [...new Set(referenced)]
+      .map(recordFor)
+      .filter((record): record is SymbolRecord => record !== undefined);
+    if (records.length === 0) {
+      return [];
+    }
+    const assessments = records.map((record) => ({
+      record,
+      assessment: assessClaimCheckability({
+        style: 'existence',
+        subjectName: record.name,
+        markerText: visibleText,
+        predicate: draft.predicate
+      })
+    }));
+    if (assessments.some(({ assessment }) => assessment.checkable)) {
+      return [];
+    }
+    const first = assessments[0]!;
+    return first.assessment.checkable ? [] : [hint(first.record.name, first.assessment.reason)];
+  }
+  if (draft.class === 'value') {
+    for (const subscription of draft.proposedSubscriptions) {
+      if (subscription.kind !== 'cited-value') {
+        continue;
+      }
+      const record = recordFor(subscription.symbolHash as string);
+      if (record === undefined) {
+        continue;
+      }
+      const assessment = assessClaimCheckability({
+        style: 'value',
+        subjectName: record.name,
+        valueNames: [subscription.valueName],
+        citedValue: subscription.citedValue,
+        markerText: visibleText,
+        predicate: draft.predicate
+      });
+      if (!assessment.checkable) {
+        // One hint per claim is enough — the writer fixes the phrasing once.
+        return [hint(record.name, assessment.reason)];
+      }
+    }
+  }
+  return [];
+};
+
 export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult => {
   const warnings: string[] = [];
   const errors: AnchorIssue[] = [];
@@ -522,6 +590,9 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       errors.push(...subjectIssues);
       continue;
     }
+    // Non-blocking phrasing hint for claims destined to stay unchecked under the checkability
+    // grammar — journaled, never gating (impl-12).
+    warnings.push(...checkabilityHints(draft, marker.visibleText, input.codemap));
     const claimEvidence = mintSymbolEvidence(draft, ctx, input.commit);
     evidence.push(...claimEvidence);
     let subscriptions = resolveSubscriptions(draft, ctx);

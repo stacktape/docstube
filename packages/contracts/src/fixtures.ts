@@ -110,7 +110,9 @@ export const buildFixtureWriterClaimLedger = (): WriterClaimLedger => ({
     {
       markerId: 'c1',
       class: 'code-structure',
-      predicate: 'there is a function retry(options)',
+      // Canonical existence phrasing (impl-12 checkability grammar) — the shape checked claims
+      // actually take under the fail-closed grammar.
+      predicate: 'retry exists',
       proposedEvidence: [{ kind: 'symbol', symbol: fixtureSymbolHash, file: 'src/retry.ts' }],
       proposedSubscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }]
     },
@@ -146,9 +148,11 @@ export const buildFixtureClaimLedger = (page?: Pick<PageEntity, 'id' | 'preamble
       {
         claimId: mintId(idPrefixes.claim),
         class: 'code-structure',
-        predicate: 'there is a function retry(options)',
+        // Canonical existence phrasing (impl-12): only claims inside the checkability grammar
+        // can genuinely carry correctness 'checked' from grounding.
+        predicate: 'retry exists',
         anchor: { blockId, markerId: 'c1' },
-        quote: 'The library exposes a `retry(options)` function.',
+        quote: '`retry` exists.',
         scope: { entityId: blockId, revision: blockRevision },
         subscriptions: [{ kind: 'signature', symbolHash: fixtureSymbolHash }],
         evidence: [groundingEvidenceId],

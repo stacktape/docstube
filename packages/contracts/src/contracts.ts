@@ -71,6 +71,9 @@ export {
 } from './subject-binding.ts';
 export type { SubjectBindingInput, SubjectBindingResult } from './subject-binding.ts';
 
+export { assessClaimCheckability, CHECKABILITY_WINDOW, NEUTRAL_ALLOWLIST } from './checkability-grammar.ts';
+export type { CheckabilityAssessment, CheckabilityInput, CheckabilityStyle } from './checkability-grammar.ts';
+
 export {
   sourceRefSchema,
   observedReadSchema,

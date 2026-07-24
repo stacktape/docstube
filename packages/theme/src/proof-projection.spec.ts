@@ -74,6 +74,43 @@ describe('projectShardProof', () => {
     expect(projectShardProof(withReviews(shard, [review({})])).reviewedFor).toBe('app-developer');
   });
 
+  it('impl-12 (fail-closed grammar, reader side): a shard whose claims are all UNCHECKED can never render as fully checked', () => {
+    // The kernel side of the impl-12 probe (core checkability-full-spine.spec) proves the spine
+    // persists "`greet` is absent." as unchecked ClaimEvidence. This is the projection side: the
+    // literal projection of an all-unchecked shard counts 0 checked and marks every claim
+    // unchecked — there is no path to a "1/1 checked" rendering without a 'checked' record.
+    const shard = installShard();
+    if (shard.ledger === undefined || shard.provenance === undefined) {
+      throw new Error('fixture shard is missing its trust spine');
+    }
+    const allUnchecked: PageShard = {
+      ...shard,
+      ledger: {
+        ...shard.ledger,
+        claims: shard.ledger.claims.map((claim) => {
+          const { decidingEvidenceId: _dropped, ...rest } = claim;
+          return { ...rest, correctness: 'unchecked' as const, disposition: 'no-checker-available' as const };
+        })
+      },
+      provenance: {
+        ...shard.provenance,
+        claimEvidence: shard.provenance.claimEvidence.map((record) => {
+          const { decidingEvidenceId: _dropped, ...rest } = record;
+          return { ...rest, correctness: 'unchecked' as const, disposition: 'no-checker-available' as const };
+        })
+      }
+    };
+    const projection = projectShardProof(allUnchecked);
+    expect(projection).toMatchObject({
+      state: 'verified',
+      checkedClaims: 0,
+      totalClaims: 2,
+      contradictedClaims: 0,
+      uncheckedClaims: 2,
+      uncheckedMarkers: ['c1', 'c2']
+    });
+  });
+
   it("projects the EXPLICIT 'unverified' state for a shard without a trust spine — never a silent 0/0 (impl-08)", () => {
     const bare = buildFixtureInput('unused-root').pages[1]!.shard;
     expect(projectShardProof(bare)).toMatchObject({

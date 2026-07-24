@@ -67,6 +67,8 @@ title: "Retry"
 
 <Claim id="m1">\`MODE\` defaults to linear.</Claim>
 
+<Claim id="e1">\`DEFAULT_RETRIES\` exists.</Claim>
+
 ## Usage
 
 Prose first. <Claim id="b1">\`retry\` retries the call.</Claim>
@@ -80,6 +82,12 @@ Elsewhere. <Claim id="b2">\`retry\` also logs.</Claim>
 Negative. <Claim id="n1">\`retry\` never throws.</Claim>
 
 Contrast. <Claim id="w1">Unlike \`shout\`, \`retry\` returns a result — not a promise.</Claim>
+
+Bypass. <Claim id="a1">\`DEFAULT_RETRIES\` is absent.</Claim>
+
+Wordy. <Claim id="wd1">\`retry\`, added in v2, exists.</Claim>
+
+Long. <Claim id="lw1">\`retry\` is available as the value of the option of the key that is not defined.</Claim>
 `;
 
 let repoRoot: string;
@@ -97,7 +105,7 @@ afterAll(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
-const FIXTURE_MARKERS = ['v1', 'v5', 'm1', 'b1', 's1', 'b2', 'n1', 'w1'];
+const FIXTURE_MARKERS = ['v1', 'v5', 'm1', 'e1', 'b1', 's1', 'b2', 'n1', 'w1', 'a1', 'wd1', 'lw1'];
 
 const anchorFixture = (
   claims: Array<{ markerId: string } & Record<string, unknown>>,
@@ -340,11 +348,13 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
 });
 
 describe('verifyClaims — code-structure and grounding', () => {
-  it('checks a code-structure claim whose grounding symbol resolves in the codemap', async () => {
+  it('checks a CANONICALLY phrased code-structure claim whose grounding symbol resolves in the codemap', async () => {
+    // The e1 marker is the canonical positive ('`DEFAULT_RETRIES` exists.') — inside the
+    // checkability grammar, so grounding is allowed to decide it.
     const result = await verify(
       anchorFixture([
         {
-          markerId: 'v1',
+          markerId: 'e1',
           class: 'code-structure',
           predicate: 'DEFAULT_RETRIES exists',
           proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
@@ -582,9 +592,12 @@ describe('verifyClaims — polarity agreement and negative assertions', () => {
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 
-  it('window scoping prevents over-rejection: a positive claim with a distant "not" still CHECKS', async () => {
-    // "not a promise" denies the OBJECT beyond the negation window — the subject assertion is
-    // positive on both sides, so grounding mints normally.
+  it('window scoping still ANCHORS a positive claim with a distant "not" — but the grammar keeps it honestly unchecked', async () => {
+    // "not a promise" denies the OBJECT beyond the negation window, so polarity agreement holds
+    // and anchoring accepts the claim (no polarity error). Under the fail-closed checkability
+    // grammar (impl-12) the phrasing is nonetheless OUTSIDE the canonical family ('returns a
+    // result' is a shape/behavior assertion, and the visible window carries unknown vocabulary),
+    // so grounding refuses to decide it: unchecked, journaled, never a repair spiral.
     const result = await verify(
       anchorFixture([
         {
@@ -597,10 +610,86 @@ describe('verifyClaims — polarity agreement and negative assertions', () => {
       ])
     );
     expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    // The refusal is the GRAMMAR's, not a polarity mismatch — window scoping did its job.
+    expect(result.warnings.some((warning) => warning.includes('POLARITY MISMATCH'))).toBe(false);
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+});
+
+const structureDraft = (markerId: string, predicate: string, symbol = KNOWN_SYMBOL) => ({
+  markerId,
+  class: 'code-structure',
+  predicate,
+  proposedEvidence: [{ kind: 'symbol', symbol }],
+  proposedSubscriptions: [{ kind: 'signature', symbolHash: symbol }]
+});
+
+// THE FAIL-CLOSED CHECKABILITY GRAMMAR (wave 2b close FINAL, impl-12): existence/value evidence
+// only decides canonically phrased claims. Sol's lexical/window bypasses — prose the negation-cue
+// vocabulary never listed — now die at the evidence decision: unknown vocabulary is unchecked by
+// default, so there is no synonym arms race left to lose.
+describe('verifyClaims — checkability grammar (impl-12, fail closed)', () => {
+  it("Sol's impl-12 probe: visible '`DEFAULT_RETRIES` is absent.' over predicate 'DEFAULT_RETRIES exists' mints NOTHING", async () => {
+    // 'absent' is not in the negation-cue vocabulary, so binding and anchoring both pass — the
+    // exact round-6 bypass. The grammar refuses: unknown vocabulary in the visible window means
+    // the claim is not existence-checkable. Unchecked, never 'checked', no findings (no spiral).
+    const result = await verify(anchorFixture([structureDraft('a1', 'DEFAULT_RETRIES exists')]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+    expect(result.claimEvidence[0]?.decidingEvidenceId).toBeUndefined();
+  });
+
+  it("Sol's long-window probe: a denial pushed beyond every window by neutral filler stays unchecked", async () => {
+    // lw1: '`retry` is available as the value of the option of the key that is not defined.' —
+    // every token within the window is neutral, but the window-independent denial screen sees
+    // 'not' anywhere in the marker and fails the gate.
+    const result = await verify(anchorFixture([structureDraft('lw1', 'retry exists', RETRY_SYMBOL)]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it('the documented COST of fail-closed: a wordy-but-TRUE positive ships honestly unchecked', async () => {
+    // wd1: '`retry`, added in v2, exists.' — retry really exists, but 'added' and 'v2' are
+    // unknown vocabulary inside the window. The claim is honestly unchecked; the writer prompt
+    // teaches the fix (tight marker, context outside).
+    const result = await verify(anchorFixture([structureDraft('wd1', 'retry exists', RETRY_SYMBOL)]));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it('a value claim phrased outside the canonical grammar skips the comparison and stays unchecked', async () => {
+    // Binding holds (subject + value present, no negation), but the predicate is not canonical —
+    // the comparison must not run, so neither 'checked' nor 'contradicted' can mint.
+    const result = await verify(
+      tamper(
+        anchorFixture([valueDraft('3')]),
+        '`DEFAULT_RETRIES` is 3 across most of the retry paths.',
+        'DEFAULT_RETRIES is usually 3'
+      )
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('canonical positives still mint checked end to end — the grammar narrows, it does not break', async () => {
+    // '`DEFAULT_RETRIES` exists.' → checked by grounding; '`DEFAULT_RETRIES` is 3.' → checked by
+    // the value comparison (both covered by their own suites); the canonical LIE still
+    // contradicts (v5 suite). Here: the canonical value form 'defaults to'.
+    const result = await verify(
+      tamper(anchorFixture([valueDraft('3')]), '`DEFAULT_RETRIES` defaults to 3.', 'DEFAULT_RETRIES defaults to 3')
+    );
+    expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
-    const evidence = result.claimEvidence[0];
-    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
-    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: RETRY_SYMBOL });
   });
 });
 
