@@ -55,6 +55,10 @@ describe('proof conformance (docstube theme)', () => {
     expect(chip).toContain('claims checked');
     expect(chip).toContain('reviewed for {reviewedFor}');
     expect(warning).toContain('contradicted by the source');
+    // Parse-safe inline marks (impl-10): this theme mounts the primitive before the content slot,
+    // so the mark script must defer its DOM queries to DOMContentLoaded during initial parsing.
+    expect(warning).toContain("document.readyState === 'loading'");
+    expect(warning).toContain("addEventListener('DOMContentLoaded', applyClaimMarks");
     for (const banned of ['proven', 'scored', 'out-of-domain', '"verified"', '"unverified"']) {
       expect(chip).not.toContain(banned);
       expect(warning).not.toContain(banned);

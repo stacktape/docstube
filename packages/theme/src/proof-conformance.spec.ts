@@ -72,6 +72,20 @@ describe('proof conformance (basic theme)', () => {
     expect(css).toMatch(/\.dt-claim--unchecked \{[^}]*dotted/u);
   });
 
+  it('applies the inline claim marks PARSE-SAFELY: the primitive mounts before the content slot (impl-10)', async () => {
+    // All themes mount DocstubeContradictions ABOVE the <Claim>-bearing slot, so an immediate
+    // query would find none of its targets. The emitted script must use a parse-safe mechanism:
+    // defer to DOMContentLoaded while the document is still parsing.
+    const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
+    expect(warning).toContain("document.readyState === 'loading'");
+    expect(warning).toContain("document.addEventListener('DOMContentLoaded', applyClaimMarks, { once: true })");
+    // The layout really does order the primitive before the slot — the guard is what makes that
+    // ordering safe, so both facts are asserted together.
+    const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
+    expect(layout.indexOf('<DocstubeContradictions')).toBeGreaterThan(-1);
+    expect(layout.indexOf('<DocstubeContradictions')).toBeLessThan(layout.indexOf('<slot'));
+  });
+
   it('stamps the stable data attributes on chip, warning, marks, sources, and entity wrapper', async () => {
     const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
     expect(chip).toContain('data-docstube-claims-checked={checked}');
