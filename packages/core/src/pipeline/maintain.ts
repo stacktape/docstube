@@ -31,6 +31,7 @@ import {
   attachSiteFindingsToShards,
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
+  docstubeOwnOutputPrefixes,
   resolveSourceRevision
 } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
@@ -172,7 +173,8 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
   // Any escaping error journals a terminal 'failed' outcome first — a crashed run must never
   // read as still running (journalRunFailure rethrows).
   try {
-    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot);
+    const ownOutputs = docstubeOwnOutputPrefixes(config);
+    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot, ownOutputs);
     await journal.append({ type: 'run-started', mode: 'maintain', commit });
     if (dirtyWorkingTree) {
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
@@ -472,8 +474,16 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       locales: [locale, ...config.locales.targets]
     });
 
-    // Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim).
-    await dirtyTreeEndOfRunSweep({ repoRoot, store, journal, commit, dirtyAtStart: dirtyWorkingTree, persistedShards });
+    // Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim; own outputs excluded).
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit,
+      dirtyAtStart: dirtyWorkingTree,
+      ownOutputPrefixes: ownOutputs,
+      persistedShards
+    });
 
     // A persisting condition whose flag was deduped still means the docs carry open system flags —
     // the outcome reflects the shipped state, not just what this run newly raised.

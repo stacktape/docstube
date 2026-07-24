@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -14,15 +14,27 @@ import {
 } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
-import { checkWorkingTreeDirty, dirtyTreeEndOfRunSweep, resolveSourceRevision } from './generate.ts';
+import {
+  checkWorkingTreeDirty,
+  dirtyTreeEndOfRunSweep,
+  docstubeOwnOutputPrefixes,
+  resolveSourceRevision
+} from './generate.ts';
 
 const execFileAsync = promisify(execFile);
 
-// Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim): a tree that was clean at
-// run start but mutated mid-run must still end with the dirtyWorkingTree marker on every shard
-// the run persisted, plus a journal warning. Full immutable-snapshot reads are reconciler work.
+// Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim, scoped by impl-10 finding 4):
+// a tree that was clean at run start but mutated mid-run must still end with the dirtyWorkingTree
+// marker on every shard the run persisted, plus a journal warning — but docstube's OWN declared
+// outputs (the committed manifest under .docstube/ and the generated site under config.outDir)
+// are the run's expected writes and must NEVER self-mark a successful run dirty. Only the
+// machine-local .docstube paths are gitignored here, mirroring real projects: the committed
+// manifest IS visible to porcelain, so the production exclusion — not the .gitignore — is what
+// keeps a normal run clean. Full immutable-snapshot reads are reconciler work.
 
 let repoRoot: string;
+
+const OWN_OUTPUTS = docstubeOwnOutputPrefixes({ outDir: 'docs-site' });
 
 const git = (...args: string[]) => execFileAsync('git', args, { cwd: repoRoot });
 
@@ -33,9 +45,9 @@ beforeAll(async () => {
   await git('config', 'user.name', 'Test');
   await git('config', 'commit.gpgsign', 'false');
   await writeFile(join(repoRoot, 'file.txt'), 'committed\n');
-  // Machine-local docstube state is gitignored in real projects; mirror that so store/journal
-  // writes do not read as tree dirtiness.
-  await writeFile(join(repoRoot, '.gitignore'), '.docstube/\n');
+  // Only the MACHINE-LOCAL docstube state is gitignored (mirroring real projects) — the committed
+  // manifest and the generated site stay visible to porcelain on purpose.
+  await writeFile(join(repoRoot, '.gitignore'), '.docstube/db.sqlite*\n.docstube/cache/\n.docstube/runs/\n');
   await git('add', '.');
   await git('commit', '-m', 'init');
 });
@@ -46,15 +58,51 @@ afterAll(async () => {
 
 describe('working-tree dirtiness', () => {
   it('reports clean after a commit, dirty after a mutation (both probes: start + end)', async () => {
-    expect(await checkWorkingTreeDirty(repoRoot)).toBe(false);
-    const start = await resolveSourceRevision(repoRoot);
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(false);
+    const start = await resolveSourceRevision(repoRoot, OWN_OUTPUTS);
     expect(start.dirtyWorkingTree).toBe(false);
 
     await writeFile(join(repoRoot, 'file.txt'), 'mutated mid-run\n');
-    expect(await checkWorkingTreeDirty(repoRoot)).toBe(true);
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(true);
 
     await git('checkout', '--', 'file.txt');
-    expect(await checkWorkingTreeDirty(repoRoot)).toBe(false);
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(false);
+  });
+
+  it("IGNORES docstube's own declared outputs — a normal successful run never self-marks dirty (impl-10)", async () => {
+    // Simulate what every meaningful run writes: the committed manifest shard and site output.
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePage();
+    const ledger = buildFixtureClaimLedger(page);
+    const shard = { ...buildFixturePageShard(page), ledger, provenance: buildFixtureProvenanceV2(ledger) };
+    await store.writePageShard(shard);
+    await mkdir(join(repoRoot, 'docs-site', 'src'), { recursive: true });
+    await writeFile(join(repoRoot, 'docs-site', 'src', 'index.mdx'), '# generated\n');
+
+    // The plain probe DOES see the output writes (the committed manifest is not gitignored) —
+    // proving the production exclusion, not the test setup, is what keeps the run clean.
+    expect(await checkWorkingTreeDirty(repoRoot)).toBe(true);
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(false);
+    expect((await resolveSourceRevision(repoRoot, OWN_OUTPUTS)).dirtyWorkingTree).toBe(false);
+
+    // The end-of-run sweep is a no-op on own outputs alone: no marker, no journal warning.
+    const journal = await createRunJournal(repoRoot, mintId(idPrefixes.run));
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit: shard.sourceCommit,
+      dirtyAtStart: false,
+      ownOutputPrefixes: OWN_OUTPUTS,
+      persistedShards: [{ locale: shard.locale, pageId: page.id }]
+    });
+    const untouched = await store.readPageShard({ locale: shard.locale, pageId: page.id });
+    expect(untouched?.provenance?.lineage.dirtyWorkingTree).toBeUndefined();
+
+    // Real SOURCE dirt is still detected even while the own-output writes are present.
+    await writeFile(join(repoRoot, 'file.txt'), 'real source dirt\n');
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(true);
+    await git('checkout', '--', 'file.txt');
   });
 
   it('marks persisted shards + journals a warning when the tree became dirty DURING the run', async () => {
@@ -66,7 +114,8 @@ describe('working-tree dirtiness', () => {
     expect(shard.provenance.lineage.dirtyWorkingTree).toBeUndefined();
 
     const journal = await createRunJournal(repoRoot, mintId(idPrefixes.run));
-    // Simulate a mid-run mutation: clean at start, dirty at the end-of-run recheck.
+    // Simulate a mid-run SOURCE mutation: clean at start, dirty at the end-of-run recheck —
+    // detected even though the run's own manifest/site writes are also present.
     await writeFile(join(repoRoot, 'file.txt'), 'mutated mid-run\n');
     await dirtyTreeEndOfRunSweep({
       repoRoot,
@@ -74,6 +123,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: shard.sourceCommit,
       dirtyAtStart: false,
+      ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
 
@@ -99,6 +149,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: shard.sourceCommit,
       dirtyAtStart: false,
+      ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
     const untouched = await store.readPageShard({ locale: shard.locale, pageId: page.id });
@@ -113,6 +164,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: shard.sourceCommit,
       dirtyAtStart: true,
+      ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
     const stillUntouched = await store.readPageShard({ locale: shard.locale, pageId: page.id });
@@ -124,5 +176,12 @@ describe('working-tree dirtiness', () => {
     ).catch(() => '');
     expect(journalRaw).not.toContain('became dirty DURING the run');
     await git('checkout', '--', 'file.txt');
+  });
+
+  it('derives the own-output prefix set from config outDir plus the .docstube tree', () => {
+    expect(docstubeOwnOutputPrefixes({ outDir: 'docs-site' })).toEqual(['docs-site', '.docstube']);
+    expect(docstubeOwnOutputPrefixes({ outDir: './docs/site/' })).toEqual(['docs/site', '.docstube']);
+    // A prefix never swallows sibling paths that merely share the leading characters.
+    expect(docstubeOwnOutputPrefixes({ outDir: 'docs' })).toEqual(['docs', '.docstube']);
   });
 });

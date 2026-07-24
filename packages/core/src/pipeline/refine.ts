@@ -11,7 +11,12 @@ import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal, journalRunFailure } from '../state/run-journal.ts';
 import { loadContextFiles } from './context-files.ts';
 import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
-import { dirtyTreeEndOfRunSweep, dirtyWorkingTreeWarning, resolveSourceRevision } from './generate.ts';
+import {
+  dirtyTreeEndOfRunSweep,
+  dirtyWorkingTreeWarning,
+  docstubeOwnOutputPrefixes,
+  resolveSourceRevision
+} from './generate.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
@@ -118,7 +123,8 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   // Any escaping error journals a terminal 'failed' outcome first — a crashed run must never
   // read as still running (journalRunFailure rethrows).
   try {
-    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot);
+    const ownOutputs = docstubeOwnOutputPrefixes(config);
+    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot, ownOutputs);
     await journal.append({ type: 'run-started', mode: 'refine', commit });
     if (dirtyWorkingTree) {
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
@@ -255,8 +261,17 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
 
     // Dirty-tree honesty, end-of-run recheck (impl-09 finding 3): refine writes evidence-bearing
     // shards exactly like generate/maintain, so a tree that mutated mid-run marks every shard this
-    // run persisted with the dirtyWorkingTree lineage marker and journals a warning.
-    await dirtyTreeEndOfRunSweep({ repoRoot, store, journal, commit, dirtyAtStart: dirtyWorkingTree, persistedShards });
+    // run persisted with the dirtyWorkingTree lineage marker and journals a warning. Own outputs
+    // (manifest + site) are excluded — the run's expected writes are not dirt (impl-10 finding 4).
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit,
+      dirtyAtStart: dirtyWorkingTree,
+      ownOutputPrefixes: ownOutputs,
+      persistedShards
+    });
 
     // A plan-usage freeze can trip with no dollar cap configured, so the event is guarded on the
     // freeze alone — never on maxRunUsd being set. Spend includes token-derived estimates so an
