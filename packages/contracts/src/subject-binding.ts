@@ -25,20 +25,33 @@
 //     also name, but they can NEVER substitute for the root: common leaf words ('config', 'mode',
 //     'default') occur across unrelated values, so a segment-only occurrence is rejected.
 //
-// Enforcement is two-layered: anchoring rejects with the repair-eligible 'subject-unbound' error
-// (the writer fixes the prose or drops the wrong symbol); verification re-checks the same rule
-// and mints NO evidence on violation — the claim stays unchecked with a journaled warning.
+// POLARITY AGREEMENT (wave 2b close, polarity finding): root-token PRESENCE alone is not
+// prose↔predicate agreement — visible "`greet` does not exist" over predicate "greet exists"
+// contains the root on both sides yet asserts the OPPOSITE fact. Both sides are therefore also
+// checked for a negation cue scoped near the bound subject token (the shared negation-cue
+// vocabulary, window-scoped so a 'not' about something else in the sentence never flips the
+// subject). A one-sided negation is the repair-eligible 'polarity-mismatch'; an AGREED negation
+// binds (the ledger accepts negative assertions) but is reported so verification can refuse to
+// treat presence evidence as proof of an absence claim.
+//
+// Enforcement is two-layered: anchoring rejects with the repair-eligible 'subject-unbound' /
+// 'polarity-mismatch' errors (the writer fixes the prose or drops the wrong symbol); verification
+// re-checks the same rule and mints NO evidence on violation — the claim stays unchecked with a
+// journaled warning.
+
+import { negationCueAfter, negationCueBefore } from './negation-cue.ts';
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const IDENTIFIER_CHAR = /[A-Za-z0-9_$]/;
 
-// True when the identifier appears verbatim (case-sensitive) with no identifier character
-// immediately before or after — a real token occurrence, never a fragment of a longer name.
-export const identifierOccursAsToken = (identifier: string, text: string): boolean => {
+// Start offsets of every verbatim (case-sensitive) occurrence with no identifier character
+// immediately before or after — real token occurrences, never fragments of a longer name.
+const identifierTokenIndexes = (identifier: string, text: string): number[] => {
   if (identifier === '') {
-    return false;
+    return [];
   }
+  const indexes: number[] = [];
   const pattern = new RegExp(escapeRegExp(identifier), 'gu');
   for (const match of text.matchAll(pattern)) {
     const before = match.index > 0 ? text[match.index - 1] : undefined;
@@ -47,11 +60,24 @@ export const identifierOccursAsToken = (identifier: string, text: string): boole
       (before === undefined || !IDENTIFIER_CHAR.test(before)) &&
       (after === undefined || !IDENTIFIER_CHAR.test(after))
     ) {
-      return true;
+      indexes.push(match.index);
     }
   }
-  return false;
+  return indexes;
 };
+
+// True when the identifier appears verbatim (case-sensitive) as a delimited token.
+export const identifierOccursAsToken = (identifier: string, text: string): boolean =>
+  identifierTokenIndexes(identifier, text).length > 0;
+
+// True when ANY token occurrence of the subject sits in negation scope: a denial cue shortly
+// before it ("not greet", "rather than greet") or a subject-denying cue shortly after it ("greet
+// does not exist", "retry never throws"). Any-occurrence semantics are the conservative choice —
+// one denied occurrence makes the side's polarity negative.
+export const subjectNegatedInText = (identifier: string, text: string): boolean =>
+  identifierTokenIndexes(identifier, text).some(
+    (index) => negationCueBefore(text, index) || negationCueAfter(text, index + identifier.length)
+  );
 
 // Structural keywords of the cited-value name grammar ('createClient.param.timeout.default') —
 // they describe the path shape, not the subject, and appear constantly in ordinary prose.
@@ -80,9 +106,18 @@ export type SubjectBindingInput = {
 };
 
 export type SubjectBindingResult =
-  | { ok: true; boundName: string }
+  | {
+      ok: true;
+      boundName: string;
+      // True when BOTH sides negate the subject (an agreed NEGATIVE assertion, "greet does not
+      // exist" through and through). The ledger accepts it, but presence-style evidence
+      // (codemap grounding, value predicates) proves presence, never absence — verification must
+      // leave such claims unchecked instead of deciding them.
+      negated: boolean;
+    }
   | {
       ok: false;
+      code: 'subject-unbound';
       // The mandatory root identifier that failed to bind — repair messages demand it verbatim.
       requiredName: string;
       // The side(s) that never name the root: both must, so either entry alone fails the claim.
@@ -90,6 +125,14 @@ export type SubjectBindingResult =
       // Non-root cited-value path segments — listed as context in repair messages; naming them
       // never substitutes for naming the root.
       contextSegments: string[];
+    }
+  | {
+      ok: false;
+      code: 'polarity-mismatch';
+      requiredName: string;
+      // The ONE side that negates the subject while the other asserts it — polarity laundering:
+      // visible "greet does not exist" over predicate "greet exists" (or the reverse).
+      negatedIn: 'marker' | 'predicate';
     };
 
 export const bindClaimSubject = (input: SubjectBindingInput): SubjectBindingResult => {
@@ -101,11 +144,24 @@ export const bindClaimSubject = (input: SubjectBindingInput): SubjectBindingResu
   if (!identifierOccursAsToken(root, input.predicate)) {
     missingIn.push('predicate');
   }
-  if (missingIn.length === 0) {
-    return { ok: true, boundName: root };
+  if (missingIn.length > 0) {
+    const contextSegments = (input.valueNames ?? [])
+      .flatMap((valueName) => valueNameBindableSegments(valueName))
+      .filter((name, index, all) => name !== root && name !== '' && all.indexOf(name) === index);
+    return { ok: false, code: 'subject-unbound', requiredName: root, missingIn, contextSegments };
   }
-  const contextSegments = (input.valueNames ?? [])
-    .flatMap((valueName) => valueNameBindableSegments(valueName))
-    .filter((name, index, all) => name !== root && name !== '' && all.indexOf(name) === index);
-  return { ok: false, requiredName: root, missingIn, contextSegments };
+  // POLARITY AGREEMENT: presence on both sides is not agreement — one side negating the subject
+  // while the other asserts it is polarity laundering ("greet does not exist" riding "greet
+  // exists" into checked). Detected independently per side, near the bound token only.
+  const markerNegated = subjectNegatedInText(root, input.markerText);
+  const predicateNegated = subjectNegatedInText(root, input.predicate);
+  if (markerNegated !== predicateNegated) {
+    return {
+      ok: false,
+      code: 'polarity-mismatch',
+      requiredName: root,
+      negatedIn: markerNegated ? 'marker' : 'predicate'
+    };
+  }
+  return { ok: true, boundName: root, negated: markerNegated };
 };

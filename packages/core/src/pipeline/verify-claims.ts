@@ -164,22 +164,49 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
       const resolved = candidateSymbols
         .map((hash) => symbolByHash.get(hash))
         .filter((record): record is SymbolRecord => record !== undefined);
-      // SUBJECT BINDING re-check (impl-09 finding 1 + impl-10 finding 1, defense in depth behind
-      // anchoring): grounding may only mint from a symbol BOTH the visible prose AND the predicate
-      // actually NAME — otherwise "`inventedFunction` exists" would launder through any real
-      // symbol's hash (including via a predicate the reader never sees). Resolved but unbound
-      // symbols mint nothing; the claim stays unchecked with a journaled warning.
-      const grounded = resolved.find(
-        (record) =>
-          bindClaimSubject({ subjectName: record.name, markerText: entry.visibleText, predicate: claim.predicate }).ok
-      );
+      // SUBJECT BINDING re-check (impl-09 finding 1 + impl-10 finding 1 + the polarity finding,
+      // defense in depth behind anchoring): grounding may only mint from a symbol BOTH the visible
+      // prose AND the predicate actually NAME, with AGREEING POLARITY — otherwise
+      // "`inventedFunction` exists" would launder through any real symbol's hash, and
+      // "`greet` does not exist" would ride real greet evidence into checked. Resolved but
+      // unbound/mismatched symbols mint nothing; the claim stays unchecked with a journaled
+      // warning. An AGREED negative assertion binds but is NOT existence-checkable: codemap
+      // grounding proves the symbol's PRESENCE, never an absence or non-behavior — the claim
+      // stays unchecked / no-checker-available with a journaled note.
+      const bindings = resolved.map((record) => ({
+        record,
+        binding: bindClaimSubject({
+          subjectName: record.name,
+          markerText: entry.visibleText,
+          predicate: claim.predicate
+        })
+      }));
+      const grounded = bindings.find(({ binding }) => binding.ok && !binding.negated)?.record;
       if (grounded === undefined && resolved.length > 0) {
-        warnings.push(
-          `claim "${entry.markerId}": grounding symbol ${resolved
-            .map((record) => `"${record.name}"`)
-            .join(', ')} resolved but is not named by BOTH the visible prose ("${entry.visibleText}") AND the ` +
-            'predicate (subject-unbound) — no grounding evidence minted; the claim stays unchecked'
-        );
+        const negated = bindings.find(({ binding }) => binding.ok && binding.negated);
+        const mismatch = bindings.find(({ binding }) => !binding.ok && binding.code === 'polarity-mismatch');
+        if (negated !== undefined) {
+          warnings.push(
+            `claim "${entry.markerId}": the prose and predicate assert a NEGATIVE fact about ` +
+              `"${negated.record.name}" ("${claim.predicate}") — codemap grounding proves presence, never absence, ` +
+              'so no grounding evidence is minted; the claim stays unchecked (no-checker-available). Negative ' +
+              'assertions cannot be mechanically checked in 0.1.0'
+          );
+        } else if (mismatch !== undefined && !mismatch.binding.ok && mismatch.binding.code === 'polarity-mismatch') {
+          warnings.push(
+            `claim "${entry.markerId}": POLARITY MISMATCH on subject "${mismatch.record.name}" — the ` +
+              `${mismatch.binding.negatedIn === 'marker' ? 'visible prose' : 'predicate'} negates the subject while ` +
+              `the other side asserts it ("${entry.visibleText}" vs "${claim.predicate}") — no grounding evidence ` +
+              'minted; the claim stays unchecked'
+          );
+        } else {
+          warnings.push(
+            `claim "${entry.markerId}": grounding symbol ${resolved
+              .map((record) => `"${record.name}"`)
+              .join(', ')} resolved but is not named by BOTH the visible prose ("${entry.visibleText}") AND the ` +
+              'predicate (subject-unbound) — no grounding evidence minted; the claim stays unchecked'
+          );
+        }
       }
       if (grounded !== undefined) {
         const record = evidenceRecordSchema.parse({
@@ -270,9 +297,27 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           if (!subjectBinding.ok) {
             unresolvable = true;
             warnings.push(
-              `claim "${entry.markerId}": the cited value "${subscription.valueName}" points at symbol ` +
-                `"${symbol.name}", but the visible prose ("${entry.visibleText}") and the predicate do not BOTH ` +
-                'name it (subject-unbound) — no value evidence minted; the claim stays unchecked'
+              subjectBinding.code === 'polarity-mismatch'
+                ? `claim "${entry.markerId}": POLARITY MISMATCH on subject "${symbol.name}" — the ` +
+                    `${subjectBinding.negatedIn === 'marker' ? 'visible prose' : 'predicate'} negates the subject ` +
+                    `while the other side asserts it ("${entry.visibleText}" vs "${claim.predicate}") — no value ` +
+                    'evidence minted; the claim stays unchecked'
+                : `claim "${entry.markerId}": the cited value "${subscription.valueName}" points at symbol ` +
+                    `"${symbol.name}", but the visible prose ("${entry.visibleText}") and the predicate do not BOTH ` +
+                    'name it (subject-unbound) — no value evidence minted; the claim stays unchecked'
+            );
+            continue;
+          }
+          if (subjectBinding.negated) {
+            // NEGATED PREDICATES ARE NOT VALUE-CHECKABLE: an agreed negative assertion about the
+            // subject cannot be decided by comparing the extracted value — the comparison proves
+            // what the value IS, never what the sentence denies. Unchecked, journaled note.
+            unresolvable = true;
+            warnings.push(
+              `claim "${entry.markerId}": the prose and predicate assert a NEGATIVE fact about "${symbol.name}" ` +
+                `("${claim.predicate}") — the value-predicate verifier proves what a value IS, never an absence or ` +
+                'non-behavior, so no value evidence is minted; the claim stays unchecked (no-checker-available). ' +
+                'Negative assertions cannot be mechanically checked in 0.1.0'
             );
             continue;
           }

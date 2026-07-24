@@ -13,6 +13,8 @@
 // cited-values.ts): strings render as JSON (double-quoted, escaped), numbers through Number()
 // (1_000, 1e3, and 1000 normalize identically), booleans as true/false, null as null.
 
+import { negationCueBefore } from './negation-cue.ts';
+
 export type CitedValueKind = 'string' | 'number' | 'boolean' | 'null';
 
 export type NormalizedCitedValue = {
@@ -103,13 +105,9 @@ export const lexNumericTokens = (text: string): number[] =>
 // Explicit negation shortly before an occurrence of the value ("not 3", "no longer defaults to
 // 3", "rather than 3"): the sentence names the value only to DENY it — binding must fail.
 // Deliberately CONSERVATIVE: a negation cue anywhere in the short window rejects, and the writer
-// gets a repair error demanding one plainly asserted value.
-const NEGATION_CUE = /\b(?:not|never|cannot|no longer|rather than|instead of)\b|n't\b/iu;
-
-const WINDOW = 32;
-
-const negatedAt = (text: string, index: number): boolean =>
-  NEGATION_CUE.test(text.slice(Math.max(0, index - WINDOW), index));
+// gets a repair error demanding one plainly asserted value. The cue vocabulary is shared with
+// subject binding (negation-cue.ts) so polarity cannot be laundered through a looser sibling rule.
+const negatedAt = (text: string, index: number): boolean => negationCueBefore(text, index);
 
 // Match positions of the value's TYPE-MATCHING occurrences in the text (empty when it never
 // occurs in the asserted type's prose form). Binding is type-aware (impl-08 finding 1):

@@ -1,0 +1,5 @@
+---
+"docstube": patch
+---
+
+Wave 2b close, polarity round. SUBJECT BINDING now enforces POLARITY AGREEMENT: root-token presence on both sides is no longer enough — a negation cue scoped near the bound subject token (shared cue vocabulary with cited-value binding, window-scoped so a "not" about something else in the sentence never flips the subject) is detected independently in the visible marker prose and in the predicate. A one-sided negation ("`greet` does not exist" over predicate "greet exists") is the new repair-eligible `polarity-mismatch` anchoring error, re-checked at verification (no evidence minted, journaled warning). NEGATED PREDICATES ARE NOT EXISTENCE-CHECKABLE: when prose and predicate agree on a negative assertion, the ledger accepts the claim but codemap-grounding and value-predicate evidence never decide it — presence evidence proves presence, never absence — so the claim ships honestly unchecked (no-checker-available) with a journaled note. The writer prompt now says so explicitly: negative assertions cannot be mechanically checked in 0.1.0 and should be avoided or phrased positively.

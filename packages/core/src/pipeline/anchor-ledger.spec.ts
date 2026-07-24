@@ -468,6 +468,113 @@ More text <Claim id="c1">second assertion.</Claim>
     expect(result.errors[0]?.message).toContain('never substitutes for the root');
   });
 
+  it("REJECTS Sol's polarity probe: visible '`retries` does not exist.' over predicate 'retries exists'", () => {
+    // Root-token PRESENCE holds on both sides — the old rule anchored this and let real evidence
+    // ride visibly false prose into 'checked'. Polarity agreement rejects it repair-eligibly.
+    const probeMdx = `# Title\n\nText <Claim id="p4">\`retries\` does not exist.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p4',
+          class: 'code-structure',
+          predicate: 'retries exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]).toMatchObject({ code: 'polarity-mismatch', kernel: false, markerId: 'p4' });
+    expect(result.errors[0]?.message).toContain('POLARITY MISMATCH');
+    expect(result.errors[0]?.message).toContain('"retries"');
+  });
+
+  it('REJECTS the reverse polarity laundering: positive prose over a negated predicate', () => {
+    const probeMdx = `# Title\n\nText <Claim id="p4">\`retries\` exists.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p4',
+          class: 'code-structure',
+          predicate: 'retries does not exist',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]).toMatchObject({ code: 'polarity-mismatch', kernel: false, markerId: 'p4' });
+    expect(result.errors[0]?.message).toContain('predicate');
+  });
+
+  it('window scoping prevents over-rejection: a positive assertion with a distant "not" still anchors', () => {
+    // The trailing negation denies the OBJECT ("not a string"), not the subject — the negation
+    // window is scoped to the bound token, so the claim anchors as an ordinary positive fact.
+    const probeMdx = `# Title\n\nText <Claim id="p6">Unlike \`shout\`, \`retries\` returns a number — not a string.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p6',
+          class: 'code-structure',
+          predicate: 'retries returns a number',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('ACCEPTS an agreed negative assertion — the ledger takes it; verification leaves it unchecked', () => {
+    const probeMdx = `# Title\n\nText <Claim id="p7">\`retries\` never mutates its input.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p7',
+          class: 'behavior',
+          predicate: 'retries never mutates its input',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'body', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it('keeps genuine aliasing passing: prose names the codemap record name, not the proposal text', () => {
     // The c1 prose says `retries`; the evidence points at the symbol whose CODEMAP name is
     // 'retries' even though the cited-value path is DEFAULT_RETRIES — the record name binds.

@@ -53,6 +53,8 @@ const claimAuthorshipRules = [
   '- The predicate must agree with the visible wrapped text: every identifier, value, quantity, and negation in the',
   '  predicate appears in the prose the marker wraps (and vice versa). Never wrap "`retries` defaults to 3" with a',
   '  predicate about a different symbol, a different number, or the opposite polarity.',
+  '- Negative assertions ("X does not exist", "X never throws") cannot be mechanically checked in 0.1.0 and should',
+  '  be avoided or phrased positively — the ledger accepts them, but they will show as unchecked.',
   "- BOTH the wrapped prose AND the predicate must NAME the subject of every symbol you cite: the symbol's real",
   '  declared ROOT identifier as the codebase spells it (e.g. "createClient" for the value path',
   '  createClient.param.retries.default). Naming only a path segment ("retries", "config") is NOT sufficient — the',

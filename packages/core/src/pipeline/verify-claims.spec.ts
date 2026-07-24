@@ -76,6 +76,10 @@ Prose first. <Claim id="b1">\`retry\` retries the call.</Claim>
 ## Other
 
 Elsewhere. <Claim id="b2">\`retry\` also logs.</Claim>
+
+Negative. <Claim id="n1">\`retry\` never throws.</Claim>
+
+Contrast. <Claim id="w1">Unlike \`shout\`, \`retry\` returns a result — not a promise.</Claim>
 `;
 
 let repoRoot: string;
@@ -93,7 +97,7 @@ afterAll(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
-const FIXTURE_MARKERS = ['v1', 'v5', 'm1', 'b1', 's1', 'b2'];
+const FIXTURE_MARKERS = ['v1', 'v5', 'm1', 'b1', 's1', 'b2', 'n1', 'w1'];
 
 const anchorFixture = (
   claims: Array<{ markerId: string } & Record<string, unknown>>,
@@ -504,6 +508,99 @@ describe('verifyClaims — subject binding (impl-09 finding 1, defense in depth)
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
     expect(result.warnings.some((warning) => warning.includes('subject-unbound'))).toBe(true);
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+});
+
+// POLARITY AGREEMENT + negated predicates (wave 2b close, polarity finding): root-token presence
+// is not prose/predicate agreement, and presence evidence never decides an absence claim.
+describe('verifyClaims — polarity agreement and negative assertions', () => {
+  it("Sol's polarity probe (tamper bypass): visible '`greet` does not exist'-style prose over a positive predicate mints NOTHING", async () => {
+    // Anchoring rejects this as polarity-mismatch; a replayed/scripted writer bypassing anchoring
+    // must hit the same wall here — no evidence, unchecked, journaled warning.
+    const anchoredResult = anchorFixture([
+      {
+        markerId: 'v1',
+        class: 'code-structure',
+        predicate: 'DEFAULT_RETRIES exists',
+        proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+        proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+      }
+    ]);
+    const result = await verify(tamper(anchoredResult, '`DEFAULT_RETRIES` does not exist.', 'DEFAULT_RETRIES exists'));
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('POLARITY MISMATCH'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("BOTH-SIDES-NEGATED probe, end to end: '`retry` never throws' + real retry evidence → unchecked, never checked or contradicted", async () => {
+    // The ledger ACCEPTS the agreed negative assertion (anchoring passes), but codemap grounding
+    // proves presence, never absence — verification must not decide the claim from it.
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'n1',
+          class: 'code-structure',
+          predicate: 'retry never throws',
+          proposedEvidence: [{ kind: 'symbol', symbol: RETRY_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: RETRY_SYMBOL }]
+        }
+      ])
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('presence, never absence'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it('a value claim with an AGREED negative subject is never decided by the value comparison', async () => {
+    // The asserted 3 binds cleanly on both sides (no negation near the value), but the subject
+    // phrase is negated on both sides — the comparison proves what the value IS, never what the
+    // sentence denies.
+    const result = await verify(
+      tamper(
+        anchorFixture([valueDraft('3')]),
+        '`DEFAULT_RETRIES` does not validate the caller input; its value is 3.',
+        'DEFAULT_RETRIES does not validate the caller input and its value is 3'
+      )
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('never an absence'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('a value claim with a ONE-SIDED subject negation mints no value evidence (polarity mismatch)', async () => {
+    const result = await verify(
+      tamper(
+        anchorFixture([valueDraft('3')]),
+        '`DEFAULT_RETRIES` does not validate the caller input; its value is 3.',
+        'DEFAULT_RETRIES is 3'
+      )
+    );
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('POLARITY MISMATCH'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('window scoping prevents over-rejection: a positive claim with a distant "not" still CHECKS', async () => {
+    // "not a promise" denies the OBJECT beyond the negation window — the subject assertion is
+    // positive on both sides, so grounding mints normally.
+    const result = await verify(
+      anchorFixture([
+        {
+          markerId: 'w1',
+          class: 'code-structure',
+          predicate: 'retry returns a result',
+          proposedEvidence: [{ kind: 'symbol', symbol: RETRY_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: RETRY_SYMBOL }]
+        }
+      ])
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'checked', disposition: null });
+    const evidence = result.claimEvidence[0];
+    const deciding = evidence?.evidence.find((record) => record.evidenceId === evidence.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({ kind: 'codemap-grounding', symbol: RETRY_SYMBOL });
   });
 });
 

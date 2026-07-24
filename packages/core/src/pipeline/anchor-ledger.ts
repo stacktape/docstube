@@ -66,6 +66,7 @@ export type AnchorIssueCode =
   | 'marker-duplicate' // the same marker id appears more than once in the accepted MDX
   | 'marker-unclaimed' // marker with no ledger entry — an unclaimed assertion shrinks nothing silently
   | 'subject-unbound' // the visible prose or the predicate fails to name the referenced symbol's root identifier
+  | 'polarity-mismatch' // one side negates the bound subject while the other asserts it — opposite facts
   | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
   // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
   // post-acceptance means the MDX was altered after acceptance — a kernel bug, never repairable.
@@ -378,6 +379,31 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
       markerText: visibleText,
       predicate: draft.predicate
     });
+    if (!binding.ok && binding.code === 'polarity-mismatch') {
+      // POLARITY AGREEMENT (wave 2b close, polarity finding): the root token occurs on both
+      // sides, but one side NEGATES the subject while the other asserts it — visible "`greet`
+      // does not exist" over predicate "greet exists" would otherwise ride real greet evidence
+      // into 'checked'. Repair-eligible: the writer fixes whichever side states the wrong fact.
+      const negatedSide =
+        binding.negatedIn === 'marker'
+          ? `the visible prose ("${visibleText}")`
+          : `the predicate ("${draft.predicate}")`;
+      const positiveSide =
+        binding.negatedIn === 'marker'
+          ? `the predicate ("${draft.predicate}")`
+          : `the visible prose ("${visibleText}")`;
+      issues.push({
+        code: 'polarity-mismatch',
+        kernel: false,
+        markerId: draft.markerId,
+        message:
+          `claim "${draft.markerId}" has a POLARITY MISMATCH on its subject "${binding.requiredName}" — ` +
+          `${negatedSide} NEGATES the subject while ${positiveSide} asserts it. The wrapped sentence and the ` +
+          'predicate must state the SAME fact with the same polarity: fix whichever side is wrong. Note that ' +
+          'negative assertions cannot be mechanically checked in 0.1.0 — prefer phrasing the fact positively'
+      });
+      continue;
+    }
     if (!binding.ok) {
       const missingSides = binding.missingIn
         .map((side) =>

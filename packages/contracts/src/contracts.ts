@@ -63,7 +63,12 @@ export type {
   CitedValueBindingResult
 } from './cited-value-binding.ts';
 
-export { identifierOccursAsToken, valueNameBindableSegments, bindClaimSubject } from './subject-binding.ts';
+export {
+  identifierOccursAsToken,
+  subjectNegatedInText,
+  valueNameBindableSegments,
+  bindClaimSubject
+} from './subject-binding.ts';
 export type { SubjectBindingInput, SubjectBindingResult } from './subject-binding.ts';
 
 export {
