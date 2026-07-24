@@ -92,6 +92,49 @@ describe('scanClaimMarkers', () => {
     expect(clean.markers).toHaveLength(1);
   });
 
+  it("rejects markers containing JSX elements — Sol's Badge-with-contradicting-prop probe (wave 2b close final)", () => {
+    // <Badge label="greet does not exist.">greet exists.</Badge> scans as 'greet exists.' but
+    // renders its prop text — the opposite assertion. Components render arbitrary content, so a
+    // marker containing ANY JSX element is invalid outright, not merely uncheckable.
+    const badge = scanClaimMarkers(
+      'Fact: <Claim id="g1"><Badge label="greet does not exist.">greet exists.</Badge></Claim>\n'
+    );
+    expect(badge.errors[0]?.code).toBe('marker-jsx');
+    expect(badge.errors[0]?.markerId).toBe('g1');
+    expect(badge.errors[0]?.message).toContain('JSX element');
+    expect(badge.markers).toEqual([]);
+
+    // Also caught when the component hides inside nested inline formatting.
+    const nested = scanClaimMarkers('Fact: <Claim id="g2">greet *really <Badge>so</Badge>* exists.</Claim>\n');
+    expect(nested.errors[0]?.code).toBe('marker-jsx');
+  });
+
+  it('flags marker purity STRUCTURALLY: only text + inlineCode content is pureText (no enumeration)', () => {
+    // Pure: plain prose and backticked identifiers — the only nodes whose rendered output
+    // provably equals the scanned text.
+    const pure = scanClaimMarkers('Fact: <Claim id="p1">`greet` exists.</Claim>\n');
+    expect(pure.errors).toEqual([]);
+    expect(pure.markers[0]).toMatchObject({ pureText: true, visibleText: 'greet exists.' });
+
+    // Impure but LEGAL MDX (repair-free): emphasis, links, images, footnote references. The
+    // visible text still extracts (binding needs it) — checkability is what purity gates.
+    const emphasis = scanClaimMarkers('Fact: <Claim id="p2">greet *really* exists.</Claim>\n');
+    expect(emphasis.errors).toEqual([]);
+    expect(emphasis.markers[0]?.pureText).toBe(false);
+
+    const link = scanClaimMarkers('Fact: <Claim id="p3">[greet exists.](/docs/greet)</Claim>\n');
+    expect(link.errors).toEqual([]);
+    expect(link.markers[0]?.pureText).toBe(false);
+
+    const image = scanClaimMarkers('Fact: <Claim id="p4">![greet exists.](greet.png)</Claim>\n');
+    expect(image.errors).toEqual([]);
+    expect(image.markers[0]).toMatchObject({ pureText: false, visibleText: 'greet exists.' });
+
+    const footnote = scanClaimMarkers('Fact: <Claim id="p5">greet exists[^1].</Claim>\n\n[^1]: removed in v3.\n');
+    expect(footnote.errors).toEqual([]);
+    expect(footnote.markers[0]).toMatchObject({ pureText: false, visibleText: 'greet exists.' });
+  });
+
   it('turns malformed marker syntax into an mdx-parse-error repair message, never a crash', () => {
     const unclosed = scanClaimMarkers('Text <Claim id="a">never closed.');
     expect(unclosed.errors[0]?.code).toBe('mdx-parse-error');
@@ -337,6 +380,15 @@ describe('validateSubmission', () => {
     });
     expect(outcome.accepted).toBeUndefined();
     expect(outcome.errors.some((error) => error.includes('MDX expression'))).toBe(true);
+  });
+
+  it('rejects a submission whose marker contains a JSX component with a repair error', () => {
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="c1"><Badge label="greet does not exist.">greet exists.</Badge></Claim>'),
+      ledger: ledgerWith([claim('c1', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors.some((error) => error.includes('JSX element'))).toBe(true);
   });
 
   it('rejects an orphan marker with no ledger entry', () => {

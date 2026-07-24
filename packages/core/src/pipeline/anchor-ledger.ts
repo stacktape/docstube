@@ -58,6 +58,10 @@ export type AnchoredClaim = {
   // AST-derived rendered text of the marker (link URLs/attributes excluded) — the text value
   // binding proves the asserted scalar against, identically to submit_page (impl-07 finding 1).
   visibleText: string;
+  // Kernel-scanned pure-marker flag (wave 2b close final): true only when the marker's AST
+  // content is exclusively text + inlineCode nodes. Non-pure markers can never be canonically
+  // checkable — verification skips existence/value evidence for them entirely.
+  pureText: boolean;
 };
 
 export type AnchorIssueCode =
@@ -442,7 +446,12 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
 // subject-binds cleanly is nonetheless phrased outside the canonical grammar — the bounded retry
 // loop can improve the phrasing opportunistically, but unchecked is a legal outcome and must
 // never spiral into repairs.
-const checkabilityHints = (draft: DraftClaim, visibleText: string, codemap: Codemap): string[] => {
+const checkabilityHints = (
+  draft: DraftClaim,
+  marker: { visibleText: string; pureText: boolean },
+  codemap: Codemap
+): string[] => {
+  const { visibleText, pureText } = marker;
   const recordFor = (symbolHash: string): SymbolRecord | undefined =>
     codemap.symbols.find((symbol) => symbol.hash === symbolHash);
   const hint = (subjectName: string, reason: string): string =>
@@ -468,6 +477,7 @@ const checkabilityHints = (draft: DraftClaim, visibleText: string, codemap: Code
       assessment: assessClaimCheckability({
         style: 'existence',
         subjectName: record.name,
+        markerPureText: pureText,
         markerText: visibleText,
         predicate: draft.predicate
       })
@@ -495,6 +505,7 @@ const checkabilityHints = (draft: DraftClaim, visibleText: string, codemap: Code
             subjectName: record.name,
             valueNames: [subscription.valueName],
             citedValue: subscription.citedValue,
+            markerPureText: pureText,
             markerText: visibleText,
             predicate: draft.predicate
           })
@@ -606,7 +617,7 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
     }
     // Non-blocking phrasing hint for claims destined to stay unchecked under the checkability
     // grammar — journaled, never gating (impl-12).
-    warnings.push(...checkabilityHints(draft, marker.visibleText, input.codemap));
+    warnings.push(...checkabilityHints(draft, marker, input.codemap));
     const claimEvidence = mintSymbolEvidence(draft, ctx, input.commit);
     evidence.push(...claimEvidence);
     let subscriptions = resolveSubscriptions(draft, ctx);
@@ -641,7 +652,8 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       claim,
       markerId: draft.markerId,
       quote: marker.innerMdx,
-      visibleText: marker.visibleText
+      visibleText: marker.visibleText,
+      pureText: marker.pureText
     });
   }
 

@@ -201,6 +201,10 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             ? assessClaimCheckability({
                 style: 'existence',
                 subjectName: bound.record.name,
+                // PURE-MARKER PRECONDITION (wave 2b close final): a marker whose AST content is
+                // not exclusively text + inlineCode renders content the scan cannot vouch for
+                // (image alt text, footnote superscripts, …) — never checkable, before any grammar.
+                markerPureText: entry.pureText,
                 markerText: entry.visibleText,
                 predicate: claim.predicate
               })
@@ -434,6 +438,9 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             subjectName: symbol.name,
             valueNames: [subscription.valueName],
             citedValue: subscription.citedValue,
+            // Non-pure markers (images, links, footnotes, formatting inside the marker) render
+            // content the scan cannot vouch for — never value-checkable (wave 2b close final).
+            markerPureText: entry.pureText,
             markerText: entry.visibleText,
             predicate: claim.predicate
           });

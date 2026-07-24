@@ -108,14 +108,14 @@ afterAll(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
-const pageMdx = (claimProse: string): string => `---
+const pageMdx = (claimProse: string, extraMdx = ''): string => `---
 title: "Greet"
 ---
 
 # Greet
 
 <Claim id="g1">${claimProse}</Claim>
-`;
+${extraMdx}`;
 
 const existenceLedger = (predicate: string, symbol = GREET_SYMBOL): WriterClaimLedger =>
   writerClaimLedgerSchema.parse({
@@ -151,8 +151,8 @@ const valueLedger = (
   });
 
 // The spine: submit_page validation → kernel anchoring → claim verification → persisted shard.
-const runSpine = async (claimProse: string, ledger: WriterClaimLedger) => {
-  const mdx = pageMdx(claimProse);
+const runSpine = async (claimProse: string, ledger: WriterClaimLedger, extraMdx = '') => {
+  const mdx = pageMdx(claimProse, extraMdx);
 
   // 1. submit_page ACCEPTS — the writer-side gate cannot catch lexical bypasses; the exact
   //    canonical visible match is the evidence-decision backstop, not an in-session repair.
@@ -321,6 +321,48 @@ describe('full-spine probes: submit → anchor → verify → shard', () => {
     });
     expect(submission.response.accepted).toBe(false);
     expect(submission.response.errors?.some((error) => error.includes('MDX expression'))).toBe(true);
+  });
+
+  it("Sol's verdict-5 Badge probe: a JSX component inside the marker is REJECTED at submit_page — the spine never starts", () => {
+    // <Badge label="greet does not exist.">greet exists.</Badge> scans as 'greet exists.' but
+    // renders the contradicting prop text — components render arbitrary content, so markers
+    // containing ANY JSX element are invalid outright (marker-jsx).
+    const submission = evaluateSubmitPageCall({
+      mdx: pageMdx('<Badge label="greet does not exist.">greet exists.</Badge>'),
+      ledger: existenceLedger('greet exists')
+    });
+    expect(submission.response.accepted).toBe(false);
+    expect(submission.response.errors?.some((error) => error.includes('JSX element'))).toBe(true);
+  });
+
+  it("Sol's verdict-5 image-alt probe: '![greet exists.](greet.png)' persists UNCHECKED — alt text scans but renders as a picture", async () => {
+    // The scanned visible text is exactly the canonical assertion, but the marker is NOT pure
+    // text + inline code: what the reader sees (an image) is not what the scan vouched for. The
+    // pure-marker precondition refuses checkability before any grammar — unchecked end to end.
+    const spine = await runSpine('![greet exists.](greet.png)', existenceLedger('greet exists'));
+    expect(spine.anchored.warnings.some((warning) => warning.includes('destined to ship UNCHECKED'))).toBe(true);
+    expect(spine.verified.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expectUnchecked(spine);
+    const records = spine.shard.provenance?.claimEvidence ?? [];
+    expect(records[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("Sol's verdict-5 footnote probe: 'greet exists[^1].' persists UNCHECKED — the reference renders content the scan cannot see", async () => {
+    const spine = await runSpine('`greet` exists[^1].', existenceLedger('greet exists'), '\n[^1]: removed in v3.\n');
+    expect(spine.verified.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expectUnchecked(spine);
+    const records = spine.shard.provenance?.claimEvidence ?? [];
+    expect(records[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it('the pure-marker gate also blocks value evidence: an image-alt canonical value assertion persists UNCHECKED', async () => {
+    const spine = await runSpine(
+      '![MODE defaults to linear.](mode.png)',
+      valueLedger('MODE defaults to linear', 'linear')
+    );
+    expectUnchecked(spine);
+    const records = spine.shard.provenance?.claimEvidence ?? [];
+    expect(records[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 
   it("Sol's root-substitution probe: '`retryDefaults` is 2.' against the nested leaf persists UNCHECKED", async () => {

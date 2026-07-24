@@ -10,7 +10,7 @@ import { assessClaimCheckability, canonicalizeAssertionText, renderValuePathSubj
 // spellings — a backtick that survives rendering is literal content and must fail.
 
 const existence = (markerText: string, predicate: string, subjectName = 'greet') =>
-  assessClaimCheckability({ style: 'existence', subjectName, markerText, predicate });
+  assessClaimCheckability({ style: 'existence', subjectName, markerPureText: true, markerText, predicate });
 
 const value = (markerText: string, predicate: string, citedValue = '3', valueNames = ['DEFAULT_RETRIES']) =>
   assessClaimCheckability({
@@ -18,6 +18,7 @@ const value = (markerText: string, predicate: string, citedValue = '3', valueNam
     subjectName: 'DEFAULT_RETRIES',
     valueNames,
     citedValue,
+    markerPureText: true,
     markerText,
     predicate
   });
@@ -46,6 +47,44 @@ describe('renderValuePathSubject — the ONE documented value-path rendering', (
     expect(renderValuePathSubject('createClient.param.retries.default')).toBe('createClient(retries)');
     // Class-member owners keep their dotted owner path.
     expect(renderValuePathSubject('Client.connect.param.timeout.default')).toBe('Client.connect(timeout)');
+  });
+});
+
+describe('pure-marker precondition — the render-laundering class (wave 2b close final)', () => {
+  it('a NON-PURE marker is never checkable, even with exact canonical text on both sides', () => {
+    // The scanned text is canonical, but the marker contained nodes (image alt, footnote, …)
+    // whose rendered output the scan cannot vouch for — checkability fails before any grammar.
+    expect(
+      assessClaimCheckability({
+        style: 'existence',
+        subjectName: 'greet',
+        markerPureText: false,
+        markerText: 'greet exists.',
+        predicate: 'greet exists'
+      })
+    ).toMatchObject({ checkable: false, gate: 'marker-impure' });
+    expect(
+      assessClaimCheckability({
+        style: 'value',
+        subjectName: 'DEFAULT_RETRIES',
+        valueNames: ['DEFAULT_RETRIES'],
+        citedValue: '3',
+        markerPureText: false,
+        markerText: 'DEFAULT_RETRIES is 3.',
+        predicate: 'DEFAULT_RETRIES is 3'
+      })
+    ).toMatchObject({ checkable: false, gate: 'marker-impure' });
+  });
+
+  it('the impure reason teaches the fix: plain prose and backticked identifiers only', () => {
+    const result = assessClaimCheckability({
+      style: 'existence',
+      subjectName: 'greet',
+      markerPureText: false,
+      markerText: 'greet exists.',
+      predicate: 'greet exists'
+    });
+    expect(result.checkable === false && result.reason).toContain('plain prose and backticked identifiers');
   });
 });
 
@@ -152,6 +191,7 @@ const rootOnly = (markerText: string, predicate: string) =>
     subjectName: 'configFileNames',
     valueNames: ['configFileNames.config'],
     citedValue: 'docstube.yml',
+    markerPureText: true,
     markerText,
     predicate
   });
@@ -162,6 +202,7 @@ const paramDefault = (markerText: string, predicate: string) =>
     subjectName: 'createClient',
     valueNames: ['createClient.param.retries.default'],
     citedValue: '3',
+    markerPureText: true,
     markerText,
     predicate
   });
@@ -180,6 +221,7 @@ describe('value family — exact canonical visible match', () => {
         subjectName: 'retryDefaults',
         valueNames: ['retryDefaults.backoff.factor'],
         citedValue: '2',
+        markerPureText: true,
         markerText: 'retryDefaults.backoff.factor is 2.',
         predicate: 'retryDefaults.backoff.factor is 2'
       })
@@ -233,6 +275,7 @@ describe('value family — exact canonical visible match', () => {
         subjectName: 'MODE',
         valueNames: ['MODE'],
         citedValue: 'linear',
+        markerPureText: true,
         markerText: 'MODE defaults to linear.',
         predicate: 'MODE defaults to "linear"'
       })
@@ -246,6 +289,7 @@ describe('value family — exact canonical visible match', () => {
         subjectName: 'MODE',
         valueNames: ['MODE'],
         citedValue: 'linear',
+        markerPureText: true,
         markerText: 'MODE returns linear.',
         predicate: 'MODE returns linear'
       })
@@ -286,6 +330,7 @@ describe('value family — exact canonical visible match', () => {
       assessClaimCheckability({
         style: 'value',
         subjectName: 'DEFAULT_RETRIES',
+        markerPureText: true,
         markerText: 'DEFAULT_RETRIES is 3.',
         predicate: 'DEFAULT_RETRIES is 3'
       })
@@ -299,6 +344,7 @@ describe('value family — exact canonical visible match', () => {
         subjectName: 'MODE',
         valueNames: ['MODE'],
         citedValue: 'exponential-backoff',
+        markerPureText: true,
         markerText: 'MODE is set to exponential-backoff.',
         predicate: 'MODE is set to exponential-backoff'
       })

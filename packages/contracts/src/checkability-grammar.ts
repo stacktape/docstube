@@ -47,6 +47,17 @@
 // ship honestly unchecked. The writer prompt teaches the fix — the marker wraps ONLY the
 // canonical assertion; surrounding prose goes outside the marker.
 //
+// PURE-MARKER PRECONDITION (wave 2b close final — the render-laundering class): the exact match
+// vouches for the SCANNED text, so it may only run when the scanned text provably IS what the
+// reader sees. That holds only when the marker's AST content consists EXCLUSIVELY of `text` and
+// `inlineCode` nodes — the only node kinds whose rendered output equals their scanned value. Any
+// other node (an image whose alt text scans but renders as a picture, a footnote reference that
+// renders a superscript, a link, emphasis, html, a break — or a node kind that does not exist
+// yet) makes the marker non-pure and the claim NEVER checkable, fail-closed by structure with no
+// enumeration. JSX elements are rejected outright at submit_page ('marker-jsx') — components can
+// render arbitrary prop text contradicting their children — so they never reach this gate.
+// Callers pass the scanner-computed `markerPureText`; false short-circuits before any grammar.
+//
 // This grammar is the EVIDENCE-DECISION backstop, enforced at claim verification. The
 // negation-cue fast paths (subject-binding polarity-mismatch, cited-value negation) are NO LONGER
 // LOAD-BEARING for trust: they stay only as earlier, better-messaged REPAIR errors where they
@@ -110,6 +121,9 @@ export type CheckabilityInput = {
   // Which evidence style would decide the claim: codemap grounding (existence) or the
   // value-predicate comparison (value).
   style: CheckabilityStyle;
+  // Scanner-computed: true only when the marker's AST content is EXCLUSIVELY text + inlineCode
+  // nodes (the pure-marker precondition above). false → never checkable, before any grammar.
+  markerPureText: boolean;
   // The CODEMAP record's display name for the bound subject — the same root identifier subject
   // binding proved on both sides. Never writer-proposed text.
   subjectName: string;
@@ -129,9 +143,12 @@ export type CheckabilityAssessment =
   // claim verification needs it because 'is exported' additionally requires the symbol record to
   // affirmatively indicate exportedness before grounding may decide the claim.
   | { checkable: true; form?: ExistenceAssertionForm }
-  | { checkable: false; gate: 'canonical-predicate' | 'canonical-visible'; reason: string };
+  | { checkable: false; gate: 'marker-impure' | 'canonical-predicate' | 'canonical-visible'; reason: string };
 
-const notCheckable = (gate: 'canonical-predicate' | 'canonical-visible', reason: string): CheckabilityAssessment => ({
+const notCheckable = (
+  gate: 'marker-impure' | 'canonical-predicate' | 'canonical-visible',
+  reason: string
+): CheckabilityAssessment => ({
   checkable: false,
   gate,
   reason
@@ -140,6 +157,15 @@ const notCheckable = (gate: 'canonical-predicate' | 'canonical-visible', reason:
 // THE decision: may existence/value evidence decide this claim's correctness? Deterministic and
 // side-effect free; claim verification is the enforcement point.
 export const assessClaimCheckability = (input: CheckabilityInput): CheckabilityAssessment => {
+  if (!input.markerPureText) {
+    return notCheckable(
+      'marker-impure',
+      'the marker content is not pure text + inline code — it contains nodes (formatting, links, images, ' +
+        'footnotes, breaks, …) whose rendered output is not provably the scanned text, so no evidence may vouch ' +
+        'for what the reader sees. A checkable marker wraps ONLY plain prose and backticked identifiers; move ' +
+        'everything else outside the marker'
+    );
+  }
   const subject = input.subjectName;
   const visible = canonicalizeAssertionText(input.markerText);
   const predicate = canonicalizeAssertionText(input.predicate);

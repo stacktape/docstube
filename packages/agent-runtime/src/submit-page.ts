@@ -26,6 +26,13 @@ export type ClaimMarker = {
   // values, link/image labels — never link URLs, JSX attributes, or {…} expressions. Value
   // binding proves the asserted scalar against THIS, so a value hidden in an href cannot bind.
   visibleText: string;
+  // PURE-MARKER FLAG (wave 2b close final — the render-laundering class): true only when the
+  // marker's AST content consists EXCLUSIVELY of `text` and `inlineCode` nodes — the only node
+  // kinds whose rendered output provably equals their scanned text. Anything else (images, links,
+  // footnote references, emphasis/strong, html, breaks — any node kind, known or not) makes the
+  // marker non-pure: legal MDX, but the claim can NEVER be canonically checkable, because the
+  // reader may see content the scan cannot vouch for. Fail-closed by structure, no enumeration.
+  pureText: boolean;
 };
 
 // Typed scan errors: the kernel (anchor-ledger) classifies placement errors as repair-eligible and
@@ -37,6 +44,7 @@ export type MarkerScanErrorCode =
   | 'marker-in-heading'
   | 'marker-in-expression'
   | 'marker-expression'
+  | 'marker-jsx'
   | 'marker-missing-id'
   | 'marker-invalid-id'
   | 'marker-empty'
@@ -98,6 +106,23 @@ const containsMdxExpression = (node: ScanNode): boolean =>
   node.type === 'mdxTextExpression' || node.type === 'mdxFlowExpression'
     ? true
     : ((node.children ?? []) as ScanNode[]).some(containsMdxExpression);
+
+// A marker containing ANY JSX element is invalid outright (wave 2b close final): a component
+// renders arbitrary content — <Badge label="greet does not exist.">greet exists.</Badge> can
+// render its prop text, the opposite of its scanned children — so no scan of the children can
+// vouch for what the reader sees. Same treatment as MDX expressions: repair error in-session,
+// kernel-invariant breach post-acceptance.
+// Nested <Claim> elements are excluded ONLY because they carry their own precise error
+// ('marker-nested', reported by the visitor) — they are still rejected, just with the right code.
+const containsJsxElement = (node: ScanNode): boolean =>
+  (node.type === 'mdxJsxTextElement' || node.type === 'mdxJsxFlowElement') && node.name !== 'Claim'
+    ? true
+    : ((node.children ?? []) as ScanNode[]).some(containsJsxElement);
+
+// The only node kinds whose rendered output provably equals their scanned text. Both are leaves,
+// so checking the marker's direct children fully determines subtree purity; every other kind —
+// including kinds that do not exist yet — fails closed into pureText: false.
+const isPureTextNode = (node: ScanNode): boolean => node.type === 'text' || node.type === 'inlineCode';
 
 // AST-based scan for inline <Claim id="…">…</Claim> markers. Only an mdxJsxTextElement in
 // translatable content is a marker: literal <Claim> text inside fenced/inline code is plain text
@@ -162,6 +187,17 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       });
       return;
     }
+    if (children.some(containsJsxElement)) {
+      errors.push({
+        code: 'marker-jsx',
+        markerId,
+        message:
+          `marker "${markerId}" contains a JSX element — a component renders arbitrary content (its props, not ` +
+          'its children), so the visible assertion and the checked assertion could differ; write the asserted ' +
+          'prose literally inside the marker, move the component outside it, and resubmit'
+      });
+      return;
+    }
     const contentStart = children[0]?.position?.start?.offset;
     const contentEnd = children[children.length - 1]?.position?.end?.offset;
     const innerMdx = contentStart === undefined || contentEnd === undefined ? '' : mdx.slice(contentStart, contentEnd);
@@ -172,7 +208,13 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
         message: `marker "${markerId}" wraps no prose — a marker must wrap the asserted sentence text: <Claim id="${markerId}">text</Claim>, never be empty or self-closing`
       });
     }
-    markers.push({ markerId, offset, innerMdx, visibleText: children.map(visibleTextOf).join('') });
+    markers.push({
+      markerId,
+      offset,
+      innerMdx,
+      visibleText: children.map(visibleTextOf).join(''),
+      pureText: children.every(isPureTextNode)
+    });
   };
 
   const visit = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean }): void => {

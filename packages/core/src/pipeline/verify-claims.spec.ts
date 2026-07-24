@@ -580,6 +580,44 @@ describe('verifyClaims — subject binding (impl-09 finding 1, defense in depth)
   });
 });
 
+// PURE-MARKER PRECONDITION (wave 2b close final — the render-laundering class): submit_page's
+// scanner computes pureText and anchoring threads it; verification is the enforcement point, so a
+// replayed/scripted writer reaching it with a non-pure marker must find the same wall. Tampering
+// pureText post-anchoring simulates exactly that bypass.
+const tamperPure = (
+  anchoredResult: Extract<AnchorLedgerResult, { ok: true }>
+): Extract<AnchorLedgerResult, { ok: true }> => ({
+  ...anchoredResult,
+  anchored: anchoredResult.anchored.map((entry, index) => (index === 0 ? { ...entry, pureText: false } : entry))
+});
+
+describe('verifyClaims — pure-marker precondition (render laundering, defense in depth)', () => {
+  it('a non-pure marker with EXACT canonical existence text mints NO grounding evidence — unchecked, journaled', async () => {
+    const anchoredResult = anchorFixture([
+      {
+        markerId: 'e1',
+        class: 'code-structure',
+        predicate: 'DEFAULT_RETRIES exists',
+        proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+        proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+      }
+    ]);
+    const result = await verify(tamperPure(anchoredResult));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('not pure text + inline code'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it('a non-pure marker with EXACT canonical value text mints NO value evidence — never checked or contradicted', async () => {
+    const result = await verify(tamperPure(anchorFixture([valueDraft('3')])));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('not pure text + inline code'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+});
+
 // POLARITY AGREEMENT + negated predicates (wave 2b close, polarity finding): root-token presence
 // is not prose/predicate agreement, and presence evidence never decides an absence claim.
 describe('verifyClaims — polarity agreement and negative assertions', () => {

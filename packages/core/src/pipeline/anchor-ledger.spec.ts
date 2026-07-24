@@ -662,6 +662,68 @@ More text <Claim id="c1">second assertion.</Claim>
     expect(result.errors.some((issue) => issue.code === 'marker-scan-invalid' && issue.kernel)).toBe(true);
   });
 
+  it('re-checks the JSX prohibition: a component inside a marker post-acceptance is a kernel breach', () => {
+    // submit_page rejects markers containing JSX elements in-session ('marker-jsx' — components
+    // render arbitrary content, e.g. prop text contradicting the scanned children), so one in the
+    // anchoring input means the MDX was altered after acceptance.
+    const acceptedMdx = `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n`;
+    const alteredMdx = `# Title\n\nText <Claim id="c1"><Badge label="retries defaults to 9.">\`retries\` defaults to 3.</Badge></Claim>\n`;
+    const page = extractPageEntity({ mdx: acceptedMdx, slug: 'h' });
+    const result = anchorWriterLedger({
+      mdx: alteredMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(
+      result.errors.some(
+        (issue) => issue.code === 'marker-scan-invalid' && issue.kernel && issue.message.includes('marker-jsx')
+      )
+    ).toBe(true);
+  });
+
+  it('threads the kernel-scanned pureText flag and hints non-pure markers as destined unchecked', () => {
+    // The image alt text IS the canonical assertion — but the reader sees a picture. Legal MDX,
+    // no repair error: the claim anchors with pureText: false and a non-blocking hint; the
+    // verification stage is what refuses existence/value evidence for it.
+    const probeMdx = `# Title\n\nText <Claim id="p10">![retries exists.](retries.png)</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p10',
+          class: 'code-structure',
+          predicate: 'retries exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    const ok = expectOk(result);
+    expect(ok.anchored[0]?.pureText).toBe(false);
+    expect(ok.warnings.some((warning) => warning.includes('destined to ship UNCHECKED'))).toBe(true);
+    // A pure marker threads true (the c1 fixture claim is plain prose + inline code).
+    const pure = expectOk(
+      anchorWriterLedger(
+        anchorInput([draft('c1'), draft('c2', { class: 'intent-history', proposedSubscriptions: [] })])
+      )
+    );
+    expect(pure.anchored.every((entry) => entry.pureText)).toBe(true);
+  });
+
   it('re-checks the MDX-expression prohibition: an expression inside a marker post-acceptance is a kernel breach', () => {
     // submit_page rejects markers containing {…} expressions in-session ('marker-expression'), so
     // one appearing in the anchoring input means the MDX was altered after acceptance — a kernel
