@@ -164,10 +164,11 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
       const resolved = candidateSymbols
         .map((hash) => symbolByHash.get(hash))
         .filter((record): record is SymbolRecord => record !== undefined);
-      // SUBJECT BINDING re-check (impl-09 finding 1, defense in depth behind anchoring): grounding
-      // may only mint from a symbol the visible prose or predicate actually NAMES — otherwise
-      // "`inventedFunction` exists" would launder through any real symbol's hash. Resolved but
-      // unbound symbols mint nothing; the claim stays unchecked with a journaled warning.
+      // SUBJECT BINDING re-check (impl-09 finding 1 + impl-10 finding 1, defense in depth behind
+      // anchoring): grounding may only mint from a symbol BOTH the visible prose AND the predicate
+      // actually NAME — otherwise "`inventedFunction` exists" would launder through any real
+      // symbol's hash (including via a predicate the reader never sees). Resolved but unbound
+      // symbols mint nothing; the claim stays unchecked with a journaled warning.
       const grounded = resolved.find(
         (record) =>
           bindClaimSubject({ subjectName: record.name, markerText: entry.visibleText, predicate: claim.predicate }).ok
@@ -176,7 +177,7 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         warnings.push(
           `claim "${entry.markerId}": grounding symbol ${resolved
             .map((record) => `"${record.name}"`)
-            .join(', ')} resolved but is never named by the visible prose ("${entry.visibleText}") or the ` +
+            .join(', ')} resolved but is not named by BOTH the visible prose ("${entry.visibleText}") AND the ` +
             'predicate (subject-unbound) — no grounding evidence minted; the claim stays unchecked'
         );
       }
@@ -254,10 +255,12 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         }
         const symbol = symbolByHash.get(subscription.symbolHash as string);
         if (symbol !== undefined) {
-          // SUBJECT BINDING re-check (impl-09 finding 1): the value comparison may only run when
-          // the prose/predicate names the subject the subscription points at (the codemap record's
-          // name or a valueName path segment) — otherwise "`INVENTED_DEFAULT` is 3" would launder
-          // through any real value that happens to equal 3. No evidence minted; warning journaled.
+          // SUBJECT BINDING re-check (impl-09 finding 1, tightened by impl-10 findings 1+2): the
+          // value comparison may only run when BOTH the visible prose AND the predicate name the
+          // subject's ROOT identifier (the codemap record's name — a valueName path segment never
+          // substitutes) — otherwise "`INVENTED_DEFAULT` is 3" would launder through any real
+          // value that happens to equal 3, and a common leaf like 'config' would bind unrelated
+          // values. No evidence minted; warning journaled.
           const subjectBinding = bindClaimSubject({
             subjectName: symbol.name,
             valueNames: [subscription.valueName],
@@ -268,8 +271,8 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             unresolvable = true;
             warnings.push(
               `claim "${entry.markerId}": the cited value "${subscription.valueName}" points at symbol ` +
-                `"${symbol.name}", but neither the visible prose ("${entry.visibleText}") nor the predicate names ` +
-                'it (subject-unbound) — no value evidence minted; the claim stays unchecked'
+                `"${symbol.name}", but the visible prose ("${entry.visibleText}") and the predicate do not BOTH ` +
+                'name it (subject-unbound) — no value evidence minted; the claim stays unchecked'
             );
             continue;
           }

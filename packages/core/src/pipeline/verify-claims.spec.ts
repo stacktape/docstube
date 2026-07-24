@@ -14,6 +14,7 @@ const COMMIT = 'f'.repeat(40);
 const KNOWN_SYMBOL = `ts:${'1'.repeat(64)}`;
 const UNKNOWN_SYMBOL = `ts:${'2'.repeat(64)}`;
 const RETRY_SYMBOL = `ts:${'4'.repeat(64)}`;
+const MODE_SYMBOL = `ts:${'6'.repeat(64)}`;
 const PRINT = '3'.repeat(64);
 const READ_HASH = '5'.repeat(64);
 
@@ -30,10 +31,11 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
       symbolHash: KNOWN_SYMBOL,
       signaturePrint: PRINT,
       // 'mode' anchors but never resolves on disk; GONE anchors but is not spelled by any marker.
-      valuePrints: { DEFAULT_RETRIES: sha256Hex('3'), MODE: sha256Hex('"linear"'), GONE: PRINT, mode: PRINT },
+      valuePrints: { DEFAULT_RETRIES: sha256Hex('3'), GONE: PRINT, mode: PRINT },
       bodyPrint: PRINT
     },
-    { symbolHash: RETRY_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT }
+    { symbolHash: RETRY_SYMBOL, signaturePrint: PRINT, valuePrints: {}, bodyPrint: PRINT },
+    { symbolHash: MODE_SYMBOL, signaturePrint: PRINT, valuePrints: { MODE: sha256Hex('"linear"') }, bodyPrint: PRINT }
   ],
   unparsedFiles: []
 });
@@ -44,7 +46,10 @@ const codemap: Codemap = codemapSchema.parse({
   symbols: [
     { hash: KNOWN_SYMBOL, lang: 'ts', kind: 'variable', name: 'DEFAULT_RETRIES', file: 'src/retry.ts', span: [1, 1] },
     // Behavior fixtures subject-bind through this record: the prose says `retry`.
-    { hash: RETRY_SYMBOL, lang: 'ts', kind: 'function', name: 'retry', file: 'src/retry.ts', span: [3, 4] }
+    { hash: RETRY_SYMBOL, lang: 'ts', kind: 'function', name: 'retry', file: 'src/retry.ts', span: [3, 4] },
+    // The MODE value claim binds through its OWN symbol record (value names root at the owning
+    // symbol — the root identifier must appear in prose and predicate, impl-10 finding 2).
+    { hash: MODE_SYMBOL, lang: 'ts', kind: 'variable', name: 'MODE', file: 'src/retry.ts', span: [2, 2] }
   ]
 });
 
@@ -66,7 +71,7 @@ title: "Retry"
 
 Prose first. <Claim id="b1">\`retry\` retries the call.</Claim>
 
-<Claim id="s1">\`mode\` defaults to "3" (a string).</Claim>
+<Claim id="s1">\`DEFAULT_RETRIES\` defaults to "3" (a string).</Claim>
 
 ## Other
 
@@ -261,11 +266,11 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
         {
           markerId: 's1',
           class: 'value',
-          predicate: 'the mode option defaults to the string "3"',
+          predicate: 'the DEFAULT_RETRIES mode option defaults to the string "3"',
           proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
           proposedSubscriptions: [
-            // 'mode' subject-binds through the s1 prose ("`mode` defaults to …") and anchors
-            // against the snapshot, but never resolves on disk.
+            // The root DEFAULT_RETRIES subject-binds through the s1 prose and predicate; the
+            // 'mode' value name anchors against the snapshot but never resolves on disk.
             { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'mode', citedValue: '"3"' }
           ]
         }
@@ -286,9 +291,9 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
           markerId: 'm1',
           class: 'value',
           predicate: 'MODE defaults to linear',
-          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedEvidence: [{ kind: 'symbol', symbol: MODE_SYMBOL }],
           proposedSubscriptions: [
-            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'MODE', citedValue: 'linear' }
+            { kind: 'cited-value', symbolHash: MODE_SYMBOL, valueName: 'MODE', citedValue: 'linear' }
           ]
         }
       ])
@@ -446,10 +451,54 @@ describe('verifyClaims — subject binding (impl-09 finding 1, defense in depth)
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
   });
 
+  it("Sol impl-10 probe: predicate-only occurrence ('greet exists'-style) mints NO grounding evidence", async () => {
+    // The predicate quietly names the REAL symbol; the VISIBLE prose asserts a hallucinated one.
+    // Readers never see the predicate — the both-sides rule refuses to mint (impl-10 finding 1).
+    const anchoredResult = anchorFixture([
+      {
+        markerId: 'v1',
+        class: 'code-structure',
+        predicate: 'DEFAULT_RETRIES exists',
+        proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+        proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+      }
+    ]);
+    const result = await verify(tamper(anchoredResult, '`inventedFunction` exists.', 'DEFAULT_RETRIES exists'));
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('subject-unbound'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
   it("Sol probe 2: '`INVENTED_DEFAULT` is 3' against an equal-valued real name mints NO value evidence", async () => {
     // Scalar binding alone passes (3 appears in both texts) — the subject rule is what refuses.
     const result = await verify(
       tamper(anchorFixture([valueDraft('3')]), '`INVENTED_DEFAULT` is 3.', 'INVENTED_DEFAULT is 3')
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('subject-unbound'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it('Sol impl-10 common-leaf probe: a value-path leaf named on both sides never substitutes for the root', async () => {
+    // Both sides spell the leaf 'mode', but the subject's root identifier (the codemap record
+    // name DEFAULT_RETRIES) appears nowhere — the common leaf must not launder the comparison.
+    const result = await verify(
+      tamper(
+        anchorFixture([
+          {
+            markerId: 's1',
+            class: 'value',
+            predicate: 'the DEFAULT_RETRIES mode option defaults to the string "3"',
+            proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+            proposedSubscriptions: [
+              { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'mode', citedValue: '"3"' }
+            ]
+          }
+        ]),
+        'the `mode` option defaults to "3".',
+        'the mode option defaults to the string "3"'
+      )
     );
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });

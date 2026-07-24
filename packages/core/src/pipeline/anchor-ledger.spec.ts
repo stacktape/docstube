@@ -370,6 +370,38 @@ More text <Claim id="c1">second assertion.</Claim>
     expect(result.errors[0]?.message).toContain('inventedFunction');
   });
 
+  it("REJECTS Sol's impl-10 probe: predicate-only occurrence — visible prose asserts a subject the evidence never proves", () => {
+    // The predicate quietly names the REAL symbol ('retries'), but the VISIBLE prose asserts
+    // 'inventedFunction exists'. Readers never see the predicate, so a predicate-only occurrence
+    // is laundering: the root identifier must occur in the visible marker text AND the predicate.
+    const probeMdx = `# Title\n\nText <Claim id="p1">\`inventedFunction\` exists.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p1',
+          class: 'code-structure',
+          predicate: 'retries exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors[0]).toMatchObject({ code: 'subject-unbound', kernel: false, markerId: 'p1' });
+    expect(result.errors[0]?.message).toContain('visible prose');
+    expect(result.errors[0]?.message).toContain('inventedFunction');
+  });
+
   it("REJECTS Sol's subject probe 2: '`INVENTED_DEFAULT` is 3' against an unrelated equal-valued name", () => {
     // The cited value resolves and equals 3 — scalar binding alone would pass. The subject rule
     // rejects it: neither the record name nor any valueName segment is spelled by the sentence.
@@ -400,6 +432,40 @@ More text <Claim id="c1">second assertion.</Claim>
     }
     expect(result.errors.every((issue) => issue.code === 'subject-unbound')).toBe(true);
     expect(result.errors.some((issue) => issue.message.includes('"DEFAULT_RETRIES"'))).toBe(true);
+  });
+
+  it("REJECTS Sol's impl-10 common-leaf probe: a valueName segment named on both sides never substitutes for the root", () => {
+    // Both sides spell the value-path leaf 'DEFAULT_RETRIES', but the subject's root identifier
+    // (the codemap record name 'retries') appears nowhere — a common leaf must not launder the
+    // claim onto an unrelated symbol.
+    const probeMdx = `# Title\n\nText <Claim id="p3">\`DEFAULT_RETRIES\` is 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p3',
+          class: 'value',
+          predicate: 'DEFAULT_RETRIES is 3',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [
+            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'DEFAULT_RETRIES', citedValue: '3' }
+          ]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.errors.every((issue) => issue.code === 'subject-unbound')).toBe(true);
+    expect(result.errors[0]?.message).toContain('"retries"');
+    expect(result.errors[0]?.message).toContain('never substitutes for the root');
   });
 
   it('keeps genuine aliasing passing: prose names the codemap record name, not the proposal text', () => {

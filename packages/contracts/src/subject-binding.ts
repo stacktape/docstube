@@ -1,22 +1,29 @@
-// SUBJECT BINDING — the deterministic prose↔evidence subject rule (impl-09 finding 1), sibling of
-// cited-value-binding. It closes the last laundering route: evidence may only mint when the
-// claim's VISIBLE prose (or its predicate) actually names the subject the evidence points at.
-// Without it, "`inventedFunction` exists" could ride an unrelated real symbol's hash into
-// 'checked', and "`INVENTED_DEFAULT` is 3" could launder through any real value that happens to
-// equal 3 — scalar binding succeeds, and verification would trust whichever proposed symbol/value
-// name resolves.
+// SUBJECT BINDING — the deterministic prose↔evidence subject rule (impl-09 finding 1, tightened
+// by impl-10 findings 1+2), sibling of cited-value-binding. It closes the laundering routes:
+// evidence may only mint when the claim's subject is named by BOTH the VISIBLE prose the reader
+// sees AND the predicate the ledger asserts. Without it, "`inventedFunction` exists" could ride an
+// unrelated real symbol's hash into 'checked' (prose-side laundering), a predicate that quietly
+// names the real symbol could carry visibly false prose (predicate-side laundering — the reader
+// never sees the predicate), and a common value-path leaf like 'config' could bind unrelated
+// values ("the Vite `config`" riding configFileNames.config).
 //
-// THE RULE (deterministic, shared verbatim by anchoring and claim verification):
-//   - The bindable subject names are the CODEMAP RECORD's display name for the referenced symbol
-//     (never the writer's own proposal text — genuine aliasing like prose `createClient` against
-//     the codemap symbol createClient keeps passing), plus, for value-predicate evidence, every
-//     IDENTIFIER SEGMENT of the cited-value name path ('retryDefaults.backoff.factor' offers
-//     retryDefaults, backoff, and the leaf factor; the structural grammar keywords 'param' and
-//     'default' are NEVER bindable — "the default is 3" must not bind X.param.retries.default).
-//   - The claim is subject-bound when AT LEAST ONE bindable name occurs as an IDENTIFIER TOKEN
+// THE RULE (deterministic, shared verbatim by anchoring and claim verification — the same
+// both-sides shape as the scalar rule in cited-value-binding):
+//   - The MANDATORY bindable name is the ROOT IDENTIFIER: the CODEMAP RECORD's display name for
+//     the referenced symbol (never the writer's own proposal text — genuine aliasing like prose
+//     `createClient` against the codemap symbol createClient keeps passing). Cited-value name
+//     paths are rooted at this same identifier ('retryDefaults.backoff.factor' roots at
+//     retryDefaults).
+//   - The claim is subject-bound ONLY when the root identifier occurs as an IDENTIFIER TOKEN
 //     (verbatim, case-sensitive, delimited by non-identifier characters on both sides) in the
-//     marker's visible text OR in the predicate. Backticks, quotes, dots, parentheses, and
-//     sentence punctuation all delimit; 'retry' never binds inside 'retries' or 'retryCount'.
+//     marker's VISIBLE text AND in the predicate. Either side alone is laundering: predicate-only
+//     occurrence mints evidence for a subject the reader never sees; visible-only occurrence lets
+//     the ledger assert a different subject than the prose shows. Backticks, quotes, dots,
+//     parentheses, and sentence punctuation all delimit; 'retry' never binds inside 'retries'.
+//   - The non-root IDENTIFIER SEGMENTS of a cited-value name path (backoff, factor — never the
+//     structural grammar keywords 'param' and 'default') are additional CONTEXT the writer may
+//     also name, but they can NEVER substitute for the root: common leaf words ('config', 'mode',
+//     'default') occur across unrelated values, so a segment-only occurrence is rejected.
 //
 // Enforcement is two-layered: anchoring rejects with the repair-eligible 'subject-unbound' error
 // (the writer fixes the prose or drops the wrong symbol); verification re-checks the same rule
@@ -52,7 +59,8 @@ const VALUE_NAME_GRAMMAR_KEYWORDS = new Set(['param', 'default']);
 
 const IDENTIFIER_SEGMENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-// The identifier segments of a cited-value name path that may bind the subject.
+// The identifier segments of a cited-value name path — CONTEXT names for repair messages. They
+// never bind on their own (impl-10 finding 2): only the root identifier gates.
 export const valueNameBindableSegments = (valueName: string): string[] =>
   valueName
     .split('.')
@@ -60,10 +68,10 @@ export const valueNameBindableSegments = (valueName: string): string[] =>
 
 export type SubjectBindingInput = {
   // The codemap record's display name for the symbol the evidence points at — resolved by the
-  // kernel, never taken from writer output.
+  // kernel, never taken from writer output. This is the MANDATORY root identifier.
   subjectName: string;
-  // For value claims: the cited-value name paths subscribed on this symbol; their identifier
-  // segments extend the bindable name set (root identifier or leaf path segment both bind).
+  // For value claims: the cited-value name paths subscribed on this symbol. Their identifier
+  // segments are context for repair messages only — they cannot substitute for the root.
   valueNames?: string[] | undefined;
   // AST-derived rendered text of the inline marker (link URLs/attributes excluded).
   markerText: string;
@@ -75,18 +83,29 @@ export type SubjectBindingResult =
   | { ok: true; boundName: string }
   | {
       ok: false;
-      // Every name that WOULD have bound — repair messages list them so the writer knows what the
-      // sentence must actually say.
-      candidates: string[];
+      // The mandatory root identifier that failed to bind — repair messages demand it verbatim.
+      requiredName: string;
+      // The side(s) that never name the root: both must, so either entry alone fails the claim.
+      missingIn: Array<'marker' | 'predicate'>;
+      // Non-root cited-value path segments — listed as context in repair messages; naming them
+      // never substitutes for naming the root.
+      contextSegments: string[];
     };
 
 export const bindClaimSubject = (input: SubjectBindingInput): SubjectBindingResult => {
-  const candidates = [
-    input.subjectName,
-    ...(input.valueNames ?? []).flatMap((valueName) => valueNameBindableSegments(valueName))
-  ].filter((name, index, all) => name !== '' && all.indexOf(name) === index);
-  const boundName = candidates.find(
-    (name) => identifierOccursAsToken(name, input.markerText) || identifierOccursAsToken(name, input.predicate)
-  );
-  return boundName === undefined ? { ok: false, candidates } : { ok: true, boundName };
+  const root = input.subjectName;
+  const missingIn: Array<'marker' | 'predicate'> = [];
+  if (!identifierOccursAsToken(root, input.markerText)) {
+    missingIn.push('marker');
+  }
+  if (!identifierOccursAsToken(root, input.predicate)) {
+    missingIn.push('predicate');
+  }
+  if (missingIn.length === 0) {
+    return { ok: true, boundName: root };
+  }
+  const contextSegments = (input.valueNames ?? [])
+    .flatMap((valueName) => valueNameBindableSegments(valueName))
+    .filter((name, index, all) => name !== root && name !== '' && all.indexOf(name) === index);
+  return { ok: false, requiredName: root, missingIn, contextSegments };
 };

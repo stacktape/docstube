@@ -65,7 +65,7 @@ export type AnchorIssueCode =
   | 'marker-missing' // ledger claim whose marker is absent from the accepted MDX
   | 'marker-duplicate' // the same marker id appears more than once in the accepted MDX
   | 'marker-unclaimed' // marker with no ledger entry — an unclaimed assertion shrinks nothing silently
-  | 'subject-unbound' // neither the visible prose nor the predicate names the referenced symbol
+  | 'subject-unbound' // the visible prose or the predicate fails to name the referenced symbol's root identifier
   | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
   // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
   // post-acceptance means the MDX was altered after acceptance — a kernel bug, never repairable.
@@ -334,16 +334,18 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
   return records;
 };
 
-// SUBJECT BINDING at anchoring (impl-09 finding 1): every symbol the claim references that
-// RESOLVES in the codemap must be named — as an identifier token — by the visible marker prose or
-// the predicate. The comparison uses the CODEMAP record's display name (plus the cited-value name
-// path segments for value subscriptions), never the writer's proposal text, so genuine aliasing
-// keeps passing while "`inventedFunction` exists" can no longer ride an unrelated real symbol.
-// Repair-eligible: the writer fixes the prose or drops the wrong symbol. Verification re-checks
-// the same rule (defense in depth) and refuses to mint evidence on violation.
+// SUBJECT BINDING at anchoring (impl-09 finding 1, tightened by impl-10 findings 1+2): every
+// symbol the claim references that RESOLVES in the codemap must be named — as an identifier token
+// — by the visible marker prose AND the predicate, using the CODEMAP record's display name (the
+// subject's ROOT identifier), never the writer's proposal text. Genuine aliasing keeps passing;
+// "`inventedFunction` exists" can no longer ride an unrelated real symbol, a predicate-only
+// occurrence can no longer launder visibly false prose, and a common cited-value leaf ('config')
+// can no longer substitute for the root. Repair-eligible: the writer fixes the prose or drops the
+// wrong symbol. Verification re-checks the same rule (defense in depth) and refuses to mint
+// evidence on violation.
 const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: Codemap): AnchorIssue[] => {
-  // Cited-value name paths per symbol: their identifier segments extend the bindable name set for
-  // EVERY reference to that symbol on this claim (the subject of a value claim is the value).
+  // Cited-value name paths per symbol: their non-root identifier segments are context for the
+  // repair message — they never substitute for the root identifier.
   const valueNamesByHash = new Map<string, string[]>();
   for (const subscription of draft.proposedSubscriptions) {
     if (subscription.kind === 'cited-value') {
@@ -377,6 +379,11 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
       predicate: draft.predicate
     });
     if (!binding.ok) {
+      const missingSides = binding.missingIn
+        .map((side) =>
+          side === 'marker' ? `the visible prose ("${visibleText}")` : `the predicate ("${draft.predicate}")`
+        )
+        .join(' and ');
       issues.push({
         code: 'subject-unbound',
         kernel: false,
@@ -384,9 +391,17 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
         message:
           `claim "${draft.markerId}" is SUBJECT-UNBOUND — its evidence points at the symbol "${record.name}"` +
           `${valueNames.length === 0 ? '' : ` (cited value ${valueNames.map((name) => `"${name}"`).join(', ')})`}, ` +
-          `but neither the visible prose ("${visibleText}") nor the predicate ("${draft.predicate}") names ` +
-          `${binding.candidates.map((name) => `"${name}"`).join(' or ')} as an identifier. ` +
-          'Name the real subject in the wrapped sentence (or the predicate), or drop/replace the wrong symbol reference'
+          `but ${missingSides} never name${binding.missingIn.length === 1 ? 's' : ''} "${binding.requiredName}" ` +
+          "as an identifier. The subject's root identifier must appear in BOTH the wrapped sentence AND the " +
+          'predicate' +
+          `${
+            binding.contextSegments.length === 0
+              ? ''
+              : ` — naming only a value-path segment (${binding.contextSegments
+                  .map((name) => `"${name}"`)
+                  .join(', ')}) never substitutes for the root`
+          }. ` +
+          'Name the real subject on both sides, or drop/replace the wrong symbol reference'
       });
     }
   }

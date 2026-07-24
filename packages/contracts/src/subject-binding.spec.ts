@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { bindClaimSubject, identifierOccursAsToken, valueNameBindableSegments } from './subject-binding.ts';
 
-// Subject binding (impl-09 finding 1): evidence may only mint when the visible prose or the
-// predicate names the subject the evidence points at — as an identifier token, case-sensitive,
-// compared against the CODEMAP record's name (plus the cited-value path segments for values).
+// Subject binding (impl-09 finding 1, tightened by impl-10 findings 1+2): evidence may only mint
+// when BOTH the visible prose AND the predicate name the subject's ROOT identifier — as an
+// identifier token, case-sensitive, compared against the CODEMAP record's name. Cited-value path
+// segments are context only; they never substitute for the root.
 
 describe('identifierOccursAsToken', () => {
   it('matches a delimited identifier: backticks, quotes, dots, parens, punctuation all bound it', () => {
@@ -43,14 +44,38 @@ describe('valueNameBindableSegments', () => {
 });
 
 describe('bindClaimSubject', () => {
-  it("REJECTS Sol's probe 1: 'inventedFunction exists' against an unrelated real symbol", () => {
+  it("REJECTS Sol's probe 1: 'inventedFunction exists' on both sides against an unrelated real symbol", () => {
     const result = bindClaimSubject({
       subjectName: 'greet',
       markerText: '`inventedFunction` exists.',
       predicate: 'inventedFunction exists'
     });
     expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.candidates).toEqual(['greet']);
+    expect(result.ok ? undefined : result.requiredName).toBe('greet');
+    expect(result.ok ? [] : result.missingIn).toEqual(['marker', 'predicate']);
+  });
+
+  it("REJECTS Sol's impl-10 probe: predicate-only occurrence is laundering — readers never see the predicate", () => {
+    // Visible prose asserts 'inventedFunction exists'; the predicate quietly names the REAL
+    // symbol greet. Under the old either-side rule this minted 'checked' for a visibly false
+    // sentence. The both-sides rule rejects: the root must occur in the VISIBLE text too.
+    const result = bindClaimSubject({
+      subjectName: 'greet',
+      markerText: '`inventedFunction` exists.',
+      predicate: 'greet exists'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.missingIn).toEqual(['marker']);
+  });
+
+  it('REJECTS visible-only occurrence: the predicate must restate the subject it asserts about', () => {
+    const result = bindClaimSubject({
+      subjectName: 'greet',
+      markerText: '`greet` exists.',
+      predicate: 'the function exists'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.missingIn).toEqual(['predicate']);
   });
 
   it("REJECTS Sol's probe 2: 'INVENTED_DEFAULT is 3' against an unrelated equal-valued name", () => {
@@ -75,17 +100,36 @@ describe('bindClaimSubject', () => {
     ).toEqual({ ok: true, boundName: 'createClient' });
   });
 
-  it('binds a value claim through any identifier segment of the valueName path', () => {
-    // Root identifier named.
+  it('a value claim binds when the ROOT identifier appears on both sides — segments are extra context', () => {
+    // Legitimate case (impl-10 finding 2): the prose names retryDefaults (the root) and factor
+    // (a segment); the predicate's dotted path contains the root as a token (dots delimit).
     expect(
       bindClaimSubject({
         subjectName: 'retryDefaults',
         valueNames: ['retryDefaults.backoff.factor'],
-        markerText: '`retryDefaults` uses exponential backoff.',
-        predicate: 'the backoff factor defaults to 2'
-      }).ok
-    ).toBe(true);
-    // Only the leaf path segment named — still bound.
+        markerText: '`retryDefaults` uses an exponential backoff `factor` of 2.',
+        predicate: 'retryDefaults.backoff.factor is 2'
+      })
+    ).toEqual({ ok: true, boundName: 'retryDefaults' });
+  });
+
+  it("REJECTS common-leaf laundering — Sol's impl-10 probe: 'config' must not bind configFileNames.config", () => {
+    // A false "The Vite `config` is docstube.yml" claim rode the unrelated configFileNames.config
+    // value solely through the common leaf 'config'. Segments never substitute for the root.
+    const result = bindClaimSubject({
+      subjectName: 'configFileNames',
+      valueNames: ['configFileNames.config'],
+      markerText: 'The Vite `config` is `docstube.yml`.',
+      predicate: 'config is docstube.yml'
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? undefined : result.requiredName).toBe('configFileNames');
+    expect(result.ok ? [] : result.missingIn).toEqual(['marker', 'predicate']);
+    expect(result.ok ? [] : result.contextSegments).toEqual(['config']);
+  });
+
+  it('REJECTS a leaf-segment-only occurrence even when both sides name the leaf', () => {
+    // The old rule accepted this; naming only 'factor' leaves the actual subject unnamed.
     expect(
       bindClaimSubject({
         subjectName: 'retryDefaults',
@@ -93,33 +137,18 @@ describe('bindClaimSubject', () => {
         markerText: 'the `factor` option defaults to 2.',
         predicate: 'factor defaults to 2'
       }).ok
-    ).toBe(true);
-    // A parameter-default path binds through the parameter name, not through 'default'.
-    expect(
-      bindClaimSubject({
-        subjectName: 'createClient',
-        valueNames: ['createClient.param.retries.default'],
-        markerText: '`retries` defaults to 3.',
-        predicate: 'the retries option defaults to 3'
-      }).ok
-    ).toBe(true);
-    expect(
-      bindClaimSubject({
-        subjectName: 'createClient',
-        valueNames: ['createClient.param.retries.default'],
-        markerText: 'the default is 3.',
-        predicate: 'the default is 3'
-      }).ok
     ).toBe(false);
   });
 
-  it('binds through either side: marker text OR predicate suffices', () => {
-    expect(
-      bindClaimSubject({
-        subjectName: 'greet',
-        markerText: 'The greeting helper exists.',
-        predicate: 'greet exists'
-      }).ok
-    ).toBe(true);
+  it("never binds through the structural grammar keywords 'param' and 'default'", () => {
+    const result = bindClaimSubject({
+      subjectName: 'createClient',
+      valueNames: ['createClient.param.retries.default'],
+      markerText: 'the default is 3.',
+      predicate: 'the default is 3'
+    });
+    expect(result.ok).toBe(false);
+    // 'param' and 'default' never even appear as context segments.
+    expect(result.ok ? [] : result.contextSegments).toEqual(['retries']);
   });
 });
