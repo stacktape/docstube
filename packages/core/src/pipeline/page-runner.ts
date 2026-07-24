@@ -14,7 +14,7 @@ import type {
   ToolDescriptor,
   Transcript
 } from '@docstube/contracts';
-import { hashValue, idPrefixes, mintId } from '@docstube/contracts';
+import { contentHash, contentHashSchema, hashValue, idPrefixes, mintId } from '@docstube/contracts';
 import type { AgentTaskSpec } from '@docstube/contracts';
 import type { ConfigFamily } from '../config/config-io.ts';
 import { CoreError } from '../errors.ts';
@@ -491,7 +491,13 @@ export const generatePage = async (
           version: ctx.version
         },
         // The prior shard byte-for-byte, plus the rejection flag and any new writer questions.
-        shard: { ...previousShard, flags: [...previousShard.flags, ...questionFlags, rejectionFlag] },
+        // The binding hash is (re)minted from the retained MDX bytes so a pre-hash prior shard
+        // still binds to the exact prose it ships with.
+        shard: {
+          ...previousShard,
+          mdxContentHash: contentHashSchema.parse(contentHash(priorMdx)),
+          flags: [...previousShard.flags, ...questionFlags, rejectionFlag]
+        },
         ...(previousShard.ledger === undefined ? {} : { ledger: previousShard.ledger }),
         ...(previousShard.provenance === undefined ? {} : { provenance: previousShard.provenance }),
         retainedPrior: true
@@ -511,6 +517,9 @@ export const generatePage = async (
     sourceCommit: ctx.commit,
     generatedAt: new Date().toISOString(),
     page: finalArtifact.page,
+    // MDX↔shard binding: the content hash of the exact final artifact bytes the callers persist.
+    // Emission refuses to render trust state over MDX that no longer matches this hash.
+    mdxContentHash: contentHashSchema.parse(contentHash(finalArtifact.mdx)),
     ...(candidate.ledger === undefined || candidate.provenance === undefined
       ? {}
       : { ledger: candidate.ledger, provenance: candidate.provenance }),

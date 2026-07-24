@@ -59,8 +59,9 @@ export type AnchoredClaim = {
   // binding proves the asserted scalar against, identically to submit_page (impl-07 finding 1).
   visibleText: string;
   // Kernel-scanned pure-marker flag (wave 2b close final): true only when the marker's AST
-  // content is exclusively text + inlineCode nodes. Non-pure markers can never be canonically
-  // checkable — verification skips existence/value evidence for them entirely.
+  // content is exclusively text + inlineCode nodes AND the marker has no JSX ancestor (a claim
+  // inside a component is legal but its rendering is component-owned). Non-pure markers can never
+  // be canonically checkable — verification skips existence/value evidence for them entirely.
   pureText: boolean;
 };
 

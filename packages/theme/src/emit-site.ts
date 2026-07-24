@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
-import { projectShardProof } from './proof-projection.ts';
+import { checkShardMdxBinding, projectShardProof, projectUnboundShardProof } from './proof-projection.ts';
 import type { ThemeConflict } from './apply-theme-bundle.ts';
 import { docsMcpReadmeMd, docsMcpServerMjs } from './mcp-server-source.ts';
 import {
@@ -60,6 +60,9 @@ export type EmitSiteResult = {
   // Theme-owned files that were NOT touched because the user modified them (reported, never
   // silently destroyed). The CLI prints these.
   themeConflicts: ThemeConflict[];
+  // MDX↔shard binding failures (tampered MDX or a pre-hash shard): each named page rendered in
+  // the loud UNVERIFIED state instead of its recorded trust state. The CLI prints/journals these.
+  warnings: string[];
 };
 
 // Kernel invariants pinned exactly (no ranges): a generated site must build identically whenever
@@ -232,16 +235,24 @@ type PageRouteContext = {
   renderers: Record<string, string>;
 };
 
-const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => {
+const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext, onWarning: (warning: string) => void): string => {
   const { frontmatter, body } = splitFrontmatter(page.mdx);
   const locale = page.shard.locale;
   const isSourceLocale = locale === context.sourceLocale;
   const slug = page.shard.page.slug;
   const depth = slug.split('/').length + (isSourceLocale ? 0 : 1);
   const up = '../'.repeat(depth);
+  // MDX↔SHARD BINDING at emission (wave 2b close final): the trust spine may only project over
+  // the EXACT MDX it was computed for. A mismatch (post-persistence edit) or a missing hash (old
+  // shard) renders the loud UNVERIFIED state with a surfaced warning — never stale claim counts
+  // over changed prose.
+  const binding = checkShardMdxBinding(page.shard, page.mdx);
+  if (!binding.ok) {
+    onWarning(binding.reason);
+  }
   // LITERAL proof surface (impl-07 finding 4): claim counts, contradiction facts, and per-claim
   // contradicted markers straight from ClaimEvidence — the guarantee-label ladder is gone.
-  const proof = projectShardProof(page.shard);
+  const proof = binding.ok ? projectShardProof(page.shard) : projectUnboundShardProof(page.shard);
   const alternates = context.alternatesBySlug.get(slug) ?? [];
   const sources = collectPageSources(page.shard.page).map((ref) => ({
     file: ref.file,
@@ -549,10 +560,14 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
     writeTextFile(join(siteRoot, 'mcp/README.md'), docsMcpReadmeMd())
   ];
 
+  const warnings: string[] = [];
+  const collectWarning = (warning: string): void => {
+    warnings.push(warning);
+  };
   for (const page of input.pages) {
     const slug = page.shard.page.slug;
     writes.push(
-      writeTextFile(join(siteRoot, 'src/pages', `${slug}.mdx`), pageRouteMdx(page, routeContext)),
+      writeTextFile(join(siteRoot, 'src/pages', `${slug}.mdx`), pageRouteMdx(page, routeContext, collectWarning)),
       // Raw markdown mirror at every doc URL, for agents and curl users.
       writeTextFile(join(siteRoot, 'public', `${slug}.md`), page.mdx)
     );
@@ -561,7 +576,10 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
     const slug = translation.shard.page.slug;
     const locale = translation.shard.locale;
     writes.push(
-      writeTextFile(join(siteRoot, 'src/pages', locale, `${slug}.mdx`), pageRouteMdx(translation, routeContext)),
+      writeTextFile(
+        join(siteRoot, 'src/pages', locale, `${slug}.mdx`),
+        pageRouteMdx(translation, routeContext, collectWarning)
+      ),
       writeTextFile(join(siteRoot, 'public', locale, `${slug}.md`), translation.mdx)
     );
   }
@@ -580,5 +598,5 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
   }
 
   await Promise.all(writes);
-  return { themeConflicts: applied.conflicts };
+  return { themeConflicts: applied.conflicts, warnings };
 };

@@ -28,10 +28,13 @@ export type ClaimMarker = {
   visibleText: string;
   // PURE-MARKER FLAG (wave 2b close final — the render-laundering class): true only when the
   // marker's AST content consists EXCLUSIVELY of `text` and `inlineCode` nodes — the only node
-  // kinds whose rendered output provably equals their scanned text. Anything else (images, links,
-  // footnote references, emphasis/strong, html, breaks — any node kind, known or not) makes the
-  // marker non-pure: legal MDX, but the claim can NEVER be canonically checkable, because the
-  // reader may see content the scan cannot vouch for. Fail-closed by structure, no enumeration.
+  // kinds whose rendered output provably equals their scanned text — AND the marker has NO JSX
+  // ANCESTOR. Anything else inside (images, links, footnote references, emphasis/strong, html,
+  // breaks — any node kind, known or not) makes the marker non-pure, and so does sitting anywhere
+  // inside a component (<Badge label="…"><Claim>…</Claim></Badge>): the component's renderer owns
+  // whether/how the Claim slot renders, so the kernel cannot prove rendered ≡ scanned. Legal MDX,
+  // repair-free — but the claim can NEVER be canonically checkable. Fail-closed by structure, no
+  // enumeration.
   pureText: boolean;
 };
 
@@ -143,7 +146,7 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
     return { markers, errors };
   }
 
-  const collectClaim = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean }): void => {
+  const collectClaim = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean; inJsx: boolean }): void => {
     const offset = node.position?.start?.offset ?? 0;
     if (context.inHeading) {
       errors.push({
@@ -213,11 +216,14 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       offset,
       innerMdx,
       visibleText: children.map(visibleTextOf).join(''),
-      pureText: children.every(isPureTextNode)
+      // NO-JSX-ANCESTOR (wave 2b close final, Sol's ancestor-component laundering): a marker
+      // inside ANY JSX element is never pure — the ancestor component decides what actually
+      // renders, so the scanned text cannot vouch for what the reader sees.
+      pureText: !context.inJsx && children.every(isPureTextNode)
     });
   };
 
-  const visit = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean }): void => {
+  const visit = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean; inJsx: boolean }): void => {
     // Code fences, inline code, and frontmatter are literal text: a <Claim> written there is a
     // documentation example, never a marker.
     if (node.type === 'code' || node.type === 'inlineCode' || node.type === 'yaml') {
@@ -242,6 +248,11 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
     } else if (node.type === 'mdxJsxTextElement' && node.name === 'Claim') {
       collectClaim(node, context);
       childContext = { ...context, inClaim: true };
+    } else if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
+      // Any non-Claim JSX element makes every descendant marker JSX-ancestored (accepted, but
+      // permanently non-pure — collectClaim threads the flag). Claims inside components stay
+      // legal, repair-free MDX; they just can never be canonically checkable.
+      childContext = { ...context, inJsx: true };
     } else if (node.type === 'heading') {
       childContext = { ...context, inHeading: true };
     }
@@ -251,7 +262,7 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
   };
 
   for (const node of tree.children) {
-    visit(node as ScanNode, { inHeading: false, inClaim: false });
+    visit(node as ScanNode, { inHeading: false, inClaim: false, inJsx: false });
   }
   return { markers, errors };
 };

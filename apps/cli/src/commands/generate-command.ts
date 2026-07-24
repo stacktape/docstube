@@ -49,6 +49,10 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
     for (const conflict of emitResult.themeConflicts) {
       output.info(`  theme-conflict  ${conflict}`);
     }
+    // MDX↔shard binding failures: the named pages rendered UNVERIFIED instead of stale trust state.
+    for (const warning of emitResult.warnings) {
+      output.error(`  unverified  ${warning}`);
+    }
     output.info(`site emitted to ${family.config.outDir}/ — build it with: npm install && npm run build`);
 
     if (summary.outcome === 'flagged') {

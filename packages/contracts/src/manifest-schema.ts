@@ -4,6 +4,7 @@ import { pageEntitySchema } from './entity-schema.ts';
 import { flagSchema } from './flag-schema.ts';
 import {
   claimIdSchema,
+  contentHashSchema,
   isoTimestampSchema,
   localeCodeSchema,
   pageIdSchema,
@@ -150,6 +151,12 @@ export const pageShardSchema = z
     sourceCommit: z.string().regex(/^[0-9a-f]{7,64}$/),
     generatedAt: isoTimestampSchema,
     page: pageEntitySchema,
+    // MDX↔SHARD BINDING HASH (wave 2b close final): the content hash of the EXACT persisted MDX
+    // artifact this shard describes, minted at persistence from the final artifact bytes. Emission
+    // verifies agreement between the MDX file it reads and this hash; a mismatch (or an old shard
+    // without the hash) renders the page in the loud UNVERIFIED state — stale trust state must
+    // never accompany changed prose. Optional only for pre-hash shards; new persists always mint.
+    mdxContentHash: contentHashSchema.optional(),
     ledger: claimLedgerSchema.optional(),
     provenance: provenanceV2Schema.optional(),
     claimMatching: claimMatchingSchema.optional(),

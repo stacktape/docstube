@@ -2,6 +2,8 @@ import {
   buildFixturePage,
   buildFixturePageShard,
   buildFixtureProvenanceV2,
+  contentHash,
+  contentHashSchema,
   docstubeConfigSchema,
   entityRevisionSchema,
   fixtureConfigInput,
@@ -94,6 +96,13 @@ const withTrustSpine = (shard: PageShard, contradicted = false): PageShard => {
   return { ...shard, ledger, provenance: buildFixtureProvenanceV2(ledger) };
 };
 
+// Fixture shards bind to their fixture MDX the way real persistence does — the emission binding
+// check would otherwise (correctly) force every fixture page into the unverified state.
+const bindMdx = (shard: PageShard, mdx: string): PageShard => ({
+  ...shard,
+  mdxContentHash: contentHashSchema.parse(contentHash(mdx))
+});
+
 export const setupMdx = '---\ndescription: Fixture setup page.\n---\n\n# Setup guide\n\nSome setup prose.\n';
 export const installMdx = '# Installation\n\n<Callout tone="info">Install with npm.</Callout>\n';
 export const installDeMdx = '# Installation (DE)\n\n<Callout tone="info">Installiere mit npm.</Callout>\n';
@@ -137,13 +146,23 @@ export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOption
     theme: basicThemeBundle,
     pages: [
       {
-        shard: withTrustSpine(buildFixturePageShard(installPage), options?.withContradiction === true),
+        shard: bindMdx(
+          withTrustSpine(buildFixturePageShard(installPage), options?.withContradiction === true),
+          installMdx
+        ),
         mdx: installMdx
       },
-      { shard: buildFixturePageShard(setupPage), mdx: setupMdx }
+      { shard: bindMdx(buildFixturePageShard(setupPage), setupMdx), mdx: setupMdx }
     ],
     ...(options?.withTranslation === true
-      ? { translations: [{ shard: { ...buildFixturePageShard(installPageDe), locale: 'de' }, mdx: installDeMdx }] }
+      ? {
+          translations: [
+            {
+              shard: bindMdx({ ...buildFixturePageShard(installPageDe), locale: 'de' }, installDeMdx),
+              mdx: installDeMdx
+            }
+          ]
+        }
       : {}),
     ...(options?.frozenVersions === undefined ? {} : { frozenVersions: options.frozenVersions }),
     ...(options?.repoUrl === undefined ? {} : { repoUrl: options.repoUrl })

@@ -24,5 +24,5 @@ export type {
   ThemeFilesManifest,
   ThemeOwnedFile
 } from './apply-theme-bundle.ts';
-export { projectShardProof } from './proof-projection.ts';
-export type { SectionClaimsChip, ShardProofProjection } from './proof-projection.ts';
+export { checkShardMdxBinding, projectShardProof, projectUnboundShardProof } from './proof-projection.ts';
+export type { SectionClaimsChip, ShardMdxBindingCheck, ShardProofProjection } from './proof-projection.ts';

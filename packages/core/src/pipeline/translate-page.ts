@@ -1,6 +1,6 @@
 import type { PageArtifact } from '@docstube/plugin-sdk';
 import type { AgentTaskSpec, Finding, PageEntity, PageShard } from '@docstube/contracts';
-import { agentTaskSpecSchema, idPrefixes, mintId } from '@docstube/contracts';
+import { agentTaskSpecSchema, contentHash, contentHashSchema, idPrefixes, mintId } from '@docstube/contracts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
 import type { PageRunContext } from './page-runner.ts';
@@ -220,6 +220,8 @@ export const translateArtifact = async (
       sourceCommit: ctx.commit,
       generatedAt: new Date().toISOString(),
       page: lastArtifact.page,
+      // MDX↔shard binding for the translated artifact bytes (same rule as source shards).
+      mdxContentHash: contentHashSchema.parse(contentHash(lastArtifact.mdx)),
       flags: passed
         ? []
         : [

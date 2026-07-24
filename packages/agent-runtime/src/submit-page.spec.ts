@@ -135,6 +135,34 @@ describe('scanClaimMarkers', () => {
     expect(footnote.markers[0]).toMatchObject({ pureText: false, visibleText: 'greet exists.' });
   });
 
+  it("tracks JSX ancestry: a marker inside ANY component is legal, repair-free — and never pure (Sol's ancestor probe)", () => {
+    // <Badge label="greet does not exist."><Claim>greet exists.</Claim></Badge>: the marker's own
+    // content is pure text, but Badge's renderer decides whether/how the Claim slot renders — the
+    // scan cannot vouch for what the reader sees. Accepted (legal MDX, no repair), pureText false.
+    const ancestor = scanClaimMarkers(
+      'Status: <Badge label="greet does not exist."><Claim id="a1">`greet` exists.</Claim></Badge>\n'
+    );
+    expect(ancestor.errors).toEqual([]);
+    expect(ancestor.markers[0]).toMatchObject({ markerId: 'a1', pureText: false, visibleText: 'greet exists.' });
+
+    // Any depth of component nesting still counts as a JSX ancestor.
+    const deep = scanClaimMarkers(
+      'Status: <Wrap><Badge label="no"><Claim id="a2">`greet` exists.</Claim></Badge></Wrap>\n'
+    );
+    expect(deep.errors).toEqual([]);
+    expect(deep.markers[0]).toMatchObject({ markerId: 'a2', pureText: false });
+
+    // A flow-level component ancestor is caught the same way.
+    const flow = scanClaimMarkers('<Panel>\n  Fact: <Claim id="a3">`greet` exists.</Claim>\n</Panel>\n');
+    expect(flow.errors).toEqual([]);
+    expect(flow.markers[0]).toMatchObject({ markerId: 'a3', pureText: false });
+
+    // A sibling component does NOT taint the marker — ancestry, not adjacency, is the condition.
+    const sibling = scanClaimMarkers('Fact: <Badge>beta</Badge> and <Claim id="a4">`greet` exists.</Claim>\n');
+    expect(sibling.errors).toEqual([]);
+    expect(sibling.markers[0]).toMatchObject({ markerId: 'a4', pureText: true });
+  });
+
   it('turns malformed marker syntax into an mdx-parse-error repair message, never a crash', () => {
     const unclosed = scanClaimMarkers('Text <Claim id="a">never closed.');
     expect(unclosed.errors[0]?.code).toBe('mdx-parse-error');

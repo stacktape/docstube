@@ -151,9 +151,7 @@ const valueLedger = (
   });
 
 // The spine: submit_page validation → kernel anchoring → claim verification → persisted shard.
-const runSpine = async (claimProse: string, ledger: WriterClaimLedger, extraMdx = '') => {
-  const mdx = pageMdx(claimProse, extraMdx);
-
+const runSpineWithMdx = async (mdx: string, ledger: WriterClaimLedger) => {
   // 1. submit_page ACCEPTS — the writer-side gate cannot catch lexical bypasses; the exact
   //    canonical visible match is the evidence-decision backstop, not an in-session repair.
   const submission = evaluateSubmitPageCall({ mdx, ledger });
@@ -202,6 +200,9 @@ const runSpine = async (claimProse: string, ledger: WriterClaimLedger, extraMdx 
   });
   return { anchored, verified, shard };
 };
+
+const runSpine = async (claimProse: string, ledger: WriterClaimLedger, extraMdx = '') =>
+  runSpineWithMdx(pageMdx(claimProse, extraMdx), ledger);
 
 const expectUnchecked = (spine: Awaited<ReturnType<typeof runSpine>>): void => {
   expect(spine.verified.findings).toEqual([]);
@@ -333,6 +334,27 @@ describe('full-spine probes: submit → anchor → verify → shard', () => {
     });
     expect(submission.response.accepted).toBe(false);
     expect(submission.response.errors?.some((error) => error.includes('JSX element'))).toBe(true);
+  });
+
+  it('Sol\'s verdict-6 ancestor probe: <Badge label="greet does not exist."><Claim>greet exists.</Claim></Badge> persists UNCHECKED — never checked', async () => {
+    // The marker's own content is the exact canonical assertion, but Badge's renderer owns the
+    // Claim slot — it can render its contradicting label instead. NO-JSX-ANCESTOR checkability:
+    // the marker scans pureText: false, so no evidence may ever decide the claim. Legal MDX,
+    // repair-free, accepted end to end — permanently unchecked, never 1/1 checked.
+    const mdx = `---
+title: "Greet"
+---
+
+# Greet
+
+Status: <Badge label="greet does not exist."><Claim id="g1">\`greet\` exists.</Claim></Badge>
+`;
+    const spine = await runSpineWithMdx(mdx, existenceLedger('greet exists'));
+    expect(spine.anchored.warnings.some((warning) => warning.includes('destined to ship UNCHECKED'))).toBe(true);
+    expect(spine.verified.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expectUnchecked(spine);
+    const records = spine.shard.provenance?.claimEvidence ?? [];
+    expect(records[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
   });
 
   it("Sol's verdict-5 image-alt probe: '![greet exists.](greet.png)' persists UNCHECKED — alt text scans but renders as a picture", async () => {

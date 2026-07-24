@@ -605,7 +605,7 @@ describe('verifyClaims — pure-marker precondition (render laundering, defense 
     const result = await verify(tamperPure(anchoredResult));
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
-    expect(result.warnings.some((warning) => warning.includes('not pure text + inline code'))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes('the marker is not pure'))).toBe(true);
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
   });
 
@@ -613,7 +613,7 @@ describe('verifyClaims — pure-marker precondition (render laundering, defense 
     const result = await verify(tamperPure(anchorFixture([valueDraft('3')])));
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
-    expect(result.warnings.some((warning) => warning.includes('not pure text + inline code'))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes('the marker is not pure'))).toBe(true);
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 });

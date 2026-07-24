@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PageShard, PersonaReview } from '@docstube/contracts';
-import { buildFixtureInput } from './emit-site-fixture.ts';
-import { projectShardProof } from './proof-projection.ts';
+import { buildFixtureInput, installMdx } from './emit-site-fixture.ts';
+import { checkShardMdxBinding, projectShardProof, projectUnboundShardProof } from './proof-projection.ts';
 
 // The interim reader projection is LITERAL (impl-07 finding 4): counts, contradiction facts, and
 // per-claim contradicted markers from ClaimEvidence; "reviewed for" ONLY from a genuinely
@@ -119,6 +119,42 @@ describe('projectShardProof', () => {
       totalClaims: 0,
       contradictedClaims: 0,
       contradictedMarkers: []
+    });
+  });
+});
+
+describe('checkShardMdxBinding + projectUnboundShardProof (MDX↔shard binding, wave 2b close final)', () => {
+  it('accepts the matched pair: the shard hash equals the persisted MDX content hash', () => {
+    expect(checkShardMdxBinding(installShard(), installMdx)).toEqual({ ok: true });
+  });
+
+  it('refuses tampered MDX with a reason naming the mismatch', () => {
+    const check = checkShardMdxBinding(installShard(), `${installMdx}\nEdited after persistence.\n`);
+    expect(check).toMatchObject({
+      ok: false,
+      code: 'hash-mismatch',
+      reason: expect.stringContaining('does not match')
+    });
+    expect(check).toMatchObject({ reason: expect.stringContaining('UNVERIFIED') });
+  });
+
+  it('refuses a shard with no recorded hash (pre-hash shard) — fail closed, never assumed bound', () => {
+    const { mdxContentHash: _dropped, ...shard } = installShard();
+    const check = checkShardMdxBinding(shard as PageShard, installMdx);
+    expect(check).toMatchObject({ ok: false, code: 'missing-hash' });
+  });
+
+  it('projects an unbound shard EXACTLY like the no-trust-spine unverified state — no stale counts or marks', () => {
+    const projection = projectUnboundShardProof(installShard(true));
+    expect(projection).toMatchObject({
+      state: 'unverified',
+      checkedClaims: 0,
+      totalClaims: 0,
+      contradictedClaims: 0,
+      uncheckedClaims: 0,
+      contradictedMarkers: [],
+      uncheckedMarkers: [],
+      reviewedFor: undefined
     });
   });
 });

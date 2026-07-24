@@ -108,17 +108,22 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     const rawShard = await readFile(join(repoRoot, '.docstube', 'manifest', 'pages', 'en', `${pageId}.json`), 'utf8');
     expect(rawShard.endsWith('\n')).toBe(true);
     const shardJson = JSON.parse(rawShard) as {
+      mdxContentHash?: string;
       ledger?: { claims: Array<{ correctness: string }> };
       provenance?: { claimEvidence: Array<{ correctness: string }> };
     };
     expect(shardJson.ledger?.claims[0]?.correctness).toBe('checked');
     expect(shardJson.provenance?.claimEvidence[0]?.correctness).toBe('checked');
+    // The MDX↔shard binding hash is minted at persistence from the final artifact bytes.
+    expect(shardJson.mdxContentHash).toMatch(/^[0-9a-f]{64}$/u);
 
-    // Emit consumes the shard through the interim ClaimEvidence projection.
+    // Emit consumes the shard through the interim ClaimEvidence projection. The matched
+    // MDX↔shard pair renders its recorded trust state with no binding warnings.
     const family = await loadConfigFamily(repoRoot);
     const store = createManifestStore(repoRoot, family.config.versions.current);
     const result = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
     expect(result.emitted).toBe(true);
+    expect(result.warnings).toEqual([]);
 
     const route = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8');
     // Literal counts only — the guarantee-label projection is gone (impl-07 finding 4).
@@ -126,7 +131,23 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(route).toContain('docstubeClaimsChecked: 1');
     expect(route).toContain('docstubeClaimsTotal: 1');
     expect(route).toContain('docstubeClaimsContradicted: 0');
+    expect(route).not.toContain('docstubeUnverified');
     // The completed primary-gating review earns the reviewed-for label.
     expect(route).toContain('docstubeReviewedFor: "app-developer"');
+
+    // MDX↔SHARD BINDING (wave 2b close final): edit the persisted MDX after persistence and
+    // re-emit — the page must render the loud UNVERIFIED state with a warning naming the
+    // mismatch, never its stale checked counts over changed prose.
+    const persistedMdxPath = join(repoRoot, 'docs-site', 'content', 'en', 'retry.mdx');
+    const persistedMdx = await readFile(persistedMdxPath, 'utf8');
+    await writeFile(persistedMdxPath, `${persistedMdx}\nEdited after generation.\n`);
+    const tampered = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(tampered.emitted).toBe(true);
+    expect(tampered.warnings).toHaveLength(1);
+    expect(tampered.warnings[0]).toContain('does not match');
+    const tamperedRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8');
+    expect(tamperedRoute).toContain('docstubeUnverified: true');
+    expect(tamperedRoute).toContain('docstubeClaimsChecked: 0');
+    expect(tamperedRoute).toContain('docstubeClaimsTotal: 0');
   }, 120_000);
 });

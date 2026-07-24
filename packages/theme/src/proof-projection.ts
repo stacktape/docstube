@@ -1,3 +1,4 @@
+import { contentHash } from '@docstube/contracts';
 import type { PageShard } from '@docstube/contracts';
 
 // INTERIM READER SURFACE (wave 2b-iii round 2, until the full trust-chip wave): the theme
@@ -38,6 +39,46 @@ export type ShardProofProjection = {
   // lighter than a contradiction, never an alarm. Distinct list from contradictedMarkers.
   uncheckedMarkers: string[];
   sections: SectionClaimsChip[];
+};
+
+// MDX↔SHARD BINDING CHECK (wave 2b close final): the shard's trust spine describes ONE exact MDX
+// artifact, recorded as mdxContentHash at persistence. Emission must refuse to project trust
+// state over prose that no longer matches — a page edited after persistence (or an old shard
+// with no hash at all) renders in the loud UNVERIFIED state instead, with the reason surfaced.
+export type ShardMdxBindingCheck = { ok: true } | { ok: false; code: 'missing-hash' | 'hash-mismatch'; reason: string };
+
+export const checkShardMdxBinding = (shard: PageShard, mdx: string): ShardMdxBindingCheck => {
+  const slug = shard.page.slug;
+  if (shard.mdxContentHash === undefined) {
+    return {
+      ok: false,
+      code: 'missing-hash',
+      reason:
+        `page "${slug}" (${shard.locale}): the shard records no mdxContentHash, so the persisted MDX cannot be ` +
+        'proven to be the prose its trust spine was computed for — rendering UNVERIFIED. Re-run `docstube generate` ' +
+        'to mint the binding hash'
+    };
+  }
+  const actual = contentHash(mdx);
+  if (actual !== shard.mdxContentHash) {
+    return {
+      ok: false,
+      code: 'hash-mismatch',
+      reason:
+        `page "${slug}" (${shard.locale}): the MDX on disk (content hash ${actual}) does not match the shard's ` +
+        `recorded mdxContentHash (${shard.mdxContentHash}) — the prose changed after the trust spine was computed, ` +
+        'so the recorded claim state is stale; rendering UNVERIFIED. Re-run `docstube generate` to reconcile'
+    };
+  }
+  return { ok: true };
+};
+
+// The projection of a shard whose MDX binding failed: EXACTLY the existing no-trust-spine
+// unverified state (loud warning, zero counts, no marks, no reviewed-for label) — stale trust
+// state must never accompany changed prose.
+export const projectUnboundShardProof = (shard: PageShard): ShardProofProjection => {
+  const { ledger: _ledger, provenance: _provenance, claimMatching: _claimMatching, ...stripped } = shard;
+  return projectShardProof(stripped as PageShard);
 };
 
 export const projectShardProof = (shard: PageShard): ShardProofProjection => {

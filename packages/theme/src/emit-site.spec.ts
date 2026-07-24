@@ -272,6 +272,52 @@ describe('emitSite', () => {
     expect(robots).toContain('Sitemap: https://docs.example.test/sitemap.xml');
   });
 
+  it('MDX↔shard binding (matched pair): pages whose MDX matches the recorded hash render their trust state, no warnings', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-binding-ok-'));
+    const result = await emitSite(buildFixtureInput(repoRoot));
+    expect(result.warnings).toEqual([]);
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(route).toContain('docstubeClaimsChecked: 1');
+    expect(route).toContain('docstubeClaimsTotal: 2');
+    expect(route).not.toContain('docstubeUnverified');
+  });
+
+  it('MDX↔shard binding (tampered): MDX edited after persistence renders the loud UNVERIFIED state — never stale counts', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-binding-tamper-'));
+    const input = buildFixtureInput(repoRoot);
+    const install = input.pages[0]!;
+    input.pages[0] = { shard: install.shard, mdx: `${install.mdx}\nEdited after persistence.\n` };
+    const result = await emitSite(input);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('does not match');
+    expect(result.warnings[0]).toContain('getting-started/installation');
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(route).toContain('docstubeUnverified: true');
+    // Stale trust state must never accompany changed prose: counts zero, no inline marks.
+    expect(route).toContain('docstubeClaimsChecked: 0');
+    expect(route).toContain('docstubeClaimsTotal: 0');
+    expect(route).not.toContain('docstubeUncheckedClaims');
+    expect(route).not.toContain('docstubeContradictedClaims');
+    // The untampered sibling page is unaffected.
+    const setup = await readFile(join(repoRoot, 'docs-site/src/pages/guides/setup.mdx'), 'utf8');
+    expect(result.warnings.some((warning) => warning.includes('guides/setup'))).toBe(false);
+    expect(setup).toBeDefined();
+  });
+
+  it('MDX↔shard binding (missing hash): an old shard without mdxContentHash renders UNVERIFIED with a warning', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-binding-nohash-'));
+    const input = buildFixtureInput(repoRoot);
+    const install = input.pages[0]!;
+    const { mdxContentHash: _dropped, ...bareShard } = install.shard;
+    input.pages[0] = { shard: bareShard, mdx: install.mdx };
+    const result = await emitSite(input);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]).toContain('no mdxContentHash');
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(route).toContain('docstubeUnverified: true');
+    expect(route).toContain('docstubeClaimsChecked: 0');
+  });
+
   it('omits sitemap.xml and robots.txt without a baseUrl', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-nobase-'));
     await emitSite(buildFixtureInput(repoRoot));

@@ -47,6 +47,9 @@ export type EmitCurrentSiteResult = {
   emitted: boolean;
   // Theme-owned files the user modified: preserved/skipped, reported by the calling command.
   themeConflicts: string[];
+  // MDX↔shard binding failures: pages whose persisted MDX no longer matches the shard's recorded
+  // mdxContentHash (or whose shard predates the hash) rendered UNVERIFIED. Printed loudly.
+  warnings: string[];
 };
 
 export const emitCurrentSite = async (input: {
@@ -57,7 +60,7 @@ export const emitCurrentSite = async (input: {
   const { workspaceDir, family, store } = input;
   const index = await store.readIndex();
   if (index === undefined) {
-    return { emitted: false, themeConflicts: [] };
+    return { emitted: false, themeConflicts: [], warnings: [] };
   }
   const readPages = async (locale: string): Promise<EmitSitePage[]> => {
     const pages: EmitSitePage[] = [];
@@ -102,6 +105,7 @@ export const emitCurrentSite = async (input: {
       conflict.kind === 'kept'
         ? `${conflict.path} — modified by you, kept (the previous theme's copy was not deleted)`
         : `${conflict.path} — modified by you, not overwritten with the theme's copy`
-    )
+    ),
+    warnings: result.warnings
   };
 };
