@@ -592,12 +592,12 @@ describe('verifyClaims — polarity agreement and negative assertions', () => {
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
 
-  it('window scoping still ANCHORS a positive claim with a distant "not" — but the grammar keeps it honestly unchecked', async () => {
-    // "not a promise" denies the OBJECT beyond the negation window, so polarity agreement holds
-    // and anchoring accepts the claim (no polarity error). Under the fail-closed checkability
-    // grammar (impl-12) the phrasing is nonetheless OUTSIDE the canonical family ('returns a
-    // result' is a shape/behavior assertion, and the visible window carries unknown vocabulary),
-    // so grounding refuses to decide it: unchecked, journaled, never a repair spiral.
+  it('negation-cue window scoping still ANCHORS a positive claim with a distant "not" — but the grammar keeps it honestly unchecked', async () => {
+    // "not a promise" denies the OBJECT beyond the negation-cue window, so polarity agreement
+    // holds and anchoring accepts the claim (no polarity error). Under exact canonical visible
+    // match (impl-13) the phrasing is nonetheless not the canonical assertion ('returns a
+    // result' is a shape/behavior sentence), so grounding refuses to decide it: unchecked,
+    // journaled, never a repair spiral.
     const result = await verify(
       anchorFixture([
         {
@@ -626,15 +626,16 @@ const structureDraft = (markerId: string, predicate: string, symbol = KNOWN_SYMB
   proposedSubscriptions: [{ kind: 'signature', symbolHash: symbol }]
 });
 
-// THE FAIL-CLOSED CHECKABILITY GRAMMAR (wave 2b close FINAL, impl-12): existence/value evidence
-// only decides canonically phrased claims. Sol's lexical/window bypasses — prose the negation-cue
-// vocabulary never listed — now die at the evidence decision: unknown vocabulary is unchecked by
-// default, so there is no synonym arms race left to lose.
-describe('verifyClaims — checkability grammar (impl-12, fail closed)', () => {
+// THE FAIL-CLOSED CHECKABILITY GRAMMAR (wave 2b close FINAL, impl-13 exact canonical visible
+// match): existence/value evidence only decides claims whose VISIBLE marker text exactly IS the
+// canonical assertion (same assertion in the predicate). Sol's lexical bypasses — 'absent',
+// 'returns', non-Latin prose, distant clauses — all die at the evidence decision because the
+// exact match fails; nothing is enumerated, so there is no arms race left to lose.
+describe('verifyClaims — checkability grammar (impl-13, exact canonical visible match)', () => {
   it("Sol's impl-12 probe: visible '`DEFAULT_RETRIES` is absent.' over predicate 'DEFAULT_RETRIES exists' mints NOTHING", async () => {
     // 'absent' is not in the negation-cue vocabulary, so binding and anchoring both pass — the
-    // exact round-6 bypass. The grammar refuses: unknown vocabulary in the visible window means
-    // the claim is not existence-checkable. Unchecked, never 'checked', no findings (no spiral).
+    // exact round-6 bypass. The exact match refuses: the visible text is not the canonical
+    // assertion. Unchecked, never 'checked', no findings (no spiral).
     const result = await verify(anchorFixture([structureDraft('a1', 'DEFAULT_RETRIES exists')]));
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
@@ -643,10 +644,10 @@ describe('verifyClaims — checkability grammar (impl-12, fail closed)', () => {
     expect(result.claimEvidence[0]?.decidingEvidenceId).toBeUndefined();
   });
 
-  it("Sol's long-window probe: a denial pushed beyond every window by neutral filler stays unchecked", async () => {
+  it("Sol's long-filler probe: a denial pushed far into the sentence stays unchecked", async () => {
     // lw1: '`retry` is available as the value of the option of the key that is not defined.' —
-    // every token within the window is neutral, but the window-independent denial screen sees
-    // 'not' anywhere in the marker and fails the gate.
+    // under exact match no window or denial screen is needed: the visible text simply is not the
+    // canonical assertion.
     const result = await verify(anchorFixture([structureDraft('lw1', 'retry exists', RETRY_SYMBOL)]));
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
@@ -654,10 +655,78 @@ describe('verifyClaims — checkability grammar (impl-12, fail closed)', () => {
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
   });
 
+  it("Sol's verdict-3 probe: '`retry` returns the value.' over predicate 'retry exists' mints NOTHING", async () => {
+    // The predicate is canonical, but the reader sees a behavior sentence — visible prose that
+    // is not the canonical assertion can never be decided by existence evidence.
+    const anchoredResult = anchorFixture([structureDraft('b1', 'retry exists', RETRY_SYMBOL)]);
+    const result = await verify(tamper(anchoredResult, '`retry` returns the value.', 'retry exists'));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("Sol's verdict-3 probe: '`MODE` returns linear.' with constant evidence stays unchecked — never checked or contradicted", async () => {
+    // Behavior prose can never reach value evidence: the value comparison is skipped outright, so
+    // neither 'checked' nor 'contradicted' can mint even though the extracted constant equals the
+    // asserted spelling.
+    const result = await verify(
+      tamper(
+        anchorFixture([
+          {
+            markerId: 'm1',
+            class: 'value',
+            predicate: 'MODE defaults to linear',
+            proposedEvidence: [{ kind: 'symbol', symbol: MODE_SYMBOL }],
+            proposedSubscriptions: [
+              { kind: 'cited-value', symbolHash: MODE_SYMBOL, valueName: 'MODE', citedValue: 'linear' }
+            ]
+          }
+        ]),
+        '`MODE` returns linear.',
+        'MODE returns linear'
+      )
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.warnings.some((warning) => warning.includes('CANONICAL CHECKABLE GRAMMAR'))).toBe(true);
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
+  });
+
+  it("Sol's verdict-3 probe: '`retry` is exported from `fiction`.' stays unchecked — the from-variant is removed", async () => {
+    // The module side was never verified by any evidence, so the whole variant is out of the
+    // 0.1.0 grammar (v1.x may reintroduce it with codemap-verified module binding).
+    const anchoredResult = anchorFixture([structureDraft('b1', 'retry exists', RETRY_SYMBOL)]);
+    const result = await verify(
+      tamper(anchoredResult, '`retry` is exported from `fiction`.', 'retry is exported from fiction')
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("Sol's non-Latin probe: '`retry` 不存在.' stays unchecked — there is no tokenizer to fool", async () => {
+    const anchoredResult = anchorFixture([structureDraft('b1', 'retry exists', RETRY_SYMBOL)]);
+    const result = await verify(tamper(anchoredResult, '`retry` 不存在.', 'retry exists'));
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
+  it("Sol's distant-clause probe: '`retry`, which recently ceased to exist, exists.' stays unchecked", async () => {
+    const anchoredResult = anchorFixture([structureDraft('b1', 'retry exists', RETRY_SYMBOL)]);
+    const result = await verify(
+      tamper(anchoredResult, '`retry`, which recently ceased to exist, exists.', 'retry exists')
+    );
+    expect(result.findings).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'codemap-grounding')).toBe(true);
+  });
+
   it('the documented COST of fail-closed: a wordy-but-TRUE positive ships honestly unchecked', async () => {
-    // wd1: '`retry`, added in v2, exists.' — retry really exists, but 'added' and 'v2' are
-    // unknown vocabulary inside the window. The claim is honestly unchecked; the writer prompt
-    // teaches the fix (tight marker, context outside).
+    // wd1: '`retry`, added in v2, exists.' — retry really exists, but the visible text is not
+    // exactly the canonical assertion. The claim is honestly unchecked; the writer prompt
+    // teaches the fix (the marker wraps only the canonical assertion, context outside).
     const result = await verify(anchorFixture([structureDraft('wd1', 'retry exists', RETRY_SYMBOL)]));
     expect(result.findings).toEqual([]);
     expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });

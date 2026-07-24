@@ -435,11 +435,12 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
   return issues;
 };
 
-// DESTINED-UNCHECKED HINTS (impl-12): the checkability grammar is enforced at VERIFICATION (the
-// evidence decision); anchoring only journals a NON-BLOCKING note when a code-structure/value
-// claim that subject-binds cleanly is nonetheless phrased outside the canonical grammar — the
-// bounded retry loop can improve the phrasing opportunistically, but unchecked is a legal outcome
-// and must never spiral into repairs.
+// DESTINED-UNCHECKED HINTS (impl-12, grammar tightened to exact canonical visible match in
+// impl-13): the checkability grammar is enforced at VERIFICATION (the evidence decision);
+// anchoring only journals a NON-BLOCKING note when a code-structure/value claim that
+// subject-binds cleanly is nonetheless phrased outside the canonical grammar — the bounded retry
+// loop can improve the phrasing opportunistically, but unchecked is a legal outcome and must
+// never spiral into repairs.
 const checkabilityHints = (draft: DraftClaim, visibleText: string, codemap: Codemap): string[] => {
   const recordFor = (symbolHash: string): SymbolRecord | undefined =>
     codemap.symbols.find((symbol) => symbol.hash === symbolHash);

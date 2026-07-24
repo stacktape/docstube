@@ -1,175 +1,82 @@
-// CHECKABILITY GRAMMAR — the fail-closed canonical positive grammar (wave 2b close FINAL,
-// impl-12). It ends the polarity arms race: instead of enumerating negation vocabulary and losing
-// to the next synonym ('absent', 'gone', a distant 'does not'), the kernel only lets EXISTENCE and
-// VALUE evidence (codemap-grounding, value-predicate) DECIDE a claim whose phrasing sits inside a
-// small canonical grammar. Arbitrary prose outside the grammar is never argued with — the claim
-// simply stays correctness 'unchecked' / disposition 'no-checker-available' with a journaled note.
-// Unchecked is a legal outcome; a bypass is not.
+// CHECKABILITY GRAMMAR — EXACT CANONICAL VISIBLE MATCH (wave 2b close FINAL, impl-13). It ends
+// both the polarity arms race AND the vocabulary arms race: existence and value evidence
+// (codemap grounding, the value-predicate comparison) may DECIDE a claim only when the marker's
+// VISIBLE text — what the reader actually sees — after minimal cosmetic normalization, EXACTLY
+// matches one canonical assertion whose parameters equal the kernel-bound subject (the codemap
+// record's display name) and, for value claims, the bound normalized citedValue; AND the claim's
+// predicate matches the SAME canonical assertion (the two sides may differ only in the cosmetic
+// normalization). There is no token window, no neutral allowlist, no denial screen, and no
+// tokenizer: ANY other character or word in the visible span — 'returns', 'absent', a distant
+// clause, non-Latin prose, anything — simply fails the exact match, and the claim stays honestly
+// 'unchecked' / 'no-checker-available' with a journaled note. Fail-closed by construction:
+// nothing needs to be enumerated for unknown prose to be refused.
 //
-// TWO GATES, both must pass (either failing ⇒ not mechanically checkable):
+// THE GRAMMAR (0.1.0):
+//   existence:  <subject> exists | <subject> is defined | <subject> is available |
+//               <subject> is exported
+//               (the '… is exported from <module>' variant is REMOVED: the module side was never
+//               verified by any evidence, so "exported from `fiction`" could mint checked. v1.x
+//               may reintroduce it with a codemap-verified module binding.)
+//   value:      <subject-or-bound-value-path> (is set to | defaults to | equals | is) <value>
+//               (longest-first alternation so 'is' never swallows 'is set to'; <value> must
+//               normalize — via the shared cited-value normalization — to EXACTLY the claim's
+//               bound citedValue: same kind, same canonical bytes.)
 //
-// GATE 1 — CANONICAL PREDICATE. The claim's atomic predicate must be a whole-string match of one
-// documented family (anchored, case-sensitive on identifiers, backticks around identifiers
-// permitted, one optional trailing period):
-//   existence:  <subject> exists | <subject> is exported [from <module>] | <subject> is defined |
-//               <subject> is available
-//   value:      <subject-or-value-path> (is | equals | defaults to | is set to) <value>
-//               where <value> must normalize (shared cited-value normalization) to exactly the
-//               claim's bound citedValue — same kind, same canonical bytes.
-//
-// GATE 2 — VISIBLE-WINDOW ALLOWLIST. In the marker's VISIBLE text (what the reader sees), every
-// word token within ±CHECKABILITY_WINDOW word tokens of each occurrence of the bound subject (and,
-// for value claims, of the bound value) must be on the curated NEUTRAL_ALLOWLIST below, or be one
-// of the claim's OWN bound tokens (the subject root, the cited-value path segments, tokens equal
-// to the bound value, the gate-1 'exported from' module). ANY other token — 'absent', 'missing',
-// 'formerly', an unrelated backticked identifier, ANY unknown word — makes the claim unchecked.
-// Fail-closed by construction: unknown vocabulary is unchecked by default, so the bypass class
-// cannot exist. As a window-independent backstop, an explicit DENIAL word anywhere in the visible
-// text ('not', "n't", 'never', 'removed', …) also fails the gate — a denial pushed beyond the
-// window by neutral filler must not slip through.
+// MINIMAL COSMETIC NORMALIZATION, both sides: Unicode NFC, backticks stripped (prose backticks
+// identifiers and values; the assertion is compared bare), whitespace collapsed to single
+// spaces, one optional trailing period dropped. Nothing else — no case folding on identifiers,
+// no punctuation tolerance, no stemming.
 //
 // The documented COST of fail-closed: wordy-but-true positives ("`greet`, added in v2, exists")
-// ship honestly unchecked. The writer prompt teaches the fix — keep the marker span tight around
-// the canonical assertion and put extra context outside the marker.
+// ship honestly unchecked. The writer prompt teaches the fix — the marker wraps ONLY the
+// canonical assertion; surrounding prose goes outside the marker.
 //
-// This grammar is the EVIDENCE-DECISION backstop, enforced at claim verification. The existing
-// negation-cue rejects (subject-binding polarity-mismatch, cited-value negation) stay as fast-path
-// REPAIR errors for the common cases — they give better messages; the grammar is what makes
-// bypassing them pointless. Anchoring may journal a non-blocking destined-unchecked hint so the
-// retry loop can improve phrasing opportunistically — never a blocking error.
+// This grammar is the EVIDENCE-DECISION backstop, enforced at claim verification. The
+// negation-cue fast paths (subject-binding polarity-mismatch, cited-value negation) are NO LONGER
+// LOAD-BEARING for trust: they stay only as earlier, better-messaged REPAIR errors where they
+// already fire — bypassing them just lands here. Anchoring may journal a non-blocking
+// destined-unchecked hint so the retry loop can improve phrasing opportunistically — never a
+// blocking error.
 
 import { normalizeCitedValue } from './cited-value-binding.ts';
 import type { NormalizedCitedValue } from './cited-value-binding.ts';
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// ±N word tokens around each bound-token occurrence in the visible text.
-export const CHECKABILITY_WINDOW = 5;
-
-// The curated neutral vocabulary — the ONLY free words canonical checkable prose may use near the
-// bound tokens. Deliberately small and lowercase (matched case-insensitively); everything else is
-// unknown and therefore unchecked. Past-tense copulas are deliberately absent: "was exported"
-// asserts history, which existence evidence cannot decide.
-export const NEUTRAL_ALLOWLIST: ReadonlySet<string> = new Set([
-  // articles + determiners
-  'a',
-  'an',
-  'the',
-  'this',
-  'that',
-  'its',
-  // copulas + auxiliaries (present tense only)
-  'is',
-  'are',
-  'be',
-  'has',
-  'have',
-  // prepositions + conjunctions
-  'to',
-  'of',
-  'in',
-  'on',
-  'at',
-  'by',
-  'for',
-  'with',
-  'as',
-  'and',
-  'from',
-  // pronouns
-  'it',
-  // canonical assertion verbs
-  'exists',
-  'exist',
-  'exported',
-  'defined',
-  'available',
-  'defaults',
-  'default',
-  'equals',
-  'set',
-  'sets',
-  'returns',
-  // domain nouns
-  'value',
-  'option',
-  'config',
-  'parameter',
-  'property',
-  'field',
-  'function',
-  'constant',
-  'method',
-  'flag',
-  'key'
-]);
-
-// Window-independent denial screen: any of these ANYWHERE in the visible marker text fails gate 2,
-// so neutral filler can never push a denial beyond the token window. Strictly fail-closed — it
-// only ever moves claims toward unchecked.
-const DENIAL_VOCABULARY =
-  /\b(?:not|no|none|never|cannot|without|absent|missing|removed|deleted|dropped|deprecated|discontinued|formerly|previously|unavailable|undefined|unsupported|gone|lacks?|neither|nor|except|unless)\b|n't\b/iu;
-
-// Word tokens: identifier-shaped runs and numeric literals. Dots, backticks, quotes, dashes, and
-// all punctuation delimit (and are themselves always permitted); "doesn't" tokenizes as
-// 'doesn' + 't', both unknown — contractions fail closed on their own.
-const WORD_TOKEN = /[A-Za-z_$][A-Za-z0-9_$]*|[0-9][0-9_]*(?:\.[0-9][0-9_]*)?(?:[eE][+-]?[0-9]+)?/gu;
-
-const wordTokens = (text: string): string[] => [...text.matchAll(WORD_TOKEN)].map((match) => match[0]);
-
-const IDENT = '[A-Za-z_$][A-Za-z0-9_$]*';
-
-// Identifiers may be backticked in prose-adjacent predicates; a stray single backtick is harmless
-// (the identifier itself is still matched verbatim).
-const ticked = (inner: string): string => `\`?${inner}\`?`;
-
-// GATE 1, existence family. Captures the optional 'exported from' module identifier so gate 2 can
-// treat it as a claim-bound token.
-const existencePredicateMatch = (subjectName: string, predicate: string): { moduleIdent?: string } | undefined => {
-  const pattern = new RegExp(
-    `^${ticked(escapeRegExp(subjectName))} (?:exists|is exported(?: from ${ticked(`(${IDENT})`)})?|is defined|is available)\\.?$`,
-    'u'
-  );
-  const match = predicate.match(pattern);
-  if (match === null) {
-    return undefined;
-  }
-  return match[1] === undefined ? {} : { moduleIdent: match[1] };
+// The one cosmetic normalization both sides pass through before the exact comparison.
+export const canonicalizeAssertionText = (text: string): string => {
+  const collapsed = text.normalize('NFC').replaceAll('`', '').replace(/\s+/gu, ' ').trim();
+  return collapsed.endsWith('.') ? collapsed.slice(0, -1) : collapsed;
 };
+
+// The four canonical existence assertions for a bound subject — nothing else exists to match.
+const canonicalExistenceAssertions = (subject: string): string[] => [
+  `${subject} exists`,
+  `${subject} is defined`,
+  `${subject} is available`,
+  `${subject} is exported`
+];
 
 // Longest alternative first: JS alternation is ordered, and a bare 'is' matching ahead of
 // 'is set to' would leave 'set to …' glued onto the value.
-const VALUE_VERBS = '(?:is set to|defaults to|equals|is)';
+const VALUE_VERBS = ['is set to', 'defaults to', 'equals', 'is'] as const;
 
-// GATE 1, value family: '<subject-or-value-path> <verb> <value>' where <value> must normalize to
-// the claim's bound citedValue exactly (same kind, same canonical bytes — '4' never passes for a
-// bound 3, and the quoted string "3" never passes for the number 3).
-const valuePredicateMatch = (subjectPaths: string[], bound: NormalizedCitedValue, predicate: string): boolean => {
-  const subjectAlternatives = subjectPaths.map((path) => ticked(escapeRegExp(path))).join('|');
-  const match = predicate.match(new RegExp(`^(?:${subjectAlternatives}) ${VALUE_VERBS} (.+)$`, 'u'));
+type ParsedValueAssertion = { subject: string; verb: string; valueSpelling: string };
+
+// Parse a canonicalized text as EXACTLY '<subject-or-bound-value-path> <verb> <value>' — the
+// whole string, nothing before, nothing after. Subject alternatives are the kernel-bound
+// spellings only (the codemap display name and the bound cited-value paths), longest first so a
+// dotted path is never truncated at its root.
+const parseValueAssertion = (subjectPaths: string[], text: string): ParsedValueAssertion | undefined => {
+  const subjectAlternatives = subjectPaths
+    .toSorted((a, b) => b.length - a.length)
+    .map((path) => escapeRegExp(path))
+    .join('|');
+  const match = text.match(new RegExp(`^(${subjectAlternatives}) (${VALUE_VERBS.join('|')}) (.+)$`, 'u'));
   if (match === null) {
-    return false;
+    return undefined;
   }
-  const tail = match[1] ?? '';
-  const candidates = tail.endsWith('.') ? [tail, tail.slice(0, -1)] : [tail];
-  return candidates.some((candidate) => {
-    const normalized = normalizeCitedValue(candidate);
-    return normalized.kind === bound.kind && normalized.canonical === bound.canonical;
-  });
-};
-
-// A visible-text token that IS the bound value, in the value's own type: numeric tokens compare
-// after numeric canonicalization; strings compare against the bare content (multi-token bare
-// strings like 'exponential-backoff' contribute each of their word tokens).
-const tokenMatchesValue = (token: string, value: NormalizedCitedValue): boolean => {
-  if (value.kind === 'number') {
-    return /^[0-9]/.test(token) && Number(token.replaceAll('_', '')) === Number(value.canonical);
-  }
-  if (value.kind === 'boolean' || value.kind === 'null') {
-    return token.toLowerCase() === value.canonical;
-  }
-  const bare = value.bare ?? '';
-  return token === bare || wordTokens(bare).includes(token);
+  return { subject: match[1]!, verb: match[2]!, valueSpelling: match[3]! };
 };
 
 export type CheckabilityStyle = 'existence' | 'value';
@@ -181,8 +88,8 @@ export type CheckabilityInput = {
   // The CODEMAP record's display name for the bound subject — the same root identifier subject
   // binding proved on both sides. Never writer-proposed text.
   subjectName: string;
-  // For value claims: the cited-value name paths bound on this symbol. Their dot segments are
-  // claim-bound tokens, and each full path is an accepted gate-1 subject spelling.
+  // For value claims: the cited-value name paths bound on this symbol — each full path is an
+  // accepted subject spelling in the canonical assertion.
   valueNames?: string[] | undefined;
   // For value claims: the claim's asserted citedValue (any accepted spelling — normalized here).
   citedValue?: string | undefined;
@@ -194,9 +101,9 @@ export type CheckabilityInput = {
 
 export type CheckabilityAssessment =
   | { checkable: true }
-  | { checkable: false; gate: 'canonical-predicate' | 'visible-window'; reason: string };
+  | { checkable: false; gate: 'canonical-predicate' | 'canonical-visible'; reason: string };
 
-const notCheckable = (gate: 'canonical-predicate' | 'visible-window', reason: string): CheckabilityAssessment => ({
+const notCheckable = (gate: 'canonical-predicate' | 'canonical-visible', reason: string): CheckabilityAssessment => ({
   checkable: false,
   gate,
   reason
@@ -206,98 +113,64 @@ const notCheckable = (gate: 'canonical-predicate' | 'visible-window', reason: st
 // side-effect free; claim verification is the enforcement point.
 export const assessClaimCheckability = (input: CheckabilityInput): CheckabilityAssessment => {
   const subject = input.subjectName;
+  const visible = canonicalizeAssertionText(input.markerText);
+  const predicate = canonicalizeAssertionText(input.predicate);
 
-  // GATE 1 — canonical predicate.
-  let moduleIdent: string | undefined;
-  let boundValue: NormalizedCitedValue | undefined;
   if (input.style === 'existence') {
-    const match = existencePredicateMatch(subject, input.predicate);
-    if (match === undefined) {
+    const assertions = canonicalExistenceAssertions(subject);
+    if (!assertions.includes(predicate)) {
       return notCheckable(
         'canonical-predicate',
         `the predicate "${input.predicate}" is not a canonical existence assertion about "${subject}" — ` +
-          `canonical forms: "${subject} exists", "${subject} is exported [from <module>]", ` +
-          `"${subject} is defined", "${subject} is available"`
+          `canonical forms: ${assertions.map((assertion) => `"${assertion}"`).join(', ')}`
       );
     }
-    moduleIdent = match.moduleIdent;
-  } else {
-    if (input.citedValue === undefined) {
-      return notCheckable('canonical-predicate', 'a value claim with no bound citedValue is never checkable');
-    }
-    boundValue = normalizeCitedValue(input.citedValue);
-    const subjectPaths = [subject, ...(input.valueNames ?? [])].filter(
-      (path, index, all) => all.indexOf(path) === index
-    );
-    if (!valuePredicateMatch(subjectPaths, boundValue, input.predicate)) {
+    if (visible !== predicate) {
       return notCheckable(
-        'canonical-predicate',
-        `the predicate "${input.predicate}" is not a canonical value assertion — canonical form: ` +
-          `"<subject> is|equals|defaults to|is set to ${boundValue.canonical}" where <subject> is ` +
-          `"${subject}" or a bound value path (${(input.valueNames ?? []).map((name) => `"${name}"`).join(', ') || 'none bound'})`
+        'canonical-visible',
+        `the visible marked prose "${input.markerText}" is not exactly the canonical assertion ` +
+          `"${predicate}" — the marker must wrap ONLY the canonical assertion (backticks, whitespace, and one ` +
+          'trailing period are tolerated); every other word goes outside the marker'
       );
     }
+    return { checkable: true };
   }
 
-  // GATE 2 — visible-window allowlist, with the window-independent denial screen first.
-  const denial = input.markerText.match(DENIAL_VOCABULARY);
-  if (denial !== null) {
-    return notCheckable(
-      'visible-window',
-      `the visible marked prose contains the denial word "${denial[0]}" — checkable prose asserts the fact ` +
-        'plainly, with no denial vocabulary anywhere inside the marker'
-    );
+  if (input.citedValue === undefined) {
+    return notCheckable('canonical-predicate', 'a value claim with no bound citedValue is never checkable');
   }
-  const boundSegments = new Set<string>([
-    subject,
-    ...(input.valueNames ?? []).flatMap((name) => name.split('.').filter((segment) => segment !== '')),
-    ...(moduleIdent === undefined ? [] : [moduleIdent])
-  ]);
-  const value = boundValue;
-  const allowed = (token: string): boolean =>
-    NEUTRAL_ALLOWLIST.has(token.toLowerCase()) ||
-    boundSegments.has(token) ||
-    (value !== undefined && tokenMatchesValue(token, value));
+  const bound = normalizeCitedValue(input.citedValue);
+  const subjectPaths = [subject, ...(input.valueNames ?? [])].filter((path, index, all) => all.indexOf(path) === index);
+  const spellsBoundValue = (spelling: string): boolean => {
+    const normalized: NormalizedCitedValue = normalizeCitedValue(spelling);
+    return normalized.kind === bound.kind && normalized.canonical === bound.canonical;
+  };
+  const canonicalShape =
+    `"<subject> is set to|defaults to|equals|is ${bound.canonical}" where <subject> is "${subject}" or a bound ` +
+    `value path (${(input.valueNames ?? []).map((name) => `"${name}"`).join(', ') || 'none bound'})`;
 
-  const tokens = wordTokens(input.markerText);
-  const anchorIndexes = tokens.flatMap((token, index) => {
-    if (token === subject) {
-      return [index];
-    }
-    if (value !== undefined && tokenMatchesValue(token, value)) {
-      return [index];
-    }
-    return [];
-  });
-  if (!tokens.includes(subject)) {
+  const predicateAssertion = parseValueAssertion(subjectPaths, predicate);
+  if (predicateAssertion === undefined || !spellsBoundValue(predicateAssertion.valueSpelling)) {
     return notCheckable(
-      'visible-window',
-      `the visible marked prose never names the bound subject "${subject}" as a word token`
+      'canonical-predicate',
+      `the predicate "${input.predicate}" is not a canonical value assertion — canonical form: ${canonicalShape}`
     );
   }
-  if (value !== undefined && !tokens.some((token) => tokenMatchesValue(token, value))) {
+  const visibleAssertion = parseValueAssertion(subjectPaths, visible);
+  if (visibleAssertion === undefined || !spellsBoundValue(visibleAssertion.valueSpelling)) {
     return notCheckable(
-      'visible-window',
-      `the visible marked prose never states the bound value ${value.canonical} as a word token`
+      'canonical-visible',
+      `the visible marked prose "${input.markerText}" is not exactly a canonical value assertion — canonical ` +
+        `form: ${canonicalShape}. The marker must wrap ONLY the canonical assertion; every other word goes ` +
+        'outside the marker'
     );
   }
-  const offending: string[] = [];
-  for (const anchor of anchorIndexes) {
-    const start = Math.max(0, anchor - CHECKABILITY_WINDOW);
-    const end = Math.min(tokens.length, anchor + CHECKABILITY_WINDOW + 1);
-    for (let index = start; index < end; index += 1) {
-      const token = tokens[index]!;
-      if (!allowed(token) && !offending.includes(token)) {
-        offending.push(token);
-      }
-    }
-  }
-  if (offending.length > 0) {
+  if (visibleAssertion.subject !== predicateAssertion.subject || visibleAssertion.verb !== predicateAssertion.verb) {
     return notCheckable(
-      'visible-window',
-      `the visible marked prose contains ${offending.map((token) => `"${token}"`).join(', ')} within ` +
-        `${CHECKABILITY_WINDOW} words of the asserted subject/value — only neutral vocabulary and the claim's own ` +
-        'bound tokens are checkable; move extra context outside the marker'
+      'canonical-visible',
+      `the visible marked prose ("${visibleAssertion.subject} ${visibleAssertion.verb} …") and the predicate ` +
+        `("${predicateAssertion.subject} ${predicateAssertion.verb} …") state DIFFERENT canonical assertions — ` +
+        'both sides must state the same one, differing only in cosmetic normalization'
     );
   }
   return { checkable: true };

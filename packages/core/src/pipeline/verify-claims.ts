@@ -33,8 +33,9 @@ import type { AnchoredClaim, RejectedProposal } from './anchor-ledger.ts';
 // never asserted:
 //
 //   code-structure  codemap grounding decides ONLY canonically phrased existence claims (the
-//                   fail-closed checkability grammar, impl-12): the grounding symbol resolves in
-//                   the codemap AND the claim sits inside the canonical grammar →
+//                   fail-closed exact-canonical-match checkability grammar, impl-13): the
+//                   grounding symbol resolves in the codemap AND the marker's visible text IS the
+//                   canonical assertion (with the predicate stating the same one) →
 //                   'codemap-grounding' evidence, outcome pass → checked. Arbitrary prose outside
 //                   the grammar stays unchecked with a journaled note — never argued with. A
 //                   missing identifier is still a HARD DEFECT for every class (the stale-naming
@@ -186,12 +187,13 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
           predicate: claim.predicate
         })
       }));
-      // CHECKABILITY GRAMMAR (wave 2b close FINAL, impl-12 — the fail-closed backstop behind the
-      // negation-cue fast paths): a bound positive subject alone is NOT enough. Grounding evidence
-      // may only DECIDE a claim whose predicate is a canonical existence assertion AND whose
-      // visible window contains only allowlisted vocabulary — "`greet` is absent" over predicate
-      // "greet exists" passes every cue detector but is unknown vocabulary here, so it stays
-      // honestly unchecked instead of minting 'checked'.
+      // CHECKABILITY GRAMMAR (wave 2b close FINAL, impl-13 — exact canonical visible match): a
+      // bound positive subject alone is NOT enough. Grounding evidence may only DECIDE a claim
+      // whose VISIBLE marker text exactly IS a canonical existence assertion about the bound
+      // subject, with the predicate stating the same assertion — "`greet` is absent", "`greet`
+      // returns the value", or "`greet` 不存在" over predicate "greet exists" all fail the exact
+      // match, so they stay honestly unchecked instead of minting 'checked'. The negation-cue
+      // fast paths above are no longer load-bearing — they only give earlier, better messages.
       const assessed = bindings.map((bound) => ({
         ...bound,
         checkability:
@@ -355,10 +357,11 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
             );
             continue;
           }
-          // CHECKABILITY GRAMMAR (impl-12, the fail-closed backstop): the value comparison may
-          // only DECIDE a canonically phrased claim. Non-canonical prose/predicates skip the
-          // comparison entirely and stay unchecked — the kernel never argues with prose the
-          // grammar cannot vouch for.
+          // CHECKABILITY GRAMMAR (impl-13, exact canonical visible match): the value comparison
+          // may only DECIDE a claim whose visible marker text exactly IS the canonical value
+          // assertion (same assertion in the predicate). Behavior prose ("`MODE` returns linear")
+          // can never reach value evidence; non-canonical prose skips the comparison entirely and
+          // stays unchecked — the kernel never argues with prose the grammar cannot vouch for.
           const checkability = assessClaimCheckability({
             style: 'value',
             subjectName: symbol.name,

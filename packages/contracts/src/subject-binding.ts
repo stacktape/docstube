@@ -25,6 +25,12 @@
 //     also name, but they can NEVER substitute for the root: common leaf words ('config', 'mode',
 //     'default') occur across unrelated values, so a segment-only occurrence is rejected.
 //
+// NO LONGER LOAD-BEARING FOR TRUST (impl-13): the exact-canonical-match checkability grammar in
+// checkability-grammar.ts is what decides whether existence/value evidence may decide a claim —
+// any prose outside the canonical assertion fails there regardless of what the cue detectors
+// below conclude. The polarity/negation checks here stay ONLY because they fire EARLIER (at
+// anchoring) with better, repair-eligible messages for the common cases.
+//
 // POLARITY AGREEMENT (wave 2b close, polarity finding): root-token PRESENCE alone is not
 // prose↔predicate agreement — visible "`greet` does not exist" over predicate "greet exists"
 // contains the root on both sides yet asserts the OPPOSITE fact. Both sides are therefore also

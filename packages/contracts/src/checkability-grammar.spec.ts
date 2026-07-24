@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { assessClaimCheckability, NEUTRAL_ALLOWLIST } from './checkability-grammar.ts';
+import { assessClaimCheckability, canonicalizeAssertionText } from './checkability-grammar.ts';
 
-// The fail-closed canonical checkability grammar (wave 2b close FINAL, impl-12): existence/value
-// evidence may only DECIDE claims phrased inside the canonical grammar (gate 1: canonical
-// predicate; gate 2: visible-window allowlist + denial screen). Everything else stays honestly
-// unchecked — never a repair spiral, never an arms race with negation synonyms.
+// EXACT CANONICAL VISIBLE MATCH (wave 2b close FINAL, impl-13): existence/value evidence may only
+// DECIDE a claim whose VISIBLE marker text, after minimal cosmetic normalization, exactly equals
+// one canonical assertion — and whose predicate states the SAME assertion. No windows, no
+// allowlists, no denial vocabulary: any other word anywhere in the visible span fails the match,
+// so unknown prose is unchecked by construction. Everything else stays honestly unchecked —
+// never a repair spiral, never an arms race with synonyms or scripts.
 
 const existence = (markerText: string, predicate: string, subjectName = 'greet') =>
   assessClaimCheckability({ style: 'existence', subjectName, markerText, predicate });
@@ -19,22 +21,30 @@ const value = (markerText: string, predicate: string, citedValue = '3', valueNam
     predicate
   });
 
-describe('gate 1 — canonical predicate (existence family)', () => {
-  it('accepts every canonical existence form, with backticks and a trailing period tolerated', () => {
-    for (const predicate of [
-      'greet exists',
-      '`greet` exists.',
-      'greet is exported',
-      'greet is exported from greeter',
-      'greet is exported from `greeter`',
-      'greet is defined',
-      'greet is available'
-    ]) {
-      expect(existence('`greet` exists.', predicate)).toEqual({ checkable: true });
+describe('cosmetic normalization', () => {
+  it('strips backticks, collapses whitespace, drops one trailing period, and applies NFC', () => {
+    expect(canonicalizeAssertionText('`greet`   exists.')).toBe('greet exists');
+    expect(canonicalizeAssertionText(' DEFAULT_RETRIES defaults to `3` ')).toBe('DEFAULT_RETRIES defaults to 3');
+    // NFC: a decomposed é normalizes to the composed form.
+    expect(canonicalizeAssertionText('café')).toBe('café');
+    // Only ONE trailing period is cosmetic.
+    expect(canonicalizeAssertionText('greet exists..')).toBe('greet exists.');
+  });
+});
+
+describe('existence family — exact canonical visible match', () => {
+  it('accepts each canonical form when the visible prose and the predicate state the SAME assertion', () => {
+    for (const form of ['exists', 'is defined', 'is available', 'is exported']) {
+      expect(existence(`\`greet\` ${form}.`, `greet ${form}`)).toEqual({ checkable: true });
     }
   });
 
-  it('rejects any predicate outside the family — shape prose is not existence-checkable', () => {
+  it('cosmetic differences between the sides are tolerated — backticks, whitespace, trailing period', () => {
+    expect(existence('`greet`  exists.', 'greet exists')).toEqual({ checkable: true });
+    expect(existence('greet is defined', '`greet` is defined.')).toEqual({ checkable: true });
+  });
+
+  it('rejects a predicate outside the family — shape/behavior prose is not existence-checkable', () => {
     for (const predicate of [
       'greet accepts a GreetOptions parameter',
       'greet returns a string',
@@ -43,29 +53,74 @@ describe('gate 1 — canonical predicate (existence family)', () => {
       'greet exists and is exported',
       'greet does not exist'
     ]) {
-      const result = existence('`greet` exists.', predicate);
-      expect(result).toMatchObject({ checkable: false, gate: 'canonical-predicate' });
+      expect(existence('`greet` exists.', predicate)).toMatchObject({ checkable: false, gate: 'canonical-predicate' });
     }
   });
 
   it('is case-sensitive and whole-identifier on the subject', () => {
-    expect(existence('`greet` exists.', 'GREET exists')).toMatchObject({ checkable: false });
-    expect(existence('`greet` exists.', 'greeting exists')).toMatchObject({ checkable: false });
+    expect(existence('`GREET` exists.', 'GREET exists')).toMatchObject({ checkable: false });
+    expect(existence('`greeting` exists.', 'greeting exists')).toMatchObject({ checkable: false });
+  });
+
+  it("Sol's laundering probe: '`greet` returns the value.' over predicate 'greet exists' is NOT checkable", () => {
+    // The predicate is canonical, but the reader sees a behavior sentence — the visible text must
+    // BE the canonical assertion, not merely accompany one.
+    const result = existence('`greet` returns the value.', 'greet exists');
+    expect(result).toMatchObject({ checkable: false, gate: 'canonical-visible' });
+    expect(result.checkable === false && result.reason).toContain('ONLY the canonical assertion');
+  });
+
+  it("Sol's module probe: '`greet` is exported from `fiction`.' is NOT checkable — the from-variant is removed", () => {
+    // The module was never verified by any evidence; the variant returns in v1.x only with a
+    // codemap-verified module binding.
+    expect(existence('`greet` is exported from `fiction`.', 'greet is exported from fiction')).toMatchObject({
+      checkable: false
+    });
+    // Even a bare 'is exported' predicate cannot ride under module-naming visible prose.
+    expect(existence('`greet` is exported from `fiction`.', 'greet is exported')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
+  });
+
+  it("Sol's non-Latin probe: '`greet` 不存在.' is NOT checkable — no tokenizer exists to fool", () => {
+    expect(existence('`greet` 不存在.', 'greet exists')).toMatchObject({ checkable: false, gate: 'canonical-visible' });
+  });
+
+  it("Sol's distant-clause probe: '`greet`, which recently ceased to exist, exists' is NOT checkable", () => {
+    expect(existence('`greet`, which recently ceased to exist, exists', 'greet exists')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
+  });
+
+  it('the documented fail-closed COST: wordy-but-TRUE positives are honestly not checkable', () => {
+    expect(existence('`greet`, added in v2, exists.', 'greet exists')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
+    expect(existence('the `greet` function is available.', 'greet is available')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
+  });
+
+  it('mixed canonical forms are DIFFERENT assertions — the sides must state the same one', () => {
+    expect(existence('`greet` exists.', 'greet is defined')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
   });
 });
 
-describe('gate 1 — canonical predicate (value family)', () => {
-  it('accepts is/equals/defaults to/is set to with the subject root or a bound value path', () => {
-    for (const predicate of [
-      'DEFAULT_RETRIES is 3',
-      'DEFAULT_RETRIES equals 3',
-      'DEFAULT_RETRIES defaults to 3',
-      'DEFAULT_RETRIES is set to 3.',
-      '`DEFAULT_RETRIES` defaults to 3'
-    ]) {
-      expect(value('`DEFAULT_RETRIES` defaults to 3.', predicate)).toEqual({ checkable: true });
+describe('value family — exact canonical visible match', () => {
+  it('accepts is/equals/defaults to/is set to when both sides state the same assertion', () => {
+    for (const verb of ['is', 'equals', 'defaults to', 'is set to']) {
+      expect(value(`\`DEFAULT_RETRIES\` ${verb} 3.`, `DEFAULT_RETRIES ${verb} 3`)).toEqual({ checkable: true });
     }
-    // A dotted value path rooted at the subject is an accepted subject spelling.
+  });
+
+  it('a dotted value path rooted at the subject is an accepted subject spelling', () => {
     expect(
       assessClaimCheckability({
         style: 'value',
@@ -78,16 +133,20 @@ describe('gate 1 — canonical predicate (value family)', () => {
     ).toEqual({ checkable: true });
   });
 
-  it('requires the predicate value to normalize EXACTLY to the bound citedValue — kind and bytes', () => {
-    // Wrong number, and the string "3" against the number 3, both fail gate 1.
+  it('requires the value on BOTH sides to normalize EXACTLY to the bound citedValue — kind and bytes', () => {
+    // Wrong number, and the string "3" against the number 3, both fail.
     expect(value('`DEFAULT_RETRIES` is 3.', 'DEFAULT_RETRIES is 4')).toMatchObject({
       checkable: false,
       gate: 'canonical-predicate'
     });
     expect(value('`DEFAULT_RETRIES` is 3.', 'DEFAULT_RETRIES is "3"')).toMatchObject({ checkable: false });
+    expect(value('`DEFAULT_RETRIES` is "3".', 'DEFAULT_RETRIES is 3')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
   });
 
-  it('normalized spellings of the SAME value pass: bare and JSON-quoted semantic strings agree', () => {
+  it('normalized spellings of the SAME value are cosmetic: bare and JSON-quoted semantic strings agree', () => {
     expect(
       assessClaimCheckability({
         style: 'value',
@@ -100,92 +159,59 @@ describe('gate 1 — canonical predicate (value family)', () => {
     ).toEqual({ checkable: true });
   });
 
-  it('rejects non-canonical value phrasing outside the verb family', () => {
+  it("Sol's behavior-prose probe: '`MODE` returns linear.' is NOT checkable — behavior prose can never reach value evidence", () => {
+    expect(
+      assessClaimCheckability({
+        style: 'value',
+        subjectName: 'MODE',
+        valueNames: ['MODE'],
+        citedValue: 'linear',
+        markerText: '`MODE` returns linear.',
+        predicate: 'MODE returns linear'
+      })
+    ).toMatchObject({ checkable: false, gate: 'canonical-predicate' });
+  });
+
+  it('a verb mismatch between the sides is a DIFFERENT assertion, not cosmetic', () => {
+    expect(value('`DEFAULT_RETRIES` defaults to 3.', 'DEFAULT_RETRIES is 3')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
+  });
+
+  it('ANY extra word in the visible span fails the exact match', () => {
+    for (const markerText of [
+      'the `DEFAULT_RETRIES` value is set to 3.',
+      '`DEFAULT_RETRIES` is 3 of 15.',
+      '`DEFAULT_RETRIES` is 3 across most retry paths.',
+      '`DEFAULT_RETRIES` is now 3.'
+    ]) {
+      expect(value(markerText, 'DEFAULT_RETRIES is 3')).toMatchObject({
+        checkable: false,
+        gate: 'canonical-visible'
+      });
+    }
+  });
+
+  it('rejects non-canonical predicate phrasing outside the verb family', () => {
     expect(value('`DEFAULT_RETRIES` is 3.', 'the DEFAULT_RETRIES option has a default of 3')).toMatchObject({
       checkable: false,
       gate: 'canonical-predicate'
     });
   });
-});
 
-describe('gate 2 — visible-window allowlist (fail closed by construction)', () => {
-  it("Sol's impl-12 probe: '`greet` is absent' over predicate 'greet exists' is NOT checkable", () => {
-    // The negation-cue vocabulary never listed 'absent' — the allowlist does not need to: any
-    // unknown word near the subject fails, so the synonym arms race is over.
-    const result = existence('`greet` is absent.', 'greet exists');
-    expect(result).toMatchObject({ checkable: false, gate: 'visible-window' });
-    expect(result.checkable === false && result.reason).toContain('absent');
+  it('a value claim with no bound citedValue is never checkable', () => {
+    expect(
+      assessClaimCheckability({
+        style: 'value',
+        subjectName: 'DEFAULT_RETRIES',
+        markerText: '`DEFAULT_RETRIES` is 3.',
+        predicate: 'DEFAULT_RETRIES is 3'
+      })
+    ).toMatchObject({ checkable: false, gate: 'canonical-predicate' });
   });
 
-  it("Sol's long-window probe: a denial pushed beyond every window still fails (denial screen)", () => {
-    const result = existence(
-      '`greet` is available as the value of the option of the key that is not defined.',
-      'greet exists'
-    );
-    expect(result).toMatchObject({ checkable: false, gate: 'visible-window' });
-    expect(result.checkable === false && result.reason).toContain('"not"');
-  });
-
-  it('the documented fail-closed COST: a wordy-but-TRUE positive is honestly not checkable', () => {
-    // 'added' and 'v2' are unknown vocabulary inside the window. The writer keeps the marker
-    // tight ('`greet` exists.') and puts the history outside the marker.
-    const result = existence('`greet`, added in v2, exists.', 'greet exists');
-    expect(result).toMatchObject({ checkable: false, gate: 'visible-window' });
-    expect(result.checkable === false && result.reason).toContain('"added"');
-    expect(result.checkable === false && result.reason).toContain('"v2"');
-  });
-
-  it('an unrelated backticked identifier near the subject is unknown vocabulary', () => {
-    expect(existence('`greet` exists like `shout`.', 'greet exists')).toMatchObject({
-      checkable: false,
-      gate: 'visible-window'
-    });
-  });
-
-  it('a numeral in an existence window is unknown (no bound value exists to equal it)', () => {
-    expect(existence('`greet` exists in 3 variants.', 'greet exists')).toMatchObject({
-      checkable: false,
-      gate: 'visible-window'
-    });
-  });
-
-  it('a numeral NOT equal to the bound value fails a value claim window', () => {
-    expect(value('`DEFAULT_RETRIES` is 3 of 15.', 'DEFAULT_RETRIES is 3')).toMatchObject({
-      checkable: false,
-      gate: 'visible-window'
-    });
-  });
-
-  it("contractions fail closed on their own tokens ('doesn' + 't' are unknown)", () => {
-    expect(existence("`greet` doesn't exist.", 'greet exists')).toMatchObject({ checkable: false });
-  });
-
-  it('the subject and value must occur as word tokens in the visible prose', () => {
-    expect(existence('the function exists.', 'greet exists')).toMatchObject({ checkable: false });
-    expect(value('`DEFAULT_RETRIES` is small.', 'DEFAULT_RETRIES is 3')).toMatchObject({ checkable: false });
-  });
-
-  it("the gate-1 'exported from' module identifier is a claim-bound token in the window", () => {
-    expect(existence('`greet` is exported from `greeter`.', 'greet is exported from greeter')).toEqual({
-      checkable: true
-    });
-    // A DIFFERENT module identifier in the prose is unknown vocabulary.
-    expect(existence('`greet` is exported from `elsewhere`.', 'greet is exported from greeter')).toMatchObject({
-      checkable: false,
-      gate: 'visible-window'
-    });
-  });
-
-  it('canonical positives pass end to end: tight markers of neutral words plus bound tokens', () => {
-    expect(existence('`greet` exists.', 'greet exists')).toEqual({ checkable: true });
-    expect(existence('the `greet` function is available.', 'greet is available')).toEqual({ checkable: true });
-    expect(value('`DEFAULT_RETRIES` defaults to 3.', 'DEFAULT_RETRIES defaults to 3')).toEqual({ checkable: true });
-    expect(value('the `DEFAULT_RETRIES` value is set to 3.', 'DEFAULT_RETRIES is set to 3')).toEqual({
-      checkable: true
-    });
-  });
-
-  it('multi-token semantic string values bind each of their word tokens', () => {
+  it('multi-word canonical positives pass — the value spelling is whatever normalizes to the bound value', () => {
     expect(
       assessClaimCheckability({
         style: 'value',
@@ -196,13 +222,5 @@ describe('gate 2 — visible-window allowlist (fail closed by construction)', ()
         predicate: 'MODE is set to exponential-backoff'
       })
     ).toEqual({ checkable: true });
-  });
-});
-
-describe('the neutral allowlist itself', () => {
-  it('contains no negation or past-tense vocabulary — fail-closed by curation', () => {
-    for (const word of ['not', 'no', 'never', 'cannot', 'was', 'were', 'absent', 'missing', 'removed', 'formerly']) {
-      expect(NEUTRAL_ALLOWLIST.has(word)).toBe(false);
-    }
   });
 });
