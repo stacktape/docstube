@@ -1,6 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AgentTaskSpec, PageShard, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
@@ -112,6 +115,41 @@ describe('runRefine', () => {
       /no generated page/u
     );
   }, 60_000);
+
+  it('re-checks the tree at run END and marks refined shards dirty when it mutated mid-run (impl-09)', async () => {
+    // Mirrors dirty-tree.spec.ts for the refine mode: refine writes evidence-bearing shards like
+    // generate/maintain, so the same end-of-run porcelain recheck must mark what it persisted.
+    const execFileAsync = promisify(execFile);
+    const git = (...args: string[]) => execFileAsync('git', args, { cwd: repoRoot });
+    // Machine-local state and emitted output are gitignored, as in real projects — only a genuine
+    // source mutation may read as dirtiness.
+    await writeFile(join(repoRoot, '.gitignore'), '.docstube/\ndocs-site/\n');
+    await git('init');
+    await git('config', 'user.email', 'test@example.com');
+    await git('config', 'user.name', 'Test');
+    await git('config', 'commit.gpgsign', 'false');
+    await git('add', '.');
+    await git('commit', '-m', 'init');
+
+    const good = makeRunner(() => goodMdx);
+    await runGenerate({ repoRoot, runTask: good.runTask, toolDescriptors: [] });
+
+    // The refine writer mutates the working tree mid-run (an untracked scratch file): the tree was
+    // clean at run start, so only the end-of-run recheck can catch it.
+    const mutating = makeRunner(() => {
+      writeFileSync(join(repoRoot, 'scratch.txt'), 'mutated mid-run\n');
+      return goodMdx;
+    });
+    const summary = await runRefine({ repoRoot, runTask: mutating.runTask, toolDescriptors: [] });
+    expect(summary.refined).toHaveLength(1);
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard?.provenance?.lineage.dirtyWorkingTree).toBe(true);
+    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', summary.runId, 'journal.jsonl'), 'utf8');
+    expect(journalRaw).toContain('became dirty DURING the run');
+  }, 120_000);
 
   it('a plan-usage freeze journals run-frozen with the estimated spend and surfaces it in the summary', async () => {
     // Two pages so the freeze (checked only between candidates) can trip before candidate 2.
