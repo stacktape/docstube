@@ -8,12 +8,8 @@ import {
   sourceKeySchema
 } from './primitives.ts';
 
-// Guarantee levels are computed, never asserted (ARCHITECTURE.md §4):
-//   proven         a deterministic tool checked it (verifier pass for code, codemap grounding for claims)
-//   scored         criteria-based AI review only
-//   out-of-domain  declared unprovable (tribal knowledge, intent) — flagged, never silently wrong
-export const guaranteeLevelSchema = z.enum(['proven', 'scored', 'out-of-domain']);
-export type GuaranteeLevel = z.infer<typeof guaranteeLevelSchema>;
+// The proven/scored/out-of-domain guarantee ladder is REMOVED (wave 2b demolition): trust state
+// lives on the claim ledger + ClaimEvidence; reader surfaces render literal claim counts.
 
 // Grounding: which source symbol (by normalized hash, never by name) an entity derives from.
 export const sourceRefSchema = z.object({

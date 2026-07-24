@@ -133,9 +133,6 @@ const buildBlock = (mdx: string, node: RootContent): BlockEntity => {
     contentHash: contentHash(hashedContent),
     ...(language === undefined ? {} : { language }),
     variants: [],
-    claims: [],
-    // Initial level; the verify stage upgrades to proven / caps to out-of-domain.
-    guarantee: 'scored',
     provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
   };
 };
@@ -205,8 +202,7 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
         title: headingText,
         level: heading.depth,
         anchor: uniqueAnchor(slugifyAnchor(headingText)),
-        blocks: [],
-        guarantee: 'scored'
+        blocks: []
       });
       continue;
     }
@@ -231,7 +227,6 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
     ...(description === undefined ? {} : { description }),
     preamble,
     sections,
-    guarantee: 'scored',
     provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
   };
 };

@@ -35,8 +35,6 @@ export const buildFixturePage = (): PageEntity => ({
       blockType: 'paragraph',
       contentHash: contentHash('Install docstube with your package manager of choice.'),
       variants: [],
-      claims: [],
-      guarantee: 'scored',
       provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
     }
   ],
@@ -47,7 +45,6 @@ export const buildFixturePage = (): PageEntity => ({
       title: 'Requirements',
       level: 2,
       anchor: 'requirements',
-      guarantee: 'proven',
       blocks: [
         {
           id: mintId(idPrefixes.block),
@@ -56,7 +53,6 @@ export const buildFixturePage = (): PageEntity => ({
           language: 'bash',
           contentHash: contentHash('npm install -g docstube'),
           variants: [],
-          guarantee: 'proven',
           provenance: {
             sources: [
               {
@@ -78,22 +74,11 @@ export const buildFixturePage = (): PageEntity => ({
               }
             ],
             reviews: []
-          },
-          claims: [
-            {
-              id: mintId(idPrefixes.claim),
-              kind: 'claim',
-              text: 'docstube installs globally via npm',
-              anchor: { quote: 'npm install -g docstube', prefix: '', suffix: '' },
-              claimClass: 'code-sample',
-              guarantee: 'proven'
-            }
-          ]
+          }
         }
       ]
     }
   ],
-  guarantee: 'scored',
   provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
 });
 

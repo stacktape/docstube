@@ -6,7 +6,7 @@ import {
   idPrefixes,
   mintId
 } from '@docstube/contracts';
-import type { BlockEntity, ClaimEntity, PageEntity, Provenance, SectionEntity } from '@docstube/contracts';
+import type { BlockEntity, PageEntity, Provenance, SectionEntity } from '@docstube/contracts';
 import type { BlockTypeRegistry, PageArtifact, VerifierContext } from '@docstube/plugin-sdk';
 
 // Test-only builders: small, hand-rolled pages whose entity tree stays consistent with the MDX
@@ -20,21 +20,11 @@ const emptyProvenance = (): Provenance => ({
   reviews: []
 });
 
-export const makeClaim = (text: string): ClaimEntity => ({
-  id: mintId(idPrefixes.claim),
-  kind: 'claim',
-  text,
-  anchor: { quote: text, prefix: '', suffix: '' },
-  claimClass: 'code-sample',
-  guarantee: 'scored'
-});
-
 export const makeBlock = (input: {
   content: string;
   blockType?: string;
   language?: string;
   metadata?: unknown;
-  claims?: ClaimEntity[];
   id?: string;
 }): BlockEntity => ({
   id: input.id ?? mintId(idPrefixes.block),
@@ -44,8 +34,6 @@ export const makeBlock = (input: {
   contentHash: contentHash(input.content),
   language: input.language,
   variants: [],
-  claims: input.claims ?? [],
-  guarantee: 'scored',
   provenance: emptyProvenance()
 });
 
@@ -60,8 +48,7 @@ export const makeSection = (input: {
   title: input.title ?? input.anchor,
   level: 2,
   anchor: input.anchor,
-  blocks: input.blocks ?? [],
-  guarantee: 'scored'
+  blocks: input.blocks ?? []
 });
 
 export const makePage = (input: {
@@ -77,7 +64,6 @@ export const makePage = (input: {
   title: input.title ?? input.slug,
   preamble: input.preamble ?? [],
   sections: input.sections ?? [],
-  guarantee: 'scored',
   provenance: emptyProvenance()
 });
 

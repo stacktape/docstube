@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { codeTypecheckTsVerifier, findCodeBlocks } from './code-typecheck-ts.ts';
-import { makeArtifact, makeBlock, makeClaim, makeContext, makePage, makeSection } from './test-support.ts';
+import { makeArtifact, makeBlock, makeContext, makePage, makeSection } from './test-support.ts';
 
 const mdxWithFence = (lang: string, code: string): string => `# Title\n\n\`\`\`${lang}\n${code}\n\`\`\`\n`;
 
@@ -21,18 +21,16 @@ describe('findCodeBlocks', () => {
 });
 
 describe('code-typecheck-ts', () => {
-  it('passes a clean snippet and covers the block and its claims', async () => {
+  it('passes a clean snippet and covers the block', async () => {
     const code = 'const x: number = 1;\nexport const doubled = x * 2;';
-    const claim = makeClaim('the value can be doubled');
-    const block = makeBlock({ content: code, blockType: 'code-example', language: 'ts', claims: [claim] });
+    const block = makeBlock({ content: code, blockType: 'code-example', language: 'ts' });
     const page = makePage({ slug: 'guide', sections: [makeSection({ anchor: 'usage', blocks: [block] })] });
 
     const result = await codeTypecheckTsVerifier.verify(makeContext(), [makeArtifact(page, mdxWithFence('ts', code))]);
 
     expect(result.status).toBe('pass');
     expect(result.findings).toEqual([]);
-    expect(result.coveredEntityIds).toContain(block.id);
-    expect(result.coveredEntityIds).toContain(claim.id);
+    expect(result.coveredEntityIds).toEqual([block.id]);
   });
 
   it('fails a type-error snippet with the block entity address and line info', async () => {

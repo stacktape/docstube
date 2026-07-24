@@ -36,12 +36,10 @@ const page: PageEntity = pageEntitySchema.parse({
       kind: 'block',
       blockType: 'paragraph',
       contentHash: HASH,
-      guarantee: 'scored',
       provenance: emptyProvenance
     }
   ],
   sections: [],
-  guarantee: 'scored',
   provenance: emptyProvenance
 });
 

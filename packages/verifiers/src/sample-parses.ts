@@ -238,7 +238,7 @@ export const sampleParsesVerifier: VerifierDefinition = {
           const language = (block.language ?? '').toLowerCase();
           const sampleErrors = jsonLanguages.has(language) ? parseJsonSample(fence.code) : parseYamlSample(fence.code);
           if (sampleErrors.length === 0) {
-            coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
+            coveredEntityIds.push(block.id);
             continue;
           }
           for (const sampleError of sampleErrors) {

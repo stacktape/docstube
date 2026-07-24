@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { codemapSchema } from '@docstube/contracts';
 import type { VerifierContext } from '@docstube/plugin-sdk';
 import { diagramD2Verifier, extractD2Nodes, groundD2Node } from './diagram-d2.ts';
-import { makeArtifact, makeBlock, makeClaim, makeContext, makePage, makeSection } from './test-support.ts';
+import { makeArtifact, makeBlock, makeContext, makePage, makeSection } from './test-support.ts';
 
 const codemap = codemapSchema.parse({
   schemaVersion: 1,
@@ -38,10 +38,9 @@ const ctxWithCodemap = (): VerifierContext => ({ ...makeContext(), codemap });
 const mdxWithFence = (info: string, code: string): string => `# Title\n\n\`\`\`${info}\n${code}\n\`\`\`\n`;
 
 const pageWithDiagram = (code: string) => {
-  const claim = makeClaim('the architecture looks like this');
-  const block = makeBlock({ content: code, blockType: 'code-example', language: 'd2', claims: [claim] });
+  const block = makeBlock({ content: code, blockType: 'code-example', language: 'd2' });
   const page = makePage({ slug: 'architecture', sections: [makeSection({ anchor: 'overview', blocks: [block] })] });
-  return { block, claim, page };
+  return { block, page };
 };
 
 describe('extractD2Nodes', () => {
@@ -77,11 +76,11 @@ describe('groundD2Node', () => {
 describe('diagram-d2 verifier', () => {
   it('proves a compiled, fully grounded diagram', async () => {
     const code = 'greet -> RetryQueue: enqueues';
-    const { block, claim, page } = pageWithDiagram(code);
+    const { block, page } = pageWithDiagram(code);
     const result = await diagramD2Verifier.verify(ctxWithCodemap(), [makeArtifact(page, mdxWithFence('d2', code))]);
     expect(result.status).toBe('pass');
     expect(result.findings).toEqual([]);
-    expect(result.coveredEntityIds).toEqual([block.id, claim.id]);
+    expect(result.coveredEntityIds).toEqual([block.id]);
   }, 30_000);
 
   it('warns on an ungrounded node by default, gates only with `strict` fence meta', async () => {

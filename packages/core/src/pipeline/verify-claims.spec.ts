@@ -240,8 +240,12 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
     const result = await verify(anchorFixture([valueDraft('3', 'DEFAULT_RETRIES', 's1')]));
     expect(result.findings.length).toBeGreaterThanOrEqual(1);
     expect(result.findings.every((finding) => finding.severity === 'error')).toBe(true);
-    expect(result.findings.some((finding) => finding.data !== undefined
-      && (finding.data as { bindingIssue?: string }).bindingIssue === 'missing-in-marker')).toBe(true);
+    expect(
+      result.findings.some(
+        (finding) =>
+          finding.data !== undefined && (finding.data as { bindingIssue?: string }).bindingIssue === 'missing-in-marker'
+      )
+    ).toBe(true);
     expect(result.ledger.claims[0]?.correctness).toBe('unchecked');
     expect(result.claimEvidence[0]?.evidence.every((record) => record.ref.kind !== 'value-predicate')).toBe(true);
   });
@@ -254,7 +258,9 @@ describe('verifyClaims — value (the minimal value-predicate verifier)', () => 
           class: 'value',
           predicate: 'the mode option defaults to the string "3"',
           proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
-          proposedSubscriptions: [{ kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'GONE', citedValue: '"3"' }]
+          proposedSubscriptions: [
+            { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'GONE', citedValue: '"3"' }
+          ]
         }
       ])
     );

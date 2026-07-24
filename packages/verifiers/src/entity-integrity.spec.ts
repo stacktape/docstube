@@ -75,7 +75,7 @@ describe('entity-integrity', () => {
     expect(result.status).toBe('pass');
     expect(result.findings).toHaveLength(1);
     expect(result.findings[0]?.severity).toBe('warning');
-    expect(result.findings[0]?.message).toContain('unknown block type "component:Foo", guarantee capped');
+    expect(result.findings[0]?.message).toContain('unknown block type "component:Foo"');
   });
 
   it('fails component metadata that violates the registry schema and passes valid metadata', async () => {

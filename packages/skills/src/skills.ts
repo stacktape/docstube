@@ -86,7 +86,7 @@ export const builtInSkills = [
     '- Severity `error` only when the page would mislead or block this persona; otherwise `warning`.',
     '  Error findings send the page back for a bounded rewrite, so reserve them for real blockers.',
     '- Never rewrite the page yourself, and never invent facts about the codebase; judge only what is',
-    '  in front of you. Guarantees are assigned by deterministic verifiers, never by review.',
+    '  in front of you. Factual trust state is computed by mechanical claim verification, never by review.',
     '',
     codeWinsRule
   ]),

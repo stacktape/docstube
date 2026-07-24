@@ -295,14 +295,12 @@ export const controlPlaneRouter = t.router({
     }),
     // Fire-and-forget: the injected launcher starts the pipeline in the host process and returns
     // the run id; the dashboard then follows it through runs.events/runs.summary.
-    start: t.procedure
-      .input(z.object({ mode: z.enum(['generate', 'refine']) }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.launchRun === undefined) {
-          throw notConfigured('starting runs');
-        }
-        return ctx.launchRun(input.mode);
-      })
+    start: t.procedure.input(z.object({ mode: z.enum(['generate', 'refine']) })).mutation(async ({ ctx, input }) => {
+      if (ctx.launchRun === undefined) {
+        throw notConfigured('starting runs');
+      }
+      return ctx.launchRun(input.mode);
+    })
   }),
   manifest: t.router({
     index: t.procedure.query(async ({ ctx }) => (await readManifestIndex(ctx.repoRoot)) ?? null),

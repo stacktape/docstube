@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseJsonSample, parseYamlSample, sampleParsesVerifier } from './sample-parses.ts';
-import { makeArtifact, makeBlock, makeClaim, makeContext, makePage, makeSection } from './test-support.ts';
+import { makeArtifact, makeBlock, makeContext, makePage, makeSection } from './test-support.ts';
 
 const mdxWithFence = (lang: string, code: string): string => `# Title\n\n\`\`\`${lang}\n${code}\n\`\`\`\n`;
 
@@ -65,16 +65,10 @@ describe('sample-parses', () => {
     expect(result.findings[0]?.message).toMatch(/line \d+, column \d+/u);
   });
 
-  it('passes well-formed samples and covers blocks and claims, including yml', async () => {
+  it('passes well-formed samples and covers blocks, including yml', async () => {
     const jsonCode = '{"name": "docstube"}';
     const ymlCode = 'name: docstube\nversion: 1\n';
-    const jsonClaim = makeClaim('the config sample is valid');
-    const jsonBlock = makeBlock({
-      content: jsonCode,
-      blockType: 'code-example',
-      language: 'json',
-      claims: [jsonClaim]
-    });
+    const jsonBlock = makeBlock({ content: jsonCode, blockType: 'code-example', language: 'json' });
     const ymlBlock = makeBlock({ content: ymlCode, blockType: 'code-example', language: 'yml' });
     const page = makePage({ slug: 'config', sections: [makeSection({ anchor: 's', blocks: [jsonBlock, ymlBlock] })] });
     const mdx = `${mdxWithFence('json', jsonCode)}\n${mdxWithFence('yml', ymlCode)}`;
@@ -84,7 +78,6 @@ describe('sample-parses', () => {
     expect(result.status).toBe('pass');
     expect(result.findings).toEqual([]);
     expect(result.coveredEntityIds).toContain(jsonBlock.id);
-    expect(result.coveredEntityIds).toContain(jsonClaim.id);
     expect(result.coveredEntityIds).toContain(ymlBlock.id);
   });
 

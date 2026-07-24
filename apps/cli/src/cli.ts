@@ -242,7 +242,7 @@ const check = defineCommand({
 });
 
 const status = defineCommand({
-  meta: { description: 'Show manifest, guarantee levels, and open flags.', name: 'status' },
+  meta: { description: 'Show manifest, claim counts, and open flags.', name: 'status' },
   async run() {
     await runCliCommand('status', async () => {
       enableNodeCompileCache();

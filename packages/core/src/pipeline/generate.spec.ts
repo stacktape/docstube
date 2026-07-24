@@ -195,9 +195,9 @@ describe('runGenerate', () => {
     // The temp repo has no HEAD: the run reads working-tree bytes no commit can vouch for, so
     // lineage carries the honest dirtyWorkingTree marker (finding 7).
     expect(shard?.provenance?.lineage.dirtyWorkingTree).toBe(true);
-    // Blocks carry no legacy ClaimEntity records anymore.
+    // Blocks carry no legacy ClaimEntity/guarantee fields anymore — the schema removed them.
     const blocks = [...(shard?.page.preamble ?? []), ...(shard?.page.sections.flatMap((s) => s.blocks) ?? [])];
-    expect(blocks.every((block) => block.claims.length === 0)).toBe(true);
+    expect(blocks.every((block) => !('claims' in block) && !('guarantee' in block))).toBe(true);
     // The inline marker survives into the shipped MDX (theme rendering is a later wave).
     expect(mdxOnDisk).toContain('<Claim id="c1">');
   }, 60_000);

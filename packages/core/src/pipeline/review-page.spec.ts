@@ -31,7 +31,6 @@ const artifact: PageArtifact = {
     title: 'Retry',
     preamble: [],
     sections: [],
-    guarantee: 'scored',
     provenance: { sources: [], seedContext: [], observedReads: [], verifications: [], reviews: [] }
   },
   mdx: '# Retry\n\nBody.\n',

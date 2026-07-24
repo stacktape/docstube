@@ -81,17 +81,13 @@ const readOptionalFile = async (path: string): Promise<string | undefined> => {
   }
 };
 
-// Every provenance record on the page: the page's own plus per-block and per-claim ones — a match
-// on any of them makes the whole page affected in v1.
+// Every provenance record on the page: the page's own plus per-block ones — a match on any of
+// them makes the whole page affected in v1. (The reconciler wave replaces this with ProvenanceV2
+// dependency subscriptions.)
 const pageProvenances = (page: PageEntity): Provenance[] => {
   const provenances: Provenance[] = [page.provenance];
   const collectBlock = (block: BlockEntity) => {
     provenances.push(block.provenance);
-    for (const claim of block.claims) {
-      if (claim.provenance !== undefined) {
-        provenances.push(claim.provenance);
-      }
-    }
   };
   for (const block of page.preamble) {
     collectBlock(block);
@@ -198,11 +194,10 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
     const store = createManifestStore(repoRoot, version);
     const previousIndex = await store.readIndex();
     if (previousIndex === undefined) {
-      throw new CoreError(
-        'state-corrupt',
-        'no committed manifest found — run `docstube generate` first',
-        { repoRoot, version }
-      );
+      throw new CoreError('state-corrupt', 'no committed manifest found — run `docstube generate` first', {
+        repoRoot,
+        version
+      });
     }
 
     // Tribal-knowledge lifecycle (same as generate): persist answered flags, then load answers and

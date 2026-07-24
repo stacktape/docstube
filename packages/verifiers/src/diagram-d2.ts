@@ -221,7 +221,7 @@ export const diagramD2Verifier: VerifierDefinition = {
           }
           // Fully grounded diagrams are proven; anything ungrounded stays visible and unproven.
           if (ungrounded.length === 0) {
-            coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
+            coveredEntityIds.push(block.id);
           }
         }
       }

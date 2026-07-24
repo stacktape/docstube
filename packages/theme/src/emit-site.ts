@@ -185,8 +185,8 @@ const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } =>
 const frontmatterHasKey = (frontmatter: string, key: string): boolean =>
   new RegExp(`^${key}\\s*:`, 'mu').test(frontmatter);
 
-// Visible per-entity citations (PRODUCT §3.2): page-level sources plus every block- and
-// claim-level source on the page, deduplicated, rendered by the layout as the Sources footer.
+// Visible per-entity citations (PRODUCT §3.2): page-level sources plus every block-level source
+// on the page, deduplicated, rendered by the layout as the Sources footer.
 const collectPageSources = (page: PageEntity): SourceRef[] => {
   const seen = new Set<string>();
   const sources: SourceRef[] = [];
@@ -203,9 +203,6 @@ const collectPageSources = (page: PageEntity): SourceRef[] => {
   const blocks = [...page.preamble, ...page.sections.flatMap((section) => section.blocks)];
   for (const block of blocks) {
     add(block.provenance.sources);
-    for (const claim of block.claims) {
-      add(claim.provenance?.sources ?? []);
-    }
   }
   return sources;
 };

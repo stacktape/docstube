@@ -1,19 +1,33 @@
 import { z } from 'zod';
 import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
-import { agentTaskSpecSchema, claimAnchorSchema, claimClassSchema, idPrefixes, mintId } from '@docstube/contracts';
+import { agentTaskSpecSchema, idPrefixes, mintId } from '@docstube/contracts';
 import type { ForeignDocPage } from './parse-foreign-docs.ts';
 
 // One 'audit-extract-claims' task per foreign page (a known agent task kind in
 // @docstube/contracts). The agent only EXTRACTS — every judgement about whether a claim holds is
-// deterministic and lives in match-claims.ts. Structured output reuses the shared claim contracts
-// (claimAnchorSchema / claimClassSchema) so audit claims and generated-docs claims stay one model.
+// deterministic and lives in match-claims.ts.
+//
+// AUDIT-LOCAL claim shapes: the legacy quote-anchored claim vocabulary survives ONLY here, for
+// post-hoc extraction from FOREIGN docs (trust-model-v2 decision 1 — "the post-hoc capped
+// extractor dies; it survives only inside audit"). Generated docs use the writer claim ledger
+// (contracts claim-ledger-schema); these schemas moved out of contracts with the wave 2b
+// demolition of the legacy entity claim model.
+
+// Quote + context anchoring (web-annotation style) — robust against whitespace/surrounding edits.
+export const auditClaimAnchorSchema = z.object({
+  quote: z.string().min(1),
+  prefix: z.string().default(''),
+  suffix: z.string().default('')
+});
+
+export const auditClaimClassSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
 
 export const maxClaimsPerPage = 30;
 
 export const extractedClaimSchema = z.object({
   text: z.string().min(1),
-  anchor: claimAnchorSchema,
-  claimClass: claimClassSchema,
+  anchor: auditClaimAnchorSchema,
+  claimClass: auditClaimClassSchema,
   // Backtick-quoted or obviously-referenced code identifiers the claim's truth depends on.
   identifiers: z.array(z.string().min(1)).default([])
 });

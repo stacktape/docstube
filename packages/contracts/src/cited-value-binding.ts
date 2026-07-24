@@ -147,7 +147,10 @@ const occurrenceIndexes = (value: NormalizedCitedValue, text: string): number[] 
     return quotedIndexes;
   }
   const barePattern = new RegExp(`(?:^|[^A-Za-z0-9_])(${escaped})(?:[^A-Za-z0-9_]|$)`, 'gu');
-  return [...quotedIndexes, ...[...text.matchAll(barePattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''))];
+  return [
+    ...quotedIndexes,
+    ...[...text.matchAll(barePattern)].map((match) => match.index + match[0].indexOf(match[1] ?? ''))
+  ];
 };
 
 // Deterministic value→text occurrence (finding 1): does the normalized scalar provably appear in

@@ -170,7 +170,12 @@ export const snippetExecVerifier: VerifierDefinition = {
             } else {
               const tail = stderrTail(run.stderr);
               findings.push(
-                executionFailureFinding(artifact, block.id, fence, `exit code ${run.exitCode}${tail === '' ? '' : `\n${tail}`}`)
+                executionFailureFinding(
+                  artifact,
+                  block.id,
+                  fence,
+                  `exit code ${run.exitCode}${tail === '' ? '' : `\n${tail}`}`
+                )
               );
             }
           } catch (error) {

@@ -10,7 +10,7 @@ export const commandHelp = [
   '  answer                 List and answer open maintainer questions.',
   '  validate               Validate the docstube config family.',
   '  check [kind]           Run deterministic checks (kinds come from registered verifier plugins).',
-  '  status                 Show manifest, guarantee levels, and open flags.',
+  '  status                 Show manifest, claim counts, and open flags.',
   '  doctor                 Check local runtime and project setup.',
   '  plugin                 Scaffold and manage docstube plugins.',
   '  upgrade                Upgrade the docstube tool itself.',
@@ -31,7 +31,7 @@ export const commandHelpByCommand: Record<string, string> = {
   validate: 'Usage: docstube validate\n\nValidate the docstube config family.',
   check:
     'Usage: docstube check [kind]\n       docstube check --list\n\nRun deterministic checks over the generated docs. Kinds derive from registered verifier plugins.',
-  status: 'Usage: docstube status\n\nShow manifest, guarantee levels, and open flags.',
+  status: 'Usage: docstube status\n\nShow manifest, claim counts, and open flags.',
   doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
   answer:
     'Usage: docstube answer\n       docstube answer <id> "your answer"\n\nList open maintainer questions (tribal knowledge) and answer them.',

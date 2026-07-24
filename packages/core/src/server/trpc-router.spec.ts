@@ -452,7 +452,7 @@ describe('agent-backed wizard mutations', () => {
     expect(await caller.runs.start({ mode: 'refine' })).toEqual({ runId });
     expect(launched).toEqual(['refine']);
     // 'refresh' is not a run mode anymore (pipeline-v2 decision 1) — the input schema rejects it.
-    await expect(caller.runs.start({ mode: 'refresh' as never })).rejects.toThrow();
+    await expect(caller.runs.start({ mode: 'refresh' as never })).rejects.toThrow(/invalid|refresh/i);
     const bare = createControlPlaneCaller({ repoRoot });
     await expect(bare.runs.start({ mode: 'generate' })).rejects.toThrow(/agent runner not configured/);
   });

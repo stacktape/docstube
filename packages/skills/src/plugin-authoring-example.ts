@@ -117,7 +117,6 @@ export const exampleSpecSource = [
   '  title: slug,',
   '  preamble: [],',
   '  sections: [],',
-  "  guarantee: 'scored',",
   '  provenance: { sources: [], seedContext: [], observedReads: [], verifications: [] }',
   '});',
   '',

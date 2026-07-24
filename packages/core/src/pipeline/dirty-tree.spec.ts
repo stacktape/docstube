@@ -118,9 +118,10 @@ describe('working-tree dirtiness', () => {
     const stillUntouched = await store.readPageShard({ locale: shard.locale, pageId: page.id });
     expect(stillUntouched?.provenance?.lineage.dirtyWorkingTree).toBeUndefined();
     // The sweep appended NO events at all (a never-appended journal file does not even exist).
-    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8').catch(
-      () => ''
-    );
+    const journalRaw = await readFile(
+      join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'),
+      'utf8'
+    ).catch(() => '');
     expect(journalRaw).not.toContain('became dirty DURING the run');
     await git('checkout', '--', 'file.txt');
   });

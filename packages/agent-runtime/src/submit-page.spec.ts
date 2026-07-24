@@ -242,7 +242,7 @@ describe('validateSubmission', () => {
     expect(conflicted.errors[0]).toContain('ONE unambiguous value');
   });
 
-  it("TYPED binding, Sol's impl-08 probe: numeric 3 must NOT bind prose stating the string \"3\"", () => {
+  it('TYPED binding, Sol\'s impl-08 probe: numeric 3 must NOT bind prose stating the string "3"', () => {
     const symbolHash = `ts:${'a'.repeat(64)}`;
     const outcome = validateSubmission({
       mdx: mdxWith('<Claim id="c1">`mode` defaults to "3" (a string).</Claim>'),

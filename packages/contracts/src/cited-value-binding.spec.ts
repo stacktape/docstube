@@ -201,9 +201,9 @@ describe('typed value binding (impl-08 finding 1: the asserted TYPE must match t
     ]);
     // Semantic strings keep binding bare delimited occurrences — only other-scalar-shaped
     // contents require quoting.
-    expect(
-      bindCitedValue('linear', { markerText: 'backoff is linear.', predicate: 'backoff mode is linear' }).ok
-    ).toBe(true);
+    expect(bindCitedValue('linear', { markerText: 'backoff is linear.', predicate: 'backoff mode is linear' }).ok).toBe(
+      true
+    );
   });
 
   it('a quoted "3" in prose is not a numeric ambiguity candidate', () => {

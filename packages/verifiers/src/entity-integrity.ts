@@ -61,7 +61,7 @@ const checkPage = (ctx: VerifierContext, artifact: PageArtifact): Finding[] => {
       findings.push({
         ...baseFinding,
         severity: 'warning',
-        message: `block ${block.id} uses unknown block type "${block.blockType}", guarantee capped — component is not in the registry`,
+        message: `block ${block.id} uses unknown block type "${block.blockType}" — component is not in the registry, so its metadata cannot be validated`,
         entity: blockEntity
       });
       continue;

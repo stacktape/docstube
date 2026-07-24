@@ -166,7 +166,7 @@ export const codeTypecheckTsVerifier: VerifierDefinition = {
           }
           const diagnostics = typecheckSnippet(fence.code, (block.language ?? '').toLowerCase() === 'tsx');
           if (diagnostics.length === 0) {
-            coveredEntityIds.push(block.id, ...block.claims.map((claim) => claim.id));
+            coveredEntityIds.push(block.id);
             continue;
           }
           for (const diagnostic of diagnostics) {

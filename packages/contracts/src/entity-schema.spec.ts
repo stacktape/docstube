@@ -3,10 +3,12 @@ import { blockTypeSchema, componentBlockType, listPageEntityIds, pageEntitySchem
 import { buildFixturePage } from './fixtures.ts';
 
 describe('entity schema', () => {
-  it('round-trips the fixture page', () => {
+  it('round-trips the fixture page (no legacy claims/guarantee fields exist on entities)', () => {
     const page = buildFixturePage();
     const parsed = pageEntitySchema.parse(page);
-    expect(parsed.sections[0]?.blocks[0]?.claims[0]?.claimClass).toBe('code-sample');
+    expect(parsed.sections[0]?.blocks[0]?.blockType).toBe('code-example');
+    expect(Object.keys(parsed)).not.toContain('guarantee');
+    expect(Object.keys(parsed.sections[0]?.blocks[0] ?? {})).not.toContain('claims');
   });
 
   it('accepts core block types and registry component types, rejects malformed ones', () => {
@@ -20,8 +22,8 @@ describe('entity schema', () => {
     const page = buildFixturePage();
     const ids = listPageEntityIds(page);
     expect(ids).toHaveLength(new Set(ids).size);
-    // page + preamble block + section + code block + claim
-    expect(ids).toHaveLength(5);
+    // page + preamble block + section + code block
+    expect(ids).toHaveLength(4);
   });
 
   it('rejects a page whose slug is not path-safe', () => {

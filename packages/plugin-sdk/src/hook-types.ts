@@ -78,7 +78,9 @@ export type VerifierDefinition = {
   // i18n semantics (PRODUCT §7.8): structural checks run per locale, code checks usually
   // source-only.
   localeScope: 'source-only' | 'per-locale';
-  // Whether a pass PROVES the covered claims (guarantee: proven) or merely checks hygiene.
+  // Whether a pass is a real mechanical check of the covered entities or merely hygiene. Note:
+  // third-party verifier evidence is labeled "project-defined check" and never mints the built-in
+  // badge unless explicitly promoted in config (PRODUCT §3.2).
   proves: boolean;
   verify: (ctx: VerifierContext, pages: PageArtifact[]) => Promise<VerifierRunResult>;
 };

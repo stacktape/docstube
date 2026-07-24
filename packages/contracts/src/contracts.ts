@@ -64,22 +64,18 @@ export type {
 } from './cited-value-binding.ts';
 
 export {
-  guaranteeLevelSchema,
   sourceRefSchema,
   observedReadSchema,
   verificationResultSchema,
   verificationRecordSchema,
   provenanceSchema
 } from './provenance-schema.ts';
-export type { GuaranteeLevel, SourceRef, ObservedRead, VerificationRecord, Provenance } from './provenance-schema.ts';
+export type { SourceRef, ObservedRead, VerificationRecord, Provenance } from './provenance-schema.ts';
 
 export {
   coreBlockTypes,
   blockTypeSchema,
   componentBlockType,
-  claimAnchorSchema,
-  claimClassSchema,
-  claimEntitySchema,
   codeVariantSchema,
   blockEntitySchema,
   sectionEntitySchema,
@@ -90,8 +86,6 @@ export {
 export type {
   CoreBlockType,
   BlockType,
-  ClaimAnchor,
-  ClaimEntity,
   BlockEntity,
   SectionEntity,
   PageEntity,

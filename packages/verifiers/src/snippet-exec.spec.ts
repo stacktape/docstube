@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import type { PluginExec, VerifierContext } from '@docstube/plugin-sdk';
 import { snippetExecVerifier } from './snippet-exec.ts';
-import { makeArtifact, makeBlock, makeClaim, makeContext, makePage, makeSection } from './test-support.ts';
+import { makeArtifact, makeBlock, makeContext, makePage, makeSection } from './test-support.ts';
 
 const mdxWithFence = (info: string, code: string): string => `# Title\n\n\`\`\`${info}\n${code}\n\`\`\`\n`;
 
@@ -37,10 +37,9 @@ const bashPassExec: PluginExec = async (_command, args) =>
   args[0] === '--version' ? { exitCode: 0, stdout: 'GNU bash', stderr: '' } : { exitCode: 0, stdout: '', stderr: '' };
 
 const pageWithBlock = (code: string, language: string) => {
-  const claim = makeClaim('the sample runs');
-  const block = makeBlock({ content: code, blockType: 'code-example', language, claims: [claim] });
+  const block = makeBlock({ content: code, blockType: 'code-example', language });
   const page = makePage({ slug: 'guide', sections: [makeSection({ anchor: 'usage', blocks: [block] })] });
-  return { block, claim, page };
+  return { block, page };
 };
 
 describe('snippet-exec', () => {
