@@ -33,6 +33,10 @@ export type ShardProofProjection = {
   // Marker ids of contradicted claims — the per-claim contradicted marks the theme renders on the
   // inline <Claim> elements.
   contradictedMarkers: string[];
+  // Marker ids of UNCHECKED claims (impl-09 finding 2, PRODUCT §4.1 always-visible marks): the
+  // theme renders a quiet-but-visible 'unchecked' mark on these — an exception indicator, visually
+  // lighter than a contradiction, never an alarm. Distinct list from contradictedMarkers.
+  uncheckedMarkers: string[];
   sections: SectionClaimsChip[];
 };
 
@@ -53,6 +57,10 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
   }
   const contradictedMarkers = claims
     .filter((claim) => correctnessByClaimId.get(claim.claimId) === 'contradicted')
+    .map((claim) => claim.anchor.markerId);
+  // A ledger claim with no ClaimEvidence record is unchecked by definition — never silently plain.
+  const uncheckedMarkers = claims
+    .filter((claim) => (correctnessByClaimId.get(claim.claimId) ?? 'unchecked') === 'unchecked')
     .map((claim) => claim.anchor.markerId);
 
   const sections: SectionClaimsChip[] = shard.page.sections.map((section) => {
@@ -81,6 +89,7 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
     uncheckedClaims: totalClaims - checkedClaims - contradictedClaims,
     reviewedFor: completedPrimaryReview?.persona,
     contradictedMarkers,
+    uncheckedMarkers,
     sections
   };
 };

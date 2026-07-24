@@ -820,6 +820,11 @@ samp {
   background: color-mix(in srgb, #e5484d 12%, transparent);
   border-bottom: 2px solid #e5484d;
 }
+/* Quiet-but-visible unchecked mark: an exception indicator, never an alarm. */
+.dt-claim--unchecked {
+  border-bottom: 1px dotted color-mix(in srgb, currentColor 55%, transparent);
+  cursor: help;
+}
 .dt-claim-mark {
   color: #e5484d;
   font-family: var(--font-code, ui-monospace, monospace);

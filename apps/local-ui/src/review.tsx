@@ -26,7 +26,7 @@ type ClaimView = {
   correctness: ClaimCorrectness;
 };
 
-type ClaimCounts = { checked: number; total: number; contradicted: number };
+type ClaimCounts = { checked: number; total: number; contradicted: number; unchecked: number };
 
 type ShardProof = {
   // 'unverified' = the shard persists WITHOUT a ledger/provenance trust spine (failed
@@ -57,7 +57,8 @@ const projectShard = (shard: PageShard): ShardProof => {
     page: {
       checked: records.filter((record) => record.correctness === 'checked').length,
       total: records.length,
-      contradicted: records.filter((record) => record.correctness === 'contradicted').length
+      contradicted: records.filter((record) => record.correctness === 'contradicted').length,
+      unchecked: records.filter((record) => record.correctness === 'unchecked').length
     },
     claimsByBlockId
   };
@@ -66,20 +67,27 @@ const projectShard = (shard: PageShard): ShardProof => {
 const countsOf = (claims: ClaimView[]): ClaimCounts => ({
   checked: claims.filter((claim) => claim.correctness === 'checked').length,
   total: claims.length,
-  contradicted: claims.filter((claim) => claim.correctness === 'contradicted').length
+  contradicted: claims.filter((claim) => claim.correctness === 'contradicted').length,
+  unchecked: claims.filter((claim) => claim.correctness === 'unchecked').length
 });
 
+// Mirrors the theme's proof surface (impl-09 finding 2): contradictions are the alarm; unchecked
+// claims get a quiet-but-visible exception count so they never read as ordinary checked content.
 function ClaimCountChip({ counts }: { counts: ClaimCounts }) {
   if (counts.total === 0) {
     return null;
   }
-  return counts.contradicted > 0 ? (
-    <span className="rounded bg-rose-950 px-1.5 py-0.5 text-[11px] text-rose-300">
-      ⚠ {counts.contradicted} contradicted
-    </span>
-  ) : (
+  if (counts.contradicted > 0) {
+    return (
+      <span className="rounded bg-rose-950 px-1.5 py-0.5 text-[11px] text-rose-300">
+        ⚠ {counts.contradicted} contradicted
+      </span>
+    );
+  }
+  return (
     <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-300">
       {counts.checked}/{counts.total} checked
+      {counts.unchecked > 0 && <span className="text-neutral-500"> · {counts.unchecked} unchecked</span>}
     </span>
   );
 }

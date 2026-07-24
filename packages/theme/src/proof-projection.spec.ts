@@ -40,6 +40,8 @@ describe('projectShardProof', () => {
       contradictedClaims: 0,
       uncheckedClaims: 1,
       contradictedMarkers: [],
+      // The unchecked claim is individually addressable — the theme marks it inline (impl-09).
+      uncheckedMarkers: ['c2'],
       reviewedFor: undefined
     });
     expect(Object.keys(projection)).not.toContain('guarantee');
@@ -49,6 +51,8 @@ describe('projectShardProof', () => {
     const projection = projectShardProof(installShard(true));
     expect(projection.contradictedClaims).toBe(1);
     expect(projection.contradictedMarkers).toEqual(['c3']);
+    // The contradicted claim is NEVER in the unchecked list — the lists stay distinct.
+    expect(projection.uncheckedMarkers).toEqual(['c2']);
     expect(projection.totalClaims).toBe(3);
     // The Requirements section holds the checked claim AND the contradicted one.
     const requirements = projection.sections.find((section) => section.anchor === 'requirements');

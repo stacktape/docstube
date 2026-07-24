@@ -167,6 +167,12 @@ pre {
   background: #fdeaea;
   border-bottom: 2px solid var(--danger, #b3261e);
 }
+/* Quiet-but-visible unchecked mark: an exception indicator, never an alarm. */
+.dt-claim--unchecked {
+  border-bottom: 1px dotted var(--text-muted, #6b7280);
+  cursor: help;
+  text-decoration: none;
+}
 .dt-claim-mark {
   color: var(--danger, #b3261e);
   font-size: 0.72rem;

@@ -57,6 +57,21 @@ describe('proof conformance (basic theme)', () => {
     expect(warning).toContain('contradicted');
   });
 
+  it('renders quiet-but-visible per-claim UNCHECKED marks — an exception indicator, not an alarm (impl-09)', async () => {
+    const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
+    // A distinct marker-id list from the contradicted one, applied as a dotted-underline class
+    // plus an explanatory title — never the contradiction alarm treatment.
+    expect(warning).toContain('dt-unchecked-claims');
+    expect(warning).toContain("classList.add('dt-claim--unchecked')");
+    expect(warning).toContain("dataset.docstubeUnchecked = 'true'");
+    expect(warning).toContain('not been mechanically checked');
+    // A contradicted claim never also gets the quiet mark.
+    expect(warning).toContain("claim.dataset.docstubeContradicted === 'true'");
+    const css = await readFile(join(siteRoot, 'src/styles/global.css'), 'utf8');
+    expect(css).toContain('.dt-claim--unchecked');
+    expect(css).toMatch(/\.dt-claim--unchecked \{[^}]*dotted/u);
+  });
+
   it('stamps the stable data attributes on chip, warning, marks, sources, and entity wrapper', async () => {
     const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
     expect(chip).toContain('data-docstube-claims-checked={checked}');
@@ -91,6 +106,8 @@ describe('proof conformance (basic theme)', () => {
     }
     // The entity wrapper receives the page identity injected by the kernel.
     expect(layout).toContain('entityId={frontmatter.docstubePageId}');
+    // The unchecked marker list reaches the primitive alongside the contradicted one.
+    expect(layout).toContain('uncheckedMarkers={uncheckedClaims}');
   });
 
   it('injects the page entity id, literal counts, and section counts into every generated route', async () => {
@@ -100,6 +117,8 @@ describe('proof conformance (basic theme)', () => {
     expect(page).toContain('docstubeClaimsChecked: 1');
     expect(page).toContain('docstubeClaimsTotal: 2');
     expect(page).toContain('docstubeClaimsContradicted: 0');
+    // The unchecked claim's marker id ships too — the inline quiet mark targets it (impl-09).
+    expect(page).toContain('docstubeUncheckedClaims: ["c2"]');
     expect(page).not.toContain('docstubeGuarantee');
     // Section chips carry literal per-section counts.
     expect(page).toContain('"checked":1');

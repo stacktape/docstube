@@ -74,11 +74,19 @@ describe('proof conformance (docstube theme)', () => {
       expect(layout).toContain(mount);
     }
     expect(layout).toContain('entityId={frontmatter.docstubePageId}');
+    // The unchecked marker list reaches the primitive alongside the contradicted one (impl-09).
+    expect(layout).toContain('uncheckedMarkers={uncheckedClaims}');
   });
 
   it('styles the claim chips and contradiction surfaces without hiding the stable hooks', async () => {
     const css = await readFile(join(siteRoot, 'src/styles/global.css'), 'utf8');
-    for (const selector of ['.dt-claims', '.dt-reviewed', '.dt-contradictions', '.dt-claim--contradicted']) {
+    for (const selector of [
+      '.dt-claims',
+      '.dt-reviewed',
+      '.dt-contradictions',
+      '.dt-claim--contradicted',
+      '.dt-claim--unchecked'
+    ]) {
       expect(css).toContain(selector);
       expect(css).not.toMatch(new RegExp(`${selector.replaceAll('.', '\\.')}[^{]*\\{[^}]*display:\\s*none`, 'u'));
     }
@@ -90,6 +98,7 @@ describe('proof conformance (docstube theme)', () => {
     expect(page).not.toContain('docstubeGuarantee');
     expect(page).toContain('docstubeClaimsChecked: 1');
     expect(page).toContain('docstubeClaimsTotal: 2');
+    expect(page).toContain('docstubeUncheckedClaims: ["c2"]');
     expect(page).toContain('"checked":1');
     // Astro components expose default exports, so renderer imports alias them by contract name.
     expect(page).toContain("import { default as Callout } from '../../components/Callout.astro';");

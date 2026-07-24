@@ -265,6 +265,11 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext): string => 
     ...(proof.contradictedMarkers.length > 0
       ? [`docstubeContradictedClaims: ${JSON.stringify(proof.contradictedMarkers)}`]
       : []),
+    // Unchecked claims are individually marked inline too (impl-09 finding 2) — quieter than a
+    // contradiction, but never invisible.
+    ...(proof.uncheckedMarkers.length > 0
+      ? [`docstubeUncheckedClaims: ${JSON.stringify(proof.uncheckedMarkers)}`]
+      : []),
     ...(proof.reviewedFor === undefined ? [] : [`docstubeReviewedFor: ${JSON.stringify(proof.reviewedFor)}`]),
     // JSON is valid YAML flow syntax, so these round-trip through Astro's frontmatter parser.
     ...(alternates.length > 1 ? [`docstubeAlternates: ${JSON.stringify(alternates)}`] : []),

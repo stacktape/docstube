@@ -113,12 +113,15 @@ describe('emitSite', () => {
     const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
     expect(warning).toContain('role="alert"');
     expect(warning).toContain('contradicted by the source');
+    // Unchecked claims get their own quiet inline marks (impl-09 finding 2).
+    expect(warning).toContain('dt-unchecked-claims');
+    expect(warning).toContain("classList.add('dt-claim--unchecked')");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain(
       '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} />'
     );
     expect(layout).toContain(
-      '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} />'
+      '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />'
     );
   });
 
@@ -132,6 +135,8 @@ describe('emitSite', () => {
     expect(install).toContain('docstubeClaimsChecked: 1');
     expect(install).toContain('docstubeClaimsTotal: 2');
     expect(install).toContain('docstubeClaimsContradicted: 0');
+    // The unchecked claim (c2) is individually marked inline (impl-09 finding 2).
+    expect(install).toContain('docstubeUncheckedClaims: ["c2"]');
     expect(install).toContain("from '../../components/theme-components.tsx'");
     expect(install).toContain('<Callout tone="info">');
 

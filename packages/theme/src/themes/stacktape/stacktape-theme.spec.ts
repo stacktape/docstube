@@ -91,6 +91,8 @@ describe('proof conformance (stacktape theme)', () => {
     }
     // The entity wrapper receives the page identity injected by the kernel.
     expect(layout).toContain('entityId={frontmatter.docstubePageId}');
+    // The unchecked marker list reaches the primitive alongside the contradicted one (impl-09).
+    expect(layout).toContain('uncheckedMarkers={uncheckedClaims}');
   });
 
   it('injects the page entity id and literal claim counts into every generated route', async () => {
@@ -99,6 +101,7 @@ describe('proof conformance (stacktape theme)', () => {
     expect(page).not.toContain('docstubeGuarantee');
     expect(page).toContain('docstubeClaimsChecked: 1');
     expect(page).toContain('docstubeClaimsTotal: 2');
+    expect(page).toContain('docstubeUncheckedClaims: ["c2"]');
     // Section chips carry literal per-section counts.
     expect(page).toContain('"checked":1');
   });

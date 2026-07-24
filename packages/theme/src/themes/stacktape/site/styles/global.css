@@ -1488,6 +1488,11 @@ html[data-mobile-nav-open] .stp-mobile-nav {
   background: rgba(255, 107, 96, 0.12);
   border-bottom: 2px solid #ff6b60;
 }
+/* Quiet-but-visible unchecked mark: an exception indicator, never an alarm. */
+.dt-claim--unchecked {
+  border-bottom: 1px dotted rgba(148, 158, 168, 0.75);
+  cursor: help;
+}
 .dt-claim-mark {
   color: #ff6b60;
   font-size: 10px;

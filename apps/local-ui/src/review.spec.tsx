@@ -29,7 +29,7 @@ const emptyProvenance = { sources: [], seedContext: [], observedReads: [], verif
 
 // The v2 shard shape: the page carries NO legacy guarantee/claims fields — trust state rides the
 // ledger + ClaimEvidence, and the UI projects literal counts from them (wave 2b demolition).
-const buildShard = (correctness: 'checked' | 'contradicted' = 'checked', withSpine = true) => ({
+const buildShard = (correctness: 'checked' | 'contradicted' | 'unchecked' = 'checked', withSpine = true) => ({
   schemaVersion: 2,
   locale: 'en',
   version: 'latest',
@@ -81,7 +81,7 @@ const buildShard = (correctness: 'checked' | 'contradicted' = 'checked', withSpi
               subscriptions: [],
               evidence: [],
               correctness,
-              disposition: correctness === 'checked' ? null : null
+              disposition: correctness === 'unchecked' ? 'no-checker-available' : null
             }
           ],
           coverageLint: { uncovered: [] }
@@ -91,7 +91,14 @@ const buildShard = (correctness: 'checked' | 'contradicted' = 'checked', withSpi
           lineage: {},
           dependencies: {},
           claimEvidence: [
-            { schemaVersion: 1, claimId, class: 'code-structure', correctness, disposition: null, evidence: [] }
+            {
+              schemaVersion: 1,
+              claimId,
+              class: 'code-structure',
+              correctness,
+              disposition: correctness === 'unchecked' ? 'no-checker-available' : null,
+              evidence: []
+            }
           ],
           assessments: { reviews: [], translationFidelity: [], structural: [] }
         }
@@ -168,6 +175,17 @@ describe('review UI', () => {
     expect(screen.getByRole('alert').textContent).toContain('contradicted by the source');
     expect(screen.getAllByText('⚠ 1 contradicted').length).toBeGreaterThan(0);
     expect(screen.getByText('contradicted')).toBeDefined();
+  });
+
+  it('marks an UNCHECKED claim quietly but visibly — distinct from the contradiction alarm (impl-09)', async () => {
+    renderReview(buildClient(vi.fn(noopSubmit), buildShard('unchecked')));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+    // The chip carries the explicit unchecked count; no contradiction alarm renders.
+    expect(screen.getAllByText(/· 1 unchecked/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('alert')).toBeNull();
+    // The per-claim row shows the 'unchecked' state badge.
+    expect(screen.getByText('unchecked')).toBeDefined();
   });
 
   it('renders a shard WITHOUT a trust spine as explicitly unverified — never a silent 0/0 (impl-08)', async () => {
