@@ -11,6 +11,7 @@ afterEach(cleanup);
 const pageId = 'pg_0123456789abcdefghjk';
 const blockId = 'bl_0123456789abcdefghjk';
 const sectionId = 'sc_0123456789abcdefghjk';
+const claimId = 'cl_0123456789abcdefghjk';
 
 const manifestIndex = {
   schemaVersion: 1,
@@ -26,8 +27,10 @@ const manifestIndex = {
 
 const emptyProvenance = { sources: [], seedContext: [], observedReads: [], verifications: [] };
 
-const shard = {
-  schemaVersion: 1,
+// The v2 shard shape: the page carries NO legacy guarantee/claims fields — trust state rides the
+// ledger + ClaimEvidence, and the UI projects literal counts from them (wave 2b demolition).
+const buildShard = (correctness: 'checked' | 'contradicted' = 'checked', withSpine = true) => ({
+  schemaVersion: 2,
   locale: 'en',
   version: 'latest',
   sourceCommit: 'a'.repeat(40),
@@ -46,7 +49,6 @@ const shard = {
         title: 'Requirements',
         level: 2,
         anchor: 'requirements',
-        guarantee: 'proven',
         blocks: [
           {
             id: blockId,
@@ -55,29 +57,50 @@ const shard = {
             language: 'bash',
             contentHash: 'f'.repeat(64),
             variants: [],
-            guarantee: 'proven',
-            provenance: emptyProvenance,
-            claims: [
-              {
-                id: 'cl_0123456789abcdefghjk',
-                kind: 'claim',
-                text: 'docstube installs globally via npm',
-                anchor: { quote: 'npm install -g docstube', prefix: '', suffix: '' },
-                claimClass: 'code-sample',
-                guarantee: 'proven'
-              }
-            ]
+            provenance: emptyProvenance
           }
         ]
       }
     ],
-    guarantee: 'scored',
     provenance: emptyProvenance
   },
+  ...(withSpine
+    ? {
+        ledger: {
+          schemaVersion: 1,
+          pageId,
+          sourceRevision: 'a'.repeat(40),
+          claims: [
+            {
+              claimId,
+              class: 'code-structure',
+              predicate: 'docstube installs globally via npm',
+              anchor: { blockId, markerId: 'c1' },
+              quote: 'npm install -g docstube',
+              scope: { entityId: blockId, revision: 'f'.repeat(64) },
+              subscriptions: [],
+              evidence: [],
+              correctness,
+              disposition: correctness === 'checked' ? null : null
+            }
+          ],
+          coverageLint: { uncovered: [] }
+        },
+        provenance: {
+          schemaVersion: 1,
+          lineage: {},
+          dependencies: {},
+          claimEvidence: [
+            { schemaVersion: 1, claimId, class: 'code-structure', correctness, disposition: null, evidence: [] }
+          ],
+          assessments: { reviews: [], translationFidelity: [], structural: [] }
+        }
+      }
+    : {}),
   flags: []
-};
+});
 
-const buildClient = (submit: (input: unknown) => Promise<unknown>): ControlPlaneClient =>
+const buildClient = (submit: (input: unknown) => Promise<unknown>, shard: unknown = buildShard()): ControlPlaneClient =>
   ({
     manifest: {
       index: { query: () => Promise.resolve(manifestIndex) },
@@ -96,19 +119,24 @@ const renderReview = (client: ControlPlaneClient) =>
     </QueryClientProvider>
   );
 
+const noopSubmit = () => Promise.resolve({ category: 'criteria', file: 'x', text: 'x', warnings: [] });
+
 describe('review UI', () => {
-  it('anchors feedback to the selected block entity', async () => {
+  it('anchors feedback to the selected block entity and renders literal claim counts from the ledger', async () => {
     const submit = vi.fn<(input: unknown) => Promise<unknown>>(() =>
       Promise.resolve({ category: 'instructions', file: '.docstube/instructions/writing.md', text: 'x', warnings: [] })
     );
     renderReview(buildClient(submit));
 
     fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
-    // The shard renders as a readable block list with guarantee chips.
+    // The shard renders as a readable block list with LITERAL claim counts — no guarantee chips.
     await screen.findByText('Requirements');
     expect(screen.getByText('code-example')).toBeDefined();
-    expect(screen.getAllByText('proven').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('1/1 checked').length).toBeGreaterThan(0);
+    expect(screen.queryByText('proven')).toBeNull();
+    expect(screen.queryByText('scored')).toBeNull();
     expect(screen.getByText(/“npm install -g docstube”/)).toBeDefined();
+    expect(screen.getByText('checked')).toBeDefined();
 
     fireEvent.click(screen.getByText('code-example'));
     fireEvent.change(screen.getByLabelText('Feedback'), { target: { value: 'Show the pnpm variant too.' } });
@@ -123,9 +151,7 @@ describe('review UI', () => {
   });
 
   it('selects the section entity from its heading and never offers approval', async () => {
-    const submit = vi.fn<(input: unknown) => Promise<unknown>>(() =>
-      Promise.resolve({ category: 'criteria', file: '.docstube/criteria/base.md', text: 'x', warnings: [] })
-    );
+    const submit = vi.fn<(input: unknown) => Promise<unknown>>(noopSubmit);
     renderReview(buildClient(submit));
     fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
     fireEvent.click(await screen.findByText('Requirements'));
@@ -133,5 +159,22 @@ describe('review UI', () => {
     // Approval is never a shipping gate (PRODUCT §3.9.4) — rendered as a caption, never a button.
     expect(screen.queryByRole('button', { name: /approve/i })).toBeNull();
     expect(screen.getByText(/approval is never a shipping gate/)).toBeDefined();
+  });
+
+  it('renders a contradicted claim LOUDLY: warning banner + per-claim contradicted mark', async () => {
+    renderReview(buildClient(vi.fn(noopSubmit), buildShard('contradicted')));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+    expect(screen.getByRole('alert').textContent).toContain('contradicted by the source');
+    expect(screen.getAllByText('⚠ 1 contradicted').length).toBeGreaterThan(0);
+    expect(screen.getByText('contradicted')).toBeDefined();
+  });
+
+  it('renders a shard WITHOUT a trust spine as explicitly unverified — never a silent 0/0 (impl-08)', async () => {
+    renderReview(buildClient(vi.fn(noopSubmit), buildShard('checked', false)));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+    expect(screen.getByRole('status').textContent).toContain('could not be verified');
+    expect(screen.queryByText(/checked$/)).toBeNull();
   });
 });
