@@ -54,7 +54,8 @@ export type MarkerScanErrorCode =
   | 'marker-duplicate-attribute'
   | 'marker-empty'
   | 'marker-nested'
-  | 'page-script';
+  | 'page-script'
+  | 'kernel-namespace';
 
 export type MarkerScanError = { code: MarkerScanErrorCode; message: string; markerId?: string };
 
@@ -80,10 +81,11 @@ const scriptStyleTagPattern = /<\s*\/?\s*(?:script|style)(?=[\s/>])/iu;
 // rewrite the very claim text the ledger vouches for. Attribute values are scanned with the SAME
 // tag regex, in every spelling: a string literal value, an expression value ({…}), and a
 // {...spread}. Returns the attribute's name (for the error message) or undefined.
-const attributeCarryingMarkup = (
-  attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>
+const attributeValueMatching = (
+  attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>,
+  pattern: RegExp
 ): string | undefined => {
-  const carries = (value: unknown): boolean => typeof value === 'string' && scriptStyleTagPattern.test(value);
+  const carries = (value: unknown): boolean => typeof value === 'string' && pattern.test(value);
   for (const attribute of attributes) {
     if (attribute.type === 'mdxJsxExpressionAttribute') {
       if (carries(attribute.value)) {
@@ -95,6 +97,87 @@ const attributeCarryingMarkup = (
     // A string literal value, or the expression source of `attr={…}` (mdxJsxAttributeValueExpression).
     if (carries(value) || (value !== null && typeof value === 'object' && carries(value.value))) {
       return `the "${attribute.name}" attribute`;
+    }
+  }
+  return undefined;
+};
+
+// EVENT-HANDLER ATTRIBUTES (wave 2b close final — Sol's <img onerror> probe): a <script>/<style>
+// TAG is not the only way to run code on a rendered page. `<img src="x" onerror="…">` contains no
+// tag at all, and neither does a handler smuggled inside a set:html value — both execute at render
+// time and can rewrite the very claim text the ledger vouches for. Reported under the SAME
+// page-script code: the prohibition is identical (the theme owns page behavior), only the spelling
+// of the payload differs.
+//
+// SHAPE, NOT ENUMERATION: `on` + an UPPERCASE letter is the JSX/React handler spelling (onError,
+// onClick); `on` + three-or-more lowercase letters is the HTML content-attribute spelling
+// (onerror, oncut, onbeforetoggle) — including handlers the HTML spec has not shipped yet. A name
+// where "on" merely begins a word ("once", "only") leaves a remainder shorter than any event type
+// and stays legal.
+const eventHandlerNamePattern = /^on(?:[A-Z]|[a-z]{3,})/u;
+
+// The same handler shape spelled INSIDE an attribute value, where it is executable only as part of
+// MARKUP: a tag whose attribute list carries a handler. Prose that merely mentions the word
+// "onerror" carries no tag and stays legal.
+const markupEventHandlerPattern = /<[a-zA-Z][^>]*?\s(?:on(?:[A-Z]|[a-z]{3,}))\s*=/u;
+
+const eventHandlerAttributeName = (
+  attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>
+): string | undefined => {
+  for (const attribute of attributes) {
+    if (attribute.type === 'mdxJsxAttribute' && eventHandlerNamePattern.test(attribute.name)) {
+      return attribute.name;
+    }
+  }
+  return undefined;
+};
+
+// KERNEL-OWNED PRESENTATION NAMESPACE (wave 2b close final — Sol's counterfeit-chip probe): the
+// proof primitives in packages/theme/src/proof-source.ts render the entire trust surface with
+// `dt-`-prefixed classes and ids (dt-claims, dt-claims--complete, dt-claim, dt-claim-mark,
+// dt-contradictions, dt-sources, dt-section-chip, dt-uncommitted, dt-search, dt-contradicted-claims
+// …) and `data-docstube-*` attributes (data-docstube-claims-complete, data-docstube-claim,
+// data-docstube-dirty-working-tree …). Writer MDX that authors an element in that namespace paints
+// proof chrome the kernel never issued — a green "complete" chip the component's defensive
+// recompute never gets a chance to correct, because the counterfeit is not the component. Same
+// principle as the kernel-owned frontmatter and ledger keys: docstube owns the names, so the
+// submission is rejected with a repair error naming the offending attribute.
+//
+// LOCKSTEP: these two prefixes and the class/attribute names the primitives emit in
+// packages/theme/src/proof-source.ts must change together — a kernel class outside `dt-`, or a
+// kernel data attribute outside `data-docstube`, needs an entry here in the same commit.
+const KERNEL_CLASS_PREFIX = 'dt-';
+const KERNEL_DATA_ATTRIBUTE_PREFIX = 'data-docstube';
+
+// The same namespace spelled inside raw HTML or an expression's source text.
+const kernelNamespaceMarkupPattern = /data-docstube|(?:class|id)\s*=\s*["'][^"']*\bdt-/iu;
+
+const attributeStringValue = (attribute: MdxJsxAttribute): string | undefined => {
+  const value = attribute.value;
+  if (typeof value === 'string') {
+    return value;
+  }
+  return value !== null && typeof value === 'object' && typeof value.value === 'string' ? value.value : undefined;
+};
+
+const kernelOwnedAttribute = (attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>): string | undefined => {
+  for (const attribute of attributes) {
+    if (attribute.type === 'mdxJsxExpressionAttribute') {
+      // A {...spread} can carry any name; its source text is all the kernel can read.
+      if (typeof attribute.value === 'string' && kernelNamespaceMarkupPattern.test(attribute.value)) {
+        return "a {…} spread naming docstube's presentation namespace";
+      }
+      continue;
+    }
+    if (attribute.name.toLowerCase().startsWith(KERNEL_DATA_ATTRIBUTE_PREFIX)) {
+      return `the "${attribute.name}" attribute`;
+    }
+    if (attribute.name === 'class' || attribute.name === 'className' || attribute.name === 'id') {
+      const value = attributeStringValue(attribute);
+      const owned = (value ?? '').split(/[\s'"`]+/u).find((token) => token.startsWith(KERNEL_CLASS_PREFIX));
+      if (owned !== undefined) {
+        return `the "${attribute.name}" attribute with the kernel-owned value "${owned}"`;
+      }
     }
   }
   return undefined;
@@ -336,30 +419,90 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       return;
     }
     if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
+      const attributes = node.attributes ?? [];
+      const elementName = node.name ?? 'element';
+      const offset = node.position?.start?.offset ?? 0;
       // Same prohibition, applied to what the element's attributes carry — the element itself is
       // innocuous, its attribute value is the executable payload. Reported under the SAME
       // page-script code; the visit continues so one pass still lists every other problem.
-      const carrier = attributeCarryingMarkup(node.attributes ?? []);
+      const carrier = attributeValueMatching(attributes, scriptStyleTagPattern);
       if (carrier !== undefined) {
         errors.push({
           code: 'page-script',
           message:
-            `the page has ${carrier} of <${node.name ?? 'element'}> carrying a <script>/<style> tag at offset ` +
-            `${node.position?.start?.offset ?? 0} — generated pages must not carry executable or style elements, ` +
+            `the page has ${carrier} of <${elementName}> carrying a <script>/<style> tag at offset ` +
+            `${offset} — generated pages must not carry executable or style elements, ` +
             'in markup OR in attribute values; the theme owns page behavior and styling. Remove the markup from ' +
             'the attribute (a code FENCE showing example markup is fine) and resubmit'
         });
       }
+      const handlerName = eventHandlerAttributeName(attributes);
+      if (handlerName !== undefined) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `<${elementName}> at offset ${offset} carries the "${handlerName}" event-handler attribute — an event ` +
+            'handler is executable page behavior with no <script> tag in sight, and it can rewrite the very claim ' +
+            'text the ledger vouches for; the theme owns page behavior. Remove the handler (a code FENCE showing ' +
+            'example markup is fine) and resubmit'
+        });
+      }
+      const handlerCarrier = attributeValueMatching(attributes, markupEventHandlerPattern);
+      if (handlerCarrier !== undefined) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `the page has ${handlerCarrier} of <${elementName}> carrying markup with an event handler at offset ` +
+            `${offset} — a handler inside an attribute VALUE (set:html and friends) executes exactly like one ` +
+            'written on the element; the theme owns page behavior. Remove the markup from the attribute (a code ' +
+            'FENCE showing example markup is fine) and resubmit'
+        });
+      }
+      const kernelName = kernelOwnedAttribute(attributes);
+      if (kernelName !== undefined) {
+        errors.push({
+          code: 'kernel-namespace',
+          message:
+            `<${elementName}> at offset ${offset} carries ${kernelName} — the "${KERNEL_CLASS_PREFIX}" class/id ` +
+            `prefix and every "${KERNEL_DATA_ATTRIBUTE_PREFIX}*" attribute are docstube's OWN presentation ` +
+            'namespace: the kernel proof components render the claim chips, contradiction warnings and source ' +
+            'footer with exactly those names, so an authored element using them would counterfeit verification ' +
+            'chrome the kernel never issued. Rename it to your own class/attribute and resubmit'
+        });
+      }
     }
-    if (node.type === 'html' && typeof node.value === 'string' && scriptStyleTagPattern.test(node.value)) {
-      errors.push({
-        code: 'page-script',
-        message:
-          `the page contains raw HTML with a <script>/<style> tag at offset ${node.position?.start?.offset ?? 0} — ` +
-          'generated pages must not carry executable or style elements; the theme owns page behavior and ' +
-          'styling. Remove the raw HTML (a code FENCE showing example markup is fine) and resubmit'
-      });
-      return;
+    if (node.type === 'html' && typeof node.value === 'string') {
+      if (scriptStyleTagPattern.test(node.value)) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `the page contains raw HTML with a <script>/<style> tag at offset ${node.position?.start?.offset ?? 0} — ` +
+            'generated pages must not carry executable or style elements; the theme owns page behavior and ' +
+            'styling. Remove the raw HTML (a code FENCE showing example markup is fine) and resubmit'
+        });
+        return;
+      }
+      if (markupEventHandlerPattern.test(node.value)) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `the page contains raw HTML with an event handler at offset ${node.position?.start?.offset ?? 0} — ` +
+            'generated pages must not carry executable page behavior; the theme owns it. Remove the raw HTML (a ' +
+            'code FENCE showing example markup is fine) and resubmit'
+        });
+        return;
+      }
+      if (kernelNamespaceMarkupPattern.test(node.value)) {
+        errors.push({
+          code: 'kernel-namespace',
+          message:
+            `the page contains raw HTML in docstube's presentation namespace at offset ` +
+            `${node.position?.start?.offset ?? 0} — the "${KERNEL_CLASS_PREFIX}" class/id prefix and every ` +
+            `"${KERNEL_DATA_ATTRIBUTE_PREFIX}*" attribute belong to the kernel proof components, so authored ` +
+            'markup using them would counterfeit verification chrome. Rename it to your own names and resubmit'
+        });
+        return;
+      }
     }
     if (node.type === 'mdxFlowExpression' || node.type === 'mdxTextExpression') {
       // Expression-wrapped script/style ({<script>…</script>}) compiles and executes exactly like
@@ -373,6 +516,28 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
             `the page contains a JSX expression with a <script>/<style> tag at offset ${node.position?.start?.offset ?? 0} — ` +
             'generated pages must not carry executable or style elements; the theme owns page behavior and ' +
             'styling. Remove the expression (a code FENCE showing example markup is fine) and resubmit'
+        });
+        return;
+      }
+      // The {…} wrapper launders an event handler exactly as it launders a <script> tag.
+      if (typeof node.value === 'string' && markupEventHandlerPattern.test(node.value)) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `the page contains a JSX expression with an event handler at offset ${node.position?.start?.offset ?? 0} — ` +
+            'generated pages must not carry executable page behavior; the theme owns it. Remove the expression (a ' +
+            'code FENCE showing example markup is fine) and resubmit'
+        });
+        return;
+      }
+      if (typeof node.value === 'string' && kernelNamespaceMarkupPattern.test(node.value)) {
+        errors.push({
+          code: 'kernel-namespace',
+          message:
+            `the page contains a JSX expression in docstube's presentation namespace at offset ` +
+            `${node.position?.start?.offset ?? 0} — the "${KERNEL_CLASS_PREFIX}" class/id prefix and every ` +
+            `"${KERNEL_DATA_ATTRIBUTE_PREFIX}*" attribute belong to the kernel proof components; an expression ` +
+            'emitting them would counterfeit verification chrome. Rename it to your own names and resubmit'
         });
         return;
       }

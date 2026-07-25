@@ -183,6 +183,44 @@ describe('working-tree dirtiness', () => {
     await git('checkout', '--', 'file.txt');
   });
 
+  it('marks shards whose OBSERVED READS name a file git does not version, on a clean tree', async () => {
+    // The run-start probe covers what the codemap PARSED; the writer can additionally read files
+    // through its tools. An untracked or ignored file read that way is bytes no commit contains,
+    // and porcelain says nothing about it — so the end-of-run sweep resolves trackedness over the
+    // observed reads the persisted shards recorded.
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePage();
+    const ledger = buildFixtureClaimLedger(page);
+    const provenance = buildFixtureProvenanceV2(ledger);
+    const shard = {
+      ...buildFixturePageShard(page),
+      ledger,
+      provenance: {
+        ...provenance,
+        lineage: { ...provenance.lineage, observedReads: [{ file: 'scratch/notes.ts', contentHash: 'a'.repeat(64) }] }
+      }
+    };
+    await store.writePageShard(shard);
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(false);
+
+    const journal = await createRunJournal(repoRoot, mintId(idPrefixes.run));
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit: shard.sourceCommit,
+      dirtyAtStart: false,
+      ownOutputPrefixes: OWN_OUTPUTS,
+      persistedShards: [{ locale: shard.locale, pageId: page.id }]
+    });
+
+    const updated = await store.readPageShard({ locale: shard.locale, pageId: page.id });
+    expect(updated?.provenance?.lineage.dirtyWorkingTree).toBe(true);
+    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8');
+    expect(journalRaw).toContain('git does not version');
+    expect(journalRaw).toContain('scratch/notes.ts');
+  });
+
   it('derives the own-output prefix set from config outDir plus the .docstube tree', () => {
     expect(docstubeOwnOutputPrefixes({ outDir: 'docs-site' })).toEqual(['docs-site', '.docstube']);
     expect(docstubeOwnOutputPrefixes({ outDir: './docs/site/' })).toEqual(['docs/site', '.docstube']);
@@ -198,6 +236,15 @@ describe('dirtyWorkingTreeWarning', () => {
     const warning = dirtyWorkingTreeWarning('a'.repeat(40));
     expect(warning.severity).toBe('warning');
     expect(warning.message).toContain('checked against uncommitted changes');
+    expect(warning.message).toContain('never the complete state');
+  });
+
+  it('names the UNVERSIONED sources as the cause when that is what made the run dirty', () => {
+    const warning = dirtyWorkingTreeWarning('b'.repeat(40), ['dist-dogfood/a.ts', 'dist-dogfood/b.ts']);
+    expect(warning.message).toContain('read 2 source files that git does not version');
+    expect(warning.message).toContain('dist-dogfood/a.ts');
+    expect(warning.message).toContain('never reports ignored files');
+    // The reader-facing consequence is identical whatever made the run dirty.
     expect(warning.message).toContain('never the complete state');
   });
 });

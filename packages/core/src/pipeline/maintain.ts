@@ -32,7 +32,9 @@ import {
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
-  resolveSourceRevision
+  readSourceFiles,
+  resolveSourceRevision,
+  unversionedReadSources
 } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 
@@ -174,9 +176,9 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
   // read as still running (journalRunFailure rethrows).
   try {
     const ownOutputs = docstubeOwnOutputPrefixes(config);
-    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot, ownOutputs);
+    const { commit, dirtyWorkingTree: treeDirtyAtStart } = await resolveSourceRevision(repoRoot, ownOutputs);
     await journal.append({ type: 'run-started', mode: 'maintain', commit });
-    if (dirtyWorkingTree) {
+    if (treeDirtyAtStart) {
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
     }
 
@@ -192,6 +194,20 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       inputHash: hashValue({ commit }),
       durationMs: Date.now() - codemapStarted
     });
+
+    // Unversioned sources count as uncommitted (wave 2b close): `git status` never reports ignored
+    // files, so a clean-reporting tree can still have been read for bytes no commit contains.
+    const unversionedSources = treeDirtyAtStart
+      ? []
+      : await unversionedReadSources({
+          repoRoot,
+          files: readSourceFiles({ codemap, fingerprints }),
+          ownOutputPrefixes: ownOutputs
+        });
+    if (unversionedSources.length > 0) {
+      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, unversionedSources)] });
+    }
+    const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 
     const store = createManifestStore(repoRoot, version);
     const previousIndex = await store.readIndex();

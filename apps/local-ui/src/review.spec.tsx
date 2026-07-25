@@ -234,6 +234,29 @@ describe('review UI', () => {
     expect(chip?.className).not.toContain('emerald');
   });
 
+  it('withholds the complete look at EVERY level on a dirty run — page, section and block agree', async () => {
+    // ROLLUPS INHERIT THE FLAG (wave 2b close — the spine finding): dirtyWorkingTree is a property
+    // of the RUN, not of a claim subset, so a section or block rollup that dropped it could paint
+    // the green/complete treatment the page-level chip had already withheld. Counts stay literal at
+    // every level; only the complete state degrades, everywhere at once.
+    const shard = buildShard('checked') as { provenance: { lineage: Record<string, unknown> } };
+    shard.provenance.lineage = { dirtyWorkingTree: true };
+    renderReview(buildClient(vi.fn(noopSubmit), shard));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+
+    // Page, section and block chips: 1/1 checked with nothing unmarked would otherwise be green.
+    const chips = screen.getAllByText(/1\/1 checked/);
+    expect(chips.length).toBe(3);
+    for (const chip of chips) {
+      const rendered = chip.closest('span[class*="rounded"]');
+      expect(rendered?.textContent).toContain('1/1 checked');
+      expect(rendered?.textContent).toContain('checked against uncommitted changes');
+      // The complete/green treatment is withheld at this level too — no chip out-greens the page.
+      expect(rendered?.className).not.toContain('emerald');
+    }
+  });
+
   it('renders a shard WITHOUT a trust spine as explicitly unverified — never a silent 0/0 (impl-08)', async () => {
     renderReview(buildClient(vi.fn(noopSubmit), buildShard('checked', false)));
     fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));

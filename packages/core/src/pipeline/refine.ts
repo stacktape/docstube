@@ -15,7 +15,9 @@ import {
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
-  resolveSourceRevision
+  readSourceFiles,
+  resolveSourceRevision,
+  unversionedReadSources
 } from './generate.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
@@ -124,9 +126,9 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   // read as still running (journalRunFailure rethrows).
   try {
     const ownOutputs = docstubeOwnOutputPrefixes(config);
-    const { commit, dirtyWorkingTree } = await resolveSourceRevision(repoRoot, ownOutputs);
+    const { commit, dirtyWorkingTree: treeDirtyAtStart } = await resolveSourceRevision(repoRoot, ownOutputs);
     await journal.append({ type: 'run-started', mode: 'refine', commit });
-    if (dirtyWorkingTree) {
+    if (treeDirtyAtStart) {
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
     }
 
@@ -134,6 +136,20 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     const codemap = await buildCodemap({ repoRoot, commit, packs });
     // Claim subscriptions resolve against the typed-fingerprint snapshot during anchoring.
     const fingerprints = await buildFingerprintSnapshot({ repoRoot, commit, packs });
+
+    // Unversioned sources count as uncommitted (wave 2b close): `git status` never reports ignored
+    // files, so a clean-reporting tree can still have been read for bytes no commit contains.
+    const unversionedSources = treeDirtyAtStart
+      ? []
+      : await unversionedReadSources({
+          repoRoot,
+          files: readSourceFiles({ codemap, fingerprints }),
+          ownOutputPrefixes: ownOutputs
+        });
+    if (unversionedSources.length > 0) {
+      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, unversionedSources)] });
+    }
+    const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 
     const pageIds = index.pages.map((entry) => entry.id);
     const locales = [locale, ...config.locales.targets];

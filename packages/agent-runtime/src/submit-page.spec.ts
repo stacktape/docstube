@@ -271,6 +271,78 @@ describe('scanClaimMarkers', () => {
     expect(customElementName.errors).toEqual([]);
   });
 
+  it('rejects EVENT-HANDLER attributes (page-script, Sol <img onerror> probe) in both spellings', () => {
+    // A script/style TAG is not the only way to run code on a rendered page: an event handler is
+    // executable page behavior with no tag in sight, and it can rewrite the very claim text the
+    // ledger vouches for.
+    const lowercase = scanClaimMarkers('Text.\n\n<img src="x" onerror="document.body.innerHTML = \'lie\'" />\n');
+    expect(lowercase.errors[0]?.code).toBe('page-script');
+    expect(lowercase.errors[0]?.message).toContain('onerror');
+    expect(lowercase.errors[0]?.message).toContain('event-handler');
+
+    const camelCase = scanClaimMarkers('Text.\n\n<img src="x" onError={() => window.alert(\'x\')} />\n');
+    expect(camelCase.errors[0]?.code).toBe('page-script');
+
+    // Inline (text-level) elements are scanned too, not only flow ones.
+    const inline = scanClaimMarkers('Prose with <span onclick="steal()">x</span> inside.\n');
+    expect(inline.errors.some((error) => error.code === 'page-script')).toBe(true);
+
+    // A handler inside an attribute VALUE executes exactly like one written on the element.
+    const setHtml = scanClaimMarkers('Text.\n\n<div set:html="<img src=x onerror=alert(1)>" />\n');
+    expect(setHtml.errors[0]?.code).toBe('page-script');
+    expect(setHtml.errors[0]?.message).toContain('set:html');
+
+    const expressionValue = scanClaimMarkers('Text.\n\n<Callout body={\'<b onmouseover="x()">hi</b>\'} />\n');
+    expect(expressionValue.errors[0]?.code).toBe('page-script');
+
+    // The {…} wrapper must not launder it either.
+    const expressionWrapped = scanClaimMarkers("Text.\n\n{'<img src=x onerror=alert(1)>'}\n");
+    expect(expressionWrapped.errors[0]?.code).toBe('page-script');
+
+    // ORDINARY attributes stay legal — including names where "on" merely begins a word, and values
+    // that merely MENTION a handler in prose.
+    const ordinary = scanClaimMarkers(
+      'Text.\n\n<Callout once="true" only="dev" title="the onerror handler is documented below">Body.</Callout>\n'
+    );
+    expect(ordinary.errors).toEqual([]);
+
+    const proseMention = scanClaimMarkers('Set `onerror` on the image to log failures; onerror fires once.\n');
+    expect(proseMention.errors).toEqual([]);
+  });
+
+  it("rejects authored elements in docstube's OWN presentation namespace (kernel-namespace)", () => {
+    // COUNTERFEIT PROOF CHROME (wave 2b close final — Sol's probe): the kernel proof components own
+    // the `dt-` class/id prefix and every `data-docstube*` attribute. Writer MDX emitting them would
+    // paint a green "complete" chip that the component's defensive recompute never sees, because
+    // the counterfeit is not the component.
+    const chip = scanClaimMarkers(
+      'Text.\n\n<span class="dt-claims dt-claims--complete" data-docstube-claims-complete="true">3 of 3 claims checked</span>\n'
+    );
+    expect(chip.errors[0]?.code).toBe('kernel-namespace');
+    expect(chip.errors[0]?.message).toContain('data-docstube');
+    expect(chip.errors[0]?.message).toContain('counterfeit');
+
+    const classOnly = scanClaimMarkers('Prose with <span class="dt-claim">a forged marker</span> inside.\n');
+    expect(classOnly.errors[0]?.code).toBe('kernel-namespace');
+
+    const idOnly = scanClaimMarkers('Text.\n\n<div id="dt-contradicted-claims">[]</div>\n');
+    expect(idOnly.errors[0]?.code).toBe('kernel-namespace');
+
+    const dataAttribute = scanClaimMarkers('Text.\n\n<div data-docstube-dirty-working-tree="false">ok</div>\n');
+    expect(dataAttribute.errors[0]?.code).toBe('kernel-namespace');
+
+    const spread = scanClaimMarkers(
+      "Text.\n\n<Callout {...{ 'data-docstube-claims-complete': 'true' }}>Body.</Callout>\n"
+    );
+    expect(spread.errors[0]?.code).toBe('kernel-namespace');
+
+    // ORDINARY classes and data attributes stay legal, including ones that merely contain "dt".
+    const ordinary = scanClaimMarkers(
+      'Text.\n\n<Callout class="note wide mydt-thing" id="install-steps" data-tone="info">Body.</Callout>\n'
+    );
+    expect(ordinary.errors).toEqual([]);
+  });
+
   it('leaves code FENCES and inline code containing <script>/<style> untouched — examples are text, not elements', () => {
     const fence = scanClaimMarkers(
       [

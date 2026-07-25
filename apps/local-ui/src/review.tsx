@@ -77,11 +77,17 @@ const projectShard = (shard: PageShard): ShardProof => {
   };
 };
 
-const countsOf = (claims: ClaimView[]): ClaimCounts => ({
+// THE FLAG TRAVELS WITH EVERY ROLLUP (wave 2b close — the spine finding): dirtyWorkingTree is a
+// property of the RUN, not of a claim subset, so a section or block rollup that dropped it could
+// still paint the green/complete treatment on a page the page-level chip already withheld it from.
+// Section and block counts are genuine and stay literal; only the complete state degrades, at every
+// level, so no chip anywhere on a dirty page ever disagrees with another.
+const countsOf = (claims: ClaimView[], dirtyWorkingTree: boolean): ClaimCounts => ({
   checked: claims.filter((claim) => claim.correctness === 'checked').length,
   total: claims.length,
   contradicted: claims.filter((claim) => claim.correctness === 'contradicted').length,
-  unchecked: claims.filter((claim) => claim.correctness === 'unchecked').length
+  unchecked: claims.filter((claim) => claim.correctness === 'unchecked').length,
+  dirtyWorkingTree
 });
 
 // Mirrors the theme's proof surface (impl-09 finding 2): contradictions are the alarm; unchecked
@@ -169,12 +175,15 @@ function BlockCard({
   claims,
   address,
   selected,
+  dirtyWorkingTree,
   onSelect
 }: {
   block: BlockEntity;
   claims: ClaimView[];
   address: EntityAddress;
   selected: boolean;
+  // Page-scope run state, threaded down so the block chip can never out-green the page chip.
+  dirtyWorkingTree: boolean;
   onSelect: SelectEntity;
 }) {
   const metadataEntries = Object.entries((block.metadata as Record<string, unknown> | undefined) ?? {});
@@ -191,7 +200,7 @@ function BlockCard({
           {block.blockType}
         </span>
         {block.language !== undefined && <span className="text-[11px] text-neutral-500">{block.language}</span>}
-        <ClaimCountChip counts={countsOf(claims)} />
+        <ClaimCountChip counts={countsOf(claims, dirtyWorkingTree)} />
       </span>
       {metadataEntries.length > 0 && (
         <span className="mt-2 block space-y-0.5">
@@ -238,6 +247,7 @@ function SectionView({
     entityId: section.id
   };
   const sectionClaims = section.blocks.flatMap((block) => proof.claimsByBlockId.get(block.id) ?? []);
+  const dirtyWorkingTree = proof.page.dirtyWorkingTree === true;
   return (
     <div className="space-y-2">
       <button
@@ -249,7 +259,7 @@ function SectionView({
       >
         <span className="text-xs text-neutral-600">H{section.level}</span>
         <span className="text-sm font-semibold text-neutral-100">{section.title}</span>
-        <ClaimCountChip counts={countsOf(sectionClaims)} />
+        <ClaimCountChip counts={countsOf(sectionClaims, dirtyWorkingTree)} />
       </button>
       <div className="space-y-2 pl-4">
         {section.blocks.map((block) => {
@@ -261,6 +271,7 @@ function SectionView({
               claims={proof.claimsByBlockId.get(block.id) ?? []}
               address={address}
               selected={sameEntity(selectedEntity, address)}
+              dirtyWorkingTree={dirtyWorkingTree}
               onSelect={onSelect}
             />
           );
@@ -464,6 +475,7 @@ export function Review() {
                       claims={proof.claimsByBlockId.get(block.id) ?? []}
                       address={address}
                       selected={sameEntity(selectedEntity, address)}
+                      dirtyWorkingTree={proof.page.dirtyWorkingTree === true}
                       onSelect={setSelectedEntity}
                     />
                   );
