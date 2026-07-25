@@ -2,6 +2,7 @@ import { mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { contentHash, contentHashSchema } from '@docstube/contracts';
 import { emitSite } from './emit-site.ts';
 import { buildFixtureInput, installMdx, setupMdx } from './emit-site-fixture.ts';
 
@@ -110,6 +111,16 @@ describe('emitSite', () => {
     expect(chip).toContain('claims checked');
     expect(chip).toContain('data-docstube-claims-checked={checked}');
     expect(chip).not.toContain('"verified"');
+    // DEFENSIVE RECOMPUTE (impl-24): the complete state is re-derived from the rendered numbers,
+    // never taken on the `complete` flag's word alone.
+    expect(chip).toContain(
+      'const isComplete = complete === true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
+    );
+    // HONEST BADGE SEMANTICS (impl-24, PRODUCT §1.2): the popover states what complete means and,
+    // just as importantly, what it does not.
+    expect(chip).toContain('title={chipTitle}');
+    expect(chip).toContain("every claim in this page's ledger is checked");
+    expect(chip).toContain('does not mean the page contains no unverified statement');
     const warning = await readFile(join(siteRoot, 'src/docstube/DocstubeContradictions.astro'), 'utf8');
     expect(warning).toContain('role="alert"');
     expect(warning).toContain('contradicted by the source');
@@ -118,7 +129,7 @@ describe('emitSite', () => {
     expect(warning).toContain("classList.add('dt-claim--unchecked')");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain(
-      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />'
+      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />'
     );
     expect(layout).toContain(
       '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />'
@@ -470,6 +481,53 @@ describe('emitSite', () => {
     await emitSite(buildFixtureInput(repoRoot));
     const result = await emitSite(buildFixtureInput(repoRoot));
     expect(result.pruned).toEqual([]);
+  });
+
+  // KERNEL-OWNED FRONTMATTER (impl-24 finding): the `docstube*` keys are computed from the
+  // persisted trust spine. An artifact that declares one — a writer, a hand edit, a stale route
+  // reused as source — must never get to decide the reader's badge.
+  it('strips authored docstube* frontmatter: a declared docstubeClaimsComplete never survives', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-fm-'));
+    const input = buildFixtureInput(repoRoot);
+    const install = input.pages[0]!;
+    const claimed = `---\ndocstubeClaimsComplete: true\ndocstubeClaimsChecked: 99\nkeywords:\n  - install\n---\n\n${installMdx}`;
+    input.pages[0] = {
+      ...install,
+      mdx: claimed,
+      shard: { ...install.shard, mdxContentHash: contentHashSchema.parse(contentHash(claimed)) }
+    };
+    await emitSite(input);
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    // The page is genuinely partial (1 of 2 claims checked), so the computed state is NOT complete.
+    expect(route).not.toContain('docstubeClaimsComplete');
+    // The authored count is replaced by the true one, and appears exactly once.
+    expect(route).toContain('docstubeClaimsChecked: 1');
+    expect(route).not.toContain('99');
+    expect(route.match(/docstubeClaimsChecked/gu)?.length).toBe(1);
+    // Authored frontmatter the kernel does not own is untouched.
+    expect(route).toContain('keywords:');
+    expect(route).toContain('- install');
+  });
+
+  // LOCALE-PREFIX SLUG COLLISION (impl-24 finding): /de/foo is both "the German rendition of foo"
+  // and "the page slugged de/foo"; whichever write lands last owns the route. Emission refuses to
+  // plan such a tree rather than resolving it by accident.
+  it('rejects a source slug whose first segment is a configured target locale', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-locale-slug-'));
+    const input = buildFixtureInput(repoRoot, { withTranslation: true });
+    const setup = input.pages[1]!;
+    input.pages[1] = { ...setup, shard: { ...setup.shard, page: { ...setup.shard.page, slug: 'de/foo' } } };
+    await expect(emitSite(input)).rejects.toMatchObject({ code: 'route-locale-collision' });
+    await expect(emitSite(input)).rejects.toThrow(/slug "de\/foo".*"de" locale route namespace/su);
+  });
+
+  it('accepts the same slug when no such locale is configured — the collision needs both halves', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-locale-slug-ok-'));
+    const input = buildFixtureInput(repoRoot);
+    const setup = input.pages[1]!;
+    input.pages[1] = { ...setup, shard: { ...setup.shard, page: { ...setup.shard.page, slug: 'de/foo' } } };
+    await emitSite(input);
+    await expect(stat(join(repoRoot, 'docs-site/src/pages/de/foo.mdx'))).resolves.toBeDefined();
   });
 
   it('omits sitemap.xml and robots.txt without a baseUrl', async () => {

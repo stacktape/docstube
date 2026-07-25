@@ -4,7 +4,13 @@ import type { Document } from 'yaml';
 import { parse, parseDocument } from 'yaml';
 import type { z } from 'zod';
 import type { DocstubeConfig, Glossary, Ia } from '@docstube/contracts';
-import { docstubeConfigSchema, glossarySchema, iaSchema } from '@docstube/contracts';
+import {
+  docstubeConfigSchema,
+  glossarySchema,
+  iaSchema,
+  localeRoutePrefixConflict,
+  walkIaNodes
+} from '@docstube/contracts';
 import { CoreError, configError } from '../errors.ts';
 
 // docstube.yml / ia.yml / glossary.yaml are user-owned typed YAML — intent only. Programmatic
@@ -50,6 +56,29 @@ const readOptional = async (path: string): Promise<string | undefined> => {
   }
 };
 
+// LOCALE-PREFIX SLUG COLLISION (impl-24 finding). ia.yml alone cannot see this: the collision only
+// exists relative to docstube.yml's locales.targets, because renditions route under /<locale>/….
+// A page slugged "de" (or any slug whose first segment is "de") with "de" configured would fight
+// the German rendition for the same route, and the winner depends on write order. The pairing is
+// rejected here — at IA load, the earliest point BOTH files are in hand — naming the page, the
+// slug, and the locale, since only the author can decide which of the two to change.
+const assertNoLocaleSlugCollisions = (config: DocstubeConfig, ia: Ia): void => {
+  for (const node of walkIaNodes(ia.tree)) {
+    if (node.brief === undefined && node.pageId === undefined) {
+      continue; // a pure grouping node renders no page and claims no route
+    }
+    const locale = localeRoutePrefixConflict(node.slug, config.locales.targets);
+    if (locale !== undefined) {
+      throw configError(
+        `${configFileNames.ia}: page "${node.title}" has slug "${node.slug}", which collides with the "${locale}" ` +
+          `locale route namespace — translated pages are emitted under /${locale}/<slug>. Rename the slug, or ` +
+          `remove "${locale}" from locales.targets in ${configFileNames.config}`,
+        { fileName: configFileNames.ia, slug: node.slug, locale }
+      );
+    }
+  }
+};
+
 export type ConfigFamily = {
   config: DocstubeConfig;
   ia: Ia;
@@ -75,9 +104,12 @@ export const loadConfigFamily = async (repoRoot: string): Promise<ConfigFamily> 
     });
   }
   const glossaryText = await readOptional(join(repoRoot, configFileNames.glossary));
+  const config = parseDocstubeConfig(configText);
+  const ia = parseIaFile(iaText);
+  assertNoLocaleSlugCollisions(config, ia);
   return {
-    config: parseDocstubeConfig(configText),
-    ia: parseIaFile(iaText),
+    config,
+    ia,
     glossary: glossaryText === undefined ? { schemaVersion: 1, terms: [] } : parseGlossaryFile(glossaryText),
     raw: { config: configText, ia: iaText, glossary: glossaryText }
   };

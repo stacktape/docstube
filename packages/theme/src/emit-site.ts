@@ -1,5 +1,6 @@
 import { mkdir, readdir, rm, rmdir, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, relative, sep } from 'node:path';
+import { localeRoutePrefixConflict } from '@docstube/contracts';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
 import {
@@ -200,6 +201,28 @@ const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } =>
 const frontmatterHasKey = (frontmatter: string, key: string): boolean =>
   new RegExp(`^${key}\\s*:`, 'mu').test(frontmatter);
 
+// KERNEL-OWNED FRONTMATTER (impl-24 finding): every `docstube*` key on a route is COMPUTED here
+// from the persisted trust spine. Authored frontmatter that declares one — a writer (or a
+// hand-edited artifact) carrying `docstubeClaimsComplete: true` on a partial page — used to
+// survive into the emitted route and decide the badge. The authored keys are stripped before the
+// computed ones are injected, so the kernel value always wins and there is exactly one of each.
+// Line-scoped: a top-level `docstube*` key drops with every continuation line under it, and no
+// other authored key is touched.
+const stripKernelOwnedFrontmatter = (frontmatter: string): string => {
+  const kept: string[] = [];
+  let dropping = false;
+  for (const line of frontmatter.split('\n')) {
+    const topLevelKey = /^([^\s#][^:]*):/u.exec(line)?.[1];
+    if (topLevelKey !== undefined) {
+      dropping = topLevelKey.startsWith('docstube');
+    }
+    if (!dropping) {
+      kept.push(line);
+    }
+  }
+  return kept.join('\n').trimEnd();
+};
+
 // Visible per-entity citations (PRODUCT §3.2): page-level sources plus every block-level source
 // on the page, deduplicated, rendered by the layout as the Sources footer.
 const collectPageSources = (page: PageEntity): SourceRef[] => {
@@ -254,7 +277,8 @@ const pageRouteMdx = (
   // The source-locale page for a translated rendition: the canonical shard its proof derives from.
   canonical?: EmitSitePage
 ): string => {
-  const { frontmatter, body } = splitFrontmatter(page.mdx);
+  const { frontmatter: authored, body } = splitFrontmatter(page.mdx);
+  const frontmatter = stripKernelOwnedFrontmatter(authored);
   const locale = page.shard.locale;
   const isSourceLocale = locale === context.sourceLocale;
   const slug = page.shard.page.slug;
@@ -577,14 +601,32 @@ const writeTextFile = async (path: string, content: string): Promise<void> => {
 // Both are in apply-theme-bundle's protected list, so nothing here can ever be theme- or
 // user-authored. Every other file under outDir — theme assets, public/*.txt, sitemap, mcp/,
 // node_modules, dist — is untouched, and nothing outside outDir is ever considered.
-const collectFiles = async (root: string, extension: string): Promise<string[]> => {
+//
+// A DIRECTORY THAT CANNOT BE READ IS REPORTED (impl-24 finding): only ENOENT — "the tree does not
+// exist yet" — is an ordinary, silent outcome. Any other readdir failure (EACCES, EPERM, EIO, a
+// path replaced by a file) means the reconciler could not see part of the tree, so obsolete routes
+// may still be serving. Swallowing it turned "stale routes deleted" into an unverifiable claim;
+// the path is surfaced as an emit warning instead.
+const collectFiles = async (
+  root: string,
+  extension: string,
+  onWarning: (warning: string) => void
+): Promise<string[]> => {
   const found: string[] = [];
   const walk = async (directory: string): Promise<void> => {
     let entries;
     try {
       entries = await readdir(directory, { withFileTypes: true });
-    } catch {
-      return; // the tree does not exist yet: nothing to prune
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') {
+        onWarning(
+          `could not scan "${directory}" for obsolete ${extension} routes (${code ?? 'unknown error'}: ` +
+            `${(error as Error).message}) — stale routes under it may still be served; check the directory's ` +
+            'permissions and re-run `docstube generate`'
+        );
+      }
+      return;
     }
     for (const entry of entries) {
       const absolute = join(directory, entry.name);
@@ -617,10 +659,11 @@ const pruneObsoleteFiles = async (
   siteRoot: string,
   root: string,
   extension: string,
-  desired: ReadonlySet<string>
+  desired: ReadonlySet<string>,
+  onWarning: (warning: string) => void
 ): Promise<string[]> => {
   const pruned: string[] = [];
-  for (const absolute of await collectFiles(root, extension)) {
+  for (const absolute of await collectFiles(root, extension, onWarning)) {
     if (desired.has(absolute)) {
       continue;
     }
@@ -631,11 +674,34 @@ const pruneObsoleteFiles = async (
   return pruned;
 };
 
+// EMISSION PLANNING GATE (impl-24 finding): a source page whose slug starts with a configured
+// target locale code wants the same route as that locale's rendition of the remaining path, and
+// whichever write lands last owns it. Emission refuses to plan such a tree at all — the page, its
+// slug, and the locale are all named, because only the author can decide which of the two to
+// rename.
+const assertNoLocaleRouteCollisions = (pages: readonly EmitSitePage[], targetLocales: readonly string[]): void => {
+  for (const page of pages) {
+    const slug = page.shard.page.slug;
+    const locale = localeRoutePrefixConflict(slug, targetLocales);
+    if (locale !== undefined) {
+      throw new ThemeError(
+        'route-locale-collision',
+        `page "${page.shard.page.title}" has slug "${slug}", which collides with the "${locale}" locale route ` +
+          `namespace: translated pages are emitted under /${locale}/<slug>, so this page and the ${locale} ` +
+          `rendition of "${slug.slice(locale.length + 1)}" would fight over the same route. Rename the page's slug ` +
+          `in ia.yml, or remove "${locale}" from locales.targets in docstube.yml`,
+        { slug, locale, pageId: page.shard.page.id }
+      );
+    }
+  }
+};
+
 export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> => {
   const siteRoot = join(input.repoRoot, input.outDir);
   const theme = input.theme;
   const sourceLocale = input.config.locales.source;
   const translations = input.translations ?? [];
+  assertNoLocaleRouteCollisions(input.pages, input.config.locales.targets);
   const navByLocale = buildNavByLocale(input.index, sourceLocale, translations);
   const alternatesBySlug = buildAlternatesBySlug(input.pages, translations, sourceLocale);
   const routeContext: PageRouteContext = { sourceLocale, alternatesBySlug, renderers: theme.manifest.renderers };
@@ -743,8 +809,8 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
   // Reconcile AFTER the desired routes exist, so an interrupted write never leaves a page with
   // neither its old route nor its new one.
   const pruned = [
-    ...(await pruneObsoleteFiles(siteRoot, join(siteRoot, 'src/pages'), '.mdx', desiredRoutes)),
-    ...(await pruneObsoleteFiles(siteRoot, join(siteRoot, 'public'), '.md', desiredTwins))
+    ...(await pruneObsoleteFiles(siteRoot, join(siteRoot, 'src/pages'), '.mdx', desiredRoutes, collectWarning)),
+    ...(await pruneObsoleteFiles(siteRoot, join(siteRoot, 'public'), '.md', desiredTwins, collectWarning))
   ].toSorted((left, right) => left.localeCompare(right));
   return { themeConflicts: applied.conflicts, warnings, pruned };
 };

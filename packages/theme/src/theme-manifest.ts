@@ -53,7 +53,13 @@ export type ThemeBundle = {
   files: ThemeBundleFile[];
 };
 
-export type ThemeErrorCode = 'theme-unknown' | 'theme-bundle-invalid' | 'theme-dependency-conflict';
+export type ThemeErrorCode =
+  | 'theme-unknown'
+  | 'theme-bundle-invalid'
+  | 'theme-dependency-conflict'
+  // A page slug that would occupy a locale's route namespace — an IA/config authoring error the
+  // kernel refuses to resolve by guessing (see localeRoutePrefixConflict).
+  | 'route-locale-collision';
 
 export class ThemeError extends Error {
   readonly code: ThemeErrorCode;

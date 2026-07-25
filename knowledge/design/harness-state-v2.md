@@ -49,6 +49,20 @@ pipeline-v2.md, and release-scope-v2.md.
    numbers, modal statements) not covered by any claim, so ledger omission cannot manufacture
    "100% checked".
 
+   **The linter is a floor with documented limits, not a soundness proof (added 2026-07-25,
+   impl-24).** Its rule is exact: a sentence carrying an assertion signal (a numeric literal or one
+   of the documented verbs/modals) is flagged when it is real prose and its owning block names a
+   code identifier anywhere. That deliberately misses assertions with no identifier in the block,
+   assertions with no lexical signal ("the client gives up after a while"), and prose inside
+   page-authored HTML/JSX, which the kernel cannot attribute to a block a claim could anchor to.
+   Widening the rule trades those misses for false positives, and a false positive permanently
+   withholds the complete badge from a correct page. Semantic assertion-coverage is therefore
+   decision 4's **risk critic**, not this linter — it ships with the review-routing wave (see
+   Sequencing). Consequence for the reader surface: the complete/green state means "every claim in
+   this page's ledger is checked and no unmarked assertion was detected", never "this page contains
+   no unverified statement", and every surface that explains the state must say so. The badge
+   computation is not weakened by this honesty: an uncovered span still forbids completeness.
+
 6. **NEW REQUIREMENT (founder): every page has a pure-markdown rendition.** Because claims are
    inline components, the site must also emit a clean `.md` twin per page, easily readable by
    agents and humans without clutter. Consequence: every supported theme/React component

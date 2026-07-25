@@ -173,8 +173,25 @@ describe('review UI', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
     await screen.findByText('Requirements');
     expect(screen.getByRole('alert').textContent).toContain('contradicted by the source');
-    expect(screen.getAllByText('⚠ 1 contradicted').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/⚠ 1 contradicted/).length).toBeGreaterThan(0);
     expect(screen.getByText('contradicted')).toBeDefined();
+  });
+
+  it('a contradicted page still shows the FULL picture: contradicted + checked/total + unmarked (impl-24)', async () => {
+    // The contradiction is the alarm, but it must not SUBTRACT information: the chip used to
+    // collapse to "⚠ N contradicted" and hide the ledger counts entirely, leaving the reviewer with
+    // the most to decide with the least to decide on.
+    const shard = buildShard('contradicted') as { ledger: { coverageLint: { uncovered: unknown[] } } };
+    shard.ledger.coverageLint = {
+      uncovered: [{ blockId, excerpt: 'The `retryLimit` defaults to 5.', detector: 'identifier-with-numeric-literal' }]
+    };
+    renderReview(buildClient(vi.fn(noopSubmit), shard));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+    const chip = screen.getAllByText(/⚠ 1 contradicted/)[0]?.closest('span[class*="rounded"]');
+    expect(chip?.textContent).toContain('⚠ 1 contradicted');
+    expect(chip?.textContent).toContain('0/1 checked');
+    expect(chip?.textContent).toContain('1 unmarked');
   });
 
   it('marks an UNCHECKED claim quietly but visibly — distinct from the contradiction alarm (impl-09)', async () => {

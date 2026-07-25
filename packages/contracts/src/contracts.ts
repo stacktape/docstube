@@ -23,6 +23,7 @@ export {
   semverSchema,
   isoTimestampSchema,
   localeCodeSchema,
+  localeRoutePrefixConflict,
   versionLabelSchema,
   repoPathSchema,
   sha256HexSchema,

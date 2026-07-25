@@ -66,6 +66,17 @@ export const localeCodeSchema = z
   .string()
   .regex(/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$/, 'expected a locale code like "en", "pt-BR", or "zh-Hans"');
 
+// LOCALE-PREFIX ROUTE COLLISION (impl-24 finding). Translated renditions are routed under
+// /<locale>/<slug>, so a SOURCE page whose slug starts with a configured target locale code — slug
+// "de/foo" with locale "de" — wants the exact route the German rendition of "foo" wants, and a
+// bare slug "de" wants the locale directory itself. Which page ends up occupying the route depends
+// on write order, so it is nondeterministic. This is an IA/config authoring error with two valid
+// fixes the kernel cannot choose between (rename the page, or drop the locale), so it is rejected
+// with both names rather than guessed at. Returns the offending locale, or undefined when the slug
+// is safe.
+export const localeRoutePrefixConflict = (slug: string, targetLocales: readonly string[]): string | undefined =>
+  targetLocales.find((locale) => slug === locale || slug.startsWith(`${locale}/`));
+
 // Docs version labels are user-declared, path-safe strings: "1.x", "v2", "2026-06".
 export const versionLabelSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);
 

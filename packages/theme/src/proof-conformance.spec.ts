@@ -182,10 +182,18 @@ describe('proof conformance (basic theme)', () => {
     const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
     expect(chip).toContain('unmarked assertion');
     expect(chip).toContain('data-docstube-uncovered-assertions={uncovered}');
-    // The complete class can only appear when the linter found nothing.
-    expect(chip).toContain('const isComplete = complete === true && uncovered === 0;');
+    // The complete class can only appear when the linter found nothing — and the chip re-derives
+    // it from the numbers it renders rather than trusting the flag (impl-24 defensive recompute).
+    expect(chip).toContain(
+      'const isComplete = complete === true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
+    );
     expect(chip).toContain('dt-claims--complete');
-    // Every built-in theme threads both props and styles the complete state — a conformance
+    // HONEST BADGE SEMANTICS (impl-24, PRODUCT §1.2 / harness-state-v2 decisions 4-5): wherever the
+    // complete state is explained it says what it means AND what it does not — the deterministic
+    // linter is a floor, and semantic assertion-coverage is the risk critic's job.
+    expect(chip).toContain("every claim in this page's ledger is checked");
+    expect(chip).toContain('does not mean the page contains no unverified statement');
+    // Every built-in theme threads the props and styles the complete state — a conformance
     // contract, not a theme choice.
     for (const bundle of Object.values(builtinThemes)) {
       const files = (await bundle()).files;
@@ -193,6 +201,9 @@ describe('proof conformance (basic theme)', () => {
       const content = layout && 'content' in layout ? layout.content : '';
       expect(content).toContain('uncovered={uncoveredAssertions}');
       expect(content).toContain('complete={claimsComplete}');
+      // The contradiction count reaches the chip too, so the recompute can refuse the green state.
+      expect(content).toContain('contradicted={claimsContradicted}');
+      expect(content).toContain('does not mean the page contains no unverified statement');
       const css = files.find((file) => file.path === 'src/styles/global.css');
       expect(css && 'content' in css ? css.content : '').toContain('.dt-claims--complete');
     }

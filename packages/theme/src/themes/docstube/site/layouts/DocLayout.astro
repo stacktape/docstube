@@ -32,6 +32,10 @@ const claimsTotal = frontmatter.docstubeClaimsTotal ?? 0;
 const claimsContradicted = frontmatter.docstubeClaimsContradicted ?? 0;
 // Coverage lint (PRODUCT §1.2, no hidden denominator): assertion-shaped prose no <Claim> marker
 // covers. The complete state is gated on it, so unmarked facts never read as a fully checked page.
+// What the complete state MEANS, precisely: every claim in this page's ledger is checked and no
+// unmarked assertion was detected. It does not mean the page contains no unverified statement —
+// the detector is a deterministic floor, and semantic assertion-coverage belongs to the risk critic
+// (harness-state-v2 decision 4). The chip states exactly this in its own popover text.
 const uncoveredAssertions = frontmatter.docstubeUncoveredAssertions ?? 0;
 const claimsComplete = frontmatter.docstubeClaimsComplete === true;
 const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
@@ -173,7 +177,7 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         <div class="dt-article">
           <div class="dt-page-meta">
             {breadcrumb ? <p class="dt-breadcrumb">{breadcrumb}</p> : null}
-            <DocstubeClaims checked={claimsChecked} total={claimsTotal} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />
+            <DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />
           </div>
           <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />
           <DocstubeEntity entityId={frontmatter.docstubePageId}>

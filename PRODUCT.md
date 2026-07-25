@@ -47,6 +47,18 @@ hidden denominator: a page's badge means **100% of its ledger claims are checked
 class-appropriate evidence, and a deterministic coverage linter catches assertion-shaped prose not
 covered by any claim, so ledger omission cannot manufacture "100% checked".
 
+**The coverage linter is a deterministic FLOOR, not a soundness proof.** No deterministic detector
+can identify every factual assertion in prose; this one fires on the documented shape (an
+assertion signal in a block that names a code identifier) and deliberately says nothing about the
+rest. Prose inside page-authored HTML/JSX is outside its attribution model, and prose that asserts
+a fact without tripping any signal ("the client gives up after a while") passes it. The
+**complete/green page state therefore means "every claim in this page's ledger is checked and no
+unmarked assertion was detected" — never "this page contains no unverified statement,"** and every
+surface that explains the state says so. Semantic assertion-coverage — catching the facts the
+detector structurally cannot see — is the job of the evidence-fed **risk critic** (harness-state-v2
+decision 4), which ships in the review-routing wave. Until then the floor stands on its own: an
+uncovered span still forbids completeness, so ledger omission can never manufacture a green badge.
+
 Trust vocabulary is **three orthogonal public axes** (the old proven / scored / out-of-domain
 ladder is removed from all public surfaces):
 
