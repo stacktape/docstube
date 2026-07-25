@@ -336,6 +336,23 @@ describe('full-spine probes: submit → anchor → verify → shard', () => {
     expect(submission.response.errors?.some((error) => error.includes('JSX element'))).toBe(true);
   });
 
+  it('Sol\'s verdict-7 probe: <Claim id="g1" set:text="…">greet exists.</Claim> is REJECTED at submit_page — the spine never reaches anchoring', () => {
+    // Astro's set:text directive replaces the rendered children with the attribute text, so the
+    // reader would see "greet does not exist." while the kernel checked "greet exists." —
+    // <Claim> accepts only the id attribute; anything else is rejected in-session.
+    const mdx = `---
+title: "Greet"
+---
+
+# Greet
+
+Fact: <Claim id="g1" set:text="greet does not exist.">\`greet\` exists.</Claim>
+`;
+    const submission = evaluateSubmitPageCall({ mdx, ledger: existenceLedger('greet exists') });
+    expect(submission.response.accepted).toBe(false);
+    expect(submission.response.errors?.some((error) => error.includes('accepts only the id attribute'))).toBe(true);
+  });
+
   it('Sol\'s verdict-6 ancestor probe: <Badge label="greet does not exist."><Claim>greet exists.</Claim></Badge> persists UNCHECKED — never checked', async () => {
     // The marker's own content is the exact canonical assertion, but Badge's renderer owns the
     // Claim slot — it can render its contradicting label instead. NO-JSX-ANCESTOR checkability:

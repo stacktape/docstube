@@ -109,6 +109,32 @@ describe('scanClaimMarkers', () => {
     expect(nested.errors[0]?.code).toBe('marker-jsx');
   });
 
+  it("rejects markers carrying any attribute other than id — Sol's set:text probe (wave 2b close final)", () => {
+    // <Claim id="g1" set:text="greet does not exist.">greet exists.</Claim> — Astro's set:text
+    // directive REPLACES the rendered children with the attribute text, so the reader sees the
+    // opposite of the scanned assertion. Whitelist: only the id attribute is legal.
+    const probe = scanClaimMarkers('Fact: <Claim id="g1" set:text="greet does not exist.">greet exists.</Claim>\n');
+    expect(probe.errors[0]?.code).toBe('marker-attribute');
+    expect(probe.errors[0]?.markerId).toBe('g1');
+    expect(probe.errors[0]?.message).toContain('accepts only the id attribute');
+    expect(probe.markers).toEqual([]);
+
+    const setHtml = scanClaimMarkers('Fact: <Claim id="g2" set:html="<b>lie</b>">greet exists.</Claim>\n');
+    expect(setHtml.errors[0]?.code).toBe('marker-attribute');
+
+    // Attribute spreads are rejected the same way — no enumeration, anything but id fails.
+    const spread = scanClaimMarkers('Fact: <Claim id="g3" {...props}>greet exists.</Claim>\n');
+    expect(spread.errors[0]?.code).toBe('marker-attribute');
+
+    const arbitraryProp = scanClaimMarkers('Fact: <Claim id="g4" className="x">greet exists.</Claim>\n');
+    expect(arbitraryProp.errors[0]?.code).toBe('marker-attribute');
+
+    // A plain id-only marker is untouched.
+    const clean = scanClaimMarkers('Fact: <Claim id="g5">greet exists.</Claim>\n');
+    expect(clean.errors).toEqual([]);
+    expect(clean.markers).toHaveLength(1);
+  });
+
   it('flags marker purity STRUCTURALLY: only text + inlineCode content is pureText (no enumeration)', () => {
     // Pure: plain prose and backticked identifiers — the only nodes whose rendered output
     // provably equals the scanned text.
@@ -417,6 +443,15 @@ describe('validateSubmission', () => {
     });
     expect(outcome.accepted).toBeUndefined();
     expect(outcome.errors.some((error) => error.includes('JSX element'))).toBe(true);
+  });
+
+  it('rejects a submission whose marker carries an extra attribute with a repair error', () => {
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="c1" set:text="greet does not exist.">greet exists.</Claim>'),
+      ledger: ledgerWith([claim('c1', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors.some((error) => error.includes('accepts only the id attribute'))).toBe(true);
   });
 
   it('rejects an orphan marker with no ledger entry', () => {

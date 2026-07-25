@@ -101,6 +101,16 @@ describe('proof conformance (basic theme)', () => {
     expect(sources).toContain('data-docstube-sources');
   });
 
+  it('the inline Claim primitive consumes ONLY the id prop — no prop spreading (wave 2b close final)', async () => {
+    // Defense in depth behind submit_page's attribute whitelist: even if a marker attribute ever
+    // reached the emitted site, the kernel Claim renderer must not forward it to the DOM. It
+    // destructures id and nothing else — a props spread would let unknown attributes through.
+    const claim = await readFile(join(siteRoot, 'src/docstube/DocstubeClaim.astro'), 'utf8');
+    expect(claim).toContain('const { id } = Astro.props;');
+    expect(claim).not.toContain('...Astro.props');
+    expect(claim).not.toContain('{...');
+  });
+
   it('links source citations in the sources primitive', async () => {
     const sources = await readFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), 'utf8');
     expect(sources).toContain('<h2>Sources</h2>');

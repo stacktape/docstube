@@ -50,6 +50,7 @@ export type MarkerScanErrorCode =
   | 'marker-jsx'
   | 'marker-missing-id'
   | 'marker-invalid-id'
+  | 'marker-attribute'
   | 'marker-empty'
   | 'marker-nested';
 
@@ -175,6 +176,28 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
         code: 'marker-invalid-id',
         markerId,
         message: `<Claim id="${markerId}"> is not a valid marker id — use letters, digits, "_" or "-"`
+      });
+      return;
+    }
+    // ATTRIBUTE WHITELIST (wave 2b close final — Sol's set:text probe): a marker may carry ONLY
+    // the id attribute. Astro renderer directives (set:text, set:html) REPLACE the rendered
+    // children with attribute text the kernel never scanned — <Claim id="g1" set:text="greet does
+    // not exist.">greet exists.</Claim> renders the opposite of its checked assertion. Whitelist,
+    // not blacklist: any unknown attribute (including {...spreads}) is rejected outright.
+    const extraAttributes = (node.attributes ?? []).filter(
+      (attribute) => !(attribute.type === 'mdxJsxAttribute' && attribute.name === 'id')
+    );
+    if (extraAttributes.length > 0) {
+      const names = extraAttributes
+        .map((attribute) => (attribute.type === 'mdxJsxAttribute' ? `"${attribute.name}"` : 'a {…} spread'))
+        .join(', ');
+      errors.push({
+        code: 'marker-attribute',
+        markerId,
+        message:
+          `marker "${markerId}" carries ${names} — <Claim> accepts only the id attribute; renderer ` +
+          'directives or props could replace the rendered prose with text the kernel never checked; remove ' +
+          'every attribute except id and resubmit'
       });
       return;
     }

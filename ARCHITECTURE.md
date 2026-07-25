@@ -220,6 +220,16 @@ badge loss, disposition regression, checked-count drop without deletion, evidenc
 weakening (e.g. execution → grounding), attestation loss. Assessment (editorial) changes are
 reported separately and never counted as correctness downgrades.
 
+### 4.4 Trust threat model boundary
+
+The trust spine mechanically prevents ACCIDENTAL lies — writer-model errors, staleness, drift:
+every route from prose to a checked state is deterministic, fail-closed, and adversarially
+reviewed. It does NOT defend against a repository owner deliberately forging their own committed
+state (coordinated MDX + shard + hash edits): docstube state is unsigned local data, and a repo
+owner can already misrepresent their own repo by any means, so cryptographic signing/attestation
+is explicitly out of scope for 0.1.0 (a possible v1.x direction is CI-side re-verification, where
+the Action recomputes evidence rather than trusting committed shards).
+
 ## 5 · State model
 
 ### 5.1 Committed — the lockfile pattern
