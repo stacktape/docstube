@@ -126,10 +126,10 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
   // read as still running (journalRunFailure rethrows).
   try {
     const ownOutputs = docstubeOwnOutputPrefixes(config);
-    const { commit, dirtyWorkingTree: treeDirtyAtStart } = await resolveSourceRevision(repoRoot, ownOutputs);
+    const { commit, dirtyWorkingTree: treeDirtyAtStart, treeState } = await resolveSourceRevision(repoRoot, ownOutputs);
     await journal.append({ type: 'run-started', mode: 'refine', commit });
     if (treeDirtyAtStart) {
-      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
+      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, [], treeState)] });
     }
 
     const packs = host.languagePacks().map((entry) => entry.definition);
@@ -149,7 +149,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     if (unversionedSources.length > 0) {
       await journal.append({
         type: 'findings',
-        findings: [dirtyWorkingTreeWarning(commit, unversionedSources, treeDirtyAtStart)]
+        findings: [dirtyWorkingTreeWarning(commit, unversionedSources, treeState)]
       });
     }
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;

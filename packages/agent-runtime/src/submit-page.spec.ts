@@ -296,11 +296,13 @@ describe('scanClaimMarkers', () => {
     );
     expect(ordinary.errors).toEqual([]);
 
+    // A custom-element NAME inside a prop value is not page-script — but it IS tag-shaped content
+    // in a prop, which the markup-attribute rule now refuses outright (see the prop-value probes).
     const customElementName = scanClaimMarkers(
       'Text.\n\n<Callout title="see <style-guide> for details" />\n',
       registry
     );
-    expect(customElementName.errors).toEqual([]);
+    expect(customElementName.errors.map((error) => error.code)).toEqual(['markup-attribute']);
   });
 
   it('rejects EVENT-HANDLER attributes (page-script, Sol <img onerror> probe) in both spellings', () => {
@@ -360,7 +362,9 @@ describe('scanClaimMarkers', () => {
     // element and inside the value.
     for (const spelling of ['onerror', 'onError', 'ONERROR', 'OnError']) {
       const smuggled = scanClaimMarkers(`Text.\n\n<Callout title="<img src=x ${spelling}=alert(1)>" />\n`, registry);
-      expect(smuggled.errors.map((error) => error.code)).toEqual(['page-script']);
+      // The named cause comes first (it repairs faster); the markup-attribute rule rides along as
+      // the rule that actually holds when the handler spelling dodges the pattern.
+      expect(smuggled.errors.map((error) => error.code)).toEqual(['page-script', 'markup-attribute']);
       expect(smuggled.errors[0]?.message).toContain('event handler');
     }
 
@@ -628,6 +632,105 @@ describe('scanClaimMarkers', () => {
       const scan = scanClaimMarkers(page, registry);
       expect(scan.errors).toEqual([]);
       expect(scan.markers[0]).toMatchObject({ markerId: 'c1', pureText: false });
+    });
+
+    it("rejects MDX ESM NODES OUTRIGHT — import/export is the third executable node kind (Sol's probe)", () => {
+      // THE SAME STRUCTURAL GAP AS EXPRESSIONS, A DIFFERENT NODE TYPE: the whitelist walks
+      // elements, the expression rule walks {…} nodes, and `mdxjsEsm` is neither — so
+      // `export default function Evil(){ return <script>…</script> }` produced NO element and NO
+      // expression node, passed submission, and was compiled by MDX into the page's own rendered
+      // wrapper. Generated docs never need an import or an export, so the whole kind is refused.
+      const importStatement = scanClaimMarkers("import x from 'y'\n\nText.\n", registry);
+      expect(importStatement.errors.map((error) => error.code)).toEqual(['mdx-esm']);
+      expect(importStatement.errors[0]?.message).toContain('import/export statement');
+
+      const exportConst = scanClaimMarkers('export const a = 1\n\nText.\n', registry);
+      expect(exportConst.errors.map((error) => error.code)).toEqual(['mdx-esm']);
+
+      // The review's payload: an exported component whose body renders a <script>. No element node
+      // and no expression node exists for any other rule to catch.
+      const exportDefault = scanClaimMarkers(
+        'export default function Evil() { return <script>document.title = "lie"</script> }\n\nText.\n',
+        registry
+      );
+      expect(exportDefault.errors.map((error) => error.code)).toEqual(['mdx-esm']);
+      expect(exportDefault.errors[0]?.message).toContain('theme owns components');
+
+      // A named export of a component is the same node kind and the same refusal.
+      const namedExport = scanClaimMarkers(
+        'export function Chip() { return <span className="dt-claims--complete">3 of 3</span> }\n\nText.\n',
+        registry
+      );
+      expect(namedExport.errors.map((error) => error.code)).toEqual(['mdx-esm']);
+
+      // ORDINARY MARKDOWN and registered components are untouched, and an import shown in a code
+      // FENCE is documentation — the whole reason fences exist.
+      const ordinary = scanClaimMarkers(
+        'Text with **emphasis** and `code`.\n\n<Callout tone="info" title="Heads up">Body.</Callout>\n',
+        registry
+      );
+      expect(ordinary.errors).toEqual([]);
+
+      const fence = scanClaimMarkers(
+        ['Import it like this:', '', '```ts', "import { greet } from './greet.ts';", 'export const a = 1;', '```'].join(
+          '\n'
+        ),
+        registry
+      );
+      expect(fence.errors).toEqual([]);
+
+      // Prose that merely says the words carries no statement.
+      const prose = scanClaimMarkers('The module exports `greet`; import it before calling it.\n', registry);
+      expect(prose.errors).toEqual([]);
+    });
+
+    it('rejects TAG-SHAPED CONTENT in a string prop wholesale — props carry plain text (Sol tokenizer probe)', () => {
+      // A REGEX OVER HTML CANNOT BE MADE TOKENIZER-SAFE: `<img title='>' ONERROR=alert(1)>` ends
+      // the tag early for any `[^>]*` while a browser keeps parsing attributes, and
+      // `<img/onError=…>` needs no whitespace before the handler. Both walked past the handler
+      // pattern. The rule that holds is structural: a prop value may not contain a tag-open shape.
+      const quotedAngle = scanClaimMarkers(`Text.\n\n<Callout title="<img title='>' ONERROR=alert(1)>" />\n`, registry);
+      expect(quotedAngle.errors.map((error) => error.code)).toEqual(['markup-attribute']);
+      expect(quotedAngle.errors[0]?.message).toContain('plain text');
+
+      const slashHandler = scanClaimMarkers('Text.\n\n<Callout title="<img/onError=alert(1)>" />\n', registry);
+      expect(slashHandler.errors.map((error) => error.code)).toEqual(['markup-attribute']);
+
+      // A closing tag opens with `</`, which is the same shape.
+      const closingTag = scanClaimMarkers('Text.\n\n<Callout title="</Callout><script>x()</script>" />\n', registry);
+      expect(closingTag.errors.some((error) => error.code === 'markup-attribute')).toBe(true);
+
+      // THE EXACT BOUNDARY: `<` immediately followed by an ASCII letter or `/`. A `<` followed by a
+      // space, a digit, `=`, or the end of the value is an ordinary less-than sign and stays legal.
+      const lessThan = scanClaimMarkers(
+        'Text.\n\n<Callout title="a < b, n <= 3, latency < 5ms, and a trailing <">Body.</Callout>\n',
+        registry
+      );
+      expect(lessThan.errors).toEqual([]);
+
+      const digit = scanClaimMarkers('Text.\n\n<Callout title="retries <3 by default">Body.</Callout>\n', registry);
+      expect(digit.errors).toEqual([]);
+
+      // …and the documented cost: no space after the sign reads as a tag open.
+      const noSpace = scanClaimMarkers('Text.\n\n<Callout title="a <b comparison">Body.</Callout>\n', registry);
+      expect(noSpace.errors.map((error) => error.code)).toEqual(['markup-attribute']);
+
+      // A code FENCE containing markup is documentation and stays legal — the repair the error
+      // message actually recommends.
+      const fence = scanClaimMarkers(
+        [
+          '<Callout tone="info" title="Rendering an image">',
+          '',
+          '```html',
+          '<img src="x" onerror="alert(1)">',
+          '<Callout title="<b>bold</b>">',
+          '```',
+          '',
+          '</Callout>'
+        ].join('\n'),
+        registry
+      );
+      expect(fence.errors).toEqual([]);
     });
   });
 

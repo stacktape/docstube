@@ -25,10 +25,13 @@ afterEach(async () => {
 });
 
 describe('resolveSourceRevision', () => {
-  it('marks a non-git directory (no HEAD) as dirty with the zero commit', async () => {
+  it('reports a non-git directory (no HEAD) as UNKNOWN — marked, but never called porcelain-dirty', async () => {
+    // UNKNOWN IS NOT OBSERVED-DIRTY (wave 2b close final, run-diagnostics finding): the trust
+    // decision is identical (the run is marked), but porcelain never ran, so nothing may claim it
+    // reported anything.
     repoRoot = await mkdtemp(join(tmpdir(), 'docstube-rev-'));
     const state = await resolveSourceRevision(repoRoot);
-    expect(state).toEqual({ commit: '0'.repeat(40), dirtyWorkingTree: true });
+    expect(state).toEqual({ commit: '0'.repeat(40), dirtyWorkingTree: true, treeState: 'unknown' });
   });
 
   it('keeps a clean committed tree unmarked (unchanged behavior)', async () => {
@@ -40,6 +43,7 @@ describe('resolveSourceRevision', () => {
     const state = await resolveSourceRevision(repoRoot);
     expect(state.commit).toMatch(/^[0-9a-f]{40,64}$/);
     expect(state.dirtyWorkingTree).toBe(false);
+    expect(state.treeState).toBe('clean');
   });
 
   it('marks a tree with uncommitted changes dirty while still recording HEAD', async () => {
@@ -52,5 +56,7 @@ describe('resolveSourceRevision', () => {
     const state = await resolveSourceRevision(repoRoot);
     expect(state.commit).toMatch(/^[0-9a-f]{40,64}$/);
     expect(state.dirtyWorkingTree).toBe(true);
+    // OBSERVED dirty — porcelain ran and said so.
+    expect(state.treeState).toBe('dirty');
   });
 });

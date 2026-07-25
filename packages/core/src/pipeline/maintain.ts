@@ -176,10 +176,10 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
   // read as still running (journalRunFailure rethrows).
   try {
     const ownOutputs = docstubeOwnOutputPrefixes(config);
-    const { commit, dirtyWorkingTree: treeDirtyAtStart } = await resolveSourceRevision(repoRoot, ownOutputs);
+    const { commit, dirtyWorkingTree: treeDirtyAtStart, treeState } = await resolveSourceRevision(repoRoot, ownOutputs);
     await journal.append({ type: 'run-started', mode: 'maintain', commit });
     if (treeDirtyAtStart) {
-      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit)] });
+      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, [], treeState)] });
     }
 
     await journal.append({ type: 'stage-started', stage: 'codemap' });
@@ -207,7 +207,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
     if (unversionedSources.length > 0) {
       await journal.append({
         type: 'findings',
-        findings: [dirtyWorkingTreeWarning(commit, unversionedSources, treeDirtyAtStart)]
+        findings: [dirtyWorkingTreeWarning(commit, unversionedSources, treeState)]
       });
     }
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;

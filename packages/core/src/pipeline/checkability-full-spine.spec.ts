@@ -419,6 +419,64 @@ Fact: <Claim id="g1" id="g2">\`greet\` exists.</Claim>
     expect(unregistered.response.errors?.some((error) => error.includes('plain string literal'))).toBe(true);
   });
 
+  it("Sol's MDX-ESM probe: an export default component is REJECTED at submit_page — the spine never starts", () => {
+    // THE THIRD EXECUTABLE NODE KIND: `export default function Evil(){ return <script>…</script> }`
+    // produces neither an element node (for the whitelist) nor an expression node (for the
+    // expression rule), and MDX compiles it into the page's OWN rendered wrapper — so the page
+    // shipped executable, claim-rewriting markup while both gates saw a clean AST.
+    const exportDefault = evaluateSubmitPageCall(
+      {
+        mdx: pageMdx(
+          '`greet` exists.',
+          '\nexport default function Evil() { return <script>document.body.innerHTML = "greet does not exist.";</script> }\n'
+        ),
+        ledger: existenceLedger('greet exists')
+      },
+      registry
+    );
+    expect(exportDefault.response.accepted).toBe(false);
+    expect(exportDefault.response.errors?.some((error) => error.includes('import/export statement'))).toBe(true);
+
+    for (const statement of ["import Evil from './evil.tsx'", 'export const a = 1']) {
+      const submission = evaluateSubmitPageCall(
+        { mdx: pageMdx('`greet` exists.', `\n${statement}\n`), ledger: existenceLedger('greet exists') },
+        registry
+      );
+      expect(submission.response.accepted).toBe(false);
+      expect(submission.response.errors?.some((error) => error.includes('import/export statement'))).toBe(true);
+    }
+  });
+
+  it("Sol's tokenizer probe: tag-shaped content in a string PROP is REJECTED at submit_page", () => {
+    // `<img title='>' ONERROR=alert(1)>` ends the tag early for every `[^>]*` regex while HTML
+    // keeps parsing attributes, and `<img/onError=…>` needs no whitespace at all. Props carry
+    // plain text, so the shape is refused instead of parsed.
+    for (const payload of ["<img title='>' ONERROR=alert(1)>", '<img/onError=alert(1)>']) {
+      const submission = evaluateSubmitPageCall(
+        {
+          mdx: pageMdx('`greet` exists.', `\n<Badge label="${payload}">beta</Badge>\n`),
+          ledger: existenceLedger('greet exists')
+        },
+        registry
+      );
+      expect(submission.response.accepted).toBe(false);
+      expect(submission.response.errors?.some((error) => error.includes('component props carry PLAIN TEXT'))).toBe(
+        true
+      );
+    }
+
+    // A less-than sign in ordinary prop text stays legal — the boundary is `<` immediately
+    // followed by a letter or "/".
+    const lessThan = evaluateSubmitPageCall(
+      {
+        mdx: pageMdx('`greet` exists.', '\n<Badge label="latency < 5ms">fast</Badge>\n'),
+        ledger: existenceLedger('greet exists')
+      },
+      registry
+    );
+    expect(lessThan.response.accepted).toBe(true);
+  });
+
   it('a code FENCE showing <script> markup is documentation, not an element — the canonical spine still mints CHECKED', async () => {
     const fence = '\n```html\n<script>console.log("example");</script>\n<style>p {}</style>\n```\n';
     const { verified, shard } = await runSpine('`greet` exists.', existenceLedger('greet exists'), fence);

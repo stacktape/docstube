@@ -20,6 +20,7 @@ import {
   dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
   headMovedDuringRunWarning,
+  probeWorkingTree,
   resolveCommit,
   resolveSourceRevision
 } from './generate.ts';
@@ -311,6 +312,10 @@ describe('working-tree dirtiness', () => {
     expect(journalRaw).toContain('HEAD MOVED during the run');
     expect(journalRaw).toContain(headCommit.slice(0, 12));
     expect(journalRaw).toContain(movedHead.slice(0, 12));
+    // …and it says what actually happened on THIS path: the tree was already dirty, so the
+    // clean-tree sentence must not be reused (wave 2b close final, run-diagnostics finding).
+    expect(journalRaw).toContain('ALREADY dirty when the run started');
+    expect(journalRaw).not.toContain('left the tree clean');
     // The run was already dirty, so the porcelain/unversioned causes are NOT re-journaled — run
     // start said them once already.
     expect(journalRaw).not.toContain('became dirty DURING the run');
@@ -319,12 +324,46 @@ describe('working-tree dirtiness', () => {
     headCommit = movedHead;
   });
 
-  it('names BOTH revisions in the HEAD-moved warning', () => {
-    const warning = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40));
-    expect(warning.severity).toBe('warning');
-    expect(warning.message).toContain('a'.repeat(12));
-    expect(warning.message).toContain('b'.repeat(12));
-    expect(warning.message).toContain('never the complete state');
+  it('names BOTH revisions in the HEAD-moved warning, and words the two start states differently', () => {
+    const fromClean = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40));
+    expect(fromClean.severity).toBe('warning');
+    expect(fromClean.message).toContain('a'.repeat(12));
+    expect(fromClean.message).toContain('b'.repeat(12));
+    expect(fromClean.message).toContain('never the complete state');
+    // On a clean-start run, "left the tree clean" is the POINT — it is why porcelain saw nothing.
+    expect(fromClean.message).toContain('left the tree clean');
+    expect(fromClean.message).toContain('now carries dirtyWorkingTree: true');
+
+    // On a dirty-start run the same sentence is simply false; the branch gets its own wording and
+    // the provenance tense follows (those shards were marked at assembly time, not by this sweep).
+    const fromDirty = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40), true);
+    expect(fromDirty.message).toContain('a'.repeat(12));
+    expect(fromDirty.message).toContain('b'.repeat(12));
+    expect(fromDirty.message).toContain('ALREADY dirty when the run started');
+    expect(fromDirty.message).not.toContain('left the tree clean');
+    expect(fromDirty.message).toContain('already carries dirtyWorkingTree: true');
+    expect(fromDirty.message).toContain('never the complete state');
+  });
+
+  it('probes a TRI-STATE: clean, observed-dirty, and unknown when git cannot be believed', async () => {
+    // The boolean the trust decision uses ("must this run be marked?") answers the same for dirty
+    // and unknown, which is exactly why the OBSERVATION has to be carried separately.
+    expect(await probeWorkingTree(repoRoot, OWN_OUTPUTS)).toBe('clean');
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(false);
+
+    await writeFile(join(repoRoot, 'file.txt'), 'observed dirt\n');
+    expect(await probeWorkingTree(repoRoot, OWN_OUTPUTS)).toBe('dirty');
+    await git('checkout', '--', 'file.txt');
+
+    // A directory git knows nothing about: `git status` fails, so nothing was observed at all.
+    const notARepo = await mkdtemp(join(tmpdir(), 'docstube-not-a-repo-'));
+    try {
+      expect(await probeWorkingTree(notARepo, OWN_OUTPUTS)).toBe('unknown');
+      // Unknown still marks the run — the trust behavior is unchanged.
+      expect(await checkWorkingTreeDirty(notARepo, OWN_OUTPUTS)).toBe(true);
+    } finally {
+      await rm(notARepo, { recursive: true, force: true });
+    }
   });
 
   it('derives the own-output prefix set from config outDir plus the .docstube tree', () => {
@@ -339,7 +378,7 @@ describe('working-tree dirtiness', () => {
 // still produces genuine, content-hash-bound checks — what it cannot produce is the complete state.
 describe('dirtyWorkingTreeWarning', () => {
   it('names the commit AND the reader-facing consequence', () => {
-    const warning = dirtyWorkingTreeWarning('a'.repeat(40));
+    const warning = dirtyWorkingTreeWarning('a'.repeat(40), [], 'dirty');
     expect(warning.severity).toBe('warning');
     expect(warning.message).toContain('checked against uncommitted changes');
     expect(warning.message).toContain('never the complete state');
@@ -358,17 +397,54 @@ describe('dirtyWorkingTreeWarning', () => {
   // sampled warning claimed the tree "looked clean" even for an UNTRACKED file, which porcelain
   // reports loudly — a line that reads as a broken probe to anyone who just ran `git status`.
   it('says the tree looked CLEAN only when it did — an ignored file porcelain cannot see', () => {
-    const warning = dirtyWorkingTreeWarning('c'.repeat(40), ['dist-dogfood/a.ts'], false);
+    const warning = dirtyWorkingTreeWarning('c'.repeat(40), ['dist-dogfood/a.ts'], 'clean');
     expect(warning.message).toContain('never reports ignored files, so the tree looked clean');
     expect(warning.message).toContain('dist-dogfood/a.ts');
   });
 
   it('says the tree was DIRTY when porcelain said so, and still names the paths', () => {
-    const warning = dirtyWorkingTreeWarning('c'.repeat(40), ['src/extra.ts'], true);
+    const warning = dirtyWorkingTreeWarning('c'.repeat(40), ['src/extra.ts'], 'dirty');
     expect(warning.message).toContain('reported the working tree dirty as well');
     expect(warning.message).not.toContain('looked clean');
     // The actionable detail survives in BOTH cases — the sample is the reason the warning exists.
     expect(warning.message).toContain('read 1 source file that git does not version');
     expect(warning.message).toContain('src/extra.ts');
+  });
+
+  // UNKNOWN IS NOT PORCELAIN-DIRTY (wave 2b close final — run-diagnostics finding): a missing HEAD
+  // or an unreadable `git status` used to arrive as the same boolean an observed dirty tree does,
+  // so the warning claimed porcelain "reported the working tree dirty" when porcelain never ran —
+  // sending an operator to debug a diff that does not exist. The trust behavior is unchanged (an
+  // unknown state still marks the run); only the sentence is now honest.
+  it('gives clean, observed-dirty and UNKNOWN their own wording — with the path samples in all three', () => {
+    const clean = dirtyWorkingTreeWarning('d'.repeat(40), ['dist-dogfood/a.ts'], 'clean');
+    expect(clean.message).toContain('never reports ignored files, so the tree looked clean');
+    expect(clean.message).not.toContain('UNKNOWN');
+    expect(clean.message).toContain('dist-dogfood/a.ts');
+
+    const dirty = dirtyWorkingTreeWarning('d'.repeat(40), ['src/extra.ts'], 'dirty');
+    expect(dirty.message).toContain('`git status` reported the working tree dirty as well');
+    expect(dirty.message).not.toContain('UNKNOWN');
+    expect(dirty.message).toContain('src/extra.ts');
+
+    const unknown = dirtyWorkingTreeWarning('d'.repeat(40), ['src/extra.ts'], 'unknown');
+    expect(unknown.message).toContain('the working tree state is UNKNOWN');
+    expect(unknown.message).toContain('no HEAD, or `git status` could not be read');
+    // It must NOT claim porcelain said anything, in either direction.
+    expect(unknown.message).not.toContain('reported the working tree dirty');
+    expect(unknown.message).not.toContain('looked clean');
+    expect(unknown.message).toContain('src/extra.ts');
+  });
+
+  it('drops the "(or has no HEAD)" hedge from the sampleless warning and states UNKNOWN outright', () => {
+    // The generic run-start line is emitted for BOTH causes, so it too must say which one it saw.
+    const observed = dirtyWorkingTreeWarning('e'.repeat(40), [], 'dirty');
+    expect(observed.message).toContain('the working tree is dirty');
+    expect(observed.message).not.toContain('has no HEAD');
+
+    const unknown = dirtyWorkingTreeWarning('e'.repeat(40), [], 'unknown');
+    expect(unknown.message).toContain('the working tree state is UNKNOWN');
+    expect(unknown.message).not.toContain('the working tree is dirty:');
+    expect(unknown.message).toContain('never the complete state');
   });
 });

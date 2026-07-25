@@ -59,7 +59,9 @@ export type MarkerScanErrorCode =
   | 'raw-html-element'
   | 'unregistered-component'
   | 'dynamic-attribute'
-  | 'mdx-expression';
+  | 'markup-attribute'
+  | 'mdx-expression'
+  | 'mdx-esm';
 
 export type MarkerScanError = { code: MarkerScanErrorCode; message: string; markerId?: string };
 
@@ -189,6 +191,30 @@ const eventHandlerNamePattern = /^(?:on[A-Z]|[oO][nN][a-zA-Z]{3,})/u;
 // `OnError=` walked past while the identical name written directly on the element was caught. HTML
 // honours every spelling, so the name shape here is exactly eventHandlerNamePattern's.
 const markupEventHandlerPattern = /<[a-zA-Z][^>]*?\s(?:on[A-Z]|[oO][nN][a-zA-Z]{3,})\s*=/u;
+
+// TAG-SHAPED CONTENT IN A STRING PROP ('markup-attribute', wave 2b close final — Sol's
+// tokenizer probe): the two patterns above read attribute VALUES with regexes over HTML, and a
+// regex over HTML cannot be made tokenizer-safe. `<img title='>' ONERROR=alert(1)>` ends the tag
+// early for any `[^>]*` while a browser keeps parsing attributes; `<img/onError=…>` needs no
+// whitespace before the handler at all; and every patch invites the next spelling — the same
+// deny-list collapse the element whitelist already refused to keep fighting.
+//
+// So shrink the surface here too: a component prop carries PLAIN TEXT. Markup belongs in Markdown
+// (which the theme renders) or in a code fence (which is documentation). A string-valued attribute
+// whose value contains a tag-open shape is refused outright, and there is nothing left to tokenize.
+//
+// THE BOUNDARY IS `<` IMMEDIATELY FOLLOWED BY AN ASCII LETTER OR `/` — precisely the two shapes
+// that open or close an HTML/JSX tag. A `<` followed by anything else — a space, a digit, `=`, `!`,
+// or the end of the value — is an ordinary less-than sign and stays legal: "a < b", "n < 5", "<= 3",
+// "latency < 5ms". "a <b" does not, and that is the documented cost of the rule.
+//
+// ASSUMPTION, CHECKED AGAINST THE THEME: no registered component renders a prop VALUE as HTML.
+// Every built-in prop in packages/theme/src/components.ts is a string/enum/number/array-of-strings
+// rendered as escaped text, and the only `set:html` in any theme bundle is Callout.astro's
+// kernel-owned icon SVG, selected by the validated `tone` enum and never by authored text. A
+// component that ever rendered a prop as HTML would make this rule load-bearing rather than
+// belt-and-braces — the two must be kept in lockstep.
+const tagOpenShapePattern = /<[a-zA-Z/]/u;
 
 const eventHandlerAttributeName = (
   attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>
@@ -474,6 +500,31 @@ export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerSca
     if (node.type === 'code' || node.type === 'inlineCode' || node.type === 'yaml') {
       return;
     }
+    // NO IMPORTS OR EXPORTS IN A PAGE BODY ('mdx-esm', wave 2b close final — Sol's ESM probe): the
+    // element whitelist walks ELEMENTS and the expression refusal walks {…} nodes, but MDX has a
+    // THIRD executable node kind. `import`/`export` statements parse into one opaque `mdxjsEsm`
+    // node, so neither gate ever saw them — and
+    // `export default function Evil(){ return <script>…</script> }` is compiled by MDX into the
+    // page's OWN rendered wrapper, executing markup the kernel never checked while producing no
+    // element and no expression node to refuse.
+    //
+    // Same shrink-the-surface move as the whitelist and the expression rule: generated
+    // documentation never needs an import or an export — the theme owns components and the kernel
+    // injects the layout, the proof components and the frontmatter — so the whole node kind is
+    // refused and there is nothing left to deny-list inside it.
+    if (node.type === 'mdxjsEsm') {
+      errors.push({
+        code: 'mdx-esm',
+        message:
+          `the page contains an import/export statement at offset ${node.position?.start?.offset ?? 0} — generated ` +
+          'pages carry NO ESM statements: an import pulls in code the kernel never checked, and an export (an ' +
+          "`export default function …` most of all) is compiled into the page's own rendered wrapper, so it can " +
+          'emit elements, scripts and text that were never part of the submission. The theme owns components and ' +
+          'the site build provides the layout. Remove the statement (a code FENCE showing example imports is ' +
+          'documentation and stays fine) and resubmit'
+      });
+      return;
+    }
     // RAW SCRIPT/STYLE PROHIBITION ('page-script', wave 2b close): a sibling <script> can rewrite
     // verified claim text after rendering and a <style> can hide or replace it visually — the
     // theme owns page behavior and styling. Case-insensitive, element and raw-html forms both.
@@ -595,6 +646,22 @@ export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerSca
               `${attribute.name}={…} — an expression computes its value at render time, so the kernel cannot read ` +
               `what the element actually gets. Write it as a plain string literal (${attribute.name}="value") and ` +
               'resubmit'
+          });
+          continue;
+        }
+        // PROPS CARRY PLAIN TEXT, NOT MARKUP (see tagOpenShapePattern): the script/style and
+        // handler scans above stay as defense in depth, but THIS is the rule that holds — they
+        // parse markup, this refuses that a prop value may look like markup at all.
+        if (typeof attribute.value === 'string' && tagOpenShapePattern.test(attribute.value)) {
+          errors.push({
+            code: 'markup-attribute',
+            message:
+              `<${elementName}> at offset ${offset} carries the "${attribute.name}" attribute whose value contains ` +
+              'markup (a "<" immediately followed by a letter or "/") — component props carry PLAIN TEXT only. ' +
+              'Markup inside a prop value is what renderer directives execute, and no scan of an attribute string ' +
+              'can tell prose from a tag reliably. Write the prop as plain text; if you meant to SHOW markup, put ' +
+              'it in a code fence or `inline code`, and if you meant a less-than sign, leave a space after it ' +
+              '("a < b") — then resubmit'
           });
         }
       }
@@ -765,8 +832,9 @@ export const submitPageDescriptor: ToolDescriptor = {
   description:
     'Submit the finished page: the complete MDX (with inline <Claim id="…">…</Claim> markers) plus the claim ' +
     'ledger. The page may contain plain Markdown, <Claim> markers, and the registered components listed in your ' +
-    'instructions — no raw HTML elements, no {…} expressions anywhere in the page, and every component prop must be ' +
-    'a plain string literal (no expression values, no spreads). The submission is validated; on errors, fix exactly ' +
+    'instructions — no raw HTML elements, no {…} expressions anywhere in the page, no import/export statements, and ' +
+    'every component prop must be a plain string literal carrying plain text (no expression values, no spreads, no ' +
+    'markup inside the value). The submission is validated; on errors, fix exactly ' +
     'what is listed and call ' +
     'submit_page again with the full corrected page. The task result is your last accepted submission.',
   paramsJsonSchema: {

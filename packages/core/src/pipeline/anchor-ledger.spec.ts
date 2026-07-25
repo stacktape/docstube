@@ -771,6 +771,36 @@ More text <Claim id="c1">second assertion.</Claim>
     ).toBe(true);
   });
 
+  it('re-checks the ESM prohibition: an import/export post-acceptance is a kernel breach', () => {
+    // submit_page rejects `mdxjsEsm` nodes in-session ('mdx-esm' — an export default is compiled
+    // into the page's own rendered wrapper), so one in the anchoring input means the MDX was
+    // altered after acceptance. Grammar code, therefore kernel-invariant, exactly like page-script
+    // and marker-expression — no per-code wiring, the repairable set is a whitelist.
+    const acceptedMdx = `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n`;
+    const alteredMdx =
+      `export default function Evil() { return <script>rewrite()</script> }\n\n` +
+      `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: acceptedMdx, slug: 'h' });
+    const result = anchorWriterLedger({
+      mdx: alteredMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(
+      result.errors.some(
+        (issue) => issue.code === 'marker-scan-invalid' && issue.kernel && issue.message.includes('mdx-esm')
+      )
+    ).toBe(true);
+  });
+
   it('threads the kernel-scanned pureText flag and hints non-pure markers as destined unchecked', () => {
     // The image alt text IS the canonical assertion — but the reader sees a picture. Legal MDX,
     // no repair error: the claim anchors with pureText: false and a non-blocking hint; the

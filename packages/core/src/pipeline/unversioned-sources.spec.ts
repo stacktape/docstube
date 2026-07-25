@@ -135,10 +135,18 @@ describe('unversioned read sources', () => {
   it('never promises samples it does not carry: the generic dirty-tree warning names no paths', () => {
     // The other half of the same rule — a warning with no unversioned sources to report describes
     // the porcelain cause and stops there, instead of advertising an example list it cannot fill.
-    const generic = dirtyWorkingTreeWarning('a'.repeat(40));
-    expect(generic.message).toContain('the working tree is dirty (or has no HEAD)');
+    // …and it no longer hedges "(or has no HEAD)": an unknown state is its own sentence now
+    // (wave 2b close final, run-diagnostics finding).
+    const generic = dirtyWorkingTreeWarning('a'.repeat(40), [], 'dirty');
+    expect(generic.message).toContain('the working tree is dirty');
+    expect(generic.message).not.toContain('has no HEAD');
     expect(generic.message).not.toContain('git does not version');
     expect(generic.message).not.toContain('()');
+
+    const unknown = dirtyWorkingTreeWarning('a'.repeat(40), [], 'unknown');
+    expect(unknown.message).toContain('the working tree state is UNKNOWN');
+    expect(unknown.message).not.toContain('git does not version');
+    expect(unknown.message).not.toContain('()');
 
     const sampled = dirtyWorkingTreeWarning('a'.repeat(40), ['dist-dogfood/lib.ts']);
     expect(sampled.message).toContain('read 1 source file that git does not version');
