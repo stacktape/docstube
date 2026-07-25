@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import { buildCodemap } from '@docstube/codemap';
 import { typescriptLanguagePack } from '@docstube/lang-typescript';
-import { writerClaimLedgerSchema } from '@docstube/contracts';
+import { contentHash, writerClaimLedgerSchema } from '@docstube/contracts';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
@@ -789,12 +789,80 @@ describe('runGenerate', () => {
     // The retained trust spine: same claims, same correctness — no contradicted state leaked in.
     expect(shardAfter?.ledger?.claims.map((claim) => claim.claimId)).toEqual(publishedClaimIds);
     expect(shardAfter?.ledger?.claims.every((claim) => claim.correctness !== 'contradicted')).toBe(true);
+    // The MDX↔shard binding hash carries forward UNCHANGED from the prior shard (verified against
+    // the retained bytes) — retention never re-mints it, so emission renders the page normally.
+    expect(shardAfter?.mdxContentHash).toBeDefined();
+    expect(shardAfter?.mdxContentHash).toBe(publishedShard?.mdxContentHash);
+    expect(shardAfter?.mdxContentHash).toBe(contentHash(publishedMdx));
     const rejection = shardAfter?.flags.find(
       (flag) => flag.status === 'open' && flag.summary.includes('previous published page retained')
     );
     expect(rejection).toBeDefined();
     expect(rejection?.detail).toContain('CONTRADICTED');
     expect(rejection?.detail).toContain(second.runId);
+  }, 180_000);
+
+  it('retention NEVER blesses tampered bytes: prior MDX edited on disk persists the retained shard HASHLESS (unverified)', async () => {
+    // Run 1 publishes a clean page; a one-sided edit then changes the MDX on disk without
+    // touching the shard — the exact drift the binding hash exists to catch.
+    const first = await runGenerate({ repoRoot, runTask: await valueRunner('3'), toolDescriptors: [] });
+    expect(first.outcome).toBe('passed');
+    const mdxPath = join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx');
+    const publishedMdx = await readFile(mdxPath, 'utf8');
+    const tamperedMdx = publishedMdx.replace('The library exposes', 'The library no longer exposes');
+    expect(tamperedMdx).not.toBe(publishedMdx);
+    await writeFile(mdxPath, tamperedMdx, 'utf8');
+
+    // Run 2 is rejected (contradicted candidate) → retention reads the TAMPERED bytes. They fail
+    // verification against the prior shard's recorded hash, so the retained shard persists
+    // WITHOUT a binding — emission renders loud-UNVERIFIED instead of blessing unknown bytes.
+    const second = await runGenerate({
+      repoRoot,
+      runTask: await valueRunner('5'),
+      toolDescriptors: [],
+      maxAttemptsPerPage: 2
+    });
+    expect(second.outcome).toBe('flagged');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shardAfter = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shardAfter?.mdxContentHash).toBeUndefined();
+    // Never a fresh hash over bytes the kernel did not write this run.
+    expect(shardAfter?.mdxContentHash).not.toBe(contentHash(tamperedMdx));
+    const rejection = shardAfter?.flags.find(
+      (flag) => flag.status === 'open' && flag.summary.includes('previous published page retained')
+    );
+    expect(rejection?.detail).toContain('do not match');
+    expect(rejection?.detail).toContain('UNVERIFIED');
+  }, 180_000);
+
+  it('retention after an interrupted write (shard present, MDX partial) persists HASHLESS — never a fresh hash over wrong bytes', async () => {
+    const first = await runGenerate({ repoRoot, runTask: await valueRunner('3'), toolDescriptors: [] });
+    expect(first.outcome).toBe('passed');
+    const mdxPath = join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx');
+    const publishedMdx = await readFile(mdxPath, 'utf8');
+    // Simulate a crash mid-write: the shard exists but the MDX file holds only a prefix.
+    const partialMdx = publishedMdx.slice(0, Math.floor(publishedMdx.length / 2));
+    await writeFile(mdxPath, partialMdx, 'utf8');
+
+    const second = await runGenerate({
+      repoRoot,
+      runTask: await valueRunner('5'),
+      toolDescriptors: [],
+      maxAttemptsPerPage: 2
+    });
+    expect(second.outcome).toBe('flagged');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shardAfter = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shardAfter?.mdxContentHash).toBeUndefined();
+    expect(shardAfter?.mdxContentHash).not.toBe(contentHash(partialMdx));
+    const rejection = shardAfter?.flags.find(
+      (flag) => flag.status === 'open' && flag.summary.includes('previous published page retained')
+    );
+    expect(rejection?.detail).toContain('UNVERIFIED');
   }, 180_000);
 
   it('flags the page instead of shipping silently when defects persist', async () => {

@@ -716,6 +716,61 @@ More text <Claim id="c1">second assertion.</Claim>
     ).toBe(true);
   });
 
+  it('re-checks duplicate marker attributes: two id attributes post-acceptance are a kernel breach', () => {
+    // submit_page rejects duplicate attributes in-session ('marker-duplicate-attribute' — the
+    // scanner reads the first id while rendering uses the last, so the trust mark would attach to
+    // the wrong claim), so one in the anchoring input means the MDX was altered after acceptance.
+    const acceptedMdx = `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n`;
+    const alteredMdx = `# Title\n\nText <Claim id="c1" id="c9">\`retries\` defaults to 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: acceptedMdx, slug: 'h' });
+    const result = anchorWriterLedger({
+      mdx: alteredMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(
+      result.errors.some(
+        (issue) =>
+          issue.code === 'marker-scan-invalid' && issue.kernel && issue.message.includes('marker-duplicate-attribute')
+      )
+    ).toBe(true);
+  });
+
+  it('re-checks the script/style prohibition: a raw <script> post-acceptance is a kernel breach', () => {
+    // submit_page rejects raw script/style elements in-session ('page-script' — a sibling script
+    // can rewrite verified claim text after rendering), so one in the anchoring input means the
+    // MDX was altered after acceptance.
+    const acceptedMdx = `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n`;
+    const alteredMdx = `# Title\n\nText <Claim id="c1">\`retries\` defaults to 3.</Claim>\n\n<script>rewrite()</script>\n`;
+    const page = extractPageEntity({ mdx: acceptedMdx, slug: 'h' });
+    const result = anchorWriterLedger({
+      mdx: alteredMdx,
+      writerLedger: ledger([draft('c1')]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(
+      result.errors.some(
+        (issue) => issue.code === 'marker-scan-invalid' && issue.kernel && issue.message.includes('page-script')
+      )
+    ).toBe(true);
+  });
+
   it('threads the kernel-scanned pureText flag and hints non-pure markers as destined unchecked', () => {
     // The image alt text IS the canonical assertion — but the reader sees a picture. Legal MDX,
     // no repair error: the claim anchors with pureText: false and a non-blocking hint; the

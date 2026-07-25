@@ -51,8 +51,10 @@ export type MarkerScanErrorCode =
   | 'marker-missing-id'
   | 'marker-invalid-id'
   | 'marker-attribute'
+  | 'marker-duplicate-attribute'
   | 'marker-empty'
-  | 'marker-nested';
+  | 'marker-nested'
+  | 'page-script';
 
 export type MarkerScanError = { code: MarkerScanErrorCode; message: string; markerId?: string };
 
@@ -163,6 +165,29 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       });
       return;
     }
+    // DUPLICATE ATTRIBUTES (wave 2b close — Sol's two-id probe): JSX parsing accepts repeated
+    // attribute names, but the scanner reads the FIRST value while JSX rendering uses the LAST —
+    // <Claim id="a" id="b"> would attach the trust mark for claim "a" to the element rendered as
+    // "b". Any repeated attribute name is rejected before id resolution, so a marker's identity
+    // is never ambiguous. Post-acceptance this classifies as a kernel invariant breach, exactly
+    // like the other non-repairable scan codes.
+    const attributeNames = (node.attributes ?? []).flatMap((attribute) =>
+      attribute.type === 'mdxJsxAttribute' ? [attribute.name] : []
+    );
+    const duplicatedNames = [
+      ...new Set(attributeNames.filter((name, index) => attributeNames.indexOf(name) !== index))
+    ];
+    if (duplicatedNames.length > 0) {
+      errors.push({
+        code: 'marker-duplicate-attribute',
+        message:
+          `<Claim> at offset ${offset} repeats the attribute${duplicatedNames.length === 1 ? '' : 's'} ` +
+          `${duplicatedNames.map((name) => `"${name}"`).join(', ')} — duplicate attributes make the marker's ` +
+          'rendered identity ambiguous (the renderer uses the last value, the scanner must not guess); write ' +
+          'exactly one id attribute and resubmit'
+      });
+      return;
+    }
     const markerId = markerIdOf(node.attributes ?? []);
     if (markerId === undefined) {
       errors.push({
@@ -248,8 +273,36 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
 
   const visit = (node: ScanNode, context: { inHeading: boolean; inClaim: boolean; inJsx: boolean }): void => {
     // Code fences, inline code, and frontmatter are literal text: a <Claim> written there is a
-    // documentation example, never a marker.
+    // documentation example, never a marker — and a <script> shown there is example code, never
+    // an element (the returns below keep the page-script check off literal text too).
     if (node.type === 'code' || node.type === 'inlineCode' || node.type === 'yaml') {
+      return;
+    }
+    // RAW SCRIPT/STYLE PROHIBITION ('page-script', wave 2b close): a sibling <script> can rewrite
+    // verified claim text after rendering and a <style> can hide or replace it visually — the
+    // theme owns page behavior and styling. Case-insensitive, element and raw-html forms both.
+    if (
+      (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') &&
+      typeof node.name === 'string' &&
+      (node.name.toLowerCase() === 'script' || node.name.toLowerCase() === 'style')
+    ) {
+      errors.push({
+        code: 'page-script',
+        message:
+          `the page contains a raw <${node.name}> element at offset ${node.position?.start?.offset ?? 0} — ` +
+          'generated pages must not carry executable or style elements; the theme owns page behavior and ' +
+          'styling. Remove the element (a code FENCE showing example markup is fine) and resubmit'
+      });
+      return;
+    }
+    if (node.type === 'html' && typeof node.value === 'string' && /<\s*\/?\s*(?:script|style)\b/iu.test(node.value)) {
+      errors.push({
+        code: 'page-script',
+        message:
+          `the page contains raw HTML with a <script>/<style> tag at offset ${node.position?.start?.offset ?? 0} — ` +
+          'generated pages must not carry executable or style elements; the theme owns page behavior and ' +
+          'styling. Remove the raw HTML (a code FENCE showing example markup is fine) and resubmit'
+      });
       return;
     }
     if (node.type === 'mdxFlowExpression' || node.type === 'mdxTextExpression') {

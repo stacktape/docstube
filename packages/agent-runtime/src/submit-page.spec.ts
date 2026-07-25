@@ -135,6 +135,62 @@ describe('scanClaimMarkers', () => {
     expect(clean.markers).toHaveLength(1);
   });
 
+  it("rejects duplicate attributes on a marker — Sol's two-id probe (wave 2b close)", () => {
+    // <Claim id="a" id="b"> — the scanner would read the FIRST id while JSX rendering uses the
+    // LAST, attaching claim "a"'s trust mark to the element rendered as "b". Rejected outright,
+    // before any id resolves.
+    const twoIds = scanClaimMarkers('Fact: <Claim id="a" id="b">greet exists.</Claim>\n');
+    expect(twoIds.errors[0]?.code).toBe('marker-duplicate-attribute');
+    expect(twoIds.errors[0]?.message).toContain('"id"');
+    expect(twoIds.markers).toEqual([]);
+
+    // Any repeated attribute name is ambiguous, not just id — caught before the whitelist.
+    const twoOthers = scanClaimMarkers('Fact: <Claim id="a" data-x="1" data-x="2">greet exists.</Claim>\n');
+    expect(twoOthers.errors[0]?.code).toBe('marker-duplicate-attribute');
+
+    // A single id stays untouched.
+    const clean = scanClaimMarkers('Fact: <Claim id="a">greet exists.</Claim>\n');
+    expect(clean.errors).toEqual([]);
+    expect(clean.markers).toHaveLength(1);
+  });
+
+  it('rejects raw <script> and <style> elements anywhere in the page (page-script, case-insensitive)', () => {
+    // Sibling script/style can rewrite or hide verified claim text after rendering — the theme
+    // owns page behavior and styling.
+    const flowScript = scanClaimMarkers('Text.\n\n<script>document.body.innerHTML = "lie";</script>\n');
+    expect(flowScript.errors[0]?.code).toBe('page-script');
+    expect(flowScript.errors[0]?.message).toContain('theme owns page behavior');
+
+    const inlineStyle = scanClaimMarkers('Text with <style>{`.claim { display: none; }`}</style> inline.\n');
+    expect(inlineStyle.errors.some((error) => error.code === 'page-script')).toBe(true);
+
+    const upperCase = scanClaimMarkers('Text.\n\n<SCRIPT>alert(1)</SCRIPT>\n');
+    expect(upperCase.errors[0]?.code).toBe('page-script');
+
+    const mixedCase = scanClaimMarkers('Text.\n\n<Style>{`p { color: red; }`}</Style>\n');
+    expect(mixedCase.errors[0]?.code).toBe('page-script');
+
+    const selfClosing = scanClaimMarkers('Text.\n\n<script src="evil.js" />\n');
+    expect(selfClosing.errors[0]?.code).toBe('page-script');
+  });
+
+  it('leaves code FENCES and inline code containing <script>/<style> untouched — examples are text, not elements', () => {
+    const fence = scanClaimMarkers(
+      [
+        'Add this snippet:',
+        '',
+        '```html',
+        '<script>console.log("example");</script>',
+        '<style>p {}</style>',
+        '```'
+      ].join('\n')
+    );
+    expect(fence.errors).toEqual([]);
+
+    const inline = scanClaimMarkers('Never use `<script>` tags, and the word script is fine in prose.\n');
+    expect(inline.errors).toEqual([]);
+  });
+
   it('flags marker purity STRUCTURALLY: only text + inlineCode content is pureText (no enumeration)', () => {
     // Pure: plain prose and backticked identifiers — the only nodes whose rendered output
     // provably equals the scanned text.
@@ -452,6 +508,41 @@ describe('validateSubmission', () => {
     });
     expect(outcome.accepted).toBeUndefined();
     expect(outcome.errors.some((error) => error.includes('accepts only the id attribute'))).toBe(true);
+  });
+
+  it('rejects a submission whose marker carries two id attributes with a repair error', () => {
+    const outcome = validateSubmission({
+      mdx: mdxWith('<Claim id="a" id="b">greet exists.</Claim>'),
+      ledger: ledgerWith([claim('a', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(outcome.accepted).toBeUndefined();
+    expect(outcome.errors.some((error) => error.includes('repeats the attribute') && error.includes('"id"'))).toBe(
+      true
+    );
+  });
+
+  it('rejects a submission carrying raw <script>/<style> elements, but accepts them inside code fences', () => {
+    const script = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">greet exists.</Claim>\n\n<script>document.title = "x";</script>'),
+      ledger: ledgerWith([claim('c1', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(script.accepted).toBeUndefined();
+    expect(script.errors.some((error) => error.includes('theme owns page behavior'))).toBe(true);
+
+    const style = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">greet exists.</Claim>\n\n<style>{`p {}`}</style>'),
+      ledger: ledgerWith([claim('c1', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(style.accepted).toBeUndefined();
+    expect(style.errors.some((error) => error.includes('theme owns page behavior'))).toBe(true);
+
+    // A code fence SHOWING a script tag is documentation, never an element.
+    const fenced = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">greet exists.</Claim>\n\n```html\n<script>console.log("example");</script>\n```'),
+      ledger: ledgerWith([claim('c1', { class: 'code-structure', predicate: 'greet exists' })])
+    });
+    expect(fenced.errors).toEqual([]);
+    expect(fenced.accepted).toBeDefined();
   });
 
   it('rejects an orphan marker with no ledger entry', () => {

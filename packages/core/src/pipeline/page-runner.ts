@@ -461,6 +461,15 @@ export const generatePage = async (
       priorMdx = undefined;
     }
     if (priorMdx !== undefined) {
+      // RETENTION BINDING (wave 2b close): the binding hash is minted ONLY over bytes the kernel
+      // itself writes in the same run (the normal and translation routes). Retention re-persists
+      // bytes it merely READ, so the prior shard's recorded mdxContentHash carries forward
+      // UNCHANGED — and only after the retained bytes verify against it. A prior shard with no
+      // hash, or bytes that no longer match (one-sided edit, interrupted prior write), persists
+      // WITHOUT a binding so emission renders the page loud-UNVERIFIED instead of blessing
+      // unknown bytes with a fresh hash.
+      const { mdxContentHash: priorMdxContentHash, ...priorShardWithoutHash } = previousShard;
+      const bindingIntact = priorMdxContentHash !== undefined && contentHash(priorMdx) === priorMdxContentHash;
       const rejectionFlag = {
         id: mintId(idPrefixes.flag),
         kind: 'system' as const,
@@ -468,7 +477,14 @@ export const generatePage = async (
         summary: `regeneration of "${node.slug}" rejected — claim verification failed; previous published page retained`,
         detail: [
           `the candidate from run ${ctx.journal.runId} (${attemptsUsed} attempt(s)) was discarded:`,
-          ...finalFindings.map((finding) => `[${finding.check}] ${finding.message}`)
+          ...finalFindings.map((finding) => `[${finding.check}] ${finding.message}`),
+          ...(bindingIntact
+            ? []
+            : [
+                priorMdxContentHash === undefined
+                  ? 'the retained prior shard records no mdxContentHash — the retained page persists without a binding and renders UNVERIFIED'
+                  : "the retained MDX bytes do not match the prior shard's recorded mdxContentHash (edited or partially written after persistence) — the retained page persists without a binding and renders UNVERIFIED"
+              ])
         ].join('\n'),
         entity: { version: ctx.version, locale: ctx.locale, pageId: previousShard.page.id },
         runId: ctx.journal.runId,
@@ -491,11 +507,12 @@ export const generatePage = async (
           version: ctx.version
         },
         // The prior shard byte-for-byte, plus the rejection flag and any new writer questions.
-        // The binding hash is (re)minted from the retained MDX bytes so a pre-hash prior shard
-        // still binds to the exact prose it ships with.
+        // The recorded binding hash carries UNCHANGED when the retained bytes verify against it;
+        // otherwise the shard persists hashless and emission renders loud-UNVERIFIED — the kernel
+        // never mints a fresh hash over bytes it did not write this run.
         shard: {
-          ...previousShard,
-          mdxContentHash: contentHashSchema.parse(contentHash(priorMdx)),
+          ...priorShardWithoutHash,
+          ...(bindingIntact ? { mdxContentHash: priorMdxContentHash } : {}),
           flags: [...previousShard.flags, ...questionFlags, rejectionFlag]
         },
         ...(previousShard.ledger === undefined ? {} : { ledger: previousShard.ledger }),

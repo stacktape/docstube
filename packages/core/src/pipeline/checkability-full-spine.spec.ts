@@ -353,6 +353,49 @@ Fact: <Claim id="g1" set:text="greet does not exist.">\`greet\` exists.</Claim>
     expect(submission.response.errors?.some((error) => error.includes('accepts only the id attribute'))).toBe(true);
   });
 
+  it('Sol\'s two-id probe: <Claim id="a" id="b"> is REJECTED at submit_page — the spine never reaches anchoring', () => {
+    // The scanner would read the first id while JSX rendering uses the last — the trust mark
+    // would attach to the wrong claim. Duplicate attributes are rejected in-session.
+    const submission = evaluateSubmitPageCall({
+      mdx: `---
+title: "Greet"
+---
+
+# Greet
+
+Fact: <Claim id="g1" id="g2">\`greet\` exists.</Claim>
+`,
+      ledger: existenceLedger('greet exists')
+    });
+    expect(submission.response.accepted).toBe(false);
+    expect(submission.response.errors?.some((error) => error.includes('repeats the attribute'))).toBe(true);
+  });
+
+  it("Sol's sibling-script probe: a raw <script> element is REJECTED at submit_page — the spine never reaches anchoring", () => {
+    // A sibling script can rewrite the verified claim text after rendering; the theme owns page
+    // behavior. Rejected in-session with the page-script repair error.
+    const submission = evaluateSubmitPageCall({
+      mdx: pageMdx('`greet` exists.', '\n<script>document.body.innerHTML = "greet does not exist.";</script>\n'),
+      ledger: existenceLedger('greet exists')
+    });
+    expect(submission.response.accepted).toBe(false);
+    expect(submission.response.errors?.some((error) => error.includes('theme owns page behavior'))).toBe(true);
+
+    const style = evaluateSubmitPageCall({
+      mdx: pageMdx('`greet` exists.', '\n<style>{`[data-docstube-claim] { display: none; }`}</style>\n'),
+      ledger: existenceLedger('greet exists')
+    });
+    expect(style.response.accepted).toBe(false);
+    expect(style.response.errors?.some((error) => error.includes('theme owns page behavior'))).toBe(true);
+  });
+
+  it('a code FENCE showing <script> markup is documentation, not an element — the canonical spine still mints CHECKED', async () => {
+    const fence = '\n```html\n<script>console.log("example");</script>\n<style>p {}</style>\n```\n';
+    const { verified, shard } = await runSpine('`greet` exists.', existenceLedger('greet exists'), fence);
+    expect(verified.findings).toEqual([]);
+    expect(shard.provenance?.claimEvidence[0]).toMatchObject({ correctness: 'checked', disposition: null });
+  });
+
   it('Sol\'s verdict-6 ancestor probe: <Badge label="greet does not exist."><Claim>greet exists.</Claim></Badge> persists UNCHECKED — never checked', async () => {
     // The marker's own content is the exact canonical assertion, but Badge's renderer owns the
     // Claim slot — it can render its contradicting label instead. NO-JSX-ANCESTOR checkability:
