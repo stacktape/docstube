@@ -6,6 +6,23 @@ import { contentHash, contentHashSchema } from '@docstube/contracts';
 import { emitSite } from './emit-site.ts';
 import { buildFixtureInput, installMdx, setupMdx } from './emit-site-fixture.ts';
 
+// Emits the fixture site with the install page carrying `frontmatter` as its authored block,
+// rebinding the shard hash the way real persistence does so the route is not forced unverified.
+const emitWithFrontmatter = async (frontmatter: string, label: string) => {
+  const repoRoot = await mkdtemp(join(tmpdir(), `docstube-theme-fm-${label}-`));
+  const input = buildFixtureInput(repoRoot);
+  const install = input.pages[0]!;
+  const mdx = `---\n${frontmatter}\n---\n\n${installMdx}`;
+  input.pages[0] = {
+    ...install,
+    mdx,
+    shard: { ...install.shard, mdxContentHash: contentHashSchema.parse(contentHash(mdx)) }
+  };
+  const result = await emitSite(input);
+  const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+  return { route, warnings: result.warnings };
+};
+
 describe('emitSite', () => {
   let siteRoot: string;
 
@@ -507,6 +524,63 @@ describe('emitSite', () => {
     // Authored frontmatter the kernel does not own is untouched.
     expect(route).toContain('keywords:');
     expect(route).toContain('- install');
+  });
+
+  // PARSED, NOT PATTERN-MATCHED (wave 2b close finding): the old line-scoped textual stripper only
+  // recognized one spelling of a key. Every other ordinary YAML spelling of the SAME key walked
+  // through it and could render a false editorial trust label on an unreviewed page.
+  describe('kernel-owned frontmatter stripping is YAML-aware', () => {
+    it.each([
+      ['quoted', '"docstubeReviewedFor": "security"'],
+      ['explicit-key', '? docstubeReviewedFor\n: security'],
+      ['indented', '  docstubeReviewedFor: security\n  keywords:\n    - install'],
+      ['mixed-case', 'DocstubeReviewedFor: security'],
+      ['single-quoted-mixed-case', "'DOCSTUBEReviewedFor': security"]
+    ])('strips an authored docstube* key written in %s form', async (label, frontmatter) => {
+      const { route, warnings } = await emitWithFrontmatter(frontmatter, label);
+      // The fixture's trust spine records no editorial review, so no reviewedFor key is computed —
+      // any occurrence in the route came from the authored block.
+      expect(route).not.toContain('ReviewedFor');
+      expect(route).not.toContain('security');
+      expect(warnings).toEqual([]);
+    });
+
+    it('leaves ordinary authored keys, their comments, and their formatting intact', async () => {
+      const { route } = await emitWithFrontmatter(
+        '# hand-written note\nkeywords:\n  - install\n  - npm\ndocstubeClaimsComplete: true\nsidebarOrder: 3',
+        'survivors'
+      );
+      expect(route).toContain('# hand-written note');
+      expect(route).toContain('keywords:');
+      expect(route).toContain('  - install');
+      expect(route).toContain('  - npm');
+      expect(route).toContain('sidebarOrder: 3');
+      expect(route).not.toContain('docstubeClaimsComplete');
+    });
+
+    it('does not inject a duplicate title when the authored key is QUOTED', async () => {
+      const { route } = await emitWithFrontmatter('"title": Hand-written title', 'quoted-title');
+      expect(route).toContain('"title": Hand-written title');
+      // Exactly one top-level title key: the textual check used to miss the quoted spelling and
+      // inject a second one, which is a YAML duplicate-key error at build time.
+      expect(route.match(/^"?title"?\s*:/gmu)).toHaveLength(1);
+    });
+
+    // FAIL CLOSED: frontmatter the kernel cannot parse is frontmatter whose keys it cannot vet.
+    it('warns and drops the whole authored block when the frontmatter cannot be parsed', async () => {
+      const { route, warnings } = await emitWithFrontmatter(
+        'docstubeReviewedFor: security\nkeywords: [install, npm\n  broken: "yes',
+        'malformed'
+      );
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('/getting-started/installation/');
+      expect(warnings[0]).toContain('could not be parsed');
+      expect(route).not.toContain('ReviewedFor');
+      expect(route).not.toContain('keywords');
+      // The kernel-computed frontmatter is still complete, so the route still renders.
+      expect(route).toContain('title: "Installation"');
+      expect(route).toContain('docstubeClaimsChecked: 1');
+    });
   });
 
   // LOCALE-PREFIX SLUG COLLISION (impl-24 finding): /de/foo is both "the German rendition of foo"

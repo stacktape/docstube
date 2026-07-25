@@ -1,5 +1,6 @@
 import { mkdir, readdir, rm, rmdir, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, relative, sep } from 'node:path';
+import { isMap, isScalar, parseDocument } from 'yaml';
 import { localeRoutePrefixConflict } from '@docstube/contracts';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
@@ -198,29 +199,78 @@ const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } =>
   return { frontmatter, body: mdx.slice(match[0].length) };
 };
 
-const frontmatterHasKey = (frontmatter: string, key: string): boolean =>
-  new RegExp(`^${key}\\s*:`, 'mu').test(frontmatter);
-
 // KERNEL-OWNED FRONTMATTER (impl-24 finding): every `docstube*` key on a route is COMPUTED here
 // from the persisted trust spine. Authored frontmatter that declares one — a writer (or a
 // hand-edited artifact) carrying `docstubeClaimsComplete: true` on a partial page — used to
 // survive into the emitted route and decide the badge. The authored keys are stripped before the
 // computed ones are injected, so the kernel value always wins and there is exactly one of each.
-// Line-scoped: a top-level `docstube*` key drops with every continuation line under it, and no
-// other authored key is touched.
-const stripKernelOwnedFrontmatter = (frontmatter: string): string => {
-  const kept: string[] = [];
-  let dropping = false;
-  for (const line of frontmatter.split('\n')) {
-    const topLevelKey = /^([^\s#][^:]*):/u.exec(line)?.[1];
-    if (topLevelKey !== undefined) {
-      dropping = topLevelKey.startsWith('docstube');
-    }
-    if (!dropping) {
-      kept.push(line);
-    }
+//
+// PARSED, NOT PATTERN-MATCHED (wave 2b close finding): the previous pass was line-scoped text, so
+// every ordinary YAML spelling of the same key walked straight through it — `"docstubeReviewedFor":
+// "security"`, the explicit form `? docstubeClaimsComplete` / `: true`, a key indented by a space.
+// Any one of them survived hashing and rendered a false editorial trust label. Ownership is decided
+// on the PARSED key — YAML compares keys by resolved scalar value, so quoting and key style cannot
+// change what a key is — and matched case-INsensitively, since `DocstubeReviewedFor` is a
+// kernel-namespace key by any honest reading. Non-docstube keys re-serialize through the Document
+// API, which preserves their comments, quoting, and block/flow style.
+type StrippedFrontmatter = {
+  // The authored frontmatter with every kernel-owned key removed, ready to precede the injected
+  // lines. Empty when nothing authored survives.
+  frontmatter: string;
+  // Top-level key names that DID survive — what the injection consults instead of re-scanning the
+  // text, so a quoted `"title"` can no longer smuggle in a duplicate.
+  keys: Set<string>;
+  warning?: string;
+};
+
+const EMPTY_FRONTMATTER: StrippedFrontmatter = { frontmatter: '', keys: new Set() };
+
+// FAIL CLOSED (wave 2b close): frontmatter the kernel cannot parse is frontmatter whose keys it
+// cannot vet, and passing it through verbatim is exactly how an authored `docstube*` key would
+// reach the reader. The page is emitted as if it declared nothing, and the dropped block is
+// surfaced as a warning naming the route so the author can see what happened.
+const stripKernelOwnedFrontmatter = (frontmatter: string, route: string): StrippedFrontmatter => {
+  if (frontmatter.trim() === '') {
+    return EMPTY_FRONTMATTER;
   }
-  return kept.join('\n').trimEnd();
+  const failClosed = (reason: string): StrippedFrontmatter => ({
+    ...EMPTY_FRONTMATTER,
+    warning:
+      `route "${route}": authored frontmatter could not be parsed as a YAML mapping (${reason}), so it was ` +
+      'dropped — the page renders with kernel-computed frontmatter only. Fix the frontmatter block in the ' +
+      'page source and re-run `docstube generate`'
+  });
+  let document;
+  try {
+    document = parseDocument(frontmatter);
+  } catch (error) {
+    return failClosed((error as Error).message);
+  }
+  if (document.errors.length > 0) {
+    return failClosed(document.errors[0]?.message ?? 'invalid YAML');
+  }
+  const contents = document.contents;
+  if (!isMap(contents)) {
+    // A scalar or sequence document cannot carry the injected key lines either — appending to it
+    // would emit invalid YAML.
+    return failClosed('frontmatter must be a mapping of keys');
+  }
+  const keys = new Set<string>();
+  contents.items = contents.items.filter((pair) => {
+    const name = isScalar(pair.key) && typeof pair.key.value === 'string' ? pair.key.value : undefined;
+    if (name !== undefined && name.toLowerCase().startsWith('docstube')) {
+      return false;
+    }
+    if (name !== undefined) {
+      keys.add(name);
+    }
+    return true;
+  });
+  if (contents.items.length === 0) {
+    // `toString()` on an emptied map yields "{}", which would then collide with the injected keys.
+    return EMPTY_FRONTMATTER;
+  }
+  return { frontmatter: document.toString({ lineWidth: 0 }).trimEnd(), keys };
 };
 
 // Visible per-entity citations (PRODUCT §3.2): page-level sources plus every block-level source
@@ -278,10 +328,14 @@ const pageRouteMdx = (
   canonical?: EmitSitePage
 ): string => {
   const { frontmatter: authored, body } = splitFrontmatter(page.mdx);
-  const frontmatter = stripKernelOwnedFrontmatter(authored);
   const locale = page.shard.locale;
   const isSourceLocale = locale === context.sourceLocale;
   const slug = page.shard.page.slug;
+  const stripped = stripKernelOwnedFrontmatter(authored, localeHref(slug, locale, context.sourceLocale));
+  if (stripped.warning !== undefined) {
+    onWarning(stripped.warning);
+  }
+  const frontmatter = stripped.frontmatter;
   const depth = slug.split('/').length + (isSourceLocale ? 0 : 1);
   const up = '../'.repeat(depth);
   // RENDITIONS INHERIT CANONICAL PROOF (i18n-lifecycle-v2 decisions 3/4, strict isomorphism):
@@ -336,8 +390,8 @@ const pageRouteMdx = (
   const injected = [
     // Every theme bundle ships this exact layout path (validated by applyThemeBundle).
     `layout: ${JSON.stringify(`${up}layouts/DocLayout.astro`)}`,
-    ...(frontmatterHasKey(frontmatter, 'title') ? [] : [`title: ${JSON.stringify(page.shard.page.title)}`]),
-    ...(page.shard.page.description !== undefined && !frontmatterHasKey(frontmatter, 'description')
+    ...(stripped.keys.has('title') ? [] : [`title: ${JSON.stringify(page.shard.page.title)}`]),
+    ...(page.shard.page.description !== undefined && !stripped.keys.has('description')
       ? [`description: ${JSON.stringify(page.shard.page.description)}`]
       : []),
     `docstubeLocale: ${JSON.stringify(locale)}`,

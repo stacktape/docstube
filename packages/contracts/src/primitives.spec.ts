@@ -8,6 +8,7 @@ import {
   gitShaSchema,
   idPrefixes,
   localeCodeSchema,
+  localeRoutePrefixConflict,
   mintId,
   pageIdSchema,
   repoPathSchema,
@@ -53,6 +54,26 @@ describe('locale codes', () => {
     for (const locale of ['EN', 'pt-br', 'zh-hans', 'zh-Hans-cn', 'english', 'en_US', '']) {
       expect(localeCodeSchema.safeParse(locale).success).toBe(false);
     }
+  });
+});
+
+describe('localeRoutePrefixConflict', () => {
+  it('reports the locale whose route namespace a slug occupies', () => {
+    expect(localeRoutePrefixConflict('de/foo', ['de'])).toBe('de');
+    expect(localeRoutePrefixConflict('de', ['de'])).toBe('de');
+    expect(localeRoutePrefixConflict('guides/de/foo', ['de'])).toBeUndefined();
+    expect(localeRoutePrefixConflict('deutsch/foo', ['de'])).toBeUndefined();
+    expect(localeRoutePrefixConflict('de/foo', ['fr'])).toBeUndefined();
+  });
+
+  // CASE-INSENSITIVE (wave 2b close): the routes are directories, and on Windows/macOS
+  // "pt-br/foo" and "pt-BR/foo" are the same path — a case-sensitive check passed planning and
+  // then aliased on disk.
+  it('matches locale codes and slug segments case-insensitively', () => {
+    expect(localeRoutePrefixConflict('pt-br/foo', ['pt-BR'])).toBe('pt-BR');
+    expect(localeRoutePrefixConflict('pt-BR/foo', ['pt-br'])).toBe('pt-br');
+    expect(localeRoutePrefixConflict('PT-br', ['pt-BR'])).toBe('pt-BR');
+    expect(localeRoutePrefixConflict('zh-hans/intro', ['zh-Hans'])).toBe('zh-Hans');
   });
 });
 

@@ -29,6 +29,22 @@ import { parseMdx } from '../entities/extract-entities.ts';
 // call. It always returns 2." asserts a fact about `retry`, but the assertion sentence names no
 // identifier of its own. Requiring both signals in the SAME sentence let every such continuation
 // escape. The block is the unit the ledger anchors to anyway, so it is the honest scope.
+//
+// TWO SCANS, TWO SCOPES (wave 2b close finding): the two halves of the rule read DIFFERENT slices
+// of the same block, and conflating them lost spans.
+//
+//   IDENTIFIER SIGNAL — "does this block name code at all?" — scans the ENTIRE block, INCLUDING
+//   <Claim> subtrees. The reader sees marked prose like everything else, so `retry` named inside a
+//   marker is `retry` named in this block, and the uncovered continuation after it ("It always
+//   returns 2.") is plainly about code. Skipping Claim subtrees wholesale threw the identifier away
+//   with the covered text and let that continuation escape the denominator.
+//
+//   SENTENCE FLAGGING — "which sentences does no marker cover?" — scans the block MINUS its <Claim>
+//   subtrees, because covered prose is by definition already claimed and must never be reported as
+//   uncovered.
+//
+// Both scans exclude every OTHER JSX/HTML element subtree, per the attribution model below: <Claim>
+// is the one element whose prose the kernel owns an anchor for.
 
 // Rule names recorded on each span (the schema's `detector` field) — the reader-facing surfaces
 // and the journal hint quote them, so they are part of the observable contract.
@@ -101,21 +117,41 @@ type ScanNode = {
   children?: unknown[];
 };
 
-// The VISIBLE prose of a block, OUTSIDE every JSX/HTML element. Claim subtrees contribute nothing —
-// their prose is, by definition, covered. Code fences and frontmatter never reach here; inline
-// code is kept but tagged, because it is the identifier signal the detector needs.
-const collectSegments = (node: ScanNode, into: Segment[]): void => {
+// Which of the two scans is running (see "TWO SCANS, TWO SCOPES" above). The ONLY thing the scope
+// changes is whether <Claim> subtrees are descended into; everything else is identical.
+type ScanScope =
+  // The whole block as the reader sees it, Claim markers included: what arms the block.
+  | 'identifier-signal'
+  // The block minus its covered prose: what may be reported.
+  | 'sentence-flagging';
+
+const isClaimElement = (node: ScanNode): boolean =>
+  (node.type === 'mdxJsxTextElement' || node.type === 'mdxJsxFlowElement') && node.name === 'Claim';
+
+// The VISIBLE prose of a block, OUTSIDE every JSX/HTML element except <Claim>, which is descended
+// into in identifier-signal scope only. Code fences and frontmatter never reach here; inline code
+// is kept but tagged, because it is the identifier signal the detector needs.
+const collectSegments = (node: ScanNode, into: Segment[], scope: ScanScope): void => {
   if (node.type === 'code' || node.type === 'yaml' || node.type === 'mdxjsEsm') {
     return;
   }
   // PAGE-AUTHORED MARKUP IS OUTSIDE THE ATTRIBUTION MODEL (impl-24 finding): raw HTML was always
   // meant to be excluded, but MDX parses `<div>…</div>` as a JSX element, so half the exclusion
-  // leaked. Every JSX/HTML element subtree is skipped uniformly — `<Claim>` (covered by
-  // definition), theme components, and hand-written markup alike. The kernel cannot attribute
-  // prose inside an arbitrary component's children to a block the ledger could anchor a claim to,
-  // and a span the writer could not fix is worse than a span not reported. This is a documented
-  // limit of the deterministic floor, not a soundness claim.
+  // leaked. Every JSX/HTML element subtree is skipped uniformly — theme components and
+  // hand-written markup alike. The kernel cannot attribute prose inside an arbitrary component's
+  // children to a block the ledger could anchor a claim to, and a span the writer could not fix is
+  // worse than a span not reported. This is a documented limit of the deterministic floor, not a
+  // soundness claim.
+  //
+  // <Claim> IS THE EXCEPTION, IN ONE SCOPE ONLY (wave 2b close finding): it is the one element the
+  // ledger DOES anchor, so its prose is part of the block for the purpose of asking whether the
+  // block names code — but never for the purpose of reporting a span, since it is covered.
   if (node.type === 'mdxJsxTextElement' || node.type === 'mdxJsxFlowElement' || node.type === 'html') {
+    if (scope === 'identifier-signal' && isClaimElement(node)) {
+      for (const child of (node.children ?? []) as ScanNode[]) {
+        collectSegments(child, into, scope);
+      }
+    }
     return;
   }
   if (node.type === 'inlineCode') {
@@ -140,7 +176,7 @@ const collectSegments = (node: ScanNode, into: Segment[]): void => {
   const isContainer =
     node.type === 'tableCell' || node.type === 'listItem' || node.type === 'paragraph' || node.type === 'heading';
   for (const child of (node.children ?? []) as ScanNode[]) {
-    collectSegments(child, into);
+    collectSegments(child, into, scope);
   }
   if (isContainer) {
     into.push({ kind: 'boundary', value: '' });
@@ -270,12 +306,17 @@ export const lintUncoveredAssertions = ({ mdx, page }: CoverageLintInput): Cover
     if (node.type === 'code') {
       continue;
     }
-    const segments: Segment[] = [];
-    collectSegments(node as ScanNode, segments);
-    const sentences = splitSentences(segments);
-    // BLOCK SCOPE: one identifier anywhere in the block arms every assertion-shaped sentence in it.
-    const blockHasIdentifier = sentences.some((sentence) => sentence.hasIdentifier);
-    for (const sentence of sentences) {
+    // SCAN 1 — IDENTIFIER SIGNAL, over the WHOLE block including <Claim> subtrees. One identifier
+    // anywhere in the block arms every assertion-shaped sentence in it; an identifier the reader
+    // only meets inside a marker still counts, because the block still names code.
+    const identifierSegments: Segment[] = [];
+    collectSegments(node as ScanNode, identifierSegments, 'identifier-signal');
+    const blockHasIdentifier = splitSentences(identifierSegments).some((sentence) => sentence.hasIdentifier);
+    // SCAN 2 — SENTENCE FLAGGING, over the block MINUS its <Claim> subtrees. Only prose no marker
+    // covers is eligible to be reported.
+    const flaggableSegments: Segment[] = [];
+    collectSegments(node as ScanNode, flaggableSegments, 'sentence-flagging');
+    for (const sentence of splitSentences(flaggableSegments)) {
       const detector = detectorFor(sentence, blockHasIdentifier);
       if (detector === undefined) {
         continue;

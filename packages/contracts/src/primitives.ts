@@ -74,8 +74,20 @@ export const localeCodeSchema = z
 // fixes the kernel cannot choose between (rename the page, or drop the locale), so it is rejected
 // with both names rather than guessed at. Returns the offending locale, or undefined when the slug
 // is safe.
-export const localeRoutePrefixConflict = (slug: string, targetLocales: readonly string[]): string | undefined =>
-  targetLocales.find((locale) => slug === locale || slug.startsWith(`${locale}/`));
+//
+// CASE-INSENSITIVE (wave 2b close): locale codes carry case ("pt-BR", "zh-Hans") but the routes
+// they name are DIRECTORIES. On the case-insensitive filesystems most contributors use (Windows,
+// default macOS), slug "pt-br/foo" and locale "pt-BR" are the same path — a case-sensitive
+// comparison waved the pair through planning and the two writes then aliased, silently overwriting
+// a route or colliding a file with a directory. The comparison is over the ASCII locale grammar,
+// so a locale-invariant lowercase is exact.
+export const localeRoutePrefixConflict = (slug: string, targetLocales: readonly string[]): string | undefined => {
+  const normalizedSlug = slug.toLowerCase();
+  return targetLocales.find((locale) => {
+    const normalizedLocale = locale.toLowerCase();
+    return normalizedSlug === normalizedLocale || normalizedSlug.startsWith(`${normalizedLocale}/`);
+  });
+};
 
 // Docs version labels are user-declared, path-safe strings: "1.x", "v2", "2026-06".
 export const versionLabelSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/);

@@ -57,6 +57,33 @@ describe('lintUncoveredAssertions', () => {
     expect(spans[0]?.detector).toBe(coverageLintRules.numericLiteral);
   });
 
+  // TWO SCANS, TWO SCOPES (wave 2b close finding): identifier signal reads the WHOLE block
+  // including <Claim> subtrees; sentence flagging reads the block MINUS them. Skipping the marker
+  // subtree for both threw the identifier away with the covered text, so the uncovered
+  // continuation after a marker produced no span at all.
+  it('arms a block from an identifier that appears only INSIDE a <Claim>', () => {
+    const spans = lint('<Claim id="c1">The `retry` helper wraps the call.</Claim> It always returns 2.');
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.excerpt).toBe('It always returns 2.');
+    expect(spans[0]?.detector).toBe(coverageLintRules.numericLiteral);
+  });
+
+  it('never reports the covered text itself, however assertive — only the uncovered residue', () => {
+    // Both the marker's own prose and the trailing sentence are assertion-shaped, and the block's
+    // only identifier is inside the marker. Exactly one span comes back, and it is the residue.
+    const spans = lint('<Claim id="c1">`retryLimit` defaults to 5.</Claim> It must never exceed 9.');
+    expect(spans).toHaveLength(1);
+    expect(spans[0]?.excerpt).toBe('It must never exceed 9.');
+    expect(spans.some((span) => span.excerpt.includes('retryLimit'))).toBe(false);
+  });
+
+  it('stays clean when no identifier appears anywhere — inside a <Claim> or outside one', () => {
+    // Same shape as the two cases above with the identifier removed: the block never names code,
+    // so its assertive narration is ordinary English, not an unmarked code fact.
+    expect(lint('<Claim id="c1">The helper wraps the call.</Claim> It always returns 2.')).toEqual([]);
+    expect(lint('The helper wraps the call. It always returns 2.')).toEqual([]);
+  });
+
   it('does not flag narrative prose with no identifier and no assertion signal', () => {
     expect(lint('This guide walks through the setup, step by step, at your own pace.')).toEqual([]);
     // An assertion verb with no identifier ANYWHERE IN THE BLOCK is ordinary English, not a code
