@@ -9,7 +9,9 @@ export { createObservedReadsCollector, createStandardTools, standardToolDescript
 export type { ObservedReadsCollector, StandardToolsOptions, ToolImplementation } from './tools.ts';
 
 export {
+  CLAIM_ELEMENT_NAME,
   createSubmitPageTool,
+  elementPolicySchema,
   evaluateSubmitPageCall,
   scanClaimMarkers,
   submitPageDescriptor,
@@ -18,6 +20,7 @@ export {
 export type {
   AcceptedSubmission,
   ClaimMarker,
+  ElementPolicy,
   MarkerScan,
   MarkerScanError,
   MarkerScanErrorCode,

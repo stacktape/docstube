@@ -1,9 +1,11 @@
 import type { PageArtifact } from '@docstube/plugin-sdk';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
+import type { ElementPolicy } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Finding, PageEntity, PageShard } from '@docstube/contracts';
 import { agentTaskSpecSchema, contentHash, contentHashSchema, idPrefixes, mintId } from '@docstube/contracts';
 import { blockSourceRanges, extractPageEntity, parseMdx } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
+import { configElementPolicy } from './element-policy.ts';
 import type { PageRunContext } from './page-runner.ts';
 import { contentRelativePath, unwrapMdxFence } from './page-runner.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
@@ -137,9 +139,9 @@ const renderHeadingDepths = (depths: readonly number[]): string =>
 // sits outside any content block.
 export type MarkerPlacement = { blockIndex: number; markerId: string };
 
-export const markerPlacements = (mdx: string): MarkerPlacement[] => {
+export const markerPlacements = (mdx: string, elementPolicy?: ElementPolicy): MarkerPlacement[] => {
   const ranges = blockSourceRanges(mdx);
-  return scanClaimMarkers(mdx).markers.map((marker) => ({
+  return scanClaimMarkers(mdx, elementPolicy).markers.map((marker) => ({
     blockIndex: ranges.findIndex(([start, end]) => marker.offset >= start && marker.offset < end),
     markerId: marker.markerId
   }));
@@ -158,14 +160,17 @@ const renderPlacements = (placements: readonly MarkerPlacement[]): string =>
 export const translationHygieneErrors = (
   mdx: string,
   sourcePlacements: readonly MarkerPlacement[],
-  sourceHeadingDepths: readonly number[]
+  sourceHeadingDepths: readonly number[],
+  // The SAME authored-element whitelist the source page was submitted under: a rendition may use
+  // the project's registered components and nothing else (fail-closed to <Claim> with no policy).
+  elementPolicy?: ElementPolicy
 ): string[] => {
   // NO TRANSLATION CAN THROW THE RUN (wave 2b close): every artifact scanned here is raw MODEL
   // output. A malformed rendition can make any parser in this function throw, and a translation
   // failure is NONBLOCKING by design (i18n-lifecycle-v2 decision 5) — so an exception becomes a
   // hygiene failure for THIS page-locale, leaving the source page and every other locale intact.
   try {
-    return hygieneErrors(mdx, sourcePlacements, sourceHeadingDepths);
+    return hygieneErrors(mdx, sourcePlacements, sourceHeadingDepths, elementPolicy);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return [
@@ -178,10 +183,11 @@ export const translationHygieneErrors = (
 const hygieneErrors = (
   mdx: string,
   sourcePlacements: readonly MarkerPlacement[],
-  sourceHeadingDepths: readonly number[]
+  sourceHeadingDepths: readonly number[],
+  elementPolicy?: ElementPolicy
 ): string[] => {
   const sourceMarkerIds = sourcePlacements.map((placement) => placement.markerId);
-  const scan = scanClaimMarkers(mdx);
+  const scan = scanClaimMarkers(mdx, elementPolicy);
   const errors = scan.errors.map((error) => `[${error.code}] ${error.message}`);
   const markerCounts = new Map<string, number>();
   for (const marker of scan.markers) {
@@ -221,7 +227,7 @@ const hygieneErrors = (
     // document-order sequence intact while now annotating different prose. The rendition must
     // therefore reproduce the source's (owning block index, marker id) pairs EXACTLY — same ids,
     // same order, each in the same structural position.
-    const translatedPlacements = markerPlacements(mdx);
+    const translatedPlacements = markerPlacements(mdx, elementPolicy);
     const translatedSequence = translatedPlacements.map((placement) => placement.markerId);
     const sameOrder =
       translatedSequence.length === sourceMarkerIds.length &&
@@ -281,7 +287,8 @@ export const translateArtifact = async (
   const maxAttempts = 2;
   // The canonical marker inventory every rendition must reproduce exactly — same ids, same
   // document order, same owning block (block-scoped ordered equality) — plus the heading skeleton.
-  const sourcePlacements = markerPlacements(sourceArtifact.mdx);
+  const elementPolicy = configElementPolicy(ctx.config);
+  const sourcePlacements = markerPlacements(sourceArtifact.mdx, elementPolicy);
   const sourceHeadingDepths = headingInventory(sourceArtifact.mdx);
   // The canonical revision this translation is made from: the exact source artifact bytes, hashed
   // the same way persistence mints the canonical shard's mdxContentHash. Recorded on the locale
@@ -338,7 +345,7 @@ export const translateArtifact = async (
         ];
         continue;
       }
-      const hygiene = translationHygieneErrors(mdx, sourcePlacements, sourceHeadingDepths);
+      const hygiene = translationHygieneErrors(mdx, sourcePlacements, sourceHeadingDepths, elementPolicy);
       if (hygiene.length > 0) {
         findings = hygiene.map((message) => ({
           source: 'verifier' as const,

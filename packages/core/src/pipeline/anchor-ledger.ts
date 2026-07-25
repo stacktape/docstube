@@ -1,5 +1,5 @@
 import { scanClaimMarkers } from '@docstube/agent-runtime';
-import type { MarkerScanError } from '@docstube/agent-runtime';
+import type { ElementPolicy, MarkerScanError } from '@docstube/agent-runtime';
 import type {
   BlockEntity,
   ClaimLedger,
@@ -138,6 +138,10 @@ export type AnchorLedgerInput = {
   // conservative fallback derives whole-file subscriptions from these, never from model output.
   observedReads: ObservedRead[];
   commit: string;
+  // The authored-element whitelist submit_page validated with. Passing the SAME policy is what
+  // makes an element error here mean "the MDX changed after acceptance" instead of "the kernel
+  // rescan is stricter than the gate". Absent, the rescan is fail-closed (Claim only).
+  elementPolicy?: ElementPolicy | undefined;
 };
 
 // Classes whose claims depend on code and therefore MUST end anchoring with at least one resolved
@@ -543,7 +547,7 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
   // submit_page already validated the markers; the re-scan here classifies anything that slipped
   // through: placement problems are writer-repairable, grammar problems post-acceptance mean the
   // MDX was altered after acceptance — a kernel invariant breach, never a warning.
-  const scan = scanClaimMarkers(input.mdx);
+  const scan = scanClaimMarkers(input.mdx, input.elementPolicy);
   errors.push(...scan.errors.map(scanErrorToIssue));
   // Unparsable MDX already produced a kernel-level scan error above; ranges degrade to empty so
   // the remaining claims report precise marker-missing errors instead of crashing the stage.

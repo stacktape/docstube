@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { evaluateSubmitPageCall } from '@docstube/agent-runtime';
+import type { ElementPolicy } from '@docstube/agent-runtime';
 import { typescriptLanguagePack } from '@docstube/lang-typescript';
 import {
   codemapSchema,
@@ -150,11 +151,15 @@ const valueLedger = (
     ]
   });
 
+// The project's registered components for these probes — the SAME policy submit_page validates
+// with and the kernel re-scans with, so an element error post-acceptance means altered MDX.
+const registry: ElementPolicy = { allowedComponents: ['Badge'] };
+
 // The spine: submit_page validation → kernel anchoring → claim verification → persisted shard.
 const runSpineWithMdx = async (mdx: string, ledger: WriterClaimLedger) => {
   // 1. submit_page ACCEPTS — the writer-side gate cannot catch lexical bypasses; the exact
   //    canonical visible match is the evidence-decision backstop, not an in-session repair.
-  const submission = evaluateSubmitPageCall({ mdx, ledger });
+  const submission = evaluateSubmitPageCall({ mdx, ledger }, registry);
   expect(submission.response.accepted).toBe(true);
 
   // 2. Kernel anchoring accepts (subject bound, polarity agreed — the probes use exactly the
@@ -167,7 +172,8 @@ const runSpineWithMdx = async (mdx: string, ledger: WriterClaimLedger) => {
     fingerprints,
     codemap,
     observedReads,
-    commit: COMMIT
+    commit: COMMIT,
+    elementPolicy: registry
   });
   if (!anchored.ok) {
     throw new Error(`anchoring failed: ${anchored.errors.map((issue) => issue.message).join('; ')}`);
@@ -387,6 +393,30 @@ Fact: <Claim id="g1" id="g2">\`greet\` exists.</Claim>
     });
     expect(style.response.accepted).toBe(false);
     expect(style.response.errors?.some((error) => error.includes('theme owns page behavior'))).toBe(true);
+  });
+
+  it('Sol\'s counterfeit-chip probe: a raw <div class="dt-…"> sibling is REJECTED at submit_page — the spine never starts', () => {
+    // Only REGISTERED components may be authored. A raw HTML sibling can paint proof chrome the
+    // kernel never issued (and restyle or hide the checked prose), so it is refused structurally —
+    // no attribute deny-list involved, and no uppercase or quoted-'>' spelling escapes it.
+    const submission = evaluateSubmitPageCall(
+      {
+        mdx: pageMdx('`greet` exists.', '\n<div title="a > b" CLASS="dt-claims--complete">1 of 1 checked</div>\n'),
+        ledger: existenceLedger('greet exists')
+      },
+      registry
+    );
+    expect(submission.response.accepted).toBe(false);
+    expect(submission.response.errors?.some((error) => error.includes('the theme owns presentation'))).toBe(true);
+
+    // An unregistered component and a non-literal prop are refused the same way.
+    const unregistered = evaluateSubmitPageCall(
+      { mdx: pageMdx('`greet` exists.', '\n<Sneaky {...handlerProps} />\n'), ledger: existenceLedger('greet exists') },
+      registry
+    );
+    expect(unregistered.response.accepted).toBe(false);
+    expect(unregistered.response.errors?.some((error) => error.includes('is not a registered component'))).toBe(true);
+    expect(unregistered.response.errors?.some((error) => error.includes('plain string literal'))).toBe(true);
   });
 
   it('a code FENCE showing <script> markup is documentation, not an element — the canonical spine still mints CHECKED', async () => {

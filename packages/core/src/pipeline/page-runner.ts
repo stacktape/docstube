@@ -24,6 +24,7 @@ import type { BlockMatchConfidence } from '../entities/match-entities.ts';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import type { RunJournal } from '../state/run-journal.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
+import { configElementPolicy } from './element-policy.ts';
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
 import type { ScoredReview } from './review-page.ts';
@@ -118,6 +119,7 @@ export const generatePage = async (
   // Clamped to at least one attempt — a non-positive cap would skip the loop entirely and crash
   // below with a misleading 'produced no artifact'.
   const maxAttempts = Math.max(1, ctx.options.maxAttemptsPerPage ?? 3);
+  const elementPolicy = configElementPolicy(ctx.config);
   let findings: Finding[] = [];
   let priorDraft: string | undefined;
   let attemptsUsed = 0;
@@ -143,7 +145,9 @@ export const generatePage = async (
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     attemptsUsed = attempt;
     // Fresh per attempt: a retry must not inherit the previous attempt's accepted submission.
-    const submitPage = createSubmitPageTool();
+    // The element policy is the enabled component registry — the SAME list the writer prompt
+    // advertises, so submit_page accepts exactly what the writer was told it may author.
+    const submitPage = createSubmitPageTool(elementPolicy);
     const task = buildWritePageTask({
       config: ctx.config,
       glossary: ctx.glossary,
@@ -230,7 +234,10 @@ export const generatePage = async (
       fingerprints: ctx.fingerprints,
       codemap: ctx.codemap,
       observedReads: transcript.observedReads,
-      commit: ctx.commit
+      commit: ctx.commit,
+      // The SAME whitelist submit_page validated against: any element error here therefore means
+      // the accepted MDX changed after acceptance — a kernel invariant breach, never a repair.
+      elementPolicy
     });
     if (anchoredLedger.warnings.length > 0) {
       const claimWarnings: Finding[] = anchoredLedger.warnings.map((warning) => ({

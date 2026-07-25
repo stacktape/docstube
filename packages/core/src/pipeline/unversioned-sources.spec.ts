@@ -6,7 +6,7 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
-import { readSourceFiles, runGenerate, unversionedReadSources } from './generate.ts';
+import { dirtyWorkingTreeWarning, readSourceFiles, runGenerate, unversionedReadSources } from './generate.ts';
 
 // UNVERSIONED SOURCES ARE UNCOMMITTED (wave 2b close — the spine finding). `git status --porcelain`
 // reports nothing about IGNORED files, while the codemap walker scans them (this repository's own
@@ -110,13 +110,36 @@ describe('unversioned read sources', () => {
     expect(journalRaw).toContain('never the complete state');
   }, 60_000);
 
-  it('marks a run that READ an UNTRACKED (never-added) source file dirty', async () => {
+  it('marks a run that READ an UNTRACKED (never-added) source file dirty, and NAMES it', async () => {
+    // WARNING SAMPLES (wave 2b close, run-diagnostics finding): an untracked file makes porcelain
+    // dirty, and the ls-files diff used to be skipped whenever porcelain had already spoken — so
+    // the operator got only "the working tree is dirty" while the actionable detail (WHICH source
+    // file this run read that no commit contains) was one cheap `git ls-files` away. The diff now
+    // always runs, so the warning names the paths it claims to have.
     await writeFile(join(repoRoot, 'src', 'extra.ts'), 'export const extra = (): number => 1;\n');
+    const { stdout } = await git('status', '--porcelain');
+    expect(stdout).toContain('src/extra.ts');
+
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
     expect((await shardLineage())?.dirtyWorkingTree).toBe(true);
     const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', summary.runId, 'journal.jsonl'), 'utf8');
     expect(journalRaw).toContain('never the complete state');
+    expect(journalRaw).toContain('read 1 source file that git does not version');
+    expect(journalRaw).toContain('src/extra.ts');
   }, 60_000);
+
+  it('never promises samples it does not carry: the generic dirty-tree warning names no paths', () => {
+    // The other half of the same rule — a warning with no unversioned sources to report describes
+    // the porcelain cause and stops there, instead of advertising an example list it cannot fill.
+    const generic = dirtyWorkingTreeWarning('a'.repeat(40));
+    expect(generic.message).toContain('the working tree is dirty (or has no HEAD)');
+    expect(generic.message).not.toContain('git does not version');
+    expect(generic.message).not.toContain('()');
+
+    const sampled = dirtyWorkingTreeWarning('a'.repeat(40), ['dist-dogfood/lib.ts']);
+    expect(sampled.message).toContain('read 1 source file that git does not version');
+    expect(sampled.message).toContain('dist-dogfood/lib.ts');
+  });
 
   it('resolves trackedness over the BOUNDED read set and excludes docstube’s own outputs', async () => {
     await mkdir(join(repoRoot, 'dist-dogfood'), { recursive: true });

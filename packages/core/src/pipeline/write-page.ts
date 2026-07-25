@@ -142,10 +142,14 @@ export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
         `- ${term.term}: ${term.definition}${term.avoid.length > 0 ? ` (never say: ${term.avoid.join(', ')})` : ''}`
     )
     .join('\n');
+  // ELEMENT WHITELIST, stated as the rule submit_page actually enforces (wave 2b close): only the
+  // listed registered components may appear as elements, their props must be plain string
+  // literals, and raw HTML is refused outright. The enforced list is exactly this list
+  // (element-policy.ts), so the writer is never told something the gate will reject.
   const components =
     input.enabledComponents.length > 0
-      ? `You may use these MDX components (no others): ${input.enabledComponents.join(', ')}.`
-      : 'Use plain Markdown/MDX primitives only — no custom components are enabled.';
+      ? `You may use these MDX components and NO others: ${input.enabledComponents.join(', ')}.`
+      : 'Use plain Markdown/MDX primitives only — no components are enabled for this project.';
   return [
     'You are the docstube writer. You produce documentation where every claim will be mechanically verified;',
     'anything you assert that the code does not support will be caught and rejected. Never invent behavior.',
@@ -156,6 +160,13 @@ export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
     '- Frontmatter must be valid YAML: double-quote the title and description values.',
     '- Never write import/export statements and never set a `layout` frontmatter key — the site build provides both.',
     `- ${components} The inline <Claim id> marker is always available — it is part of the claim contract, not a theme component.`,
+    '- NO RAW HTML, EVER: never write <div>, <span>, <img>, <br>, <script>, <style>, or any other HTML tag, and never',
+    '  a JSX fragment (<>…</>). The theme owns presentation — use ordinary Markdown, or one of the components listed',
+    '  above. A code FENCE that SHOWS HTML is documentation and is always fine.',
+    '- COMPONENT PROPS ARE PLAIN STRING LITERALS: write prop="value" only. Never an expression value (prop={…}),',
+    '  never a spread ({...props}), never an event handler (onClick, onerror), and never a class, id, or data-*',
+    '  attribute starting with "dt-" or "data-docstube" — those names belong to docstube\'s own proof components.',
+    '  submit_page rejects every one of these outright.',
     '- Code examples must be complete and correct — they are compiled and executed.',
     '- If something cannot be known from the code (intent, history, "why"), use the `flag_question` tool to ask the',
     '  maintainers, then keep writing with what IS knowable. Never block on it; never invent the answer.',

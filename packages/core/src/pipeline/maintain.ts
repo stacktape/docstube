@@ -196,14 +196,14 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
     });
 
     // Unversioned sources count as uncommitted (wave 2b close): `git status` never reports ignored
-    // files, so a clean-reporting tree can still have been read for bytes no commit contains.
-    const unversionedSources = treeDirtyAtStart
-      ? []
-      : await unversionedReadSources({
-          repoRoot,
-          files: readSourceFiles({ codemap, fingerprints }),
-          ownOutputPrefixes: ownOutputs
-        });
+    // files, so a clean-reporting tree can still have been read for bytes no commit contains. The
+    // diff runs even on an already-dirty tree so the warning can NAME the offending paths instead
+    // of degrading to the generic line (wave 2b close, run-diagnostics finding).
+    const unversionedSources = await unversionedReadSources({
+      repoRoot,
+      files: readSourceFiles({ codemap, fingerprints }),
+      ownOutputPrefixes: ownOutputs
+    });
     if (unversionedSources.length > 0) {
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, unversionedSources)] });
     }

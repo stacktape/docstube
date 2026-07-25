@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalMdxSource } from '@docstube/contracts';
+import type { ElementPolicy } from './submit-page.ts';
 import { createSubmitPageTool, scanClaimMarkers, submitPageDescriptor, validateSubmission } from './submit-page.ts';
+
+// The registered-component whitelist these probes run under — core supplies the project's enabled
+// registry the same way when it builds the write-page task's submit_page tool (element-policy.ts).
+// Tests that pass NO policy are exercising the fail-closed default: <Claim> and nothing else.
+const registry: ElementPolicy = { allowedComponents: ['Callout', 'Badge', 'Panel', 'Wrap'] };
 
 const mdxWith = (body: string): string => `---\ntitle: "Retry"\n---\n\n# Retry\n\n${body}\n`;
 
@@ -218,11 +224,13 @@ describe('scanClaimMarkers', () => {
     expect(inlineWord.errors).toEqual([]);
   });
 
-  it('leaves custom elements whose name merely STARTS with script/style legal — the tag name must end at whitespace, "/", or ">"', () => {
+  it('leaves names that merely START with script/style out of the page-script code — the tag name must end at whitespace, "/", or ">"', () => {
     // <style-guide> is an ordinary custom element, not a <style> tag: the old \b boundary matched
-    // "style" before the hyphen and rejected legal pages (wave 2b close, tag-regex precision).
-    const customElement = scanClaimMarkers('Text.\n\n<style-guide>Read the guide.</style-guide>\n');
-    expect(customElement.errors).toEqual([]);
+    // "style" before the hyphen (wave 2b close, tag-regex precision). It is still REFUSED — as raw
+    // HTML, because only registered components may be authored — but never as page-script, and the
+    // distinction keeps mattering for the expression/attribute scans below, which read text.
+    const customElement = scanClaimMarkers('Text.\n\n<style-guide>Read the guide.</style-guide>\n', registry);
+    expect(customElement.errors.map((error) => error.code)).toEqual(['raw-html-element']);
 
     const customExpression = scanClaimMarkers("Text.\n\n{'see the <style-guide> element for details'}\n");
     expect(customExpression.errors).toEqual([]);
@@ -244,30 +252,42 @@ describe('scanClaimMarkers', () => {
     // attribute CARRIES — so a renderer directive like set:html could smuggle a script past them
     // and rewrite checked claim text after rendering.
     const setHtml = scanClaimMarkers(
-      'Text.\n\n<div set:html="<script>document.body.innerHTML = \'lie\'</script>" />\n'
+      'Text.\n\n<div set:html="<script>document.body.innerHTML = \'lie\'</script>" />\n',
+      registry
     );
     expect(setHtml.errors[0]?.code).toBe('page-script');
     expect(setHtml.errors[0]?.message).toContain('theme owns page behavior');
     expect(setHtml.errors[0]?.message).toContain('set:html');
 
-    // Expression-valued attributes and {...spreads} are the same channel.
-    const expressionValue = scanClaimMarkers("Text.\n\n<Callout body={'<style>.dt-claim{display:none}</style>'} />\n");
+    // Expression-valued attributes and {...spreads} are the same channel — and are now ALSO
+    // refused outright for not being statically analyzable (see the dynamic-attribute probes).
+    const expressionValue = scanClaimMarkers(
+      "Text.\n\n<Callout body={'<style>.dt-claim{display:none}</style>'} />\n",
+      registry
+    );
     expect(expressionValue.errors[0]?.code).toBe('page-script');
 
-    const spread = scanClaimMarkers('Text.\n\n<Callout {...{ html: \'<script src="evil.js">\' }} />\n');
+    const spread = scanClaimMarkers('Text.\n\n<Callout {...{ html: \'<script src="evil.js">\' }} />\n', registry);
     expect(spread.errors[0]?.code).toBe('page-script');
 
     // Inline (text-level) elements are scanned too, not only flow ones.
-    const inline = scanClaimMarkers('Prose with <Badge label="<script>alert(1)</script>">x</Badge> inside.\n');
+    const inline = scanClaimMarkers(
+      'Prose with <Badge label="<script>alert(1)</script>">x</Badge> inside.\n',
+      registry
+    );
     expect(inline.errors.some((error) => error.code === 'page-script')).toBe(true);
 
     // ORDINARY attribute values stay legal, including ones that merely MENTION the words.
     const ordinary = scanClaimMarkers(
-      'Text.\n\n<Callout title="Run the script" tone="info" note={\'mind the style guide\'}>Body.</Callout>\n'
+      'Text.\n\n<Callout title="Run the script" tone="info" note="mind the style guide">Body.</Callout>\n',
+      registry
     );
     expect(ordinary.errors).toEqual([]);
 
-    const customElementName = scanClaimMarkers('Text.\n\n<Callout title="see <style-guide> for details" />\n');
+    const customElementName = scanClaimMarkers(
+      'Text.\n\n<Callout title="see <style-guide> for details" />\n',
+      registry
+    );
     expect(customElementName.errors).toEqual([]);
   });
 
@@ -275,24 +295,33 @@ describe('scanClaimMarkers', () => {
     // A script/style TAG is not the only way to run code on a rendered page: an event handler is
     // executable page behavior with no tag in sight, and it can rewrite the very claim text the
     // ledger vouches for.
-    const lowercase = scanClaimMarkers('Text.\n\n<img src="x" onerror="document.body.innerHTML = \'lie\'" />\n');
-    expect(lowercase.errors[0]?.code).toBe('page-script');
+    const lowercase = scanClaimMarkers(
+      'Text.\n\n<img src="x" onerror="document.body.innerHTML = \'lie\'" />\n',
+      registry
+    );
+    expect(lowercase.errors.some((error) => error.code === 'page-script')).toBe(true);
     expect(lowercase.errors[0]?.message).toContain('onerror');
     expect(lowercase.errors[0]?.message).toContain('event-handler');
 
-    const camelCase = scanClaimMarkers('Text.\n\n<img src="x" onError={() => window.alert(\'x\')} />\n');
+    const camelCase = scanClaimMarkers('Text.\n\n<img src="x" onError={() => window.alert(\'x\')} />\n', registry);
     expect(camelCase.errors[0]?.code).toBe('page-script');
 
     // Inline (text-level) elements are scanned too, not only flow ones.
-    const inline = scanClaimMarkers('Prose with <span onclick="steal()">x</span> inside.\n');
+    const inline = scanClaimMarkers('Prose with <span onclick="steal()">x</span> inside.\n', registry);
     expect(inline.errors.some((error) => error.code === 'page-script')).toBe(true);
 
+    // A handler on a REGISTERED component is where this check still carries weight — and the
+    // SHOUTED HTML spelling is caught too (the old ^on shape read case-sensitively and missed it).
+    const shouted = scanClaimMarkers('Text.\n\n<Callout ONERROR="steal()">Body.</Callout>\n', registry);
+    expect(shouted.errors[0]?.code).toBe('page-script');
+    expect(shouted.errors[0]?.message).toContain('ONERROR');
+
     // A handler inside an attribute VALUE executes exactly like one written on the element.
-    const setHtml = scanClaimMarkers('Text.\n\n<div set:html="<img src=x onerror=alert(1)>" />\n');
+    const setHtml = scanClaimMarkers('Text.\n\n<div set:html="<img src=x onerror=alert(1)>" />\n', registry);
     expect(setHtml.errors[0]?.code).toBe('page-script');
     expect(setHtml.errors[0]?.message).toContain('set:html');
 
-    const expressionValue = scanClaimMarkers('Text.\n\n<Callout body={\'<b onmouseover="x()">hi</b>\'} />\n');
+    const expressionValue = scanClaimMarkers('Text.\n\n<Callout body={\'<b onmouseover="x()">hi</b>\'} />\n', registry);
     expect(expressionValue.errors[0]?.code).toBe('page-script');
 
     // The {…} wrapper must not launder it either.
@@ -302,7 +331,8 @@ describe('scanClaimMarkers', () => {
     // ORDINARY attributes stay legal — including names where "on" merely begins a word, and values
     // that merely MENTION a handler in prose.
     const ordinary = scanClaimMarkers(
-      'Text.\n\n<Callout once="true" only="dev" title="the onerror handler is documented below">Body.</Callout>\n'
+      'Text.\n\n<Callout once="true" only="dev" title="the onerror handler is documented below">Body.</Callout>\n',
+      registry
     );
     expect(ordinary.errors).toEqual([]);
 
@@ -316,29 +346,41 @@ describe('scanClaimMarkers', () => {
     // paint a green "complete" chip that the component's defensive recompute never sees, because
     // the counterfeit is not the component.
     const chip = scanClaimMarkers(
-      'Text.\n\n<span class="dt-claims dt-claims--complete" data-docstube-claims-complete="true">3 of 3 claims checked</span>\n'
+      'Text.\n\n<span class="dt-claims dt-claims--complete" data-docstube-claims-complete="true">3 of 3 claims checked</span>\n',
+      registry
     );
     expect(chip.errors[0]?.code).toBe('kernel-namespace');
     expect(chip.errors[0]?.message).toContain('data-docstube');
     expect(chip.errors[0]?.message).toContain('counterfeit');
 
-    const classOnly = scanClaimMarkers('Prose with <span class="dt-claim">a forged marker</span> inside.\n');
+    const classOnly = scanClaimMarkers('Prose with <span class="dt-claim">a forged marker</span> inside.\n', registry);
     expect(classOnly.errors[0]?.code).toBe('kernel-namespace');
 
-    const idOnly = scanClaimMarkers('Text.\n\n<div id="dt-contradicted-claims">[]</div>\n');
+    const idOnly = scanClaimMarkers('Text.\n\n<div id="dt-contradicted-claims">[]</div>\n', registry);
     expect(idOnly.errors[0]?.code).toBe('kernel-namespace');
 
-    const dataAttribute = scanClaimMarkers('Text.\n\n<div data-docstube-dirty-working-tree="false">ok</div>\n');
+    const dataAttribute = scanClaimMarkers(
+      'Text.\n\n<div data-docstube-dirty-working-tree="false">ok</div>\n',
+      registry
+    );
     expect(dataAttribute.errors[0]?.code).toBe('kernel-namespace');
 
     const spread = scanClaimMarkers(
-      "Text.\n\n<Callout {...{ 'data-docstube-claims-complete': 'true' }}>Body.</Callout>\n"
+      "Text.\n\n<Callout {...{ 'data-docstube-claims-complete': 'true' }}>Body.</Callout>\n",
+      registry
     );
     expect(spread.errors[0]?.code).toBe('kernel-namespace');
 
+    // The SHOUTED attribute spelling HTML also honours is caught on a registered component (the
+    // old exact-case class/id list read "CLASS" as an ordinary prop and let it through).
+    const shoutedClass = scanClaimMarkers('Text.\n\n<Callout CLASS="dt-claims--complete">Body.</Callout>\n', registry);
+    expect(shoutedClass.errors[0]?.code).toBe('kernel-namespace');
+    expect(shoutedClass.errors[0]?.message).toContain('dt-claims--complete');
+
     // ORDINARY classes and data attributes stay legal, including ones that merely contain "dt".
     const ordinary = scanClaimMarkers(
-      'Text.\n\n<Callout class="note wide mydt-thing" id="install-steps" data-tone="info">Body.</Callout>\n'
+      'Text.\n\n<Callout class="note wide mydt-thing" id="install-steps" data-tone="info">Body.</Callout>\n',
+      registry
     );
     expect(ordinary.errors).toEqual([]);
   });
@@ -391,27 +433,126 @@ describe('scanClaimMarkers', () => {
     // content is pure text, but Badge's renderer decides whether/how the Claim slot renders — the
     // scan cannot vouch for what the reader sees. Accepted (legal MDX, no repair), pureText false.
     const ancestor = scanClaimMarkers(
-      'Status: <Badge label="greet does not exist."><Claim id="a1">`greet` exists.</Claim></Badge>\n'
+      'Status: <Badge label="greet does not exist."><Claim id="a1">`greet` exists.</Claim></Badge>\n',
+      registry
     );
     expect(ancestor.errors).toEqual([]);
     expect(ancestor.markers[0]).toMatchObject({ markerId: 'a1', pureText: false, visibleText: 'greet exists.' });
 
     // Any depth of component nesting still counts as a JSX ancestor.
     const deep = scanClaimMarkers(
-      'Status: <Wrap><Badge label="no"><Claim id="a2">`greet` exists.</Claim></Badge></Wrap>\n'
+      'Status: <Wrap><Badge label="no"><Claim id="a2">`greet` exists.</Claim></Badge></Wrap>\n',
+      registry
     );
     expect(deep.errors).toEqual([]);
     expect(deep.markers[0]).toMatchObject({ markerId: 'a2', pureText: false });
 
     // A flow-level component ancestor is caught the same way.
-    const flow = scanClaimMarkers('<Panel>\n  Fact: <Claim id="a3">`greet` exists.</Claim>\n</Panel>\n');
+    const flow = scanClaimMarkers('<Panel>\n  Fact: <Claim id="a3">`greet` exists.</Claim>\n</Panel>\n', registry);
     expect(flow.errors).toEqual([]);
     expect(flow.markers[0]).toMatchObject({ markerId: 'a3', pureText: false });
 
     // A sibling component does NOT taint the marker — ancestry, not adjacency, is the condition.
-    const sibling = scanClaimMarkers('Fact: <Badge>beta</Badge> and <Claim id="a4">`greet` exists.</Claim>\n');
+    const sibling = scanClaimMarkers(
+      'Fact: <Badge>beta</Badge> and <Claim id="a4">`greet` exists.</Claim>\n',
+      registry
+    );
     expect(sibling.errors).toEqual([]);
     expect(sibling.markers[0]).toMatchObject({ markerId: 'a4', pureText: true });
+  });
+
+  // AUTHORED ELEMENTS ARE A WHITELIST (wave 2b close). The deny-list scans these replace regexed
+  // over source text, so uppercase names (ONERROR, CLASS), a quoted '>' inside markup, {...spread}
+  // objects, and expression-valued attributes all slipped past. The structural policy needs none
+  // of that: an element is legal only when the registry knows its name, and every attribute must
+  // be a plain string literal, which is what makes names and values readable straight off the AST.
+  describe('registered-components-only element policy', () => {
+    it('rejects RAW HTML elements — the theme owns presentation (Sol: <div class="dt-…">, <img onerror>)', () => {
+      const div = scanClaimMarkers('Text.\n\n<div class="dt-claims--complete">3 of 3 claims checked</div>\n', registry);
+      expect(div.errors.some((error) => error.code === 'raw-html-element')).toBe(true);
+      expect(div.errors.find((error) => error.code === 'raw-html-element')?.message).toContain(
+        'the theme owns presentation'
+      );
+      // The counterfeit-namespace error rides along; either one alone would reject the page.
+      expect(div.errors.some((error) => error.code === 'kernel-namespace')).toBe(true);
+
+      const img = scanClaimMarkers('Text.\n\n<img src="x" onerror="rewrite()" />\n', registry);
+      expect(img.errors.some((error) => error.code === 'raw-html-element')).toBe(true);
+      expect(img.errors.some((error) => error.code === 'page-script')).toBe(true);
+
+      // UPPERCASE handler names walked past the old ^on shape check entirely; the element itself
+      // is raw HTML, so the whitelist rejects it without needing to recognize the attribute at all.
+      const shouted = scanClaimMarkers('Text.\n\n<img src="x" ONERROR="rewrite()" />\n', registry);
+      expect(shouted.errors.some((error) => error.code === 'raw-html-element')).toBe(true);
+
+      // A quoted '>' inside an attribute value broke every `[^>]*` source regex. The AST does not
+      // care: the element is raw HTML and the class value reads literally.
+      const quotedAngle = scanClaimMarkers(
+        'Text.\n\n<div title="a > b" class="dt-claims--complete">chip</div>\n',
+        registry
+      );
+      expect(quotedAngle.errors.some((error) => error.code === 'raw-html-element')).toBe(true);
+      expect(quotedAngle.errors.some((error) => error.code === 'kernel-namespace')).toBe(true);
+
+      // …and the same quoted '>' on a REGISTERED component still surfaces the kernel-owned value.
+      const quotedOnComponent = scanClaimMarkers(
+        'Text.\n\n<Callout title="a > b" class="dt-claims--complete">chip</Callout>\n',
+        registry
+      );
+      expect(quotedOnComponent.errors.map((error) => error.code)).toEqual(['kernel-namespace']);
+    });
+
+    it('rejects components the registry does not know, and JSX fragments', () => {
+      const unknown = scanClaimMarkers('Text.\n\n<Sneaky title="x">Body.</Sneaky>\n', registry);
+      expect(unknown.errors.map((error) => error.code)).toEqual(['unregistered-component']);
+      expect(unknown.errors[0]?.message).toContain('<Callout>');
+
+      const fragment = scanClaimMarkers('Text.\n\n<><Callout title="x">Body.</Callout></>\n', registry);
+      expect(fragment.errors.some((error) => error.code === 'unregistered-component')).toBe(true);
+
+      // FAIL-CLOSED: with no policy at all, only <Claim> survives — a missing whitelist must never
+      // widen what is accepted.
+      const noPolicy = scanClaimMarkers('Text.\n\n<Callout title="x">Body.</Callout>\n');
+      expect(noPolicy.errors.map((error) => error.code)).toEqual(['unregistered-component']);
+      expect(noPolicy.errors[0]?.message).toContain('enables no components at all');
+      const claimOnly = scanClaimMarkers('Fact: <Claim id="c1">`greet` exists.</Claim>\n');
+      expect(claimOnly.errors).toEqual([]);
+    });
+
+    it('rejects {...spread} and expression-valued attributes — props must be plain string literals', () => {
+      const spread = scanClaimMarkers('Text.\n\n<Callout {...handlerProps}>Body.</Callout>\n', registry);
+      expect(spread.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+      expect(spread.errors[0]?.message).toContain('spread');
+      expect(spread.errors[0]?.message).toContain('plain string literal');
+
+      const expressionValue = scanClaimMarkers('Text.\n\n<Callout className={x}>Body.</Callout>\n', registry);
+      expect(expressionValue.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+      expect(expressionValue.errors[0]?.message).toContain('className={…}');
+
+      // Literal props — including a valueless boolean prop — stay legal and fully readable.
+      const literal = scanClaimMarkers('Text.\n\n<Callout tone="info" wide>Body.</Callout>\n', registry);
+      expect(literal.errors).toEqual([]);
+    });
+
+    it('leaves ordinary Markdown and registered components with literal props untouched', () => {
+      const page = [
+        '# Title',
+        '',
+        'Prose with **emphasis**, a [link](/docs), and `code`.',
+        '',
+        '- a list item',
+        '',
+        '```ts',
+        'const x = 1;',
+        '```',
+        '',
+        '<Callout tone="info" title="Heads up">Body with <Claim id="c1">`greet` exists.</Claim></Callout>',
+        ''
+      ].join('\n');
+      const scan = scanClaimMarkers(page, registry);
+      expect(scan.errors).toEqual([]);
+      expect(scan.markers[0]).toMatchObject({ markerId: 'c1', pureText: false });
+    });
   });
 
   it('turns malformed marker syntax into an mdx-parse-error repair message, never a crash', () => {
@@ -455,19 +596,27 @@ describe('validateSubmission', () => {
   });
 
   it('REJECTS a submission whose attribute value carries script markup, and accepts one that merely mentions it', () => {
-    const rejected = validateSubmission({
-      mdx: mdxWith('<Claim id="c1">`retries` defaults to 3.</Claim>\n\n<div set:html="<script>rewrite()</script>" />'),
-      ledger: ledgerWith([claim('c1')])
-    });
+    const rejected = validateSubmission(
+      {
+        mdx: mdxWith(
+          '<Claim id="c1">`retries` defaults to 3.</Claim>\n\n<div set:html="<script>rewrite()</script>" />'
+        ),
+        ledger: ledgerWith([claim('c1')])
+      },
+      registry
+    );
     expect(rejected.accepted).toBeUndefined();
     expect(rejected.errors.some((error) => error.includes('theme owns page behavior'))).toBe(true);
 
-    const accepted = validateSubmission({
-      mdx: mdxWith(
-        '<Claim id="c1">`retries` defaults to 3.</Claim>\n\n<Callout title="Run the script">Body.</Callout>'
-      ),
-      ledger: ledgerWith([claim('c1')])
-    });
+    const accepted = validateSubmission(
+      {
+        mdx: mdxWith(
+          '<Claim id="c1">`retries` defaults to 3.</Claim>\n\n<Callout title="Run the script">Body.</Callout>'
+        ),
+        ledger: ledgerWith([claim('c1')])
+      },
+      registry
+    );
     expect(accepted.errors).toEqual([]);
     expect(accepted.accepted).toBeDefined();
   });

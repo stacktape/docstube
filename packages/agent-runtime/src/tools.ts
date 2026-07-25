@@ -44,6 +44,11 @@ export type ToolImplementation = {
   // Result-bearing tools (submit_page): the harness asks these for the task result when the spec
   // declares a tool-delivered output type ('mdx-ledger') instead of reading the final text.
   taskResult?: (() => TaskResult | undefined) | undefined;
+  // SERIALIZABLE validation policy — plain JSON, never behavior. Handlers are closures and cannot
+  // be shipped to the spawned MCP child, but submit_page's registered-component whitelist must be
+  // identical in-session on every transport, so it travels with the descriptor
+  // (transports/forwarded-tools.ts). A tool with no policy validates fail-closed.
+  policy?: unknown;
 };
 
 export type StandardToolsOptions = {

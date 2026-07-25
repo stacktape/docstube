@@ -56,6 +56,41 @@ describe('prepareForwardedTools', () => {
     await session.cleanup();
   });
 
+  it("carries submit_page's element policy to the child, so the child accepts EXACTLY what the parent does", async () => {
+    // The registered-component whitelist is data, not behavior, so it can cross the process
+    // boundary the handler closures cannot. Without it the child would reject a page using a
+    // legitimately enabled component while the parent accepted it — the model would then repair a
+    // problem that does not exist.
+    const submitPage = createSubmitPageTool({ allowedComponents: ['Callout'] });
+    const session = await prepareForwardedTools([submitPage.tool]);
+    const childTools = await loadForwardedToolImplementations(session.env[mcpServerEnvVars.extraToolsFile]!, () => {});
+    const mdx = '---\ntitle: "Retry"\n---\n\n# Retry\n\n<Callout tone="info">Read on.</Callout>\n';
+    const ledger = { schemaVersion: 1, claims: [] };
+    const child = (await childTools[0]!.handler({ mdx, ledger })) as { accepted: boolean; errors?: string[] };
+    expect(child.accepted).toBe(true);
+
+    // …and a component the registry does not know is refused on the child exactly as on the parent.
+    const unknown = (await childTools[0]!.handler({
+      mdx: mdx.replace('Callout', 'Sneaky').replace('Callout', 'Sneaky'),
+      ledger
+    })) as { accepted: boolean; errors?: string[] };
+    expect(unknown.accepted).toBe(false);
+    expect(unknown.errors?.some((error) => error.includes('is not a registered component'))).toBe(true);
+    await session.cleanup();
+  });
+
+  it('validates FAIL-CLOSED in the child when no policy travels with submit_page', async () => {
+    const session = await prepareForwardedTools([createSubmitPageTool().tool]);
+    const childTools = await loadForwardedToolImplementations(session.env[mcpServerEnvVars.extraToolsFile]!, () => {});
+    const result = (await childTools[0]!.handler({
+      mdx: '---\ntitle: "Retry"\n---\n\n# Retry\n\n<Callout tone="info">Read on.</Callout>\n',
+      ledger: { schemaVersion: 1, claims: [] }
+    })) as { accepted: boolean; errors?: string[] };
+    expect(result.accepted).toBe(false);
+    expect(result.errors?.some((error) => error.includes('enables no components at all'))).toBe(true);
+    await session.cleanup();
+  });
+
   it('skips malformed sink lines and unknown tools without failing', async () => {
     const captured: unknown[] = [];
     const session = await prepareForwardedTools([flagQuestionTool(captured)]);

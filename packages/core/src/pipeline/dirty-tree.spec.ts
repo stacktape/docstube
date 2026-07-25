@@ -19,6 +19,8 @@ import {
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
+  headMovedDuringRunWarning,
+  resolveCommit,
   resolveSourceRevision
 } from './generate.ts';
 
@@ -34,6 +36,10 @@ const execFileAsync = promisify(execFile);
 // keeps a normal run clean. Full immutable-snapshot reads are reconciler work.
 
 let repoRoot: string;
+// The run-start HEAD every sweep below is given. HEAD STABILITY (wave 2b close): the sweep now
+// re-reads HEAD, so the commit a run reports must be the repository's real one — a fixture commit
+// would (correctly) read as "HEAD moved mid-run".
+let headCommit: string;
 
 const OWN_OUTPUTS = docstubeOwnOutputPrefixes({ outDir: 'docs-site' });
 
@@ -51,6 +57,7 @@ beforeAll(async () => {
   await writeFile(join(repoRoot, '.gitignore'), '.docstube/db.sqlite*\n.docstube/cache/\n.docstube/runs/\n');
   await git('add', '.');
   await git('commit', '-m', 'init');
+  headCommit = await resolveCommit(repoRoot);
 });
 
 afterAll(async () => {
@@ -92,7 +99,7 @@ describe('working-tree dirtiness', () => {
       repoRoot,
       store,
       journal,
-      commit: shard.sourceCommit,
+      commit: headCommit,
       dirtyAtStart: false,
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
@@ -122,7 +129,7 @@ describe('working-tree dirtiness', () => {
       repoRoot,
       store,
       journal,
-      commit: shard.sourceCommit,
+      commit: headCommit,
       dirtyAtStart: false,
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
@@ -152,7 +159,7 @@ describe('working-tree dirtiness', () => {
       repoRoot,
       store,
       journal,
-      commit: shard.sourceCommit,
+      commit: headCommit,
       dirtyAtStart: false,
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
@@ -167,7 +174,7 @@ describe('working-tree dirtiness', () => {
       repoRoot,
       store,
       journal,
-      commit: shard.sourceCommit,
+      commit: headCommit,
       dirtyAtStart: true,
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
@@ -208,7 +215,7 @@ describe('working-tree dirtiness', () => {
       repoRoot,
       store,
       journal,
-      commit: shard.sourceCommit,
+      commit: headCommit,
       dirtyAtStart: false,
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
@@ -219,6 +226,57 @@ describe('working-tree dirtiness', () => {
     const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8');
     expect(journalRaw).toContain('git does not version');
     expect(journalRaw).toContain('scratch/notes.ts');
+  });
+
+  it('marks the run when HEAD MOVED mid-run, even though the tree stayed perfectly clean', async () => {
+    // THE CLEAN-MID-RUN-COMMIT CLASS (wave 2b close): a commit landing while the run works leaves
+    // `git status` clean, so the porcelain-only sweep saw nothing — and the evidence this run
+    // recorded stayed labeled with a revision that need not contain the bytes it checked. HEAD is
+    // recorded at start and re-read at the end; any movement marks every persisted shard.
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePage();
+    const ledger = buildFixtureClaimLedger(page);
+    const shard = { ...buildFixturePageShard(page), ledger, provenance: buildFixtureProvenanceV2(ledger) };
+    await store.writePageShard(shard);
+
+    // A mid-run commit: the tree is CLEAN afterwards, only the revision changed.
+    await writeFile(join(repoRoot, 'landed-mid-run.txt'), 'a colleague pushed\n');
+    await git('add', 'landed-mid-run.txt');
+    await git('commit', '-m', 'landed mid-run');
+    const movedHead = await resolveCommit(repoRoot);
+    expect(movedHead).not.toBe(headCommit);
+    expect(await checkWorkingTreeDirty(repoRoot, OWN_OUTPUTS)).toBe(false);
+
+    const journal = await createRunJournal(repoRoot, mintId(idPrefixes.run));
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit: headCommit,
+      dirtyAtStart: false,
+      ownOutputPrefixes: OWN_OUTPUTS,
+      persistedShards: [{ locale: shard.locale, pageId: page.id }]
+    });
+
+    // The run is marked, so no page persisted this run can ever render the complete state.
+    const updated = await store.readPageShard({ locale: shard.locale, pageId: page.id });
+    expect(updated?.provenance?.lineage.dirtyWorkingTree).toBe(true);
+    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8');
+    expect(journalRaw).toContain('HEAD MOVED during the run');
+    // Both revisions are named, so the mismatch is diagnosable without guessing.
+    expect(journalRaw).toContain(headCommit.slice(0, 12));
+    expect(journalRaw).toContain(movedHead.slice(0, 12));
+    expect(journalRaw).toContain('never the complete state');
+
+    headCommit = movedHead;
+  });
+
+  it('names BOTH revisions in the HEAD-moved warning', () => {
+    const warning = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40));
+    expect(warning.severity).toBe('warning');
+    expect(warning.message).toContain('a'.repeat(12));
+    expect(warning.message).toContain('b'.repeat(12));
+    expect(warning.message).toContain('never the complete state');
   });
 
   it('derives the own-output prefix set from config outDir plus the .docstube tree', () => {

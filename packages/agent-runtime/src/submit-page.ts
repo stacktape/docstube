@@ -55,7 +55,10 @@ export type MarkerScanErrorCode =
   | 'marker-empty'
   | 'marker-nested'
   | 'page-script'
-  | 'kernel-namespace';
+  | 'kernel-namespace'
+  | 'raw-html-element'
+  | 'unregistered-component'
+  | 'dynamic-attribute';
 
 export type MarkerScanError = { code: MarkerScanErrorCode; message: string; markerId?: string };
 
@@ -63,6 +66,46 @@ export type MarkerScan = {
   markers: ClaimMarker[];
   errors: MarkerScanError[];
 };
+
+// AUTHORED ELEMENTS ARE A WHITELIST (wave 2b close — the deny-list collapse): the earlier scans
+// looked for spreads, raw markup, and expression attributes by REGEX over source text, so
+// uppercase names (ONERROR, CLASS), a quoted '>' inside markup, {...spread} objects, and
+// expression-valued attributes all walked through. A deny-list over arbitrary source cannot be
+// won, so the policy is structural and fail-closed instead: an element may appear in submitted MDX
+// only when the kernel's component registry knows its name, and every attribute must be a plain
+// string literal so its name and value read straight off the AST. Everything the old regexes tried
+// to catch is then either impossible (raw HTML, spreads, expressions) or a one-line AST name check.
+//
+// The registry lives in core (entities/block-registry.ts: one block type per registered
+// component); core passes the enabled names in when it constructs the task's submit_page tool. NO
+// POLICY MEANS CLAIM ONLY — a missing whitelist must never widen what is accepted.
+export const elementPolicySchema = z.object({
+  allowedComponents: z.array(z.string().min(1)).default([])
+});
+export type ElementPolicy = z.infer<typeof elementPolicySchema>;
+
+// The inline claim marker is claim VOCABULARY, not a theme component (it is deliberately absent
+// from the block registry), so it is allowed unconditionally and validated by its own far stricter
+// rules below (id-only attribute whitelist, no nesting, no expressions, no JSX).
+export const CLAIM_ELEMENT_NAME = 'Claim';
+
+const allowedElementNames = (policy: ElementPolicy | undefined): Set<string> =>
+  new Set([CLAIM_ELEMENT_NAME, ...(policy?.allowedComponents ?? [])]);
+
+const renderAllowedComponents = (allowed: ReadonlySet<string>): string => {
+  const names = [...allowed].filter((name) => name !== CLAIM_ELEMENT_NAME);
+  return names.length === 0
+    ? 'this project enables no components at all, so plain Markdown is the only option'
+    : `the components you may use are ${names.map((name) => `<${name}>`).join(', ')}`;
+};
+
+// The JSX rule MDX and React both use: a name starting with a lowercase letter is an INTRINSIC
+// element (raw HTML) rather than a component reference. Dashed custom elements start lowercase too.
+const isIntrinsicElementName = (name: string): boolean => /^[a-z]/u.test(name);
+
+// A raw-HTML `html` node carries a tag when it opens an element or closes one. MDX normally parses
+// markup into JSX nodes, so this is defense in depth for anything remark still hands back as html.
+const rawHtmlTagPattern = /<\s*\/?\s*[a-zA-Z]/u;
 
 // Same plugin set as the kernel's extraction parser (core extract-entities.ts) so marker positions
 // agree byte-for-byte with block source ranges.
@@ -110,11 +153,14 @@ const attributeValueMatching = (
 // of the payload differs.
 //
 // SHAPE, NOT ENUMERATION: `on` + an UPPERCASE letter is the JSX/React handler spelling (onError,
-// onClick); `on` + three-or-more lowercase letters is the HTML content-attribute spelling
-// (onerror, oncut, onbeforetoggle) — including handlers the HTML spec has not shipped yet. A name
-// where "on" merely begins a word ("once", "only") leaves a remainder shorter than any event type
-// and stays legal.
-const eventHandlerNamePattern = /^on(?:[A-Z]|[a-z]{3,})/u;
+// onClick); `on` + three-or-more letters is the HTML content-attribute spelling (onerror, oncut,
+// onbeforetoggle) — including handlers the HTML spec has not shipped yet, and including the
+// SHOUTED spelling HTML also honours (ONERROR). A name where "on" merely begins a word ("once",
+// "only") leaves a remainder shorter than any event type and stays legal.
+//
+// Defense in depth since the registered-components whitelist landed: raw HTML cannot be authored
+// at all, so this now only guards a handler-shaped prop on a REGISTERED component.
+const eventHandlerNamePattern = /^(?:on[A-Z]|[oO][nN][a-zA-Z]{3,})/u;
 
 // The same handler shape spelled INSIDE an attribute value, where it is executable only as part of
 // MARKUP: a tag whose attribute list carries a handler. Prose that merely mentions the word
@@ -172,7 +218,10 @@ const kernelOwnedAttribute = (attributes: Array<MdxJsxAttribute | MdxJsxExpressi
     if (attribute.name.toLowerCase().startsWith(KERNEL_DATA_ATTRIBUTE_PREFIX)) {
       return `the "${attribute.name}" attribute`;
     }
-    if (attribute.name === 'class' || attribute.name === 'className' || attribute.name === 'id') {
+    // Attribute names are compared case-INSENSITIVELY: HTML honours CLASS and ID, and a component
+    // prop spelled ClassName is the same channel (the earlier exact-case list missed both).
+    const lowerName = attribute.name.toLowerCase();
+    if (lowerName === 'class' || lowerName === 'classname' || lowerName === 'id') {
       const value = attributeStringValue(attribute);
       const owned = (value ?? '').split(/[\s'"`]+/u).find((token) => token.startsWith(KERNEL_CLASS_PREFIX));
       if (owned !== undefined) {
@@ -250,9 +299,10 @@ const isPureTextNode = (node: ScanNode): boolean => node.type === 'text' || node
 // translatable content is a marker: literal <Claim> text inside fenced/inline code is plain text
 // (a docs example never counts), flow-level Claim elements and markers inside headings or JSX
 // expressions are precise repair errors — formatting must never change claim or block semantics.
-export const scanClaimMarkers = (mdx: string): MarkerScan => {
+export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerScan => {
   const markers: ClaimMarker[] = [];
   const errors: MarkerScanError[] = [];
+  const allowed = allowedElementNames(policy);
   // CANONICAL SOURCE, NOT RAW BYTES (wave 2b close): remark only recognizes a frontmatter block
   // that starts at offset 0, so a page whose `---` is preceded by a blank line or a BOM parsed as a
   // thematic break plus a setext heading — a SYNTHETIC section made of the `title:` text that
@@ -418,7 +468,7 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       });
       return;
     }
-    if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
+    if ((node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') && node.name !== CLAIM_ELEMENT_NAME) {
       const attributes = node.attributes ?? [];
       const elementName = node.name ?? 'element';
       const offset = node.position?.start?.offset ?? 0;
@@ -470,6 +520,61 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
             'chrome the kernel never issued. Rename it to your own class/attribute and resubmit'
         });
       }
+      // REGISTERED COMPONENTS ONLY — the fail-closed structural rule that replaces the old
+      // source-text scans. An authored element must be a component the kernel's registry knows.
+      // Raw HTML is refused outright: the theme owns presentation, and an authored <div>/<span>/
+      // <img> can restyle, hide, or overwrite verified prose whatever its attributes say.
+      if (node.name === null || node.name === undefined) {
+        errors.push({
+          code: 'unregistered-component',
+          message:
+            `the page contains a JSX fragment (<>…</>) at offset ${offset} — only registered components may ` +
+            `appear as elements in a generated page (${renderAllowedComponents(allowed)}). Remove the fragment and ` +
+            'resubmit'
+        });
+      } else if (isIntrinsicElementName(node.name)) {
+        errors.push({
+          code: 'raw-html-element',
+          message:
+            `the page authors the raw HTML element <${node.name}> at offset ${offset} — generated pages carry NO ` +
+            'raw HTML: the theme owns presentation, and an authored element can restyle, hide, or overwrite the ' +
+            'very prose the ledger vouches for. Use ordinary Markdown, or a registered component ' +
+            `(${renderAllowedComponents(allowed)}), and resubmit (a code FENCE showing example markup is fine)`
+        });
+      } else if (!allowed.has(node.name)) {
+        errors.push({
+          code: 'unregistered-component',
+          message:
+            `<${node.name}> at offset ${offset} is not a registered component — a generated page may only use ` +
+            `components the theme actually renders (${renderAllowedComponents(allowed)}). Replace it with plain ` +
+            'Markdown or a registered component and resubmit'
+        });
+      }
+      // STATICALLY ANALYZABLE ATTRIBUTES. With spreads and expression values refused, every
+      // attribute name and value reads straight off the AST — which is exactly why no regex over
+      // source text is needed to see what an element carries.
+      for (const attribute of attributes) {
+        if (attribute.type === 'mdxJsxExpressionAttribute') {
+          errors.push({
+            code: 'dynamic-attribute',
+            message:
+              `<${elementName}> at offset ${offset} carries a {…} spread attribute — a spread hides which props ` +
+              'an element actually gets, so the kernel cannot tell prose formatting from executable behavior or ' +
+              'counterfeit proof chrome. Write every prop as a plain string literal (prop="value") and resubmit'
+          });
+          continue;
+        }
+        if (attribute.value !== null && typeof attribute.value === 'object') {
+          errors.push({
+            code: 'dynamic-attribute',
+            message:
+              `<${elementName}> at offset ${offset} carries the expression-valued attribute ` +
+              `${attribute.name}={…} — an expression computes its value at render time, so the kernel cannot read ` +
+              `what the element actually gets. Write it as a plain string literal (${attribute.name}="value") and ` +
+              'resubmit'
+          });
+        }
+      }
     }
     if (node.type === 'html' && typeof node.value === 'string') {
       if (scriptStyleTagPattern.test(node.value)) {
@@ -500,6 +605,20 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
             `${node.position?.start?.offset ?? 0} — the "${KERNEL_CLASS_PREFIX}" class/id prefix and every ` +
             `"${KERNEL_DATA_ATTRIBUTE_PREFIX}*" attribute belong to the kernel proof components, so authored ` +
             'markup using them would counterfeit verification chrome. Rename it to your own names and resubmit'
+        });
+        return;
+      }
+      // Any remaining raw-HTML node carrying a tag is refused for the same reason an intrinsic JSX
+      // element is: the theme owns presentation, and no attribute deny-list can secure markup the
+      // kernel only sees as text.
+      if (rawHtmlTagPattern.test(node.value)) {
+        errors.push({
+          code: 'raw-html-element',
+          message:
+            `the page contains raw HTML at offset ${node.position?.start?.offset ?? 0} — generated pages carry NO ` +
+            'raw HTML: the theme owns presentation, and authored markup can restyle, hide, or overwrite the very ' +
+            `prose the ledger vouches for. Use ordinary Markdown, or a registered component ` +
+            `(${renderAllowedComponents(allowed)}), and resubmit (a code FENCE showing example markup is fine)`
         });
         return;
       }
@@ -599,8 +718,10 @@ export const submitPageDescriptor: ToolDescriptor = {
   name: 'submit_page',
   description:
     'Submit the finished page: the complete MDX (with inline <Claim id="…">…</Claim> markers) plus the claim ' +
-    'ledger. The submission is validated; on errors, fix exactly what is listed and call submit_page again with the ' +
-    'full corrected page. The task result is your last accepted submission.',
+    'ledger. The page may contain plain Markdown, <Claim> markers, and the registered components listed in your ' +
+    'instructions — no raw HTML elements, and every component prop must be a plain string literal (no {…} ' +
+    'expressions, no spreads). The submission is validated; on errors, fix exactly what is listed and call ' +
+    'submit_page again with the full corrected page. The task result is your last accepted submission.',
   paramsJsonSchema: {
     type: 'object',
     properties: {
@@ -644,7 +765,11 @@ const ledgerIssueMessage = (issue: z.core.$ZodIssue): string => {
 export type AcceptedSubmission = { mdx: string; ledger: WriterClaimLedger };
 
 // Every problem in one pass, phrased as an instruction the model can act on directly.
-export const validateSubmission = (args: unknown): { accepted: AcceptedSubmission | undefined; errors: string[] } => {
+export const validateSubmission = (
+  args: unknown,
+  // Fail-closed: with no policy only <Claim> is a legal element (see elementPolicySchema).
+  policy?: ElementPolicy
+): { accepted: AcceptedSubmission | undefined; errors: string[] } => {
   const shape = submitPageArgsSchema.safeParse(args ?? {});
   if (!shape.success) {
     return {
@@ -657,7 +782,7 @@ export const validateSubmission = (args: unknown): { accepted: AcceptedSubmissio
   if (!ledgerParse.success) {
     errors.push(...ledgerParse.error.issues.map(ledgerIssueMessage));
   }
-  const scan = scanClaimMarkers(shape.data.mdx);
+  const scan = scanClaimMarkers(shape.data.mdx, policy);
   errors.push(...scan.errors.map((error) => error.message));
 
   const markerCounts = new Map<string, number>();
@@ -736,9 +861,10 @@ export type SubmitPageResponse = {
 // (transports/forwarded-tools.ts): what the model sees in-session is always the real validation
 // outcome, on every transport.
 export const evaluateSubmitPageCall = (
-  args: unknown
+  args: unknown,
+  policy?: ElementPolicy
 ): { response: SubmitPageResponse; accepted: AcceptedSubmission | undefined } => {
-  const outcome = validateSubmission(args);
+  const outcome = validateSubmission(args, policy);
   if (outcome.accepted === undefined) {
     return {
       accepted: undefined,
@@ -763,13 +889,17 @@ export type SubmitPageTool = {
   accepted: () => AcceptedSubmission | undefined;
 };
 
-export const createSubmitPageTool = (): SubmitPageTool => {
+export const createSubmitPageTool = (policy?: ElementPolicy): SubmitPageTool => {
   let accepted: AcceptedSubmission | undefined;
   return {
     tool: {
       descriptor: submitPageDescriptor,
+      // The policy rides on the tool because it must cross the MCP-child process boundary: the
+      // child cannot receive the handler closure, but this is plain JSON and ships with the
+      // descriptor (transports/forwarded-tools.ts), so in-session validation is identical there.
+      ...(policy === undefined ? {} : { policy }),
       handler: async (args) => {
-        const outcome = evaluateSubmitPageCall(args);
+        const outcome = evaluateSubmitPageCall(args, policy);
         // Last accepted submission wins — a re-call intentionally replaces the artifact.
         if (outcome.accepted !== undefined) {
           accepted = outcome.accepted;

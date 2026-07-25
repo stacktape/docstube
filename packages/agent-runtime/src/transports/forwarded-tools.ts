@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toolDescriptorSchema } from '@docstube/contracts';
 import { mcpServerEnvVars } from '../mcp-stdio-server.ts';
-import { evaluateSubmitPageCall } from '../submit-page.ts';
+import { elementPolicySchema, evaluateSubmitPageCall } from '../submit-page.ts';
 import { standardToolDescriptors } from '../tools.ts';
 import type { ToolImplementation } from '../tools.ts';
 
@@ -39,7 +39,14 @@ export const prepareForwardedTools = async (tools: ToolImplementation[]): Promis
   const dir = await mkdtemp(join(tmpdir(), 'docstube-fwd-tools-'));
   const descriptorsFile = join(dir, 'descriptors.json');
   const callsFile = join(dir, 'calls.jsonl');
-  await writeFile(descriptorsFile, JSON.stringify(extras.map((tool) => tool.descriptor)), 'utf8');
+  // Descriptor PLUS the tool's serializable policy: submit_page's registered-component whitelist
+  // is what makes its in-session validation identical in the child (see below). Handlers stay in
+  // this process; only data crosses.
+  await writeFile(
+    descriptorsFile,
+    JSON.stringify(extras.map((tool) => ({ descriptor: tool.descriptor, policy: tool.policy }))),
+    'utf8'
+  );
 
   const byName = new Map(extras.map((tool) => [tool.descriptor.name, tool]));
   return {
@@ -82,18 +89,24 @@ export const loadForwardedToolImplementations = async (
   descriptorsFile: string,
   appendCall: (line: string) => void
 ): Promise<ToolImplementation[]> => {
-  const raw = JSON.parse(await readFile(descriptorsFile, 'utf8')) as unknown[];
+  const raw = JSON.parse(await readFile(descriptorsFile, 'utf8')) as Array<{ descriptor?: unknown; policy?: unknown }>;
   return raw.map((entry) => {
-    const descriptor = toolDescriptorSchema.parse(entry);
+    const descriptor = toolDescriptorSchema.parse(entry.descriptor);
     if (descriptor.name === 'submit_page') {
       // In-session validation: the vendor model gets the REAL repair errors (or accepted:true)
       // while it can still fix them. Every call is recorded regardless — the parent replay through
       // the real handler is what mints the accepted artifact.
+      //
+      // The element policy crosses as data so the child accepts EXACTLY what the parent accepts.
+      // A missing or malformed policy validates fail-closed (Claim only) rather than open.
+      const parsedPolicy = elementPolicySchema.safeParse(entry.policy);
+      const policy = parsedPolicy.success ? parsedPolicy.data : undefined;
       return {
         descriptor,
+        ...(policy === undefined ? {} : { policy }),
         handler: async (args: unknown) => {
           appendCall(JSON.stringify({ name: descriptor.name, args }));
-          return evaluateSubmitPageCall(args).response;
+          return evaluateSubmitPageCall(args, policy).response;
         }
       };
     }
