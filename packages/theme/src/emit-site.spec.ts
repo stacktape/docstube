@@ -2,9 +2,19 @@ import { mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import { contentHash, contentHashSchema } from '@docstube/contracts';
 import { emitSite } from './emit-site.ts';
 import { buildFixtureInput, installMdx, setupMdx } from './emit-site-fixture.ts';
+
+// The emitted frontmatter block, for tests that assert on it as YAML rather than as text.
+const frontmatterOf = (route: string): string => {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/.exec(route);
+  if (match?.[1] === undefined) {
+    throw new Error('route has no frontmatter block');
+  }
+  return match[1];
+};
 
 // Emits the fixture site with the install page carrying `frontmatter` as its authored block,
 // rebinding the shard hash the way real persistence does so the route is not forced unverified.
@@ -249,12 +259,12 @@ describe('emitSite', () => {
     // canonical shard's — proof is language-independent, anchors are not.
     const installDe = await readFile(join(siteRoot, 'src/pages/de/getting-started/installation.mdx'), 'utf8');
     expect(installDe).toContain(
-      '"anchor":"anforderungen","title":"Anforderungen","checked":1,"total":1,"contradicted":0'
+      '{anchor: "anforderungen", title: "Anforderungen", checked: 1, total: 1, contradicted: 0}'
     );
-    expect(installDe).not.toContain('"anchor":"requirements"');
+    expect(installDe).not.toContain('anchor: "requirements"');
     // The source route is unchanged: canonical anchors, canonical counts.
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
-    expect(install).toContain('"anchor":"requirements","title":"Requirements","checked":1,"total":1,"contradicted":0');
+    expect(install).toContain('{anchor: "requirements", title: "Requirements", checked: 1, total: 1, contradicted: 0}');
   });
 
   it('a source-fallback rendition keeps the CANONICAL section anchors — it renders the source headings', async () => {
@@ -269,15 +279,15 @@ describe('emitSite', () => {
     await emitSite(input);
     const route = await readFile(join(repoRoot, 'docs-site/src/pages/de/getting-started/installation.mdx'), 'utf8');
     // The fallback serves the SOURCE bytes, so the source anchors are the ones in the HTML.
-    expect(route).toContain('"anchor":"requirements"');
-    expect(route).not.toContain('"anchor":"anforderungen"');
+    expect(route).toContain('anchor: "requirements"');
+    expect(route).not.toContain('anchor: "anforderungen"');
   });
 
   it('injects locale alternates for translated pages only and renders the switcher + hreflang', async () => {
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(install).toContain('docstubeAlternates: ');
-    expect(install).toContain('"locale":"en","href":"/getting-started/installation/"');
-    expect(install).toContain('"locale":"de","href":"/de/getting-started/installation/"');
+    expect(install).toContain('{locale: "en", href: "/getting-started/installation/"}');
+    expect(install).toContain('{locale: "de", href: "/de/getting-started/installation/"}');
     // The setup page has no translation, so no alternates and no switcher.
     const setup = await readFile(join(siteRoot, 'src/pages/guides/setup.mdx'), 'utf8');
     expect(setup).not.toContain('docstubeAlternates');
@@ -312,9 +322,9 @@ describe('emitSite', () => {
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     // Block-level sources roll up into the page Sources footer (fixture page-level list is empty).
     expect(install).toContain('docstubeSources: ');
-    expect(install).toContain('"file":"src/cli.ts","line":1,"endLine":12');
+    expect(install).toContain('{file: "src/cli.ts", line: 1, endLine: 12');
     expect(install).toContain('docstubeSections: ');
-    expect(install).toContain('"anchor":"requirements","title":"Requirements","checked":1,"total":1,"contradicted":0');
+    expect(install).toContain('{anchor: "requirements", title: "Requirements", checked: 1, total: 1, contradicted: 0}');
 
     const sourcesFooter = await readFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), 'utf8');
     expect(sourcesFooter).toContain('class="dt-sources"');
@@ -580,6 +590,101 @@ describe('emitSite', () => {
       // The kernel-computed frontmatter is still complete, so the route still renders.
       expect(route).toContain('title: "Installation"');
       expect(route).toContain('docstubeClaimsChecked: 1');
+    });
+  });
+
+  // ONE PARSE, ONE SERIALIZE (wave 2b close 2 finding): the kernel's keys are SET on the parsed
+  // authored document, so the emitted block is a single internally consistent mapping. Appending
+  // them as TEXT meant an authored flow root — ordinary, valid, Astro-legal YAML — was followed by
+  // block lines and the route stopped parsing at build time.
+  describe('kernel frontmatter is set through the Document API', () => {
+    it('emits VALID yaml when the authored root is a flow mapping, keeping authored and kernel keys', async () => {
+      const { route, warnings } = await emitWithFrontmatter('{ title: Docs, keywords: [install, npm] }', 'flow-root');
+      expect(warnings).toEqual([]);
+      const block = frontmatterOf(route);
+      const parsedBack = parse(block) as Record<string, unknown>;
+      // Authored keys survive with their authored values...
+      expect(parsedBack.title).toBe('Docs');
+      expect(parsedBack.keywords).toEqual(['install', 'npm']);
+      // ...beside the kernel-computed ones, in one mapping the YAML parser accepts.
+      expect(parsedBack.layout).toBe('../../layouts/DocLayout.astro');
+      expect(parsedBack.docstubeClaimsChecked).toBe(1);
+      expect(parsedBack.docstubeUncheckedClaims).toEqual(['c2']);
+      // The authored title wins, and is not duplicated by the injected one.
+      expect(block.match(/^title\s*:/gmu)).toHaveLength(1);
+    });
+
+    it('round-trips a nested flow value authored inside a block mapping', async () => {
+      const { route, warnings } = await emitWithFrontmatter('keywords: [install, npm]\nsidebarOrder: 3', 'nested-flow');
+      expect(warnings).toEqual([]);
+      const parsedBack = parse(frontmatterOf(route)) as Record<string, unknown>;
+      expect(parsedBack.keywords).toEqual(['install', 'npm']);
+      expect(parsedBack.sidebarOrder).toBe(3);
+      expect(parsedBack.docstubePageId).toMatch(/^pg/u);
+    });
+
+    it('every emitted route parses as a YAML mapping', async () => {
+      const routes = [
+        'src/pages/getting-started/installation.mdx',
+        'src/pages/guides/setup.mdx',
+        'src/pages/de/getting-started/installation.mdx'
+      ];
+      const parsedRoutes = await Promise.all(
+        routes.map(async (route) => {
+          const block = frontmatterOf(await readFile(join(siteRoot, route), 'utf8'));
+          return [route, typeof parse(block)];
+        })
+      );
+      expect(parsedRoutes).toEqual(routes.map((route) => [route, 'object']));
+    });
+
+    // FAIL CLOSED on constructs the kernel cannot vet by key name: a merge key or an alias INSERTS
+    // pairs, so `<<: *base` can mint `docstubeReviewedFor` on an unreviewed page.
+    it.each([
+      ['merge-key', 'base: &base\n  docstubeReviewedFor: security\nkeywords: [install]\n<<: *base', 'merge key'],
+      ['alias', 'base: &base security\ndocstubeReviewedFor: *base', 'anchor'],
+      ['anchor', 'keywords: &kw [install]\nmore: *kw', 'anchor'],
+      ['custom-tag', 'keywords: !custom [install]', 'tag']
+    ])('fails closed on %s frontmatter, naming the route', async (label, frontmatter, expectedReason) => {
+      const { route, warnings } = await emitWithFrontmatter(frontmatter, label);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain('/getting-started/installation/');
+      expect(warnings[0]).toContain('cannot vet');
+      expect(warnings[0]?.toLowerCase()).toContain(expectedReason);
+      // Nothing authored reaches the reader — including a merged trust label.
+      expect(route).not.toContain('ReviewedFor');
+      expect(route).not.toContain('security');
+      expect(route).not.toContain('keywords');
+      // The kernel-computed frontmatter is still injected, so the route still renders.
+      expect(route).toContain('title: "Installation"');
+      expect(route).toContain('docstubeClaimsChecked: 1');
+      expect(parse(frontmatterOf(route))).toMatchObject({ docstubeClaimsTotal: 2 });
+    });
+
+    // COMMENT MIGRATION: the author's note lives on the pair BELOW it, so deleting a kernel-owned
+    // key used to delete a comment that was written about the ordinary keys underneath.
+    it('moves a comment above a deleted docstube key onto the next surviving key', async () => {
+      const { route } = await emitWithFrontmatter(
+        '# these keywords drive the sidebar\ndocstubeClaimsComplete: true\nkeywords:\n  - install',
+        'comment-migration'
+      );
+      expect(route).toContain('# these keywords drive the sidebar');
+      expect(route).not.toContain('docstubeClaimsComplete');
+      const block = frontmatterOf(route);
+      const commentLine = block.split('\n').findIndex((line) => line.includes('drive the sidebar'));
+      const keywordsLine = block.split('\n').findIndex((line) => line.startsWith('keywords'));
+      expect(commentLine).toBeGreaterThanOrEqual(0);
+      expect(keywordsLine).toBe(commentLine + 1);
+    });
+
+    it('keeps a trailing comment when the deleted key was the last one', async () => {
+      const { route } = await emitWithFrontmatter(
+        'keywords:\n  - install\n# authored trailing note\ndocstubeReviewedFor: security',
+        'comment-trailing'
+      );
+      expect(route).toContain('# authored trailing note');
+      expect(route).not.toContain('ReviewedFor');
+      expect(parse(frontmatterOf(route))).toMatchObject({ keywords: ['install'] });
     });
   });
 

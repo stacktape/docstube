@@ -8,6 +8,8 @@ const configWithImportKind = (kind: string) => ({
   sources: { imports: [{ kind, location: 'https://example.readme.io' }] }
 });
 
+const parseLocales = (locales: unknown) => docstubeConfigSchema.safeParse({ ...fixtureConfigInput, locales });
+
 describe('docstube.yml schema', () => {
   it('parses a minimal config and applies defaults', () => {
     const config = docstubeConfigSchema.parse(fixtureConfigInput);
@@ -113,6 +115,41 @@ describe('docstube.yml schema', () => {
       }).success
     ).toBe(false);
     expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, screenshots: {} }).success).toBe(false);
+  });
+
+  // TRANSLATION TARGETS (wave 2b close 2 finding): the source locale is truth, so it is never a
+  // target, and a repeated target buys a second identical rendition of the same route.
+  describe('locales.targets', () => {
+    it('accepts distinct targets that are not the source locale', () => {
+      const result = parseLocales({ source: 'en', targets: ['de', 'pt-BR', 'zh-Hans'] });
+      expect(result.success).toBe(true);
+      expect(result.data?.locales.targets).toEqual(['de', 'pt-BR', 'zh-Hans']);
+    });
+
+    it('rejects the source locale appearing among the targets, naming it', () => {
+      const result = parseLocales({ source: 'de', targets: ['en', 'de'] });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toContain('"de"');
+      expect(result.error?.issues[0]?.message).toContain('source locale');
+      expect(result.error?.issues[0]?.path).toEqual(['locales', 'targets', 1]);
+    });
+
+    it('rejects a duplicate target, naming the repeat', () => {
+      const result = parseLocales({ source: 'en', targets: ['pt-BR', 'de', 'pt-BR'] });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues[0]?.message).toContain('"pt-BR"');
+      expect(result.error?.issues[0]?.message).toContain('more than once');
+      expect(result.error?.issues[0]?.path).toEqual(['locales', 'targets', 2]);
+    });
+
+    // The locale grammar already pins each subtag's case, so a differently-cased spelling of the
+    // same locale never reaches the comparison — it is rejected as a malformed code. The
+    // comparison stays case-insensitive anyway, matching localeRoutePrefixConflict: the two rules
+    // decide the same thing (which /<locale>/ directory a target owns) and must not disagree.
+    it('rejects a differently-cased spelling of a configured locale', () => {
+      expect(parseLocales({ source: 'pt-BR', targets: ['pt-br'] }).success).toBe(false);
+      expect(parseLocales({ source: 'en', targets: ['pt-BR', 'pt-br'] }).success).toBe(false);
+    });
   });
 });
 

@@ -333,10 +333,10 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     // document's own heading anchor (the id Astro derives from "## Verwendung"), mapped
     // positionally onto the canonical section counts — never the source anchor, which does not
     // exist in the rendered de HTML. The source route keeps its own anchors.
-    expect(deRoute).toContain('"anchor":"verwendung"');
-    expect(deRoute).not.toContain('"anchor":"usage"');
+    expect(deRoute).toContain('anchor: "verwendung"');
+    expect(deRoute).not.toContain('anchor: "usage"');
     const enRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8');
-    expect(enRoute).toContain('"anchor":"usage"');
+    expect(enRoute).toContain('anchor: "usage"');
 
     // Run 2: the retranslation fails (marker renamed v1→v9 — isomorphism violation). The stale de
     // MDX from run 1 remains on disk against the now-hashless de shard.
@@ -361,8 +361,8 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     // notice, never additionally a "not yet reviewed" line about a translation nobody is serving.
     expect(fallbackRoute).not.toContain('docstubeTranslationAssurance');
     // A fallback route renders the SOURCE headings, so it keeps the canonical anchors.
-    expect(fallbackRoute).toContain('"anchor":"usage"');
-    expect(fallbackRoute).not.toContain('"anchor":"verwendung"');
+    expect(fallbackRoute).toContain('anchor: "usage"');
+    expect(fallbackRoute).not.toContain('anchor: "verwendung"');
     // The raw markdown mirror serves the fallback bytes too, never the stale translation.
     const deMirror = await readFile(join(repoRoot, 'docs-site', 'public', 'de', 'retry.md'), 'utf8');
     expect(deMirror).not.toContain('ist standardmäßig 3');

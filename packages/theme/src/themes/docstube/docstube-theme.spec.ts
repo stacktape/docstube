@@ -103,7 +103,7 @@ describe('proof conformance (docstube theme)', () => {
     expect(page).toContain('docstubeClaimsChecked: 1');
     expect(page).toContain('docstubeClaimsTotal: 2');
     expect(page).toContain('docstubeUncheckedClaims: ["c2"]');
-    expect(page).toContain('"checked":1');
+    expect(page).toContain('checked: 1');
     // Astro components expose default exports, so renderer imports alias them by contract name.
     expect(page).toContain("import { default as Callout } from '../../components/Callout.astro';");
   });

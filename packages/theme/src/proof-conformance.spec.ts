@@ -169,8 +169,8 @@ describe('proof conformance (basic theme)', () => {
     expect(page).toContain('docstubeUncheckedClaims: ["c2"]');
     expect(page).not.toContain('docstubeGuarantee');
     // Section chips carry literal per-section counts.
-    expect(page).toContain('"checked":1');
-    expect(page).toContain('"total":1');
+    expect(page).toContain('checked: 1');
+    expect(page).toContain('total: 1');
     // The kernel Claim renderer is always in scope for the inline markers.
     expect(page).toContain("import Claim from '../../docstube/DocstubeClaim.astro';");
   });
@@ -255,7 +255,7 @@ describe('proof conformance (basic theme)', () => {
     expect(page).toContain('docstubeContradictedClaims: ["c3"]');
     expect(page).toContain('docstubeClaimsTotal: 3');
     // Section counts surface the contradiction where it lives.
-    expect(page).toContain('"contradicted":1');
+    expect(page).toContain('contradicted: 1');
   });
 
   it('renders a page WITHOUT a trust spine LOUDLY unverified — never a silent 0/0 (impl-08)', async () => {

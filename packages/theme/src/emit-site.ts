@@ -1,6 +1,7 @@
 import { mkdir, readdir, rm, rmdir, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, relative, sep } from 'node:path';
-import { isMap, isScalar, parseDocument } from 'yaml';
+import { Document, isAlias, isCollection, isMap, isScalar, parseDocument, visit } from 'yaml';
+import type { Pair, ToStringOptions } from 'yaml';
 import { localeRoutePrefixConflict } from '@docstube/contracts';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
@@ -213,64 +214,152 @@ const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } =>
 // change what a key is — and matched case-INsensitively, since `DocstubeReviewedFor` is a
 // kernel-namespace key by any honest reading. Non-docstube keys re-serialize through the Document
 // API, which preserves their comments, quoting, and block/flow style.
-type StrippedFrontmatter = {
-  // The authored frontmatter with every kernel-owned key removed, ready to precede the injected
-  // lines. Empty when nothing authored survives.
-  frontmatter: string;
+//
+// ONE PARSE, ONE SERIALIZE (wave 2b close 2 finding): the kernel's own keys are SET on this same
+// document and the document is serialized exactly once. Appending `key: value` TEXT to a
+// re-serialized authored block was a second, incompatible syntax: an authored flow root
+// (`{ title: Docs }`) followed by block lines is not YAML at all, so a perfectly ordinary page
+// emitted a route Astro cannot parse.
+type AuthoredFrontmatter = {
+  // The authored mapping with every kernel-owned key deleted — the single document the kernel's
+  // computed keys are set on, and the only thing that gets serialized.
+  document: Document;
   // Top-level key names that DID survive — what the injection consults instead of re-scanning the
   // text, so a quoted `"title"` can no longer smuggle in a duplicate.
   keys: Set<string>;
   warning?: string;
 };
 
-const EMPTY_FRONTMATTER: StrippedFrontmatter = { frontmatter: '', keys: new Set() };
+// Kernel-created nodes carry no parsed style, so these defaults decide how they are spelled:
+// double-quoted string values (the JSON spelling every theme and test already reads), plain keys,
+// and unpadded flow collections. Authored nodes keep the style they were parsed with — a parsed
+// scalar carries its own type — so an author's quoting, comments, and block/flow choices survive.
+const frontmatterStringifyOptions: ToStringOptions = {
+  lineWidth: 0,
+  defaultStringType: 'QUOTE_DOUBLE',
+  defaultKeyType: 'PLAIN',
+  flowCollectionPadding: false
+};
+
+const emptyFrontmatterDocument = (): Document => new Document({});
 
 // FAIL CLOSED (wave 2b close): frontmatter the kernel cannot parse is frontmatter whose keys it
 // cannot vet, and passing it through verbatim is exactly how an authored `docstube*` key would
 // reach the reader. The page is emitted as if it declared nothing, and the dropped block is
 // surfaced as a warning naming the route so the author can see what happened.
-const stripKernelOwnedFrontmatter = (frontmatter: string, route: string): StrippedFrontmatter => {
-  if (frontmatter.trim() === '') {
-    return EMPTY_FRONTMATTER;
+const failClosed = (route: string, problem: string, reason: string): AuthoredFrontmatter => ({
+  document: emptyFrontmatterDocument(),
+  keys: new Set(),
+  warning:
+    `route "${route}": authored frontmatter ${problem} (${reason}), so it was dropped — the page renders ` +
+    'with kernel-computed frontmatter only. Fix the frontmatter block in the page source and re-run ' +
+    '`docstube generate`'
+});
+
+// Constructs whose meaning the kernel cannot decide by looking at top-level key names. An alias or
+// a merge key (`<<: *base`) INSERTS pairs the kernel never sees as pairs — a merged mapping can
+// carry `docstubeReviewedFor`, minting a false editorial trust label on an unreviewed page — and an
+// explicit/unresolved tag reinterprets a node's value under a schema the kernel did not vet (and
+// Astro's parser would reject anyway). None of these can be filtered by key name, and all of them
+// are vanishingly rare in docs frontmatter, so the whole authored block fails closed instead.
+const unvettableConstruct = (document: Document): string | undefined => {
+  const unresolvedTag = document.warnings[0];
+  if (unresolvedTag !== undefined) {
+    return unresolvedTag.message;
   }
-  const failClosed = (reason: string): StrippedFrontmatter => ({
-    ...EMPTY_FRONTMATTER,
-    warning:
-      `route "${route}": authored frontmatter could not be parsed as a YAML mapping (${reason}), so it was ` +
-      'dropped — the page renders with kernel-computed frontmatter only. Fix the frontmatter block in the ' +
-      'page source and re-run `docstube generate`'
+  // Merge keys are reported first: `<<` is the construct an author is most likely to have written
+  // deliberately, and the anchor it points at would otherwise be blamed instead.
+  let merge: string | undefined;
+  visit(document, {
+    Pair(_key, pair) {
+      if (isScalar(pair.key) && pair.key.value === '<<') {
+        merge ??= 'YAML merge key "<<"';
+      }
+    }
   });
+  if (merge !== undefined) {
+    return merge;
+  }
+  let reason: string | undefined;
+  visit(document, {
+    Node(_key, node) {
+      if (isAlias(node)) {
+        reason ??= `YAML alias "*${node.source}"`;
+      } else if (node.anchor !== undefined) {
+        reason ??= `YAML anchor "&${node.anchor}"`;
+      } else if (node.tag !== undefined) {
+        reason ??= `explicit YAML tag "${node.tag}"`;
+      }
+    }
+  });
+  return reason;
+};
+
+const pairKeyName = (pair: Pair): string | undefined =>
+  isScalar(pair.key) && typeof pair.key.value === 'string' ? pair.key.value : undefined;
+
+const readAuthoredFrontmatter = (frontmatter: string, route: string): AuthoredFrontmatter => {
+  if (frontmatter.trim() === '') {
+    return { document: emptyFrontmatterDocument(), keys: new Set() };
+  }
   let document;
   try {
     document = parseDocument(frontmatter);
   } catch (error) {
-    return failClosed((error as Error).message);
+    return failClosed(route, 'could not be parsed as a YAML mapping', (error as Error).message);
   }
   if (document.errors.length > 0) {
-    return failClosed(document.errors[0]?.message ?? 'invalid YAML');
+    return failClosed(route, 'could not be parsed as a YAML mapping', document.errors[0]?.message ?? 'invalid YAML');
   }
   const contents = document.contents;
   if (!isMap(contents)) {
-    // A scalar or sequence document cannot carry the injected key lines either — appending to it
-    // would emit invalid YAML.
-    return failClosed('frontmatter must be a mapping of keys');
+    // A scalar or sequence document has nowhere to put the kernel's keys.
+    return failClosed(route, 'could not be parsed as a YAML mapping', 'frontmatter must be a mapping of keys');
+  }
+  const unvettable = unvettableConstruct(document);
+  if (unvettable !== undefined) {
+    return failClosed(route, 'uses a YAML construct the kernel cannot vet', unvettable);
   }
   const keys = new Set<string>();
-  contents.items = contents.items.filter((pair) => {
-    const name = isScalar(pair.key) && typeof pair.key.value === 'string' ? pair.key.value : undefined;
+  const surviving: typeof contents.items = [];
+  // COMMENT MIGRATION: a leading comment sits on the pair BELOW it, so deleting a kernel-owned pair
+  // silently deletes the author's comment too — including a comment that was written about the
+  // ordinary keys underneath it. It moves to the next surviving pair instead; if the deleted pair
+  // was last, it lands as a trailing document comment rather than being reattributed to a pair it
+  // was never written above.
+  let orphanedComment: string | undefined;
+  const carry = (comment: string | undefined) => {
+    if (comment !== undefined) {
+      orphanedComment = orphanedComment === undefined ? comment : `${orphanedComment}\n${comment}`;
+    }
+  };
+  for (const pair of contents.items) {
+    const name = pairKeyName(pair);
+    const key = isScalar(pair.key) ? pair.key : undefined;
     if (name !== undefined && name.toLowerCase().startsWith('docstube')) {
-      return false;
+      carry(key?.commentBefore ?? undefined);
+      continue;
     }
     if (name !== undefined) {
       keys.add(name);
     }
-    return true;
-  });
-  if (contents.items.length === 0) {
-    // `toString()` on an emptied map yields "{}", which would then collide with the injected keys.
-    return EMPTY_FRONTMATTER;
+    if (orphanedComment !== undefined && key !== undefined) {
+      key.commentBefore =
+        key.commentBefore === undefined ? orphanedComment : `${orphanedComment}\n${key.commentBefore}`;
+      orphanedComment = undefined;
+    }
+    surviving.push(pair);
   }
-  return { frontmatter: document.toString({ lineWidth: 0 }).trimEnd(), keys };
+  contents.items = surviving;
+  if (orphanedComment !== undefined) {
+    document.comment = document.comment === undefined ? orphanedComment : `${document.comment}\n${orphanedComment}`;
+  }
+  // FLOW ROOT NORMALIZED TO BLOCK (wave 2b close 2): the kernel sets a dozen keys on this mapping,
+  // and a flow root would put every one of them on a single unreadable line. Block style is what
+  // every other emitted route uses, and the conversion is style-only — the authored keys, values,
+  // comments, and any NESTED flow collections are untouched.
+  contents.flow = false;
+  return { document, keys };
 };
 
 // Visible per-entity citations (PRODUCT §3.2): page-level sources plus every block-level source
@@ -331,11 +420,10 @@ const pageRouteMdx = (
   const locale = page.shard.locale;
   const isSourceLocale = locale === context.sourceLocale;
   const slug = page.shard.page.slug;
-  const stripped = stripKernelOwnedFrontmatter(authored, localeHref(slug, locale, context.sourceLocale));
-  if (stripped.warning !== undefined) {
-    onWarning(stripped.warning);
+  const parsed = readAuthoredFrontmatter(authored, localeHref(slug, locale, context.sourceLocale));
+  if (parsed.warning !== undefined) {
+    onWarning(parsed.warning);
   }
-  const frontmatter = stripped.frontmatter;
   const depth = slug.split('/').length + (isSourceLocale ? 0 : 1);
   const up = '../'.repeat(depth);
   // RENDITIONS INHERIT CANONICAL PROOF (i18n-lifecycle-v2 decisions 3/4, strict isomorphism):
@@ -387,49 +475,80 @@ const pageRouteMdx = (
     ...(ref.span === undefined ? {} : { line: ref.span[0], endLine: ref.span[1] }),
     commit: ref.commit
   }));
-  const injected = [
-    // Every theme bundle ships this exact layout path (validated by applyThemeBundle).
-    `layout: ${JSON.stringify(`${up}layouts/DocLayout.astro`)}`,
-    ...(stripped.keys.has('title') ? [] : [`title: ${JSON.stringify(page.shard.page.title)}`]),
-    ...(page.shard.page.description !== undefined && !stripped.keys.has('description')
-      ? [`description: ${JSON.stringify(page.shard.page.description)}`]
-      : []),
-    `docstubeLocale: ${JSON.stringify(locale)}`,
-    `docstubePageId: ${JSON.stringify(page.shard.page.id)}`,
-    `docstubeClaimsChecked: ${proof.checkedClaims}`,
-    `docstubeClaimsTotal: ${proof.totalClaims}`,
-    `docstubeClaimsContradicted: ${proof.contradictedClaims}`,
-    // Coverage lint (harness-state-v2 decision 5): assertion-shaped prose no marker covers. It
-    // rides beside the counts and gates the complete state — a page with any unmarked assertion
-    // can never present as done, so ledger omission cannot manufacture "100% checked".
-    `docstubeUncoveredAssertions: ${proof.uncoveredAssertions}`,
-    ...(proof.complete ? ['docstubeClaimsComplete: true'] : []),
-    // A page without a persisted trust spine renders a LOUD unverified warning (impl-08).
-    ...(proof.state === 'unverified' ? ['docstubeUnverified: true'] : []),
-    // Source-fallback rendition: themes render the visible not-yet-translated notice from this.
-    ...(page.sourceFallback === true ? ['docstubeSourceFallback: true'] : []),
-    // The translation dimension of a served rendition, rendered as its own line by every theme.
-    ...(translationAssurance === undefined
-      ? []
-      : [`docstubeTranslationAssurance: ${JSON.stringify(translationAssurance)}`]),
-    ...(proof.contradictedMarkers.length > 0
-      ? [`docstubeContradictedClaims: ${JSON.stringify(proof.contradictedMarkers)}`]
-      : []),
-    // Unchecked claims are individually marked inline too (impl-09 finding 2) — quieter than a
-    // contradiction, but never invisible.
-    ...(proof.uncheckedMarkers.length > 0
-      ? [`docstubeUncheckedClaims: ${JSON.stringify(proof.uncheckedMarkers)}`]
-      : []),
-    ...(proof.reviewedFor === undefined ? [] : [`docstubeReviewedFor: ${JSON.stringify(proof.reviewedFor)}`]),
-    // JSON is valid YAML flow syntax, so these round-trip through Astro's frontmatter parser.
-    ...(alternates.length > 1 ? [`docstubeAlternates: ${JSON.stringify(alternates)}`] : []),
-    ...(sources.length > 0 ? [`docstubeSources: ${JSON.stringify(sources)}`] : []),
-    ...(sections.length > 0 ? [`docstubeSections: ${JSON.stringify(sections)}`] : [])
-  ];
+  // Every kernel-owned value is SET on the authored document (never appended as text), so the
+  // emitted block is one internally consistent YAML mapping whatever the author wrote.
+  const document = parsed.document;
+  const set = (key: string, value: string | number | boolean): void => {
+    document.set(key, value);
+  };
+  // Structured values stay on one line, as they did when they were JSON: a route carries one
+  // `docstubeSources` line, not a forty-line block.
+  const setFlow = (key: string, value: unknown): void => {
+    const node = document.createNode(value);
+    visit(node, {
+      Node(_visitKey, child) {
+        if (isCollection(child)) {
+          child.flow = true;
+        }
+      }
+    });
+    document.set(key, node);
+  };
+  // Every theme bundle ships this exact layout path (validated by applyThemeBundle).
+  set('layout', `${up}layouts/DocLayout.astro`);
+  if (!parsed.keys.has('title')) {
+    set('title', page.shard.page.title);
+  }
+  if (page.shard.page.description !== undefined && !parsed.keys.has('description')) {
+    set('description', page.shard.page.description);
+  }
+  set('docstubeLocale', locale);
+  set('docstubePageId', page.shard.page.id);
+  set('docstubeClaimsChecked', proof.checkedClaims);
+  set('docstubeClaimsTotal', proof.totalClaims);
+  set('docstubeClaimsContradicted', proof.contradictedClaims);
+  // Coverage lint (harness-state-v2 decision 5): assertion-shaped prose no marker covers. It
+  // rides beside the counts and gates the complete state — a page with any unmarked assertion
+  // can never present as done, so ledger omission cannot manufacture "100% checked".
+  set('docstubeUncoveredAssertions', proof.uncoveredAssertions);
+  if (proof.complete) {
+    set('docstubeClaimsComplete', true);
+  }
+  // A page without a persisted trust spine renders a LOUD unverified warning (impl-08).
+  if (proof.state === 'unverified') {
+    set('docstubeUnverified', true);
+  }
+  // Source-fallback rendition: themes render the visible not-yet-translated notice from this.
+  if (page.sourceFallback === true) {
+    set('docstubeSourceFallback', true);
+  }
+  // The translation dimension of a served rendition, rendered as its own line by every theme.
+  if (translationAssurance !== undefined) {
+    set('docstubeTranslationAssurance', translationAssurance);
+  }
+  if (proof.contradictedMarkers.length > 0) {
+    setFlow('docstubeContradictedClaims', proof.contradictedMarkers);
+  }
+  // Unchecked claims are individually marked inline too (impl-09 finding 2) — quieter than a
+  // contradiction, but never invisible.
+  if (proof.uncheckedMarkers.length > 0) {
+    setFlow('docstubeUncheckedClaims', proof.uncheckedMarkers);
+  }
+  if (proof.reviewedFor !== undefined) {
+    set('docstubeReviewedFor', proof.reviewedFor);
+  }
+  if (alternates.length > 1) {
+    setFlow('docstubeAlternates', alternates);
+  }
+  if (sources.length > 0) {
+    setFlow('docstubeSources', sources);
+  }
+  if (sections.length > 0) {
+    setFlow('docstubeSections', sections);
+  }
   return [
     '---',
-    ...(frontmatter === '' ? [] : [frontmatter.trimEnd()]),
-    ...injected,
+    document.toString(frontmatterStringifyOptions).trimEnd(),
     '---',
     '',
     // The kernel-owned inline Claim renderer is always in scope: writer MDX carries <Claim>

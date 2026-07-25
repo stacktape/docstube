@@ -92,10 +92,44 @@ export const versionsConfigSchema = z.strictObject({
   frozen: z.array(versionLabelSchema).default([])
 });
 
-export const localesConfigSchema = z.strictObject({
-  source: localeCodeSchema.default('en'),
-  targets: z.array(localeCodeSchema).default([])
-});
+// TARGETS ARE OTHER LOCALES, EXACTLY ONCE EACH (wave 2b close 2 finding): the source locale is
+// truth, so listing it as a target asks the pipeline to translate a page into the language it is
+// already written in, and a repeated target asks for the same rendition twice — each one burns
+// agent budget and both write the same /<locale>/<slug> route. Comparison is case-INsensitive, the
+// same rule localeRoutePrefixConflict uses: locale codes name route DIRECTORIES, so "pt-BR" and
+// "pt-br" are one target on the case-insensitive filesystems most contributors use.
+export const localesConfigSchema = z
+  .strictObject({
+    source: localeCodeSchema.default('en'),
+    targets: z.array(localeCodeSchema).default([])
+  })
+  .superRefine((locales, ctx) => {
+    const seen = new Set<string>();
+    locales.targets.forEach((target, index) => {
+      const normalized = target.toLowerCase();
+      if (normalized === locales.source.toLowerCase()) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['targets', index],
+          message:
+            `locales.targets contains the source locale "${target}" (locales.source is "${locales.source}"): ` +
+            'the source locale is the original, never a translation target. Remove it from locales.targets'
+        });
+        return;
+      }
+      if (seen.has(normalized)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['targets', index],
+          message:
+            `locales.targets lists "${target}" more than once (locale codes are compared case-insensitively ` +
+            'because they name route directories). Remove the duplicate'
+        });
+        return;
+      }
+      seen.add(normalized);
+    });
+  });
 
 export const themeConfigSchema = z.strictObject({
   // Built-in theme rendering the emitted site. The wizard always writes an explicit name, so a
