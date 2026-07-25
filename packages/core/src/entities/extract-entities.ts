@@ -7,7 +7,7 @@ import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { parse as parseYaml } from 'yaml';
-import { readStaticJsonLiteral } from '@docstube/agent-runtime';
+import { isPrototypeMutatingName, readStaticJsonLiteral } from '@docstube/agent-runtime';
 import type { BlockEntity, PageEntity, SectionEntity } from '@docstube/contracts';
 import {
   canonicalMdxSource,
@@ -84,12 +84,21 @@ const sliceSource = (mdx: string, node: RootContent): string => {
   return start === undefined || end === undefined ? '' : mdx.slice(start, end);
 };
 
+// PROP NAMES NEVER REACH A PROTOTYPE (wave 2b close — the pathological-input finding): the record
+// is built with a NULL prototype, so `metadata[name] = …` is always an own-property write, and the
+// three names that would otherwise mutate a prototype chain are dropped outright — the same set
+// submit_page refuses on the generation path (isPrototypeMutatingName), so extraction of foreign
+// MDX cannot persist a prop the submission gate would have rejected. Storing them normally would
+// have silently swallowed the value: `Object.entries()` skips it and shard serialization drops it.
 const jsxAttributesToMetadata = (
   attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>
 ): Record<string, unknown> => {
-  const metadata: Record<string, unknown> = {};
+  const metadata = Object.create(null) as Record<string, unknown>;
   for (const attribute of attributes) {
     if (attribute.type !== 'mdxJsxAttribute') {
+      continue;
+    }
+    if (isPrototypeMutatingName(attribute.name)) {
       continue;
     }
     if (attribute.value === null || attribute.value === undefined) {
@@ -104,7 +113,7 @@ const jsxAttributesToMetadata = (
       // — otherwise the block metadata never validates against the component's props schema
       // (verifiers/entity-integrity.ts) and the component is unusable in practice.
       // Anything not provably literal keeps the raw expression text; registry validation decides.
-      const literal = readStaticJsonLiteral(attribute.value);
+      const literal = readStaticJsonLiteral(attribute.value, attribute.name);
       metadata[attribute.name] = literal.ok ? literal.value : { $expression: attribute.value.value };
     }
   }

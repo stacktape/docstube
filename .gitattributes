@@ -10,3 +10,9 @@
 *.zip binary
 *.tar.gz binary
 *.sqlite binary
+
+# TypeScript sources are ALWAYS diffed as text. `text=auto` alone leaves the decision to git's
+# content heuristic, so a single stray NUL byte silently turns a source file into an opaque
+# "Binary files differ" — which is exactly how one survived several reviews in generate.ts.
+*.ts text diff
+*.tsx text diff

@@ -24,6 +24,7 @@ import {
   resolveCommit,
   resolveSourceRevision
 } from './generate.ts';
+import type { WorkingTreeState } from './generate.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -102,6 +103,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: false,
+      treeStateAtStart: 'clean',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -132,6 +134,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: false,
+      treeStateAtStart: 'clean',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -162,6 +165,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: false,
+      treeStateAtStart: 'clean',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -177,6 +181,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: true,
+      treeStateAtStart: 'dirty',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -218,6 +223,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: false,
+      treeStateAtStart: 'clean',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -255,6 +261,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: false,
+      treeStateAtStart: 'clean',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -268,7 +275,50 @@ describe('working-tree dirtiness', () => {
     expect(journalRaw).toContain(headCommit.slice(0, 12));
     expect(journalRaw).toContain(movedHead.slice(0, 12));
     expect(journalRaw).toContain('never the complete state');
+    // A clean→clean run is the ONE case that may say the commit left the tree clean.
+    expect(journalRaw).toContain('and left the tree clean');
 
+    headCommit = movedHead;
+  });
+
+  it('does not claim a clean-start run "left the tree clean" when it ended DIRTY', async () => {
+    // THE CONTRADICTION (wave 2b close — the run-diagnostics finding, third pass): the sweep knows
+    // both the start tri-state and the end state, but the warning was given only a boolean — so a
+    // run that started clean and ended dirty journaled the end-of-run dirt warning and, in the very
+    // same batch, a HEAD-moved warning claiming the mid-run commit "left the tree clean".
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePage();
+    const ledger = buildFixtureClaimLedger(page);
+    const shard = { ...buildFixturePageShard(page), ledger, provenance: buildFixtureProvenanceV2(ledger) };
+    await store.writePageShard(shard);
+
+    await writeFile(join(repoRoot, 'landed-then-dirtied.txt'), 'a colleague pushed\n');
+    await git('add', 'landed-then-dirtied.txt');
+    await git('commit', '-m', 'landed then dirtied');
+    const movedHead = await resolveCommit(repoRoot);
+    // …and the tree is left DIRTY afterwards.
+    await writeFile(join(repoRoot, 'file.txt'), 'dirtied after the mid-run commit\n');
+    expect(await probeWorkingTree(repoRoot, OWN_OUTPUTS)).toBe('dirty');
+
+    const journal = await createRunJournal(repoRoot, mintId(idPrefixes.run));
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit: headCommit,
+      dirtyAtStart: false,
+      treeStateAtStart: 'clean',
+      ownOutputPrefixes: OWN_OUTPUTS,
+      persistedShards: [{ locale: shard.locale, pageId: page.id }]
+    });
+
+    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8');
+    expect(journalRaw).toContain('HEAD MOVED during the run');
+    expect(journalRaw).toContain('became dirty DURING the run');
+    expect(journalRaw).toContain('left the tree DIRTY');
+    expect(journalRaw).not.toContain('and left the tree clean');
+
+    await git('checkout', '--', 'file.txt');
     headCommit = movedHead;
   });
 
@@ -304,6 +354,7 @@ describe('working-tree dirtiness', () => {
       journal,
       commit: headCommit,
       dirtyAtStart: true,
+      treeStateAtStart: 'dirty',
       ownOutputPrefixes: OWN_OUTPUTS,
       persistedShards: [{ locale: shard.locale, pageId: page.id }]
     });
@@ -324,25 +375,113 @@ describe('working-tree dirtiness', () => {
     headCommit = movedHead;
   });
 
-  it('names BOTH revisions in the HEAD-moved warning, and words the two start states differently', () => {
-    const fromClean = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40));
-    expect(fromClean.severity).toBe('warning');
-    expect(fromClean.message).toContain('a'.repeat(12));
-    expect(fromClean.message).toContain('b'.repeat(12));
-    expect(fromClean.message).toContain('never the complete state');
-    // On a clean-start run, "left the tree clean" is the POINT — it is why porcelain saw nothing.
-    expect(fromClean.message).toContain('left the tree clean');
-    expect(fromClean.message).toContain('now carries dirtyWorkingTree: true');
+  // BOTH ENDS OF THE RUN, NOT A BOOLEAN (wave 2b close — the run-diagnostics finding, third pass):
+  // the warning used to collapse the start tri-state and the end state into one `startedDirty`
+  // flag, which made two sentences contradict what actually happened — a clean-start run whose
+  // tree ended dirty still claimed the commit "left the tree clean", and an unknown start (where
+  // porcelain NEVER RAN) was relabeled "ALREADY dirty" as soon as HEAD became readable. Each
+  // combination now gets its own wording, and none of them carries another combination's phrase.
+  const START = 'a'.repeat(40);
+  const END = 'b'.repeat(40);
+  const headWarning = (startState: WorkingTreeState, endState?: WorkingTreeState, alreadyMarked?: boolean) =>
+    headMovedDuringRunWarning({
+      startCommit: START,
+      endCommit: END,
+      startState,
+      ...(endState === undefined ? {} : { endState }),
+      ...(alreadyMarked === undefined ? {} : { alreadyMarked })
+    }).message;
 
-    // On a dirty-start run the same sentence is simply false; the branch gets its own wording and
-    // the provenance tense follows (those shards were marked at assembly time, not by this sweep).
-    const fromDirty = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40), true);
-    expect(fromDirty.message).toContain('a'.repeat(12));
-    expect(fromDirty.message).toContain('b'.repeat(12));
-    expect(fromDirty.message).toContain('ALREADY dirty when the run started');
-    expect(fromDirty.message).not.toContain('left the tree clean');
-    expect(fromDirty.message).toContain('already carries dirtyWorkingTree: true');
-    expect(fromDirty.message).toContain('never the complete state');
+  it('names BOTH revisions and the reader-facing consequence in every combination', () => {
+    const combinations: Array<[WorkingTreeState, WorkingTreeState | undefined]> = [
+      ['clean', 'clean'],
+      ['clean', 'dirty'],
+      ['clean', 'unknown'],
+      ['dirty', 'clean'],
+      ['dirty', 'dirty'],
+      ['dirty', 'unknown'],
+      ['dirty', undefined],
+      ['unknown', 'clean'],
+      ['unknown', 'dirty'],
+      ['unknown', 'unknown'],
+      ['unknown', undefined]
+    ];
+    for (const [startState, endState] of combinations) {
+      const message = headWarning(startState, endState);
+      expect(message).toContain('HEAD MOVED during the run');
+      expect(message).toContain(START.slice(0, 12));
+      expect(message).toContain(END.slice(0, 12));
+      expect(message).toContain('never the complete state');
+    }
+    expect(headMovedDuringRunWarning({ startCommit: START, endCommit: END, startState: 'clean' }).severity).toBe(
+      'warning'
+    );
+  });
+
+  it('says "left the tree clean" ONLY for a run that started clean and ended clean', () => {
+    // On a clean→clean run that sentence is the POINT — it is why porcelain saw nothing.
+    expect(headWarning('clean', 'clean')).toContain('and left the tree clean');
+    expect(headWarning('clean', 'clean')).toContain('now carries dirtyWorkingTree: true');
+
+    // Every other combination must not reuse it.
+    for (const message of [
+      headWarning('clean', 'dirty'),
+      headWarning('clean', 'unknown'),
+      headWarning('dirty', 'clean'),
+      headWarning('dirty', 'dirty'),
+      headWarning('unknown', 'clean'),
+      headWarning('unknown', undefined)
+    ]) {
+      expect(message).not.toContain('and left the tree clean');
+    }
+  });
+
+  it('reports a clean-start run whose tree ended DIRTY or UNKNOWN as exactly that', () => {
+    const endedDirty = headWarning('clean', 'dirty');
+    expect(endedDirty).toContain('left the tree DIRTY');
+    expect(endedDirty).toContain('reported it clean at run start');
+    expect(endedDirty).not.toContain('ALREADY');
+    expect(endedDirty).toContain('now carries dirtyWorkingTree: true');
+
+    const endedUnknown = headWarning('clean', 'unknown');
+    expect(endedUnknown).toContain('left the working tree state UNKNOWN');
+    expect(endedUnknown).toContain('no HEAD, or `git status` could not be read');
+    expect(endedUnknown).toContain('reported it clean at run start');
+    expect(endedUnknown).not.toContain('ALREADY');
+    expect(endedUnknown).not.toContain('left the tree DIRTY');
+  });
+
+  it('says ALREADY DIRTY only for a dirty start, whatever the tree did afterwards', () => {
+    for (const endState of ['clean', 'dirty', 'unknown', undefined] as const) {
+      const message = headWarning('dirty', endState);
+      expect(message).toContain('ALREADY dirty when the run started');
+      expect(message).not.toContain('ALREADY UNKNOWN');
+      // Those shards were marked at assembly time, not by this sweep.
+      expect(message).toContain('already carries dirtyWorkingTree: true');
+      expect(message).not.toContain('now carries dirtyWorkingTree: true');
+    }
+  });
+
+  it('never relabels an UNKNOWN start as dirty, even once HEAD becomes readable again', () => {
+    for (const endState of ['clean', 'dirty', 'unknown', undefined] as const) {
+      const message = headWarning('unknown', endState);
+      expect(message).toContain('ALREADY UNKNOWN at run start');
+      expect(message).toContain('no HEAD, or `git status` could not be read');
+      // Porcelain never ran, so the warning must claim no porcelain result in either direction.
+      expect(message).not.toContain('ALREADY dirty');
+      expect(message).not.toContain('reported it clean at run start');
+      expect(message).toContain('already carries dirtyWorkingTree: true');
+    }
+  });
+
+  it('claims nothing about the end state when the sweep deliberately did not re-probe it', () => {
+    // The already-marked path re-reads HEAD only; a clean-reporting start there means the run was
+    // marked by unversioned reads, so the tense is "already" and no end state is asserted.
+    const unprobed = headWarning('clean', undefined, true);
+    expect(unprobed).toContain('reported clean at run start');
+    expect(unprobed).not.toContain('at the end');
+    expect(unprobed).not.toContain('and left the tree');
+    expect(unprobed).toContain('already carries dirtyWorkingTree: true');
   });
 
   it('probes a TRI-STATE: clean, observed-dirty, and unknown when git cannot be believed', async () => {

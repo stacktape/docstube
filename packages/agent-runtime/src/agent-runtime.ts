@@ -13,6 +13,7 @@ export {
   createSubmitPageTool,
   elementPolicySchema,
   evaluateSubmitPageCall,
+  isPrototypeMutatingName,
   normalizeElementPolicy,
   readStaticJsonLiteral,
   scanClaimMarkers,

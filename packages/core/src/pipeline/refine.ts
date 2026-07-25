@@ -288,6 +288,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       journal,
       commit,
       dirtyAtStart: dirtyWorkingTree,
+      treeStateAtStart: treeState,
       ownOutputPrefixes: ownOutputs,
       persistedShards
     });

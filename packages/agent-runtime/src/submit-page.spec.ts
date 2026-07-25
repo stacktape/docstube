@@ -4,6 +4,7 @@ import type { ElementPolicy } from './submit-page.ts';
 import {
   createSubmitPageTool,
   normalizeElementPolicy,
+  readStaticJsonLiteral,
   scanClaimMarkers,
   submitPageDescriptor,
   validateSubmission
@@ -657,6 +658,103 @@ describe('scanClaimMarkers', () => {
         );
         expect(kernelValue.errors.map((error) => error.code)).toEqual(['kernel-namespace']);
         expect(kernelValue.errors[0]?.message).toContain('dt-claims--complete');
+      });
+
+      // PROTOTYPE-MUTATING KEYS (wave 2b close — the pathological-input finding): `__proto__` is
+      // not a member, it is the object's PROTOTYPE. Decoding it with a plain assignment meant
+      // `Object.entries()` never yielded it, so the recursive markup/handler/kernel-namespace scan
+      // below never saw the strings underneath — and shard serialization dropped them too, so the
+      // page validated against the component schema while carrying content nobody checked.
+      describe('prototype-mutating object keys', () => {
+        it("rejects the review's exact payload — smuggled markup under a __proto__ key", () => {
+          const smuggled = scanClaimMarkers(
+            'Text.\n\n<Tabs tabs={[{"__proto__": {label: "<img>", value: "npm"}}]} />\n',
+            structured
+          );
+          expect(smuggled.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+          expect(smuggled.errors[0]?.message).toContain('prototype-mutating object key "__proto__"');
+          // The refusal names the exact member, so the writer knows what to rename.
+          expect(smuggled.errors[0]?.message).toContain('tabs[0].__proto__');
+        });
+
+        it('rejects constructor and prototype keys the same way, at any depth', () => {
+          for (const key of ['__proto__', 'constructor', 'prototype']) {
+            const flat = scanClaimMarkers(`Text.\n\n<Steps items={[{ ${key}: "x" }]} />\n`, structured);
+            expect(flat.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+            expect(flat.errors[0]?.message).toContain(`prototype-mutating object key "${key}"`);
+            expect(flat.errors[0]?.message).toContain(`items[0].${key}`);
+
+            // Quoted and deeply nested spellings are the same key.
+            const nested = scanClaimMarkers(
+              `Text.\n\n<Steps items={[{ title: "One", detail: { "${key}": { note: "deep" } } }]} />\n`,
+              structured
+            );
+            expect(nested.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+            expect(nested.errors[0]?.message).toContain(`items[0].detail.${key}`);
+          }
+        });
+
+        it('refuses the same names as PROP names — the kernel stores props by name too', () => {
+          for (const key of ['__proto__', 'constructor', 'prototype']) {
+            const scan = scanClaimMarkers(`Text.\n\n<Callout ${key}="x">Body.</Callout>\n`, structured);
+            expect(scan.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+            expect(scan.errors[0]?.message).toContain(`carries the prop name "${key}"`);
+          }
+        });
+
+        it('leaves legitimate nested literals authorable, with every content rule still applied', () => {
+          const legitimate = scanClaimMarkers(
+            'Text.\n\n<Tabs tabs={[{ label: "npm", value: "npm", detail: { note: "deep", tags: ["a", 1] } }]} />\n',
+            structured
+          );
+          expect(legitimate.errors).toEqual([]);
+
+          // …and the strings inside that same shape still face the markup rule.
+          const markup = scanClaimMarkers(
+            'Text.\n\n<Tabs tabs={[{ label: "npm", detail: { note: "<img src=x>" } }]} />\n',
+            structured
+          );
+          expect(markup.errors.map((error) => error.code)).toEqual(['markup-attribute']);
+          expect(markup.errors[0]?.message).toContain('tabs[0].detail.note');
+        });
+
+        it('decodes objects with a NULL prototype, so no assignment can reach a prototype chain', () => {
+          // Belt and braces behind the outright rejection: even a key the rule never listed cannot
+          // reach Object.prototype from here. The estree is written out because that is exactly the
+          // shape remark-mdx attaches at `value.data.estree`.
+          const literal = readStaticJsonLiteral(
+            {
+              type: 'mdxJsxAttributeValueExpression',
+              value: '{ label: "npm" }',
+              data: {
+                estree: {
+                  type: 'Program',
+                  body: [
+                    {
+                      type: 'ExpressionStatement',
+                      expression: {
+                        type: 'ObjectExpression',
+                        properties: [
+                          {
+                            type: 'Property',
+                            kind: 'init',
+                            method: false,
+                            computed: false,
+                            key: { type: 'Identifier', name: 'label' },
+                            value: { type: 'Literal', value: 'npm' }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            'tabs'
+          );
+          expect(literal).toEqual({ ok: true, value: { label: 'npm' } });
+          expect(Object.getPrototypeOf(literal.ok ? literal.value : {})).toBeNull();
+        });
       });
     });
 

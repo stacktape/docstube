@@ -78,6 +78,50 @@ describe('extractPageEntity', () => {
     expect(flow.preamble[0]?.blockType).not.toBe('component:Claim');
   });
 
+  // NO PROP NAME EVER REACHES A PROTOTYPE (wave 2b close — the pathological-input finding). The
+  // extractor stores props into a record BY NAME and decodes structured props with the same
+  // decoder the submission gate uses, so both levels had a prototype-assignment hole: content
+  // stored under `__proto__` becomes the record's prototype, which `Object.entries()` skips and
+  // shard serialization drops — the page then validates against the component schema while
+  // carrying data the manifest never persisted and no content rule ever inspected.
+  describe('prototype-mutating names', () => {
+    it('decodes structured props into NULL-prototype objects', () => {
+      const page = extractPageEntity({
+        mdx: '# T\n\n<Tabs tabs={[{ label: "npm", value: "npm" }]} />\n',
+        slug: 'x'
+      });
+      const metadata = page.preamble[0]?.metadata;
+      expect(metadata).toEqual({ tabs: [{ label: 'npm', value: 'npm' }] });
+      expect(Object.getPrototypeOf(metadata)).toBeNull();
+      const tabs = (metadata as { tabs: unknown[] }).tabs;
+      expect(Object.getPrototypeOf(tabs[0])).toBeNull();
+    });
+
+    it('drops __proto__, constructor and prototype PROP names instead of mutating a prototype', () => {
+      for (const name of ['__proto__', 'constructor', 'prototype']) {
+        const page = extractPageEntity({ mdx: `# T\n\n<Callout ${name}="x" kind="warning" />\n`, slug: 'x' });
+        const metadata = page.preamble[0]?.metadata;
+        // The legitimate prop survives; the dangerous name is neither stored nor able to mutate.
+        expect(metadata).toEqual({ kind: 'warning' });
+        expect(Object.getPrototypeOf(metadata)).toBeNull();
+      }
+      // Nothing leaked onto the shared prototype along the way.
+      expect(({} as Record<string, unknown>)['label']).toBeUndefined();
+    });
+
+    it('keeps a structured prop whose literal carries a __proto__ key as an UNDECODED expression', () => {
+      // The decoder refuses the literal outright (submit_page turns that into a repair error), so
+      // extraction of foreign MDX preserves the raw source rather than silently absorbing it.
+      const page = extractPageEntity({
+        mdx: '# T\n\n<Tabs tabs={[{"__proto__": {label: "<img>", value: "npm"}}]} />\n',
+        slug: 'x'
+      });
+      const metadata = page.preamble[0]?.metadata as { tabs: { $expression: string } } | undefined;
+      expect(metadata?.tabs.$expression).toContain('__proto__');
+      expect(({} as Record<string, unknown>)['label']).toBeUndefined();
+    });
+  });
+
   it('survives invalid frontmatter YAML and still recovers title/description leniently', () => {
     // Live regression: an unquoted description containing ": " is invalid YAML; extraction must
     // not crash on model output — the mdx-compile verifier owns reporting the syntax error.

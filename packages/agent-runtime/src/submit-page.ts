@@ -353,7 +353,21 @@ const describeExpressionNode = (type: unknown): string => {
   }
 };
 
-const literalFromEstree = (node: unknown): StaticLiteralResult => {
+// PROTOTYPE-MUTATING KEYS ARE NOT PROP NAMES (wave 2b close — the pathological-input finding).
+// `value.__proto__ = {…}` does not add a member: it REPLACES the decoded object's prototype, so
+// `Object.entries()` never yields it, the recursive markup/handler/kernel-namespace scan never sees
+// the strings underneath, and shard serialization drops them — `<Tabs tabs={[{"__proto__": {label:
+// "<img>", value: "npm"}}]} />` used to pass submission AND the Tabs schema with the smuggled
+// markup invisible to both. `constructor` and `prototype` are the same class of reach-through.
+// Rejected OUTRIGHT (they are never legitimate component prop names) rather than skipped, so the
+// writer is told what happened instead of silently losing data; the decoded objects additionally
+// carry a NULL PROTOTYPE, so no assignment in this decoder can reach a prototype chain at all.
+const prototypeMutatingKeys = new Set(['__proto__', 'constructor', 'prototype']);
+
+// Shared with the kernel's extractor so both ends of the contract refuse the SAME names.
+export const isPrototypeMutatingName = (name: string): boolean => prototypeMutatingKeys.has(name);
+
+const literalFromEstree = (node: unknown, path: string): StaticLiteralResult => {
   const estree = asEstreeNode(node);
   if (estree === undefined) {
     return { ok: false, reason: 'an unreadable expression' };
@@ -381,7 +395,7 @@ const literalFromEstree = (node: unknown): StaticLiteralResult => {
       if (element === null || element === undefined) {
         return { ok: false, reason: 'an array hole ([1, , 2])' };
       }
-      const item = literalFromEstree(element);
+      const item = literalFromEstree(element, `${path}[${values.length}]`);
       if (!item.ok) {
         return item;
       }
@@ -391,7 +405,7 @@ const literalFromEstree = (node: unknown): StaticLiteralResult => {
   }
   if (estree.type === 'ObjectExpression') {
     const properties = Array.isArray(estree.properties) ? estree.properties : [];
-    const value: Record<string, StaticLiteral> = {};
+    const value = Object.create(null) as Record<string, StaticLiteral>;
     for (const rawProperty of properties) {
       const property = asEstreeNode(rawProperty);
       if (property === undefined) {
@@ -416,7 +430,16 @@ const literalFromEstree = (node: unknown): StaticLiteralResult => {
       if (name === undefined) {
         return { ok: false, reason: 'an object key that is not a plain name' };
       }
-      const item = literalFromEstree(property.value);
+      if (prototypeMutatingKeys.has(name)) {
+        return {
+          ok: false,
+          reason:
+            `the prototype-mutating object key "${name}" at ${path}.${name} — writing it would replace the ` +
+            "decoded value's prototype instead of adding a prop, hiding whatever it carries from every content " +
+            'rule and from the manifest'
+        };
+      }
+      const item = literalFromEstree(property.value, `${path}.${name}`);
       if (!item.ok) {
         return item;
       }
@@ -428,7 +451,9 @@ const literalFromEstree = (node: unknown): StaticLiteralResult => {
 };
 
 // Reads an mdxJsxAttributeValueExpression (prop={…}) as static JSON data, or says why it is not.
-export const readStaticJsonLiteral = (attributeValue: unknown): StaticLiteralResult => {
+// `path` names the prop the value belongs to so a refusal can point at the exact member — the
+// caller passes the attribute name (both the submission gate and the kernel's extractor do).
+export const readStaticJsonLiteral = (attributeValue: unknown, path = 'the prop'): StaticLiteralResult => {
   const node = asEstreeNode(attributeValue);
   const program = asEstreeNode(asEstreeNode(node?.data)?.estree);
   if (program === undefined || program.type !== 'Program') {
@@ -447,7 +472,7 @@ export const readStaticJsonLiteral = (attributeValue: unknown): StaticLiteralRes
   if (statement?.type !== 'ExpressionStatement') {
     return { ok: false, reason: 'a statement rather than a value' };
   }
-  return literalFromEstree(statement.expression);
+  return literalFromEstree(statement.expression, path);
 };
 
 // EVERY PROHIBITION APPLIES TO THE RESULT, RECURSIVELY: a literal must not smuggle in a nested
@@ -874,8 +899,21 @@ export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerSca
           });
           continue;
         }
+        // The same rule the literal decoder applies one level down (prototypeMutatingKeys): a prop
+        // NAME that mutates a prototype is not a prop either — the kernel's extractor stores props
+        // by name into a metadata record, so the two levels must refuse exactly the same names.
+        if (isPrototypeMutatingName(attribute.name)) {
+          errors.push({
+            code: 'dynamic-attribute',
+            message:
+              `<${elementName}> at offset ${offset} carries the prop name "${attribute.name}", which mutates an ` +
+              'object prototype rather than naming a prop — no theme component declares it, and stored by name it ' +
+              'would vanish from the manifest instead of being persisted. Rename the prop and resubmit'
+          });
+          continue;
+        }
         if (attribute.value !== null && typeof attribute.value === 'object') {
-          const literal = readStaticJsonLiteral(attribute.value);
+          const literal = readStaticJsonLiteral(attribute.value, attribute.name);
           if (!literal.ok) {
             errors.push({
               code: 'dynamic-attribute',

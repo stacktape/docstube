@@ -500,6 +500,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       journal,
       commit,
       dirtyAtStart: dirtyWorkingTree,
+      treeStateAtStart: treeState,
       ownOutputPrefixes: ownOutputs,
       persistedShards
     });
