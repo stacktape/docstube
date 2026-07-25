@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { z } from 'zod';
 import type { Codemap, Flag, PageShard, ToolDescriptor } from '@docstube/contracts';
-import { idPrefixes, mintId, sha256Hex } from '@docstube/contracts';
+import { idPrefixes, mintId, sha256Hex, splitFrontmatter } from '@docstube/contracts';
 import type { ManifestStore } from '../state/manifest-store.ts';
 
 // Tribal-knowledge capture (PRODUCT §4.1): when generation hits something the code cannot answer
@@ -79,20 +79,21 @@ export const loadKnowledge = async (repoRoot: string): Promise<KnowledgeEntry[]>
   const entries: KnowledgeEntry[] = [];
   for (const name of files) {
     const raw = await readFile(join(knowledgeDir(repoRoot), name), 'utf8');
-    // CRLF-tolerant: knowledge files are committed, so a Windows autocrlf checkout hands us \r\n
-    // and an LF-only pattern would silently drop every stored answer.
-    const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/u);
-    if (!match) {
+    // The shared splitter (contracts/src/frontmatter.ts) owns the tolerant rules: knowledge files
+    // are committed, so a Windows autocrlf checkout hands us \r\n and an editor may prepend a BOM —
+    // either would silently drop every stored answer under a strict pattern.
+    const split = splitFrontmatter(raw);
+    if (!split.hadFrontmatter) {
       continue;
     }
-    const frontmatter = knowledgeFrontmatterSchema.safeParse(parse(match[1] ?? ''));
+    const frontmatter = knowledgeFrontmatterSchema.safeParse(parse(split.frontmatter));
     if (!frontmatter.success) {
       continue;
     }
     entries.push({
       key: name.slice(0, -'.md'.length),
       question: frontmatter.data.question,
-      answer: (match[2] ?? '').trim(),
+      answer: split.body.trim(),
       subjectSymbol: frontmatter.data.subjectSymbol
     });
   }

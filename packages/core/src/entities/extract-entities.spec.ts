@@ -99,6 +99,29 @@ describe('extractPageEntity', () => {
     expect(page.title).toBe('Notes');
     expect(page.preamble).toHaveLength(1);
   });
+
+  // ONE SHARED FRONTMATTER SPLITTER (wave 2b close): emission was tolerant of a BOM and of blank
+  // lines above the delimiter while extraction still used remark's strict rule, so these documents
+  // parsed as a thematic break plus a SETEXT HEADING — a synthetic `title: Installation` section
+  // that sections, blocks, and claims anchored to, and that emission then stripped as frontmatter,
+  // leaving recorded section proof pointing at an anchor no rendered page contains.
+  it.each([
+    ['a UTF-8 BOM before the delimiter', `${String.fromCharCode(0xfeff)}${sampleMdx}`],
+    ['blank lines above the delimiter', `\n\n${sampleMdx}`],
+    ['whitespace-only lines above the delimiter', `  \n\t\n${sampleMdx}`]
+  ])('reads frontmatter as frontmatter when the document has %s', (_label, mdx) => {
+    const page = extractPageEntity({ mdx, slug: 'installation' });
+    const plain = extractPageEntity({ mdx: sampleMdx, slug: 'installation' });
+    expect(page.title).toBe('Installation');
+    expect(page.description).toBe('How to install.');
+    // No synthetic section minted out of the frontmatter text, and identical structure otherwise.
+    expect(page.sections.map((section) => section.title)).toEqual(['Requirements', 'Configuration']);
+    expect(page.sections.map((section) => section.anchor)).toEqual(['requirements', 'configuration']);
+    expect(page.preamble.map((block) => block.contentHash)).toEqual(plain.preamble.map((block) => block.contentHash));
+    expect(page.sections.flatMap((section) => section.blocks.map((block) => block.contentHash))).toEqual(
+      plain.sections.flatMap((section) => section.blocks.map((block) => block.contentHash))
+    );
+  });
 });
 
 // ASTRO-ALIGNED ANCHORS (wave 2b close): section anchors must be byte-identical to the ids Astro

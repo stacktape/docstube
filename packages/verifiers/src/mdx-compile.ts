@@ -1,5 +1,6 @@
 import { compile } from '@mdx-js/mdx';
 import { parse as parseYaml } from 'yaml';
+import { splitFrontmatter } from '@docstube/contracts';
 import type { Finding } from '@docstube/contracts';
 import type { PageArtifact, VerifierDefinition } from '@docstube/plugin-sdk';
 import { runVerifier } from './run-support.ts';
@@ -64,14 +65,15 @@ const compileErrorFinding = (artifact: PageArtifact, error: unknown): Finding =>
 
 // remark treats the frontmatter fence as opaque, so @mdx-js/mdx compiles pages whose frontmatter
 // is broken YAML — and those pages crash any downstream YAML consumer (live-hit: an unquoted
-// description containing ": "). Validate the fenced block ourselves.
+// description containing ": "). Validate the fenced block ourselves, using the shared splitter so
+// the verifier vets exactly the block emission will vet (wave 2b close).
 const frontmatterFinding = (artifact: PageArtifact): Finding | undefined => {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(artifact.mdx);
-  if (!match) {
+  const split = splitFrontmatter(artifact.mdx);
+  if (!split.hadFrontmatter) {
     return undefined;
   }
   try {
-    parseYaml(match[1] ?? '');
+    parseYaml(split.frontmatter);
     return undefined;
   } catch (error) {
     const reason = error instanceof Error ? (error.message.split('\n')[0] ?? 'invalid YAML') : 'invalid YAML';

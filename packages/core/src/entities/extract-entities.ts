@@ -8,7 +8,14 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { parse as parseYaml } from 'yaml';
 import type { BlockEntity, PageEntity, SectionEntity } from '@docstube/contracts';
-import { componentBlockType, contentHash, idPrefixes, mintId, unrenderableAnchorPrefix } from '@docstube/contracts';
+import {
+  canonicalMdxSource,
+  componentBlockType,
+  contentHash,
+  idPrefixes,
+  mintId,
+  unrenderableAnchorPrefix
+} from '@docstube/contracts';
 
 // Deterministic extraction pass (ARCHITECTURE.md §3.4): MDX → entity tree. IDs live in the
 // manifest sidecar, never inline in MDX — the writer agent produces clean MDX and the kernel owns
@@ -16,7 +23,19 @@ import { componentBlockType, contentHash, idPrefixes, mintId, unrenderableAnchor
 
 const mdxProcessor = unified().use(remarkParse).use(remarkMdx).use(remarkGfm).use(remarkFrontmatter, ['yaml']);
 
-export const parseMdx = (mdx: string): Root => mdxProcessor.parse(mdx) as Root;
+// CANONICAL SOURCE, NOT RAW BYTES (wave 2b close): remark only recognizes a frontmatter block that
+// starts at offset 0, so a page whose `---` sits under a blank line or a BOM parsed as a thematic
+// break plus a setext heading — extraction minted a SYNTHETIC section out of the `title:` text and
+// anchored sections and claims to it, while emission stripped that same text as frontmatter. The
+// shared splitter (contracts/src/frontmatter.ts) is the single definition of where frontmatter
+// ends, so the kernel and emission read the same bytes; node offsets are canonical-source offsets
+// on both the marker side (agent-runtime submit-page.ts) and here.
+const parseCanonical = (mdx: string): { tree: Root; source: string } => {
+  const source = canonicalMdxSource(mdx);
+  return { tree: mdxProcessor.parse(source) as Root, source };
+};
+
+export const parseMdx = (mdx: string): Root => parseCanonical(mdx).tree;
 
 // Frontmatter is MODEL OUTPUT, so it may be invalid YAML (live-hit: an unquoted description
 // containing ": "). Extraction must never crash on it — fall back to a line-based scan so the
@@ -146,7 +165,7 @@ const buildBlock = (mdx: string, node: RootContent): BlockEntity => {
 // the same order extractPageEntity emits, so callers can zip ranges with a page's flattened
 // blocks to locate a text offset's owning block (claim anchoring).
 export const blockSourceRanges = (mdx: string): Array<[number, number]> => {
-  const tree = parseMdx(mdx);
+  const { tree } = parseCanonical(mdx);
   const ranges: Array<[number, number]> = [];
   for (const node of tree.children) {
     // Frontmatter, ESM plumbing, and headings never become blocks (headings delimit sections).
@@ -167,7 +186,7 @@ export type ExtractPageInput = {
 };
 
 export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput): PageEntity => {
-  const tree = parseMdx(mdx);
+  const { tree, source } = parseCanonical(mdx);
   let title: string | undefined;
   let description: string | undefined;
   const preamble: BlockEntity[] = [];
@@ -229,7 +248,7 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
       // import/export statements are page plumbing, not content entities.
       continue;
     }
-    const block = buildBlock(mdx, node);
+    const block = buildBlock(source, node);
     const currentSection = sections[sections.length - 1];
     if (currentSection === undefined) {
       preamble.push(block);

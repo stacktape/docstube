@@ -6,7 +6,7 @@ import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { z } from 'zod';
-import { bindCitedValue, claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
+import { bindCitedValue, canonicalMdxSource, claimMarkerIdSchema, writerClaimLedgerSchema } from '@docstube/contracts';
 import type { ToolDescriptor, WriterClaimLedger } from '@docstube/contracts';
 import type { ToolImplementation } from './tools.ts';
 
@@ -143,9 +143,15 @@ const isPureTextNode = (node: ScanNode): boolean => node.type === 'text' || node
 export const scanClaimMarkers = (mdx: string): MarkerScan => {
   const markers: ClaimMarker[] = [];
   const errors: MarkerScanError[] = [];
+  // CANONICAL SOURCE, NOT RAW BYTES (wave 2b close): remark only recognizes a frontmatter block
+  // that starts at offset 0, so a page whose `---` is preceded by a blank line or a BOM parsed as a
+  // thematic break plus a setext heading — a SYNTHETIC section made of the `title:` text that
+  // emission then strips as frontmatter. Every offset below (marker offsets, inner-MDX slices) is
+  // taken against the shared canonical source, which is exactly the text emission splits.
+  const source = canonicalMdxSource(mdx);
   let tree: Root;
   try {
-    tree = markerProcessor.parse(mdx) as Root;
+    tree = markerProcessor.parse(source) as Root;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     errors.push({
@@ -257,7 +263,8 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
     }
     const contentStart = children[0]?.position?.start?.offset;
     const contentEnd = children[children.length - 1]?.position?.end?.offset;
-    const innerMdx = contentStart === undefined || contentEnd === undefined ? '' : mdx.slice(contentStart, contentEnd);
+    const innerMdx =
+      contentStart === undefined || contentEnd === undefined ? '' : source.slice(contentStart, contentEnd);
     if (innerMdx.trim() === '') {
       errors.push({
         code: 'marker-empty',

@@ -539,7 +539,8 @@ describe('emitSite', () => {
     expect(route).not.toContain('docstubeClaimsComplete');
     // The authored count is replaced by the true one, and appears exactly once.
     expect(route).toContain('docstubeClaimsChecked: 1');
-    expect(route).not.toContain('99');
+    // Asserted on the parsed value, not on the raw text: a minted page id can contain "99".
+    expect(parse(frontmatterOf(route))).toMatchObject({ docstubeClaimsChecked: 1 });
     expect(route.match(/docstubeClaimsChecked/gu)?.length).toBe(1);
     // Authored frontmatter the kernel does not own is untouched.
     expect(route).toContain('keywords:');
@@ -657,7 +658,13 @@ describe('emitSite', () => {
       ['merge-key', 'base: &base\n  docstubeReviewedFor: security\nkeywords: [install]\n<<: *base', 'merge key'],
       ['alias', 'base: &base security\ndocstubeReviewedFor: *base', 'anchor'],
       ['anchor', 'keywords: &kw [install]\nmore: *kw', 'anchor'],
-      ['custom-tag', 'keywords: !custom [install]', 'tag']
+      ['custom-tag', 'keywords: !custom [install]', 'tag'],
+      // COMPLEX KEYS (wave 2b close): a root key that is not a plain scalar has no spelling the
+      // kernel can read, but the downstream parser invents one — js-yaml resolves the sequence key
+      // `[docstubeReviewedFor]` to the plain key `docstubeReviewedFor`, minting a false editorial
+      // trust label on an unreviewed page.
+      ['complex-seq-key', '? [docstubeReviewedFor]\n: security\nkeywords: [install]', 'sequence'],
+      ['complex-map-key', '? {docstubeReviewedFor: security}\n: true\nkeywords: [install]', 'mapping']
     ])('fails closed on %s frontmatter, naming the route', async (label, frontmatter, expectedReason) => {
       const { route, warnings } = await emitWithFrontmatter(frontmatter, label);
       expect(warnings).toHaveLength(1);
@@ -672,6 +679,22 @@ describe('emitSite', () => {
       expect(route).toContain('title: "Installation"');
       expect(route).toContain('docstubeClaimsChecked: 1');
       expect(parse(frontmatterOf(route))).toMatchObject({ docstubeClaimsTotal: 2 });
+    });
+
+    // The exact probe document, asserted key by key: no `docstube*` key the kernel did not compute
+    // may reach the route, under any YAML spelling of the key.
+    it('lets no false docstube* key survive a complex-key document into the route', async () => {
+      const { route, warnings } = await emitWithFrontmatter('? [docstubeReviewedFor]\n: security', 'complex-key-probe');
+      expect(warnings).toHaveLength(1);
+      const parsedBack = parse(frontmatterOf(route)) as Record<string, unknown>;
+      expect(parsedBack.docstubeReviewedFor).toBeUndefined();
+      expect(Object.keys(parsedBack).filter((key) => key.toLowerCase().startsWith('docstube'))).not.toContain(
+        'docstubeReviewedFor'
+      );
+      expect(route).not.toContain('security');
+      // The route still renders on the kernel's own computed spine.
+      expect(parsedBack).toMatchObject({ title: 'Installation', docstubeClaimsTotal: 2 });
+      expect(bodyOf(route)).toContain('# Installation');
     });
 
     // NO COMMENT MIGRATION (wave 2b close, deliberate): a comment above a deleted `docstube*` key

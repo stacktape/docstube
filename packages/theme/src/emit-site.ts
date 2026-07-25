@@ -1,8 +1,11 @@
 import { mkdir, readdir, rm, rmdir, writeFile } from 'node:fs/promises';
 import { dirname, join, posix, relative, sep } from 'node:path';
-import { Document, isAlias, isCollection, isMap, isScalar, parseDocument, visit } from 'yaml';
+import { Document, isAlias, isCollection, isMap, isScalar, isSeq, parseDocument, visit } from 'yaml';
 import type { Pair, ToStringOptions } from 'yaml';
-import { localeRoutePrefixConflict } from '@docstube/contracts';
+// ONE SHARED FRONTMATTER SPLITTER (wave 2b close): emission and the kernel must read the same
+// bytes as frontmatter, so the tolerant rules live in contracts and both sides import them. See
+// contracts/src/frontmatter.ts for why a second local definition is a cross-boundary bug.
+import { localeRoutePrefixConflict, splitFrontmatter } from '@docstube/contracts';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
 import {
@@ -191,31 +194,6 @@ const buildAlternatesBySlug = (
   return alternates;
 };
 
-// TOLERANT SPLIT (wave 2b close): the block Astro reads as frontmatter is the block the kernel has
-// to vet, and missing one is not a harmless no-op — the raw YAML is emitted as page BODY, so the
-// author's keys turn into visible junk on the rendered page and every `docstube*` key inside them
-// goes unvetted. Three forms Astro accepts used to walk straight past the strict single regex: a
-// UTF-8 BOM before the opening delimiter (what a Windows editor writes), blank or whitespace-only
-// lines above it, and an EMPTY block (`---\n---`), which is frontmatter present with no keys rather
-// than frontmatter absent. A document that genuinely opens with anything else is returned untouched,
-// so a `---` thematic break in the body can still never be mistaken for a frontmatter delimiter.
-const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } => {
-  const text = mdx.startsWith('\uFEFF') ? mdx.slice(1) : mdx;
-  const open = /^(?:[ \t]*\r?\n)*---[ \t]*\r?\n/u.exec(text);
-  if (open === null) {
-    return { frontmatter: '', body: text };
-  }
-  const rest = text.slice(open[0].length);
-  const close = /^---[ \t]*(?:\r?\n|$)/mu.exec(rest);
-  if (close === null) {
-    return { frontmatter: '', body: text };
-  }
-  return {
-    frontmatter: rest.slice(0, close.index).replace(/\r?\n$/u, ''),
-    body: rest.slice(close.index + close[0].length)
-  };
-};
-
 // KERNEL-OWNED FRONTMATTER (impl-24 finding): every `docstube*` key on a route is COMPUTED here
 // from the persisted trust spine. Authored frontmatter that declares one — a writer (or a
 // hand-edited artifact) carrying `docstubeClaimsComplete: true` on a partial page — used to
@@ -314,6 +292,28 @@ const unvettableConstruct = (document: Document): string | undefined => {
 const pairKeyName = (pair: Pair): string | undefined =>
   isScalar(pair.key) && typeof pair.key.value === 'string' ? pair.key.value : undefined;
 
+// COMPLEX ROOT KEYS FAIL CLOSED (wave 2b close): ownership is decided on the RESOLVED key string,
+// so a root key the kernel cannot read as a string is a key it cannot vet — while the downstream
+// YAML parser still gives it one, and decides the spelling itself. The explicit form
+// `? [docstubeReviewedFor]` / `: security` walked straight past the namespace strip and reached
+// Astro's loader as the key `docstubeReviewedFor` (js-yaml resolves a sequence key to its joined
+// items), minting a false editorial trust label on an unreviewed page. Same treatment as anchors,
+// aliases, merge keys, and tags — all vanishingly rare in docs frontmatter, none filterable by key
+// name — the whole authored block is dropped.
+const complexRootKey = (pair: Pair): string | undefined => {
+  if (pairKeyName(pair) !== undefined) {
+    return undefined;
+  }
+  const key = pair.key;
+  if (isSeq(key)) {
+    return 'a root key that is a sequence, not a plain scalar';
+  }
+  if (isMap(key)) {
+    return 'a root key that is a mapping, not a plain scalar';
+  }
+  return 'a root key that is not a plain string scalar';
+};
+
 const readAuthoredFrontmatter = (frontmatter: string, route: string): AuthoredFrontmatter => {
   if (frontmatter.trim() === '') {
     return { document: emptyFrontmatterDocument(), keys: new Set() };
@@ -335,6 +335,12 @@ const readAuthoredFrontmatter = (frontmatter: string, route: string): AuthoredFr
   const unvettable = unvettableConstruct(document);
   if (unvettable !== undefined) {
     return failClosed(route, 'uses a YAML construct the kernel cannot vet', unvettable);
+  }
+  for (const pair of contents.items) {
+    const complexKey = complexRootKey(pair);
+    if (complexKey !== undefined) {
+      return failClosed(route, 'uses a YAML construct the kernel cannot vet', complexKey);
+    }
   }
   const keys = new Set<string>();
   const surviving: typeof contents.items = [];

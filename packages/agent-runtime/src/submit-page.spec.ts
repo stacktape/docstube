@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { canonicalMdxSource } from '@docstube/contracts';
 import { createSubmitPageTool, scanClaimMarkers, submitPageDescriptor, validateSubmission } from './submit-page.ts';
 
 const mdxWith = (body: string): string => `---\ntitle: "Retry"\n---\n\n# Retry\n\n${body}\n`;
@@ -20,6 +21,25 @@ describe('scanClaimMarkers', () => {
     expect(scan.markers).toHaveLength(1);
     expect(scan.markers[0]).toMatchObject({ markerId: 'c1', innerMdx: '`retries` defaults to 3.' });
     expect(mdx.slice(scan.markers[0]!.offset)).toMatch(/^<Claim id="c1">/);
+  });
+
+  // ONE SHARED FRONTMATTER SPLITTER (wave 2b close): remark only recognizes a block that starts at
+  // offset 0, so a page whose `---` sits under a blank line or a BOM used to parse as a thematic
+  // break plus a setext heading — markers landed in a synthetic `title:` section that emission then
+  // stripped as frontmatter. The scan now runs over the same canonical source emission splits, so
+  // marker offsets index that text and no frontmatter key ever becomes prose.
+  it.each([
+    ['a UTF-8 BOM before the delimiter', `${String.fromCharCode(0xfeff)}`],
+    ['blank lines above the delimiter', '\n\n'],
+    ['whitespace-only lines above the delimiter', '  \n\t\n']
+  ])('scans markers against the canonical source when the document has %s', (_label, prefix) => {
+    const mdx = `${prefix}---\ntitle: "Retry"\n---\n\n# Retry\n\nIntro <Claim id="c1">\`retries\` defaults to 3.</Claim>.\n`;
+    const scan = scanClaimMarkers(mdx);
+    expect(scan.errors).toEqual([]);
+    expect(scan.markers).toHaveLength(1);
+    expect(scan.markers[0]).toMatchObject({ markerId: 'c1', innerMdx: '`retries` defaults to 3.' });
+    // The offset indexes the canonical source — the exact text emission emits as the page body.
+    expect(canonicalMdxSource(mdx).slice(scan.markers[0]!.offset)).toMatch(/^<Claim id="c1">/);
   });
 
   it('ignores literal <Claim> examples inside fenced code and inline code as plain text', () => {

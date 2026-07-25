@@ -50,6 +50,9 @@ export type {
 
 export { sha256Hex, canonicalJson, canonicalStateJson, hashValue, contentHash } from './hashing.ts';
 
+export { splitFrontmatter, canonicalMdxSource } from './frontmatter.ts';
+export type { FrontmatterSplit } from './frontmatter.ts';
+
 export {
   normalizeCitedValue,
   citedValueOccursInText,
