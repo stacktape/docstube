@@ -271,6 +271,54 @@ describe('working-tree dirtiness', () => {
     headCommit = movedHead;
   });
 
+  it('reports HEAD movement even on a run that was ALREADY DIRTY at start (diagnostics, not trust)', async () => {
+    // ALWAYS RE-READ HEAD (wave 2b close final — the run-diagnostics finding): the sweep used to
+    // return immediately when the run started dirty, so a commit landing mid-run produced NO
+    // revision-pair warning at all. The shards need no further marking (they were marked at
+    // assembly time, so trust is unaffected) — but the operator still has to be able to see WHICH
+    // two revisions the run straddled, which is exactly when a dirty tree makes it hardest to guess.
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePage();
+    const ledger = buildFixtureClaimLedger(page);
+    const provenance = buildFixtureProvenanceV2(ledger);
+    const shard = {
+      ...buildFixturePageShard(page),
+      ledger,
+      provenance: { ...provenance, lineage: { ...provenance.lineage, dirtyWorkingTree: true } }
+    };
+    await store.writePageShard(shard);
+
+    // Dirty at start AND a commit lands mid-run.
+    await writeFile(join(repoRoot, 'file.txt'), 'dirty from the very start\n');
+    await writeFile(join(repoRoot, 'landed-during-a-dirty-run.txt'), 'a colleague pushed again\n');
+    await git('add', 'landed-during-a-dirty-run.txt');
+    await git('commit', '-m', 'landed during a dirty run');
+    const movedHead = await resolveCommit(repoRoot);
+    expect(movedHead).not.toBe(headCommit);
+
+    const journal = await createRunJournal(repoRoot, mintId(idPrefixes.run));
+    await dirtyTreeEndOfRunSweep({
+      repoRoot,
+      store,
+      journal,
+      commit: headCommit,
+      dirtyAtStart: true,
+      ownOutputPrefixes: OWN_OUTPUTS,
+      persistedShards: [{ locale: shard.locale, pageId: page.id }]
+    });
+
+    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8');
+    expect(journalRaw).toContain('HEAD MOVED during the run');
+    expect(journalRaw).toContain(headCommit.slice(0, 12));
+    expect(journalRaw).toContain(movedHead.slice(0, 12));
+    // The run was already dirty, so the porcelain/unversioned causes are NOT re-journaled — run
+    // start said them once already.
+    expect(journalRaw).not.toContain('became dirty DURING the run');
+
+    await git('checkout', '--', 'file.txt');
+    headCommit = movedHead;
+  });
+
   it('names BOTH revisions in the HEAD-moved warning', () => {
     const warning = headMovedDuringRunWarning('a'.repeat(40), 'b'.repeat(40));
     expect(warning.severity).toBe('warning');
@@ -304,5 +352,23 @@ describe('dirtyWorkingTreeWarning', () => {
     expect(warning.message).toContain('never reports ignored files');
     // The reader-facing consequence is identical whatever made the run dirty.
     expect(warning.message).toContain('never the complete state');
+  });
+
+  // THE WORDING MATCHES WHAT WAS OBSERVED (wave 2b close final — run-diagnostics finding): the
+  // sampled warning claimed the tree "looked clean" even for an UNTRACKED file, which porcelain
+  // reports loudly — a line that reads as a broken probe to anyone who just ran `git status`.
+  it('says the tree looked CLEAN only when it did — an ignored file porcelain cannot see', () => {
+    const warning = dirtyWorkingTreeWarning('c'.repeat(40), ['dist-dogfood/a.ts'], false);
+    expect(warning.message).toContain('never reports ignored files, so the tree looked clean');
+    expect(warning.message).toContain('dist-dogfood/a.ts');
+  });
+
+  it('says the tree was DIRTY when porcelain said so, and still names the paths', () => {
+    const warning = dirtyWorkingTreeWarning('c'.repeat(40), ['src/extra.ts'], true);
+    expect(warning.message).toContain('reported the working tree dirty as well');
+    expect(warning.message).not.toContain('looked clean');
+    // The actionable detail survives in BOTH cases — the sample is the reason the warning exists.
+    expect(warning.message).toContain('read 1 source file that git does not version');
+    expect(warning.message).toContain('src/extra.ts');
   });
 });

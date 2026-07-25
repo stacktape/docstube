@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { toolDescriptorSchema } from '@docstube/contracts';
 import { mcpServerEnvVars } from '../mcp-stdio-server.ts';
-import { elementPolicySchema, evaluateSubmitPageCall } from '../submit-page.ts';
+import { evaluateSubmitPageCall, normalizeElementPolicy } from '../submit-page.ts';
 import { standardToolDescriptors } from '../tools.ts';
 import type { ToolImplementation } from '../tools.ts';
 
@@ -98,9 +98,10 @@ export const loadForwardedToolImplementations = async (
       // the real handler is what mints the accepted artifact.
       //
       // The element policy crosses as data so the child accepts EXACTLY what the parent accepts.
-      // A missing or malformed policy validates fail-closed (Claim only) rather than open.
-      const parsedPolicy = elementPolicySchema.safeParse(entry.policy);
-      const policy = parsedPolicy.success ? parsedPolicy.data : undefined;
+      // A missing or malformed policy validates fail-closed (Claim only) rather than open — through
+      // the SAME normalization the parent ran when it built the tool (submit-page.ts), so the two
+      // ends can never disagree about what a policy means.
+      const policy = normalizeElementPolicy(entry.policy);
       return {
         descriptor,
         ...(policy === undefined ? {} : { policy }),

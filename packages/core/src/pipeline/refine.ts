@@ -147,7 +147,10 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       ownOutputPrefixes: ownOutputs
     });
     if (unversionedSources.length > 0) {
-      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, unversionedSources)] });
+      await journal.append({
+        type: 'findings',
+        findings: [dirtyWorkingTreeWarning(commit, unversionedSources, treeDirtyAtStart)]
+      });
     }
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 

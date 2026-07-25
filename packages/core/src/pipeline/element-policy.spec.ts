@@ -69,6 +69,22 @@ describe('configElementPolicy', () => {
     expect(createSubmitPageTool(policy).tool.policy).toEqual(policy);
     expect(createSubmitPageTool().tool.policy).toBeUndefined();
   });
+
+  it('fails closed on a components value that is not the array the contract promises', () => {
+    // ONE SCHEMA, BOTH ENDS (wave 2b close final): the kernel builds the policy the validator
+    // consumes, so a config the contract could not have produced — a hand-edited docstube.yml, a
+    // plugin returning a string — must degrade to Claim-only HERE too, exactly as it would in the
+    // MCP child, instead of throwing or spreading a string into a per-character allow-list.
+    for (const components of ['Callout', 42, null, undefined, ['Callout', 7]]) {
+      const policy = configElementPolicy({ components } as unknown as { components: readonly string[] });
+      expect(policy).toEqual({ allowedComponents: [] });
+      const scan = validateSubmission({ mdx: mdxWith('<Callout>Body.</Callout>'), ledger: emptyLedger }, policy);
+      expect(scan.errors.some((error) => error.includes('enables no components at all'))).toBe(true);
+      // A single-character element name is what a spread string used to admit.
+      const single = validateSubmission({ mdx: mdxWith('<C>Body.</C>'), ledger: emptyLedger }, policy);
+      expect(single.errors.some((error) => error.includes('is not a registered component'))).toBe(true);
+    }
+  });
 });
 
 describe('buildWriterSystemPrompt', () => {

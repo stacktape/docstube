@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalMdxSource } from '@docstube/contracts';
 import type { ElementPolicy } from './submit-page.ts';
-import { createSubmitPageTool, scanClaimMarkers, submitPageDescriptor, validateSubmission } from './submit-page.ts';
+import {
+  createSubmitPageTool,
+  normalizeElementPolicy,
+  scanClaimMarkers,
+  submitPageDescriptor,
+  validateSubmission
+} from './submit-page.ts';
 
 // The registered-component whitelist these probes run under — core supplies the project's enabled
 // registry the same way when it builds the write-page task's submit_page tool (element-policy.ts).
@@ -216,12 +222,15 @@ describe('scanClaimMarkers', () => {
     const upperCaseExpression = scanClaimMarkers('Text.\n\n{<SCRIPT src="evil.js" />}\n');
     expect(upperCaseExpression.errors[0]?.code).toBe('page-script');
 
-    // TAG match, never a WORD match: the word "script" inside an expression string is legal.
+    // TAG match, never a WORD match: the word "script" inside an expression carries no executable
+    // markup, so the page-script code stays off it. The expression itself is still refused — every
+    // {…} is (see the no-expressions probes) — but under the generic code, so the operator is never
+    // told a benign string is a script.
     const wordOnly = scanClaimMarkers("Text.\n\n{'the script ran'}\n");
-    expect(wordOnly.errors).toEqual([]);
+    expect(wordOnly.errors.map((error) => error.code)).toEqual(['mdx-expression']);
 
     const inlineWord = scanClaimMarkers("The tool said {'the style guide applies'} here.\n");
-    expect(inlineWord.errors).toEqual([]);
+    expect(inlineWord.errors.map((error) => error.code)).toEqual(['mdx-expression']);
   });
 
   it('leaves names that merely START with script/style out of the page-script code — the tag name must end at whitespace, "/", or ">"', () => {
@@ -232,11 +241,14 @@ describe('scanClaimMarkers', () => {
     const customElement = scanClaimMarkers('Text.\n\n<style-guide>Read the guide.</style-guide>\n', registry);
     expect(customElement.errors.map((error) => error.code)).toEqual(['raw-html-element']);
 
+    // Refused as an expression (all of them are), never as page-script — the distinction is what
+    // keeps the tag regex honest for the attribute-value scans, which read text with no node kind
+    // to fall back on.
     const customExpression = scanClaimMarkers("Text.\n\n{'see the <style-guide> element for details'}\n");
-    expect(customExpression.errors).toEqual([]);
+    expect(customExpression.errors.map((error) => error.code)).toEqual(['mdx-expression']);
 
     const scriptedTable = scanClaimMarkers("Text with {'a <scripted-table> column'} inline.\n");
-    expect(scriptedTable.errors).toEqual([]);
+    expect(scriptedTable.errors.map((error) => error.code)).toEqual(['mdx-expression']);
 
     // The real tags stay rejected in every terminator form: '>', whitespace, and '/'.
     const bareScript = scanClaimMarkers('Text.\n\n{<script>alert(1)</script>}\n');
@@ -338,6 +350,26 @@ describe('scanClaimMarkers', () => {
 
     const proseMention = scanClaimMarkers('Set `onerror` on the image to log failures; onerror fires once.\n');
     expect(proseMention.errors).toEqual([]);
+  });
+
+  it('reads a handler inside a STRING-VALUED prop case-insensitively, in all four spellings (wave 2b close final)', () => {
+    // The attribute-value scan used to read `on` case-SENSITIVELY, so only the lowercase HTML
+    // spelling and the camelCase JSX one were caught: `ONERROR=` and `OnError=` inside a prop
+    // value executed exactly the same and walked straight through. HTML honours every spelling, so
+    // the name SHAPE — not an enumeration, and not a casing — is the rule, identically on the
+    // element and inside the value.
+    for (const spelling of ['onerror', 'onError', 'ONERROR', 'OnError']) {
+      const smuggled = scanClaimMarkers(`Text.\n\n<Callout title="<img src=x ${spelling}=alert(1)>" />\n`, registry);
+      expect(smuggled.errors.map((error) => error.code)).toEqual(['page-script']);
+      expect(smuggled.errors[0]?.message).toContain('event handler');
+    }
+
+    // PROSE MENTIONING THE WORD CARRIES NO TAG and stays legal, in every spelling.
+    const prose = scanClaimMarkers(
+      'Text.\n\n<Callout title="the ONERROR handler, spelled onerror in HTML, fires once">Body.</Callout>\n',
+      registry
+    );
+    expect(prose.errors).toEqual([]);
   });
 
   it("rejects authored elements in docstube's OWN presentation namespace (kernel-namespace)", () => {
@@ -532,6 +564,50 @@ describe('scanClaimMarkers', () => {
       // Literal props — including a valueless boolean prop — stay legal and fully readable.
       const literal = scanClaimMarkers('Text.\n\n<Callout tone="info" wide>Body.</Callout>\n', registry);
       expect(literal.errors).toEqual([]);
+    });
+
+    it("rejects MDX EXPRESSIONS OUTRIGHT — {…} hides JSX from the element whitelist (Sol's probe)", () => {
+      // THE WHITELIST WALKS ELEMENTS; AN EXPRESSION IS NOT ONE. `{<Sneaky/>}` compiles to a real
+      // component, `{<>…</>}` to a fragment, `{<Callout tone={x}/>}` to a dynamic attribute — and
+      // mdast hands all three back as ONE opaque expression node, so the element, fragment and
+      // attribute rules never saw them. Same shrink-the-surface move the whitelist itself made:
+      // the whole node kind is refused, leaving nothing to deny-list inside it.
+      const component = scanClaimMarkers('Text.\n\n{<Sneaky/>}\n', registry);
+      expect(component.errors.map((error) => error.code)).toEqual(['mdx-expression']);
+      expect(component.errors[0]?.message).toContain('Write the literal text');
+
+      const fragment = scanClaimMarkers('Text.\n\n{<>hello</>}\n', registry);
+      expect(fragment.errors.map((error) => error.code)).toEqual(['mdx-expression']);
+
+      const dynamicAttribute = scanClaimMarkers('Text.\n\n{<Callout tone={danger()}/>}\n', registry);
+      expect(dynamicAttribute.errors.map((error) => error.code)).toEqual(['mdx-expression']);
+
+      const rawHtml = scanClaimMarkers('Text.\n\n{<div>chip</div>}\n', registry);
+      expect(rawHtml.errors.map((error) => error.code)).toEqual(['mdx-expression']);
+
+      // Inline (text-level) expressions are refused exactly like flow ones.
+      const inline = scanClaimMarkers('Prose with {<Sneaky/>} inside.\n', registry);
+      expect(inline.errors.map((error) => error.code)).toEqual(['mdx-expression']);
+
+      // An expression that does not even parse is still a rejection, just a syntax one.
+      const unparseable = scanClaimMarkers('Text.\n\n{<div>}\n', registry);
+      expect(unparseable.errors.map((error) => error.code)).toEqual(['mdx-parse-error']);
+
+      // BRACES IN LITERAL TEXT STAY LEGAL: a fenced block and inline code are documentation, never
+      // expressions — the whole point of writing them that way.
+      const fence = scanClaimMarkers(['Interpolate like this:', '', '```js', 'const a = {foo};', '```'].join('\n'));
+      expect(fence.errors).toEqual([]);
+
+      const inlineCode = scanClaimMarkers('Write `{foo}` to interpolate, and `<Callout tone={x}/>` renders it.\n');
+      expect(inlineCode.errors).toEqual([]);
+    });
+
+    it('does not stack a second error on an expression inside a <Claim> — the marker names it precisely', () => {
+      // Both rules forbid the same thing; the marker's own 'marker-expression' error carries the
+      // marker id and the checkability reason, so the generic page rule stands down inside it.
+      const marker = scanClaimMarkers('Fact: <Claim id="g1">greet {\'never \'}exists.</Claim>\n', registry);
+      expect(marker.errors.map((error) => error.code)).toEqual(['marker-expression']);
+      expect(marker.errors[0]?.markerId).toBe('g1');
     });
 
     it('leaves ordinary Markdown and registered components with literal props untouched', () => {
@@ -930,6 +1006,51 @@ describe('validateSubmission', () => {
     });
     expect(outcome.errors.some((error) => error.startsWith('ledger claims.0.class'))).toBe(true);
     expect(outcome.errors.some((error) => error.startsWith('ledger claims.0.predicate'))).toBe(true);
+  });
+});
+
+// ONE SCHEMA, VALIDATED AT BOTH ENDS (wave 2b close final — Sol's malformed-policy probe). The
+// policy is plain JSON that crosses a process boundary, so it is untrusted at the parent too: an
+// unvalidated one either THREW (a non-iterable `allowedComponents` is not spreadable) or silently
+// WIDENED (a string spread into a per-character allow-list, admitting <B>, <a>, <d>…). The child's
+// half of this contract is proved in transports/forwarded-tools.spec.ts.
+describe('element policy validation', () => {
+  const malformed: Array<[string, unknown]> = [
+    ['a non-iterable allowedComponents', { allowedComponents: 42 }],
+    ['a bare string', 'Callout'],
+    ['null', null],
+    ['an unknown shape', { components: ['Callout'] }],
+    ['a list with a non-string entry', { allowedComponents: ['Callout', 7] }],
+    ['an array', ['Callout']]
+  ];
+
+  it.each(malformed)('degrades %s to Claim-only — never a throw, never a partial allow-list', (_label, policy) => {
+    expect(normalizeElementPolicy(policy)).toBeUndefined();
+
+    const scan = scanClaimMarkers('Text.\n\n<Callout tone="info">Body.</Callout>\n', policy as ElementPolicy);
+    expect(scan.errors.map((error) => error.code)).toEqual(['unregistered-component']);
+    expect(scan.errors[0]?.message).toContain('enables no components at all');
+
+    // The character-wise widening a spread string used to produce: a one-letter component name.
+    const single = scanClaimMarkers('Text.\n\n<C>Body.</C>\n', policy as ElementPolicy);
+    expect(single.errors.map((error) => error.code)).toEqual(['unregistered-component']);
+
+    // <Claim> keeps working — claim vocabulary is never policy-gated.
+    const claimOnly = scanClaimMarkers('Fact: <Claim id="c1">`greet` exists.</Claim>\n', policy as ElementPolicy);
+    expect(claimOnly.errors).toEqual([]);
+
+    // The tool refuses to carry it to the child, so the two ends cannot disagree.
+    expect(createSubmitPageTool(policy).tool.policy).toBeUndefined();
+  });
+
+  it('round-trips a VALID policy identically, through the schema and onto the tool', () => {
+    expect(normalizeElementPolicy(registry)).toEqual(registry);
+    expect(normalizeElementPolicy(JSON.parse(JSON.stringify(registry)))).toEqual(registry);
+    expect(createSubmitPageTool(registry).tool.policy).toEqual(registry);
+    // An empty registry is VALID and means Claim-only — the same outcome as no policy, reached
+    // deliberately rather than by degradation.
+    expect(normalizeElementPolicy({ allowedComponents: [] })).toEqual({ allowedComponents: [] });
+    expect(normalizeElementPolicy({})).toEqual({ allowedComponents: [] });
   });
 });
 

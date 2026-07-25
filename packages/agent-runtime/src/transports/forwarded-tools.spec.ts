@@ -91,6 +91,39 @@ describe('prepareForwardedTools', () => {
     await session.cleanup();
   });
 
+  it('degrades a MALFORMED policy in the descriptors file to Claim-only, never a throw or a partial allow-list', async () => {
+    // THE CHILD'S HALF OF ONE SCHEMA, BOTH ENDS (wave 2b close final): the descriptors file is
+    // ordinary JSON on disk, so the child must treat the policy as untrusted exactly as the parent
+    // does — a non-iterable, a bare string (which a spread would widen into a per-character
+    // allow-list), null, and an unknown shape all mean Claim-only, and none of them may crash the
+    // rebuild that gives the model its tools.
+    const session = await prepareForwardedTools([createSubmitPageTool({ allowedComponents: ['Callout'] }).tool]);
+    const descriptorsFile = session.env[mcpServerEnvVars.extraToolsFile]!;
+    const [entry] = JSON.parse(await readFile(descriptorsFile, 'utf8')) as Array<{ descriptor: unknown }>;
+    const mdx = '---\ntitle: "Retry"\n---\n\n# Retry\n\n<Callout tone="info">Read on.</Callout>\n';
+    const ledger = { schemaVersion: 1, claims: [] };
+
+    for (const policy of [{ allowedComponents: 42 }, 'Callout', null, { components: ['Callout'] }, ['Callout']]) {
+      await writeFile(descriptorsFile, JSON.stringify([{ ...entry, policy }]), 'utf8');
+      const childTools = await loadForwardedToolImplementations(descriptorsFile, () => {});
+      expect(childTools[0]!.policy).toBeUndefined();
+      const result = (await childTools[0]!.handler({ mdx, ledger })) as { accepted: boolean; errors?: string[] };
+      expect(result.accepted).toBe(false);
+      expect(result.errors?.some((error) => error.includes('enables no components at all'))).toBe(true);
+    }
+
+    // …and the valid policy round-trips identically through the same file.
+    await writeFile(
+      descriptorsFile,
+      JSON.stringify([{ ...entry, policy: { allowedComponents: ['Callout'] } }]),
+      'utf8'
+    );
+    const childTools = await loadForwardedToolImplementations(descriptorsFile, () => {});
+    expect(childTools[0]!.policy).toEqual({ allowedComponents: ['Callout'] });
+    expect(((await childTools[0]!.handler({ mdx, ledger })) as { accepted: boolean }).accepted).toBe(true);
+    await session.cleanup();
+  });
+
   it('skips malformed sink lines and unknown tools without failing', async () => {
     const captured: unknown[] = [];
     const session = await prepareForwardedTools([flagQuestionTool(captured)]);

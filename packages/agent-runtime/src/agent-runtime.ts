@@ -13,6 +13,7 @@ export {
   createSubmitPageTool,
   elementPolicySchema,
   evaluateSubmitPageCall,
+  normalizeElementPolicy,
   scanClaimMarkers,
   submitPageDescriptor,
   validateSubmission

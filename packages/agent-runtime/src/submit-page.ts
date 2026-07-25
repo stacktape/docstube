@@ -58,7 +58,8 @@ export type MarkerScanErrorCode =
   | 'kernel-namespace'
   | 'raw-html-element'
   | 'unregistered-component'
-  | 'dynamic-attribute';
+  | 'dynamic-attribute'
+  | 'mdx-expression';
 
 export type MarkerScanError = { code: MarkerScanErrorCode; message: string; markerId?: string };
 
@@ -79,18 +80,35 @@ export type MarkerScan = {
 // The registry lives in core (entities/block-registry.ts: one block type per registered
 // component); core passes the enabled names in when it constructs the task's submit_page tool. NO
 // POLICY MEANS CLAIM ONLY — a missing whitelist must never widen what is accepted.
-export const elementPolicySchema = z.object({
+//
+// ONE SCHEMA, VALIDATED AT BOTH ENDS (wave 2b close final — Sol's malformed-policy probe): the
+// policy is plain JSON that crosses a process boundary (the parent writes it into the MCP child's
+// descriptors file), so it is UNTRUSTED input on both sides. An unvalidated parent policy either
+// threw (`allowedComponents: 42` is not spreadable) or silently degraded (`allowedComponents: 'Bad'`
+// spread into a character allow-list, admitting <B>, <a>, <d>), and the child normalized through
+// this schema while the parent did not — the two ends could accept different pages. STRICT object:
+// an unknown key means the value was not built by configElementPolicy, and a policy shape the
+// kernel does not recognize must never widen what is accepted.
+export const elementPolicySchema = z.strictObject({
   allowedComponents: z.array(z.string().min(1)).default([])
 });
 export type ElementPolicy = z.infer<typeof elementPolicySchema>;
+
+// The single normalization every consumer runs — parent tool construction, every validation entry
+// point, and the MCP child's rebuild. Anything that fails validation degrades to undefined, which
+// means CLAIM-ONLY; never a throw, never a partial allow-list.
+export const normalizeElementPolicy = (policy: unknown): ElementPolicy | undefined => {
+  const parsed = elementPolicySchema.safeParse(policy);
+  return parsed.success ? parsed.data : undefined;
+};
 
 // The inline claim marker is claim VOCABULARY, not a theme component (it is deliberately absent
 // from the block registry), so it is allowed unconditionally and validated by its own far stricter
 // rules below (id-only attribute whitelist, no nesting, no expressions, no JSX).
 export const CLAIM_ELEMENT_NAME = 'Claim';
 
-const allowedElementNames = (policy: ElementPolicy | undefined): Set<string> =>
-  new Set([CLAIM_ELEMENT_NAME, ...(policy?.allowedComponents ?? [])]);
+const allowedElementNames = (policy: unknown): Set<string> =>
+  new Set([CLAIM_ELEMENT_NAME, ...(normalizeElementPolicy(policy)?.allowedComponents ?? [])]);
 
 const renderAllowedComponents = (allowed: ReadonlySet<string>): string => {
   const names = [...allowed].filter((name) => name !== CLAIM_ELEMENT_NAME);
@@ -165,7 +183,12 @@ const eventHandlerNamePattern = /^(?:on[A-Z]|[oO][nN][a-zA-Z]{3,})/u;
 // The same handler shape spelled INSIDE an attribute value, where it is executable only as part of
 // MARKUP: a tag whose attribute list carries a handler. Prose that merely mentions the word
 // "onerror" carries no tag and stays legal.
-const markupEventHandlerPattern = /<[a-zA-Z][^>]*?\s(?:on(?:[A-Z]|[a-z]{3,}))\s*=/u;
+//
+// THE SAME SHAPE RULE, CASE-INSENSITIVELY (wave 2b close final — Sol's ONERROR-in-a-prop probe):
+// this pattern used to read `on` case-SENSITIVELY, so `set:html="<img onError=…>"`, `ONERROR=` and
+// `OnError=` walked past while the identical name written directly on the element was caught. HTML
+// honours every spelling, so the name shape here is exactly eventHandlerNamePattern's.
+const markupEventHandlerPattern = /<[a-zA-Z][^>]*?\s(?:on[A-Z]|[oO][nN][a-zA-Z]{3,})\s*=/u;
 
 const eventHandlerAttributeName = (
   attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>
@@ -665,7 +688,30 @@ export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerSca
           code: 'marker-in-expression',
           message: `a <Claim> marker sits inside a JSX expression at offset ${node.position?.start?.offset ?? 0} — markers must be plain inline MDX in the prose, never inside {…} expressions`
         });
+        return;
       }
+      // NO EXPRESSIONS IN A PAGE BODY (wave 2b close final — Sol's expression-wrapped-JSX probe):
+      // the element whitelist walks ELEMENTS, but an expression's contents are one opaque source
+      // string to mdast — `{<div>}`, `{<Sneaky/>}`, `{<>…</>}` and `{<Callout tone={x}/>}` all
+      // compile to real elements while producing no element node the whitelist could refuse. The
+      // same shrink-the-surface move the whitelist made for elements applies here: generated
+      // documentation never needs an embedded expression, so the whole node kind is refused and
+      // there is nothing left to deny-list inside it. The payload-specific codes above still fire
+      // first, because a named cause repairs faster than a generic one.
+      //
+      // Inside a <Claim>, collectClaim already reported 'marker-expression' against the marker id —
+      // the more precise message for the same prohibition, so this does not pile a second error on.
+      if (context.inClaim) {
+        return;
+      }
+      errors.push({
+        code: 'mdx-expression',
+        message:
+          `the page contains an MDX expression ({…}) at offset ${node.position?.start?.offset ?? 0} — generated ` +
+          'pages carry NO embedded expressions: an expression is evaluated at render time, so it can emit elements, ' +
+          'props and text the kernel never saw when it checked the page. Write the literal text instead (a code ' +
+          'FENCE or `inline code` containing braces is documentation and stays fine) and resubmit'
+      });
       return;
     }
     let childContext = context;
@@ -719,8 +765,9 @@ export const submitPageDescriptor: ToolDescriptor = {
   description:
     'Submit the finished page: the complete MDX (with inline <Claim id="…">…</Claim> markers) plus the claim ' +
     'ledger. The page may contain plain Markdown, <Claim> markers, and the registered components listed in your ' +
-    'instructions — no raw HTML elements, and every component prop must be a plain string literal (no {…} ' +
-    'expressions, no spreads). The submission is validated; on errors, fix exactly what is listed and call ' +
+    'instructions — no raw HTML elements, no {…} expressions anywhere in the page, and every component prop must be ' +
+    'a plain string literal (no expression values, no spreads). The submission is validated; on errors, fix exactly ' +
+    'what is listed and call ' +
     'submit_page again with the full corrected page. The task result is your last accepted submission.',
   paramsJsonSchema: {
     type: 'object',
@@ -889,8 +936,12 @@ export type SubmitPageTool = {
   accepted: () => AcceptedSubmission | undefined;
 };
 
-export const createSubmitPageTool = (policy?: ElementPolicy): SubmitPageTool => {
+export const createSubmitPageTool = (rawPolicy?: unknown): SubmitPageTool => {
   let accepted: AcceptedSubmission | undefined;
+  // VALIDATED AT THE PARENT END TOO: the policy is normalized once, here, so a malformed one
+  // degrades to Claim-only instead of throwing inside the scan — and the value that rides to the
+  // MCP child is already the canonical shape the child re-validates.
+  const policy = normalizeElementPolicy(rawPolicy);
   return {
     tool: {
       descriptor: submitPageDescriptor,

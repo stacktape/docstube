@@ -205,7 +205,10 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       ownOutputPrefixes: ownOutputs
     });
     if (unversionedSources.length > 0) {
-      await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, unversionedSources)] });
+      await journal.append({
+        type: 'findings',
+        findings: [dirtyWorkingTreeWarning(commit, unversionedSources, treeDirtyAtStart)]
+      });
     }
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 

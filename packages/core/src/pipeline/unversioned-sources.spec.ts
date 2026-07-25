@@ -126,6 +126,10 @@ describe('unversioned read sources', () => {
     expect(journalRaw).toContain('never the complete state');
     expect(journalRaw).toContain('read 1 source file that git does not version');
     expect(journalRaw).toContain('src/extra.ts');
+    // …and the sentence describes what was actually observed: porcelain reported this file, so the
+    // warning must not claim the tree "looked clean" (wave 2b close final).
+    expect(journalRaw).toContain('reported the working tree dirty as well');
+    expect(journalRaw).not.toContain('looked clean');
   }, 60_000);
 
   it('never promises samples it does not carry: the generic dirty-tree warning names no paths', () => {
@@ -139,6 +143,8 @@ describe('unversioned read sources', () => {
     const sampled = dirtyWorkingTreeWarning('a'.repeat(40), ['dist-dogfood/lib.ts']);
     expect(sampled.message).toContain('read 1 source file that git does not version');
     expect(sampled.message).toContain('dist-dogfood/lib.ts');
+    // An ignored file IS invisible to porcelain, so this is the case that may say "looked clean".
+    expect(sampled.message).toContain('so the tree looked clean');
   });
 
   it('resolves trackedness over the BOUNDED read set and excludes docstube’s own outputs', async () => {
