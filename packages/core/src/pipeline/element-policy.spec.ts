@@ -96,6 +96,33 @@ describe('buildWriterSystemPrompt', () => {
     expect(prompt).toContain('data-docstube');
   });
 
+  it('teaches the STRUCTURED prop shape the gate accepts, with an example (wave 2b close)', () => {
+    // PROMPT AND GATE IN LOCKSTEP, second axis: five registered components declare array/object
+    // props that JSX can only spell as an expression. The gate accepts a static literal, so the
+    // prompt must show that shape — otherwise the writer reads "plain string literals only",
+    // hits a guaranteed repair loop on <Steps>, and quietly stops using half the registry.
+    const prompt = buildWriterSystemPrompt(promptInput(['Steps', 'Tabs']));
+    expect(prompt).toContain('STATIC LITERAL DATA');
+    expect(prompt).toContain('<Tabs tabs={[{ label: "npm", value: "npm" }, { label: "pnpm", value: "pnpm" }]}');
+    expect(prompt).toContain('function call (prop={getSteps()})');
+    // The page-body expression ban is stated as exactly that, so it does not read as forbidding
+    // the prop form the very next rule requires.
+    expect(prompt).toContain('NO {…} EXPRESSIONS IN THE PAGE BODY');
+
+    // The prompt's own example is authorable under the policy it describes.
+    const policy = configElementPolicy({ components: ['Tabs'] });
+    const example = validateSubmission(
+      {
+        mdx: mdxWith(
+          '<Tabs tabs={[{ label: "npm", value: "npm" }, { label: "pnpm", value: "pnpm" }]} defaultValue="npm" />'
+        ),
+        ledger: emptyLedger
+      },
+      policy
+    );
+    expect(example.errors).toEqual([]);
+  });
+
   it('tells a component-less project to use plain Markdown, matching the fail-closed policy', () => {
     expect(buildWriterSystemPrompt(promptInput([]))).toContain('no components are enabled for this project');
   });

@@ -7,6 +7,7 @@ import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { parse as parseYaml } from 'yaml';
+import { readStaticJsonLiteral } from '@docstube/agent-runtime';
 import type { BlockEntity, PageEntity, SectionEntity } from '@docstube/contracts';
 import {
   canonicalMdxSource,
@@ -96,8 +97,15 @@ const jsxAttributesToMetadata = (
     } else if (typeof attribute.value === 'string') {
       metadata[attribute.name] = attribute.value;
     } else {
-      // Expression attribute: keep the raw expression text; registry validation decides.
-      metadata[attribute.name] = { $expression: attribute.value.value };
+      // STRUCTURED PROPS ARE REAL VALUES (wave 2b close — the structured-component regression):
+      // components like Steps, Tabs and ParamTable declare array/object props, and JSX can only
+      // spell those as an expression. submit_page accepts such a value when the whole of it is
+      // static literal data, so extraction must decode it to the SAME value the renderer receives
+      // — otherwise the block metadata never validates against the component's props schema
+      // (verifiers/entity-integrity.ts) and the component is unusable in practice.
+      // Anything not provably literal keeps the raw expression text; registry validation decides.
+      const literal = readStaticJsonLiteral(attribute.value);
+      metadata[attribute.name] = literal.ok ? literal.value : { $expression: attribute.value.value };
     }
   }
   return metadata;

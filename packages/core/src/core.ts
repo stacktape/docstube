@@ -41,6 +41,7 @@ export type { VersionCutResult } from './state/version-cut.ts';
 
 export { runVerifiers, errorFindings } from './pipeline/verify-page.ts';
 export type { VerifyStageInput } from './pipeline/verify-page.ts';
+export { configElementPolicy } from './pipeline/element-policy.ts';
 export { buildWriterSystemPrompt, buildWriterUserPrompt, buildWritePageTask } from './pipeline/write-page.ts';
 export type { WritePromptInput } from './pipeline/write-page.ts';
 export { runGenerate, unwrapMdxFence, resolveCommit } from './pipeline/generate.ts';

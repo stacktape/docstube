@@ -281,6 +281,241 @@ const kernelOwnedAttribute = (attributes: Array<MdxJsxAttribute | MdxJsxExpressi
   return undefined;
 };
 
+// STATIC JSON-LITERAL PROPS ('dynamic-attribute', wave 2b close — the structured-component
+// regression): the literal-props-only rule refused EVERY expression value, but five registered
+// components (Steps, Tabs, FileTree, ParamTable, ComparisonTable) declare array/object props that
+// JSX can only spell as an expression — items={[…]}. They were advertised to the writer in the
+// prompt AND in this tool's descriptor while every use was rejected, so the writer hit a
+// guaranteed repair loop and would quietly stop using them, degrading every page that wanted a
+// step list or a parameter table.
+//
+// The rule that restores them without reopening the dynamic-value hole: an expression value is
+// accepted ONLY when the WHOLE of it is JSON data — strings, numbers, booleans, null, arrays and
+// objects, nested freely. Nothing else: no identifier (`undefined` is one), no property access,
+// no call, no template literal, no JSX, no spread, no operator, no comment, no second statement.
+// A value that is entirely literal data reads off the AST exactly as the renderer will see it,
+// which is the whole property the string-literal rule existed to preserve.
+//
+// OPERATORS STAY OUT, INCLUDING UNARY MINUS: `-1` parses as a UnaryExpression, not a literal, and
+// admitting one operator is the first step of the deny-list collapse the element whitelist already
+// refused to keep fighting. The documented cost: a negative number in a ComparisonTable cell is
+// written as the string "-1".
+//
+// THE ESTREE ROUTE, NOT A TEXT PARSE: remark-mdx already attaches acorn's parse of every attribute
+// expression at `value.data.estree`, so this walks the REAL parse tree of the exact bytes MDX will
+// compile, and every node kind must be Literal / ArrayExpression / ObjectExpression or the value
+// is refused. Re-parsing the source text with JSON.parse would first need JS source normalized
+// into JSON (unquoted keys, single quotes, trailing commas), and any gap in that normalization is
+// a value the kernel reads differently from the renderer — exactly the divergence the policy
+// exists to prevent. A missing or unreadable estree fails closed.
+export type StaticLiteral = string | number | boolean | null | StaticLiteral[] | { [key: string]: StaticLiteral };
+export type StaticLiteralResult = { ok: true; value: StaticLiteral } | { ok: false; reason: string };
+
+type EstreeNode = { type?: unknown; [key: string]: unknown };
+
+const asEstreeNode = (node: unknown): EstreeNode | undefined =>
+  node !== null && typeof node === 'object' ? (node as EstreeNode) : undefined;
+
+// Names the writer will recognize for the thing it actually wrote.
+const describeExpressionNode = (type: unknown): string => {
+  switch (type) {
+    case 'Identifier':
+      return 'a name (an identifier such as a variable, or `undefined`)';
+    case 'MemberExpression':
+      return 'a property access';
+    case 'CallExpression':
+    case 'NewExpression':
+      return 'a function call';
+    case 'TemplateLiteral':
+    case 'TaggedTemplateExpression':
+      return 'a template literal';
+    case 'JSXElement':
+    case 'JSXFragment':
+      return 'JSX';
+    case 'SpreadElement':
+      return 'a spread (...)';
+    case 'ArrowFunctionExpression':
+    case 'FunctionExpression':
+      return 'a function';
+    case 'UnaryExpression':
+    case 'BinaryExpression':
+    case 'LogicalExpression':
+    case 'ConditionalExpression':
+    case 'AssignmentExpression':
+    case 'SequenceExpression':
+    case 'UpdateExpression':
+      return 'an operator expression';
+    case 'AwaitExpression':
+    case 'YieldExpression':
+      return 'a suspended expression';
+    default:
+      return typeof type === 'string' ? `a ${type}` : 'an unreadable expression';
+  }
+};
+
+const literalFromEstree = (node: unknown): StaticLiteralResult => {
+  const estree = asEstreeNode(node);
+  if (estree === undefined) {
+    return { ok: false, reason: 'an unreadable expression' };
+  }
+  if (estree.type === 'Literal') {
+    // A regex or bigint literal is a Literal node whose VALUE is not JSON data; both carry their
+    // own marker property, and both are refused by the value check below anyway.
+    if ('regex' in estree || 'bigint' in estree) {
+      return { ok: false, reason: 'a regular-expression or bigint literal' };
+    }
+    const value = estree.value;
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+      return { ok: true, value };
+    }
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? { ok: true, value } : { ok: false, reason: 'a non-finite number' };
+    }
+    return { ok: false, reason: 'a literal that is not JSON data' };
+  }
+  if (estree.type === 'ArrayExpression') {
+    const elements = Array.isArray(estree.elements) ? estree.elements : [];
+    const values: StaticLiteral[] = [];
+    for (const element of elements) {
+      // A hole ([1, , 2]) is a null element — not a value the kernel can read.
+      if (element === null || element === undefined) {
+        return { ok: false, reason: 'an array hole ([1, , 2])' };
+      }
+      const item = literalFromEstree(element);
+      if (!item.ok) {
+        return item;
+      }
+      values.push(item.value);
+    }
+    return { ok: true, value: values };
+  }
+  if (estree.type === 'ObjectExpression') {
+    const properties = Array.isArray(estree.properties) ? estree.properties : [];
+    const value: Record<string, StaticLiteral> = {};
+    for (const rawProperty of properties) {
+      const property = asEstreeNode(rawProperty);
+      if (property === undefined) {
+        return { ok: false, reason: 'an unreadable object member' };
+      }
+      if (property.type !== 'Property' || property.kind !== 'init' || property.method === true) {
+        return {
+          ok: false,
+          reason: describeExpressionNode(property.type === 'Property' ? 'FunctionExpression' : property.type)
+        };
+      }
+      if (property.computed === true) {
+        return { ok: false, reason: 'a computed object key ({[k]: v})' };
+      }
+      const key = asEstreeNode(property.key);
+      const name =
+        key?.type === 'Identifier' && typeof key.name === 'string'
+          ? key.name
+          : key?.type === 'Literal' && (typeof key.value === 'string' || typeof key.value === 'number')
+            ? String(key.value)
+            : undefined;
+      if (name === undefined) {
+        return { ok: false, reason: 'an object key that is not a plain name' };
+      }
+      const item = literalFromEstree(property.value);
+      if (!item.ok) {
+        return item;
+      }
+      value[name] = item.value;
+    }
+    return { ok: true, value };
+  }
+  return { ok: false, reason: describeExpressionNode(estree.type) };
+};
+
+// Reads an mdxJsxAttributeValueExpression (prop={…}) as static JSON data, or says why it is not.
+export const readStaticJsonLiteral = (attributeValue: unknown): StaticLiteralResult => {
+  const node = asEstreeNode(attributeValue);
+  const program = asEstreeNode(asEstreeNode(node?.data)?.estree);
+  if (program === undefined || program.type !== 'Program') {
+    return { ok: false, reason: 'an expression the kernel could not parse' };
+  }
+  // A comment can carry no runtime effect, but "no comments" is one fewer thing to reason about
+  // and costs a writer nothing — documentation props do not need annotations.
+  if (Array.isArray(program.comments) && program.comments.length > 0) {
+    return { ok: false, reason: 'a comment' };
+  }
+  const body = Array.isArray(program.body) ? program.body : [];
+  if (body.length !== 1) {
+    return { ok: false, reason: body.length === 0 ? 'no value at all' : 'more than one statement' };
+  }
+  const statement = asEstreeNode(body[0]);
+  if (statement?.type !== 'ExpressionStatement') {
+    return { ok: false, reason: 'a statement rather than a value' };
+  }
+  return literalFromEstree(statement.expression);
+};
+
+// EVERY PROHIBITION APPLIES TO THE RESULT, RECURSIVELY: a literal must not smuggle in a nested
+// string what a plain string prop could never carry. Strings anywhere in the structure face the
+// same tag-shape rule as a string attribute value, and object KEYS are prop names one level down,
+// so they face the handler-name and kernel-namespace rules that guard attribute names.
+type LiteralContentIssue = { code: MarkerScanErrorCode; detail: string };
+
+const literalContentIssues = (value: StaticLiteral, path: string): LiteralContentIssue[] => {
+  if (typeof value === 'string') {
+    return tagOpenShapePattern.test(value)
+      ? [
+          {
+            code: 'markup-attribute',
+            detail:
+              `the literal value at ${path} contains markup (a "<" immediately followed by a letter or "/") — ` +
+              'component props carry PLAIN TEXT, in nested literal data exactly as in a string prop'
+          }
+        ]
+      : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => literalContentIssues(item, `${path}[${index}]`));
+  }
+  if (value === null || typeof value !== 'object') {
+    return [];
+  }
+  const issues: LiteralContentIssue[] = [];
+  for (const [key, member] of Object.entries(value)) {
+    const keyPath = `${path}.${key}`;
+    if (eventHandlerNamePattern.test(key)) {
+      issues.push({
+        code: 'page-script',
+        detail:
+          `the literal key ${keyPath} is an event-handler name — a handler is executable page behavior wherever ` +
+          'it is spelled, and the theme owns page behavior'
+      });
+    }
+    if (key.toLowerCase().startsWith(KERNEL_DATA_ATTRIBUTE_PREFIX)) {
+      issues.push({
+        code: 'kernel-namespace',
+        detail: `the literal key ${keyPath} is in docstube's own "${KERNEL_DATA_ATTRIBUTE_PREFIX}*" namespace`
+      });
+    }
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'class' || lowerKey === 'classname' || lowerKey === 'id') {
+      const owned =
+        typeof member === 'string'
+          ? member.split(/[\s'"`]+/u).find((token) => token.startsWith(KERNEL_CLASS_PREFIX))
+          : undefined;
+      if (owned !== undefined) {
+        issues.push({
+          code: 'kernel-namespace',
+          detail: `the literal key ${keyPath} carries the kernel-owned value "${owned}"`
+        });
+      }
+    }
+    if (tagOpenShapePattern.test(key)) {
+      issues.push({
+        code: 'markup-attribute',
+        detail: `the literal key ${keyPath} contains markup (a "<" immediately followed by a letter or "/")`
+      });
+    }
+    issues.push(...literalContentIssues(member, keyPath));
+  }
+  return issues;
+};
+
 const markerIdOf = (attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>): string | undefined => {
   for (const attribute of attributes) {
     if (attribute.type === 'mdxJsxAttribute' && attribute.name === 'id' && typeof attribute.value === 'string') {
@@ -624,9 +859,9 @@ export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerSca
             'Markdown or a registered component and resubmit'
         });
       }
-      // STATICALLY ANALYZABLE ATTRIBUTES. With spreads and expression values refused, every
-      // attribute name and value reads straight off the AST — which is exactly why no regex over
-      // source text is needed to see what an element carries.
+      // STATICALLY ANALYZABLE ATTRIBUTES. With spreads and computed expression values refused,
+      // every attribute name and value reads straight off the AST — which is exactly why no regex
+      // over source text is needed to see what an element carries.
       for (const attribute of attributes) {
         if (attribute.type === 'mdxJsxExpressionAttribute') {
           errors.push({
@@ -634,19 +869,35 @@ export const scanClaimMarkers = (mdx: string, policy?: ElementPolicy): MarkerSca
             message:
               `<${elementName}> at offset ${offset} carries a {…} spread attribute — a spread hides which props ` +
               'an element actually gets, so the kernel cannot tell prose formatting from executable behavior or ' +
-              'counterfeit proof chrome. Write every prop as a plain string literal (prop="value") and resubmit'
+              'counterfeit proof chrome. Write every prop out by name, as a plain string literal (prop="value") ' +
+              'or as static literal data (prop={[…]}), and resubmit'
           });
           continue;
         }
         if (attribute.value !== null && typeof attribute.value === 'object') {
-          errors.push({
-            code: 'dynamic-attribute',
-            message:
-              `<${elementName}> at offset ${offset} carries the expression-valued attribute ` +
-              `${attribute.name}={…} — an expression computes its value at render time, so the kernel cannot read ` +
-              `what the element actually gets. Write it as a plain string literal (${attribute.name}="value") and ` +
-              'resubmit'
-          });
+          const literal = readStaticJsonLiteral(attribute.value);
+          if (!literal.ok) {
+            errors.push({
+              code: 'dynamic-attribute',
+              message:
+                `<${elementName}> at offset ${offset} carries the expression-valued attribute ` +
+                `${attribute.name}={…}, which contains ${literal.reason} — an expression value is accepted ONLY ` +
+                'when the WHOLE of it is static literal data (strings, numbers, true/false, null, arrays and ' +
+                'objects, nested freely). Anything else is computed when the page renders, so the kernel cannot ' +
+                `read what the element actually gets. Write a text prop as ${attribute.name}="value", or a ` +
+                `structured prop as literal data (${attribute.name}={[{ label: "npm", value: "npm" }]}), and resubmit`
+            });
+            continue;
+          }
+          for (const issue of literalContentIssues(literal.value, attribute.name)) {
+            errors.push({
+              code: issue.code,
+              message:
+                `<${elementName}> at offset ${offset} carries the "${attribute.name}" prop where ${issue.detail}. ` +
+                'The rules that govern a string prop govern every string and key inside literal data too — write ' +
+                'plain text (put markup you want to SHOW in a code fence), rename kernel-owned names, and resubmit'
+            });
+          }
           continue;
         }
         // PROPS CARRY PLAIN TEXT, NOT MARKUP (see tagOpenShapePattern): the script/style and
@@ -832,10 +1083,12 @@ export const submitPageDescriptor: ToolDescriptor = {
   description:
     'Submit the finished page: the complete MDX (with inline <Claim id="…">…</Claim> markers) plus the claim ' +
     'ledger. The page may contain plain Markdown, <Claim> markers, and the registered components listed in your ' +
-    'instructions — no raw HTML elements, no {…} expressions anywhere in the page, no import/export statements, and ' +
-    'every component prop must be a plain string literal carrying plain text (no expression values, no spreads, no ' +
-    'markup inside the value). The submission is validated; on errors, fix exactly ' +
-    'what is listed and call ' +
+    'instructions — no raw HTML elements, no {…} expressions anywhere in the page, and no import/export statements. ' +
+    'Every component prop is either a plain string literal carrying plain text (title="Setup") or, for a structured ' +
+    'prop, STATIC literal data: strings, numbers, true/false, null, arrays and objects only, e.g. ' +
+    '<Tabs tabs={[{ label: "npm", value: "npm" }]} />. No identifiers, calls, template literals, spreads, operators ' +
+    'or expressions of any other kind, and no markup inside any value or key. The submission is validated; on ' +
+    'errors, fix exactly what is listed and call ' +
     'submit_page again with the full corrected page. The task result is your last accepted submission.',
   paramsJsonSchema: {
     type: 'object',

@@ -14,6 +14,7 @@ export {
   elementPolicySchema,
   evaluateSubmitPageCall,
   normalizeElementPolicy,
+  readStaticJsonLiteral,
   scanClaimMarkers,
   submitPageDescriptor,
   validateSubmission
@@ -25,6 +26,8 @@ export type {
   MarkerScan,
   MarkerScanError,
   MarkerScanErrorCode,
+  StaticLiteral,
+  StaticLiteralResult,
   SubmitPageResponse,
   SubmitPageTool
 } from './submit-page.ts';

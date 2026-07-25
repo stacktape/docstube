@@ -555,7 +555,7 @@ describe('scanClaimMarkers', () => {
       expect(claimOnly.errors).toEqual([]);
     });
 
-    it('rejects {...spread} and expression-valued attributes — props must be plain string literals', () => {
+    it('rejects {...spread} and COMPUTED expression-valued attributes — a prop value must read off the AST', () => {
       const spread = scanClaimMarkers('Text.\n\n<Callout {...handlerProps}>Body.</Callout>\n', registry);
       expect(spread.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
       expect(spread.errors[0]?.message).toContain('spread');
@@ -568,6 +568,96 @@ describe('scanClaimMarkers', () => {
       // Literal props — including a valueless boolean prop — stay legal and fully readable.
       const literal = scanClaimMarkers('Text.\n\n<Callout tone="info" wide>Body.</Callout>\n', registry);
       expect(literal.errors).toEqual([]);
+    });
+
+    // STATIC JSON-LITERAL PROPS (wave 2b close — the structured-component regression): five
+    // registered components declare array/object props that JSX can only spell as an expression, so
+    // a literal-props-ONLY rule advertised them in the prompt and the descriptor while rejecting
+    // every use — a guaranteed repair loop. Static literal DATA is accepted; anything computed is
+    // not, and every string prohibition still applies recursively to what the literal carries.
+    describe('static JSON-literal props', () => {
+      const structured: ElementPolicy = {
+        allowedComponents: ['Steps', 'Tabs', 'FileTree', 'ParamTable', 'ComparisonTable', 'Callout']
+      };
+
+      it("accepts each structured component's documented prop shape", () => {
+        const shapes = [
+          '<Steps items={["Install the CLI", "Run docstube init", "Commit .docstube/"]} />',
+          '<Tabs tabs={[{ label: "npm", value: "npm" }, { label: "pnpm", value: "pnpm" }]} defaultValue="npm">Body.</Tabs>',
+          '<FileTree entries={[{ path: "src/cli.ts", kind: "file" }, { path: "src", kind: "directory" }]} />',
+          '<ParamTable params={[{ name: "retries", type: "number", required: false, description: "Attempts before failing." }]} />',
+          '<ComparisonTable columns={["Feature", "v1", "v2"]} rows={[["Retries", false, true], ["Timeout", 30, 60]]} />'
+        ];
+        for (const shape of shapes) {
+          expect(scanClaimMarkers(`Text.\n\n${shape}\n`, structured).errors).toEqual([]);
+        }
+      });
+
+      it('accepts nesting, and keeps plain string literals and valueless booleans working', () => {
+        const nested = scanClaimMarkers(
+          'Text.\n\n<Steps items={[{ title: "One", detail: { note: "deep", tags: ["a", null, 1, true] } }]} />\n',
+          structured
+        );
+        expect(nested.errors).toEqual([]);
+        const plain = scanClaimMarkers(
+          'Text.\n\n<Callout tone="info" wide title="Heads up">Body.</Callout>\n',
+          structured
+        );
+        expect(plain.errors).toEqual([]);
+      });
+
+      it('rejects every computed expression value as dynamic-attribute', () => {
+        const cases: Array<[string, string]> = [
+          ['<Steps items={getSteps()} />', 'a function call'],
+          ['<Steps items={x} />', 'an identifier'],
+          ['<Steps items={undefined} />', 'an identifier'],
+          ['<Steps items={[...a, b]} />', 'a spread (...)'],
+          ['<Steps items={config.steps} />', 'a property access'],
+          ['<Steps items={[`one`]} />', 'a template literal'],
+          ['<Steps items={[<Callout />]} />', 'JSX'],
+          ['<Steps items={[-1]} />', 'an operator expression'],
+          ['<Steps items={[{ ...rest }]} />', 'a spread (...)'],
+          ['<Steps items={{ [key]: "x" }} />', 'a computed object key'],
+          ['<Steps items={/re/} />', 'a regular-expression or bigint literal']
+        ];
+        for (const [body, reason] of cases) {
+          const scan = scanClaimMarkers(`Text.\n\n${body}\n`, structured);
+          expect(scan.errors.map((error) => error.code)).toEqual(['dynamic-attribute']);
+          expect(scan.errors[0]?.message).toContain(reason);
+          expect(scan.errors[0]?.message).toContain('items={…}');
+        }
+      });
+
+      it('applies the markup and handler rules RECURSIVELY to strings and keys inside an accepted literal', () => {
+        // The literal parses as pure data, so the shape check passes — and the smuggled markup is
+        // caught anyway, by the same rules a plain string prop faces.
+        const smuggled = scanClaimMarkers(
+          'Text.\n\n<Steps items={["Install it", "<img src=x onerror=rewrite()>"]} />\n',
+          structured
+        );
+        expect(smuggled.errors.length).toBeGreaterThan(0);
+        expect(smuggled.errors.some((error) => error.code === 'markup-attribute')).toBe(true);
+        expect(smuggled.errors.some((error) => error.code === 'page-script')).toBe(true);
+        expect(smuggled.errors.find((error) => error.code === 'markup-attribute')?.message).toContain('items[1]');
+
+        // A handler-shaped KEY is a prop name one level down, and gets the prop-name rule.
+        const handlerKey = scanClaimMarkers('Text.\n\n<Steps items={[{ onClick: "run" }]} />\n', structured);
+        expect(handlerKey.errors.map((error) => error.code)).toEqual(['page-script']);
+        expect(handlerKey.errors[0]?.message).toContain('items[0].onClick');
+
+        // …and so does a key (or value) in docstube's own presentation namespace.
+        const kernelKey = scanClaimMarkers(
+          'Text.\n\n<Steps items={[{ "data-docstube-claim": "c1" }]} />\n',
+          structured
+        );
+        expect(kernelKey.errors.map((error) => error.code)).toEqual(['kernel-namespace']);
+        const kernelValue = scanClaimMarkers(
+          'Text.\n\n<Steps items={[{ class: "dt-claims--complete" }]} />\n',
+          structured
+        );
+        expect(kernelValue.errors.map((error) => error.code)).toEqual(['kernel-namespace']);
+        expect(kernelValue.errors[0]?.message).toContain('dt-claims--complete');
+      });
     });
 
     it("rejects MDX EXPRESSIONS OUTRIGHT — {…} hides JSX from the element whitelist (Sol's probe)", () => {
@@ -757,6 +847,14 @@ describe('submitPageDescriptor', () => {
     }
     expect(serialized).not.toContain('"check"');
     expect(serialized).not.toContain('$schema');
+  });
+
+  it('states the prop rule the validator enforces, including the structured form', () => {
+    // The descriptor is what a vendor transport shows the model, so it must not advertise a rule
+    // stricter than the gate: a structured component could otherwise never be authored.
+    expect(submitPageDescriptor.description).toContain('STATIC literal data');
+    expect(submitPageDescriptor.description).toContain('<Tabs tabs={[{ label: "npm", value: "npm" }]} />');
+    expect(submitPageDescriptor.description).toContain('No identifiers, calls, template literals, spreads, operators');
   });
 });
 
