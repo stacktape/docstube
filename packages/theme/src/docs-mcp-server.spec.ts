@@ -144,3 +144,50 @@ describe('emitted docs-mcp-server', () => {
     expect(tool.error?.code).toBe(-32602);
   });
 });
+
+// The emitted server re-implements frontmatter stripping inline (it ships standalone into sites
+// that cannot import @docstube/contracts), so it is the one place the canonical rules can drift.
+// A strict rule here does not throw — it silently indexes frontmatter as prose.
+describe('emitted docs-mcp-server with BOM/leading-blank frontmatter', () => {
+  let child: ChildProcess | undefined;
+  let url = '';
+  let nextId = 100;
+
+  const rpc = async (method: string, params?: unknown): Promise<JsonRpcResponse> => {
+    nextId += 1;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: nextId, method, ...(params === undefined ? {} : { params }) })
+    });
+    expect(response.status).toBe(200);
+    return (await response.json()) as JsonRpcResponse;
+  };
+
+  beforeAll(async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-mcp-untidy-'));
+    await emitSite(buildFixtureInput(repoRoot, { withUntidyFrontmatter: true }));
+    const started = await startServer(join(repoRoot, 'docs-site/mcp/docs-mcp-server.mjs'));
+    child = started.child;
+    url = started.url;
+    child.removeAllListeners('exit');
+  }, 30_000);
+
+  afterAll(() => {
+    child?.kill();
+  });
+
+  it('never indexes a term that exists only in BOM-prefixed frontmatter', async () => {
+    const response = await rpc('tools/call', { name: 'ask_question', arguments: { question: 'zzyzx' } });
+    const content = response.result?.content as Array<{ type: string; text: string }>;
+    expect(content[0]?.text).toContain('No page matched');
+  });
+
+  it('strips BOM-prefixed frontmatter out of the text it returns', async () => {
+    const response = await rpc('tools/call', { name: 'ask_question', arguments: { question: 'setup prose' } });
+    const content = response.result?.content as Array<{ type: string; text: string }>;
+    expect(content[0]?.text).toContain('Some setup prose.');
+    expect(content[0]?.text).not.toContain('Zzyzx');
+    expect(content[0]?.text).not.toContain('description:');
+  });
+});

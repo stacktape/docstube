@@ -58,4 +58,43 @@ describe('mdx-compile', () => {
     expect(finding?.message).toMatch(/at line \d+/u);
     expect(finding?.span?.[0]).toBeGreaterThanOrEqual(1);
   });
+
+  it('does not read frontmatter as prose — JSX-looking text in a quoted YAML value passes', async () => {
+    // Live false-positive: the verifier compiled the RAW file, so this correct authored value —
+    // which Astro accepts and every YAML consumer parses fine — failed as an unclosed JSX tag.
+    const mdx =
+      '---\ntitle: "Widgets"\ndescription: "Use <Widget> literally, and <b>never</b> close it"\n---\n\nBody.\n';
+
+    const result = await mdxCompileVerifier.verify(makeContext(), [makeArtifact(makePage({ slug: 'widgets' }), mdx)]);
+
+    expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
+  });
+
+  it('reports body compile errors at SOURCE line numbers, not body-relative ones', async () => {
+    // The unclosed tag is on source line 7; the compiler only ever sees the body, where it is
+    // line 2. A finding that says "line 2" would send a human to the frontmatter.
+    const mdx = ['---', 'title: "Broken"', 'description: "A page"', '---', '', '# Title', '<Callout>', ''].join('\n');
+    expect(mdx.split('\n')[6]).toBe('<Callout>');
+
+    const result = await mdxCompileVerifier.verify(makeContext(), [makeArtifact(makePage({ slug: 'broken' }), mdx)]);
+
+    expect(result.status).toBe('fail');
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.message).toContain('at line 7');
+    expect(result.findings[0]?.span).toEqual([7, 7]);
+    // No stale body-relative duplicate left inside the reason text.
+    expect(result.findings[0]?.message).not.toMatch(/\(\d+:\d+/u);
+  });
+
+  it('reports malformed frontmatter as a YAML error, never as an MDX compile error', async () => {
+    const mdx = '---\ntitle: Configuration\ndescription: unquoted: colon\n---\n\n# Fine body\n\nPlain prose.\n';
+
+    const result = await mdxCompileVerifier.verify(makeContext(), [makeArtifact(makePage({ slug: 'bad-yaml' }), mdx)]);
+
+    expect(result.status).toBe('fail');
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]?.message).toContain('frontmatter is not valid YAML');
+    expect(result.findings[0]?.message).not.toContain('MDX failed to compile');
+  });
 });

@@ -27,6 +27,9 @@ export type FixtureInputOptions = {
   // Adds a CONTRADICTED value claim to the install page's trust spine — the loud-rendering path
   // (impl-07 finding 4).
   withContradiction?: boolean;
+  // Writes the setup page's frontmatter the tolerant way (BOM + a blank line above the delimiter),
+  // which strict stripping leaks into whatever consumes the page's text.
+  withUntidyFrontmatter?: boolean;
 };
 
 // A shard carrying the v2 trust spine: one CHECKED claim anchored in the "Requirements" section
@@ -104,12 +107,18 @@ const bindMdx = (shard: PageShard, mdx: string): PageShard => ({
 });
 
 export const setupMdx = '---\ndescription: Fixture setup page.\n---\n\n# Setup guide\n\nSome setup prose.\n';
+// The same page as a Windows editor writes it: a UTF-8 BOM and a blank line above the delimiter.
+// "zzyzx" appears ONLY in the frontmatter, so a search hit on it is proof that frontmatter leaked
+// into indexed text.
+export const untidySetupMdx =
+  '\uFEFF\n---\ndescription: Zzyzx fixture setup page.\n---\n\n# Setup guide\n\nSome setup prose.\n';
 export const installMdx = '# Installation\n\n<Callout tone="info">Install with npm.</Callout>\n';
 export const installDeMdx = '# Installation (DE)\n\n<Callout tone="info">Installiere mit npm.</Callout>\n';
 
 export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOptions): EmitSiteInput => {
   const installPage = buildFixturePage();
   const setupPage: PageEntity = { ...buildFixturePage(), slug: 'guides/setup', title: 'Setup guide' };
+  const setupPageMdx = options?.withUntidyFrontmatter === true ? untidySetupMdx : setupMdx;
   const config = docstubeConfigSchema.parse({
     ...fixtureConfigInput,
     site: {
@@ -159,7 +168,7 @@ export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOption
         ),
         mdx: installMdx
       },
-      { shard: bindMdx(buildFixturePageShard(setupPage), setupMdx), mdx: setupMdx }
+      { shard: bindMdx(buildFixturePageShard(setupPage), setupPageMdx), mdx: setupPageMdx }
     ],
     ...(options?.withTranslation === true
       ? {

@@ -18,6 +18,12 @@
 //   - an EMPTY block (`---\n---`), which is frontmatter PRESENT with no keys, not absent.
 // A document that opens with anything else is returned untouched, so a `---` thematic break in the
 // body can never be mistaken for a frontmatter delimiter.
+//
+// ONE mirror exists and must be updated in lockstep: the docs MCP server emitted into every
+// generated site (`packages/theme/src/mcp-server-source.ts`) re-implements these rules inline,
+// because it ships as a standalone script into sites that never depend on @docstube/* at runtime
+// (ARCHITECTURE.md §2) and so cannot import this module. This file stays the source of truth; if
+// the rules change here, change them there too or frontmatter leaks into that server's search.
 
 export type FrontmatterSplit = {
   // The YAML text between the delimiters, without its trailing newline. Empty both for a document
