@@ -191,13 +191,29 @@ const buildAlternatesBySlug = (
   return alternates;
 };
 
+// TOLERANT SPLIT (wave 2b close): the block Astro reads as frontmatter is the block the kernel has
+// to vet, and missing one is not a harmless no-op — the raw YAML is emitted as page BODY, so the
+// author's keys turn into visible junk on the rendered page and every `docstube*` key inside them
+// goes unvetted. Three forms Astro accepts used to walk straight past the strict single regex: a
+// UTF-8 BOM before the opening delimiter (what a Windows editor writes), blank or whitespace-only
+// lines above it, and an EMPTY block (`---\n---`), which is frontmatter present with no keys rather
+// than frontmatter absent. A document that genuinely opens with anything else is returned untouched,
+// so a `---` thematic break in the body can still never be mistaken for a frontmatter delimiter.
 const splitFrontmatter = (mdx: string): { frontmatter: string; body: string } => {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(mdx);
-  const frontmatter = match?.[1];
-  if (!match || frontmatter === undefined) {
-    return { frontmatter: '', body: mdx };
+  const text = mdx.startsWith('\uFEFF') ? mdx.slice(1) : mdx;
+  const open = /^(?:[ \t]*\r?\n)*---[ \t]*\r?\n/u.exec(text);
+  if (open === null) {
+    return { frontmatter: '', body: text };
   }
-  return { frontmatter, body: mdx.slice(match[0].length) };
+  const rest = text.slice(open[0].length);
+  const close = /^---[ \t]*(?:\r?\n|$)/mu.exec(rest);
+  if (close === null) {
+    return { frontmatter: '', body: text };
+  }
+  return {
+    frontmatter: rest.slice(0, close.index).replace(/\r?\n$/u, ''),
+    body: rest.slice(close.index + close[0].length)
+  };
 };
 
 // KERNEL-OWNED FRONTMATTER (impl-24 finding): every `docstube*` key on a route is COMPUTED here
@@ -322,38 +338,22 @@ const readAuthoredFrontmatter = (frontmatter: string, route: string): AuthoredFr
   }
   const keys = new Set<string>();
   const surviving: typeof contents.items = [];
-  // COMMENT MIGRATION: a leading comment sits on the pair BELOW it, so deleting a kernel-owned pair
-  // silently deletes the author's comment too — including a comment that was written about the
-  // ordinary keys underneath it. It moves to the next surviving pair instead; if the deleted pair
-  // was last, it lands as a trailing document comment rather than being reattributed to a pair it
-  // was never written above.
-  let orphanedComment: string | undefined;
-  const carry = (comment: string | undefined) => {
-    if (comment !== undefined) {
-      orphanedComment = orphanedComment === undefined ? comment : `${orphanedComment}\n${comment}`;
-    }
-  };
+  // NO COMMENT MIGRATION (wave 2b close, deliberate — do not re-add): a comment written above a
+  // deleted `docstube*` pair is deleted with the pair, which is the yaml Document's own behavior and
+  // is defensible — the comment sat above a key the kernel owns. Reattributing it to the next
+  // surviving pair was purely cosmetic and bought real defects: a spurious `#null` comment, reversed
+  // trailing-comment order, and silently skipped complex keys.
   for (const pair of contents.items) {
     const name = pairKeyName(pair);
-    const key = isScalar(pair.key) ? pair.key : undefined;
     if (name !== undefined && name.toLowerCase().startsWith('docstube')) {
-      carry(key?.commentBefore ?? undefined);
       continue;
     }
     if (name !== undefined) {
       keys.add(name);
     }
-    if (orphanedComment !== undefined && key !== undefined) {
-      key.commentBefore =
-        key.commentBefore === undefined ? orphanedComment : `${orphanedComment}\n${key.commentBefore}`;
-      orphanedComment = undefined;
-    }
     surviving.push(pair);
   }
   contents.items = surviving;
-  if (orphanedComment !== undefined) {
-    document.comment = document.comment === undefined ? orphanedComment : `${document.comment}\n${orphanedComment}`;
-  }
   // FLOW ROOT NORMALIZED TO BLOCK (wave 2b close 2): the kernel sets a dozen keys on this mapping,
   // and a flow root would put every one of them on a single unreadable line. Block style is what
   // every other emitted route uses, and the conversion is style-only — the authored keys, values,

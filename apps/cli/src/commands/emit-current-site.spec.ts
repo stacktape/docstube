@@ -6,7 +6,7 @@ import { buildCodemap } from '@docstube/codemap';
 import { typescriptLanguagePack } from '@docstube/lang-typescript';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore, loadConfigFamily, runGenerate, runRefine } from '@docstube/core';
-import { emitCurrentSite } from './emit-current-site.ts';
+import { emitCurrentSite, emitPersistedSite } from './emit-current-site.ts';
 
 // The wave 2b-iii trust-spine E2E: generate on a real fixture repo → canonical JSON shards
 // (kernel ledger + ClaimEvidence embedded) → emitCurrentSite → the theme's interim projection
@@ -236,6 +236,16 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(tamperedRoute).toContain('docstubeUnverified: true');
     expect(tamperedRoute).toContain('docstubeClaimsChecked: 0');
     expect(tamperedRoute).toContain('docstubeClaimsTotal: 0');
+
+    // EMIT DIAGNOSTIC LABEL (wave 2b close): one warning channel carries binding failures, dropped
+    // authored frontmatter, ignored stale locale files and untranslated routes — so the printed
+    // label must NOT borrow the page trust state's name. A dropped frontmatter block leaves the
+    // page's proof exactly as verified as it was.
+    const printed: string[] = [];
+    await emitPersistedSite(repoRoot, family, { info: () => {}, error: (line) => printed.push(line) });
+    expect(printed).toHaveLength(1);
+    expect(printed[0]).toContain('  emit-warning  ');
+    expect(printed[0]?.toLowerCase()).not.toContain('  unverified  ');
   }, 120_000);
 
   it('locale routes inherit the CANONICAL proof, and a failed retranslation serves the source fallback — never stale locale bytes', async () => {

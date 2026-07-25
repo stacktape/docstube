@@ -16,13 +16,19 @@ const frontmatterOf = (route: string): string => {
   return match[1];
 };
 
-// Emits the fixture site with the install page carrying `frontmatter` as its authored block,
+// Everything after the emitted frontmatter block and its closing delimiter: the injected imports
+// plus the page body.
+const bodyOf = (route: string): string => {
+  const block = frontmatterOf(route);
+  return route.slice(route.indexOf(block) + block.length).replace(/^\r?\n---\r?\n/u, '');
+};
+
+// Emits the fixture site with the install page carrying exactly `mdx` as its persisted artifact,
 // rebinding the shard hash the way real persistence does so the route is not forced unverified.
-const emitWithFrontmatter = async (frontmatter: string, label: string) => {
+const emitWithMdx = async (mdx: string, label: string) => {
   const repoRoot = await mkdtemp(join(tmpdir(), `docstube-theme-fm-${label}-`));
   const input = buildFixtureInput(repoRoot);
   const install = input.pages[0]!;
-  const mdx = `---\n${frontmatter}\n---\n\n${installMdx}`;
   input.pages[0] = {
     ...install,
     mdx,
@@ -32,6 +38,10 @@ const emitWithFrontmatter = async (frontmatter: string, label: string) => {
   const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
   return { route, warnings: result.warnings };
 };
+
+// The same, with `frontmatter` wrapped in an ordinary delimited block.
+const emitWithFrontmatter = async (frontmatter: string, label: string) =>
+  emitWithMdx(`---\n${frontmatter}\n---\n\n${installMdx}`, label);
 
 describe('emitSite', () => {
   let siteRoot: string;
@@ -585,6 +595,9 @@ describe('emitSite', () => {
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toContain('/getting-started/installation/');
       expect(warnings[0]).toContain('could not be parsed');
+      expect(warnings[0]).toContain('it was dropped');
+      // The warning describes a DROPPED BLOCK, never the page's trust state: the proof is untouched.
+      expect(warnings[0]?.toLowerCase()).not.toContain('verified');
       expect(route).not.toContain('ReviewedFor');
       expect(route).not.toContain('keywords');
       // The kernel-computed frontmatter is still complete, so the route still renders.
@@ -661,30 +674,75 @@ describe('emitSite', () => {
       expect(parse(frontmatterOf(route))).toMatchObject({ docstubeClaimsTotal: 2 });
     });
 
-    // COMMENT MIGRATION: the author's note lives on the pair BELOW it, so deleting a kernel-owned
-    // key used to delete a comment that was written about the ordinary keys underneath.
-    it('moves a comment above a deleted docstube key onto the next surviving key', async () => {
-      const { route } = await emitWithFrontmatter(
-        '# these keywords drive the sidebar\ndocstubeClaimsComplete: true\nkeywords:\n  - install',
-        'comment-migration'
+    // NO COMMENT MIGRATION (wave 2b close, deliberate): a comment above a deleted `docstube*` key
+    // goes away with the pair — the yaml Document's own behavior, and defensible, since the comment
+    // was written above a key the kernel owns. Reattributing it was cosmetic and shipped defects
+    // (a `#null` comment, reversed trailing-comment order, skipped complex keys).
+    it('drops a comment written above a deleted docstube key, keeping comments on surviving keys', async () => {
+      const { route, warnings } = await emitWithFrontmatter(
+        '# note about the keywords\nkeywords:\n  - install\n# note about the owned key\ndocstubeReviewedFor: security',
+        'comment-drop'
       );
-      expect(route).toContain('# these keywords drive the sidebar');
-      expect(route).not.toContain('docstubeClaimsComplete');
-      const block = frontmatterOf(route);
-      const commentLine = block.split('\n').findIndex((line) => line.includes('drive the sidebar'));
-      const keywordsLine = block.split('\n').findIndex((line) => line.startsWith('keywords'));
-      expect(commentLine).toBeGreaterThanOrEqual(0);
-      expect(keywordsLine).toBe(commentLine + 1);
+      expect(warnings).toEqual([]);
+      expect(route).toContain('# note about the keywords');
+      expect(route).not.toContain('note about the owned key');
+      expect(route).not.toContain('ReviewedFor');
+      // The migration used to synthesize this out of a commentless deleted pair.
+      expect(route).not.toContain('#null');
+      expect(parse(frontmatterOf(route))).toMatchObject({ keywords: ['install'] });
+    });
+  });
+
+  // TOLERANT SPLIT (wave 2b close): Astro reads all of these as frontmatter. A split that missed one
+  // did not fail safe — it emitted the raw YAML block as page BODY, so the author's keys became
+  // visible junk on the rendered page and any `docstube*` key among them was never vetted.
+  describe('frontmatter splitting accepts every block Astro accepts', () => {
+    it.each([
+      ['a UTF-8 BOM before the delimiter', `\uFEFF---\nkeywords:\n  - install\n---\n\n${installMdx}`],
+      ['blank lines above the delimiter', `\n\n---\nkeywords:\n  - install\n---\n\n${installMdx}`],
+      ['CRLF line endings', `---\r\nkeywords:\r\n  - install\r\n---\r\n\r\n${installMdx}`]
+    ])('parses the authored block when the document has %s', async (label, mdx) => {
+      const { route, warnings } = await emitWithMdx(mdx, label.replaceAll(' ', '-'));
+      expect(warnings).toEqual([]);
+      const parsedBack = parse(frontmatterOf(route)) as Record<string, unknown>;
+      // The authored keys were parsed as frontmatter, beside the kernel-computed ones.
+      expect(parsedBack.keywords).toEqual(['install']);
+      expect(parsedBack.docstubeClaimsChecked).toBe(1);
+      // Nothing from the block leaked into the rendered body.
+      expect(bodyOf(route)).not.toContain('keywords');
+      expect(bodyOf(route)).not.toContain('\uFEFF');
     });
 
-    it('keeps a trailing comment when the deleted key was the last one', async () => {
-      const { route } = await emitWithFrontmatter(
-        'keywords:\n  - install\n# authored trailing note\ndocstubeReviewedFor: security',
-        'comment-trailing'
+    // An EMPTY block is frontmatter PRESENT with no keys, not frontmatter absent.
+    it('treats an empty frontmatter block as present-but-empty', async () => {
+      const { route, warnings } = await emitWithMdx(`---\n---\n\n${installMdx}`, 'empty-block');
+      expect(warnings).toEqual([]);
+      expect(parse(frontmatterOf(route))).toMatchObject({ title: 'Installation', docstubeClaimsChecked: 1 });
+      // The delimiters are consumed, so no stray `---` opens a thematic break above the prose.
+      expect(bodyOf(route).trimStart().startsWith('---')).toBe(false);
+      expect(bodyOf(route)).toContain('# Installation');
+    });
+
+    it('creates a frontmatter block for a document that has none', async () => {
+      const { route, warnings } = await emitWithMdx(installMdx, 'no-frontmatter');
+      expect(warnings).toEqual([]);
+      expect(parse(frontmatterOf(route))).toMatchObject({ title: 'Installation', docstubeClaimsTotal: 2 });
+      expect(bodyOf(route)).toContain('# Installation');
+    });
+
+    it('does not mistake a `---` thematic rule in the body for frontmatter', async () => {
+      const { route, warnings } = await emitWithMdx(
+        '# Installation\n\nBefore the rule.\n\n---\n\nAfter the rule.\n',
+        'rule'
       );
-      expect(route).toContain('# authored trailing note');
-      expect(route).not.toContain('ReviewedFor');
-      expect(parse(frontmatterOf(route))).toMatchObject({ keywords: ['install'] });
+      expect(warnings).toEqual([]);
+      // The whole document is body: both halves of the rule survive, and the kernel's own block is
+      // the only frontmatter on the route.
+      const body = bodyOf(route);
+      expect(body).toContain('Before the rule.');
+      expect(body).toContain('After the rule.');
+      expect(body).toContain('\n---\n');
+      expect(parse(frontmatterOf(route))).toMatchObject({ title: 'Installation' });
     });
   });
 

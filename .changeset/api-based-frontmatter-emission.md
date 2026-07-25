@@ -11,7 +11,6 @@ Astro could not parse; a flow root is now normalized to block style and both the
 computed keys land in one valid mapping. Frontmatter that uses a construct the kernel cannot vet by
 key name — anchors, aliases, merge keys (`<<`), or explicit/unresolved tags, any of which can insert
 a `docstubeReviewedFor` the key scan never sees — fails closed with a warning naming the route, like
-unparsable frontmatter already did. A leading comment on a deleted `docstube*` key moves to the next
-surviving key instead of disappearing with it. `locales.targets` rejects the source locale and
+unparsable frontmatter already did. `locales.targets` rejects the source locale and
 duplicate targets, naming the offending value, instead of quietly translating a page into its own
 language or paying for the same rendition twice.

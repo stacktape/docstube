@@ -54,9 +54,11 @@ export const emitWizardSite = async (workspaceDir: string, output: CliOutput): P
   for (const conflict of result.themeConflicts) {
     output.info(`  theme-conflict  ${conflict}`);
   }
-  // MDX↔shard binding failures: the named pages rendered UNVERIFIED instead of stale trust state.
+  // Same neutral emit-warning label the CLI commands print (emit-current-site.ts): these lines cover
+  // dropped authored frontmatter and stale locale files as well as binding failures, so they must
+  // not be labelled with the page trust state's name.
   for (const warning of result.warnings) {
-    output.error(`  unverified  ${warning}`);
+    output.error(`  emit-warning  ${warning}`);
   }
 };
 

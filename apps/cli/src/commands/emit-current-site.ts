@@ -51,7 +51,8 @@ export type EmitCurrentSiteResult = {
   // MDX↔shard binding failures (pages rendered UNVERIFIED because the persisted MDX no longer
   // matches the shard's recorded mdxContentHash, or the shard predates the hash) plus locale
   // routes that served the source fallback instead of a failed or REVISION-STALE translation
-  // (locale shard's sourceContentRevision != current canonical mdxContentHash). Printed loudly.
+  // (locale shard's sourceContentRevision != current canonical mdxContentHash), plus authored
+  // frontmatter blocks the kernel could not vet and therefore dropped. Printed loudly.
   warnings: string[];
   // Obsolete routes and .md twins removed because their page left the manifest or changed slug.
   pruned: string[];
@@ -223,10 +224,14 @@ export const emitPersistedSite = async (
   for (const path of result.pruned) {
     output.info(`  pruned  ${path} — no page in the current manifest routes here`);
   }
-  // Binding failures / ignored stale locale files / untranslated locale routes: the named pages
-  // rendered UNVERIFIED or as source fallbacks instead of stale state.
+  // EMIT WARNINGS, NOT A TRUST STATE (wave 2b close): these lines carry several unrelated outcomes —
+  // MDX↔shard binding failures, authored frontmatter that could not be vetted and was dropped,
+  // ignored stale locale files, untranslated locale routes, unscannable directories. Labelling them
+  // all "unverified" borrowed the page trust state's name for warnings that mostly do not touch it:
+  // a dropped frontmatter block leaves the page's proof exactly as verified as it was. The label is
+  // deliberately neutral; each warning says for itself what happened.
   for (const warning of result.warnings) {
-    output.error(`  unverified  ${warning}`);
+    output.error(`  emit-warning  ${warning}`);
   }
   return result;
 };
