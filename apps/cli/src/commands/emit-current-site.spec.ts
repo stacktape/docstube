@@ -45,6 +45,15 @@ afterEach(async () => {
   await rm(repoRoot, { recursive: true, force: true });
 });
 
+const germanMdx = mdx
+  .replace('title: "Retry"', 'title: "Wiederholung"')
+  .replace('description: "Retry defaults."', 'description: "Wiederholungs-Standardwerte."')
+  .replace('# Retry', '# Wiederholung')
+  .replace(
+    '<Claim id="v1">`DEFAULT_RETRIES` defaults to 3.</Claim>',
+    '<Claim id="v1">`DEFAULT_RETRIES` ist standardmäßig 3.</Claim>'
+  );
+
 describe('generate → JSON shards → emit (trust-spine E2E)', () => {
   it('emits the site with claim-count proof frontmatter projected from the shard ClaimEvidence', async () => {
     const codemap = await buildCodemap({
@@ -150,4 +159,111 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(tamperedRoute).toContain('docstubeClaimsChecked: 0');
     expect(tamperedRoute).toContain('docstubeClaimsTotal: 0');
   }, 120_000);
+
+  it('locale routes inherit the CANONICAL proof, and a failed retranslation serves the source fallback — never stale locale bytes', async () => {
+    await writeFile(
+      join(repoRoot, 'docstube.yml'),
+      'schemaVersion: 1\ndocType: external-library\npersonas:\n  - id: app-developer\n    description: Builds apps\n' +
+        'site:\n  title: Retry Docs\nlocales:\n  source: en\n  targets: [de]\n'
+    );
+    const codemap = await buildCodemap({
+      repoRoot,
+      commit: 'a'.repeat(40),
+      packs: [typescriptLanguagePack],
+      logger: { info: () => {}, warn: () => {} }
+    });
+    const symbolHash = codemap.symbols.find((symbol) => symbol.name === 'DEFAULT_RETRIES')?.hash;
+    if (symbolHash === undefined) {
+      throw new Error('fixture symbol missing from codemap');
+    }
+    const ledger: WriterClaimLedger = {
+      schemaVersion: 1,
+      claims: [
+        {
+          markerId: 'v1',
+          class: 'value',
+          predicate: 'DEFAULT_RETRIES defaults to 3',
+          proposedEvidence: [{ kind: 'symbol', symbol: symbolHash }],
+          proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'DEFAULT_RETRIES', citedValue: '3' }]
+        }
+      ]
+    } as WriterClaimLedger;
+    const runnerWith =
+      (translation: string) =>
+      async (spec: AgentTaskSpec): Promise<Transcript> => {
+        const base = {
+          schemaVersion: 1 as const,
+          taskId: spec.id,
+          cacheKey: 'test',
+          transport: 'replay',
+          model: 'scripted',
+          observedReads: [{ file: 'src/retry.ts', contentHash: '0'.repeat(64) }],
+          usage: { inputTokens: 1, outputTokens: 1, cacheHit: false },
+          stopReason: 'complete' as const,
+          turns: []
+        };
+        if (spec.kind === 'review-page') {
+          return {
+            ...base,
+            observedReads: [],
+            result: {
+              type: 'structured',
+              value: {
+                persona: 'app-developer',
+                criteria: [{ criterion: 'audience-fit', outcome: 'met', reasoning: 'fits' }],
+                findings: []
+              }
+            }
+          };
+        }
+        if (spec.kind === 'translate-page') {
+          return { ...base, result: { type: 'mdx', mdx: translation } };
+        }
+        return { ...base, result: { type: 'mdx-ledger', mdx, ledger } };
+      };
+
+    // Run 1: source page 1/1 checked; the de translation passes and ships.
+    const first = await runGenerate({ repoRoot, runTask: runnerWith(germanMdx), toolDescriptors: [] });
+    expect(first.outcome).toBe('passed');
+    expect(first.translations[0]?.status).toBe('passed');
+
+    const family = await loadConfigFamily(repoRoot);
+    const store = createManifestStore(repoRoot, family.config.versions.current);
+    const firstEmit = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(firstEmit.warnings).toEqual([]);
+
+    // RENDITIONS INHERIT CANONICAL PROOF (i18n-lifecycle-v2 decisions 3/4): the de route renders
+    // the SOURCE shard's 1/1 checked state, never the 0/0-unverified projection of its own
+    // ledgerless locale shard.
+    const deRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'de', 'retry.mdx'), 'utf8');
+    expect(deRoute).toContain('docstubeLocale: "de"');
+    expect(deRoute).toContain('docstubeClaimsChecked: 1');
+    expect(deRoute).toContain('docstubeClaimsTotal: 1');
+    expect(deRoute).not.toContain('docstubeUnverified');
+    expect(deRoute).not.toContain('docstubeSourceFallback');
+    expect(deRoute).toContain('ist standardmäßig 3');
+
+    // Run 2: the retranslation fails (marker renamed v1→v9 — isomorphism violation). The stale de
+    // MDX from run 1 remains on disk against the now-hashless de shard.
+    const renamed = germanMdx.replace('<Claim id="v1">', '<Claim id="v9">');
+    const second = await runGenerate({ repoRoot, runTask: runnerWith(renamed), toolDescriptors: [] });
+    expect(second.translations[0]?.status).toBe('flagged');
+    const staleDeMdx = await readFile(join(repoRoot, 'docs-site', 'content', 'de', 'retry.mdx'), 'utf8');
+    expect(staleDeMdx).toContain('ist standardmäßig 3');
+
+    // STALE LOCALE MDX NEVER SERVED: the de route serves the fresh SOURCE content with the
+    // canonical proof and the fallback marker; the stale bytes are ignored and reported.
+    const secondEmit = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(secondEmit.warnings.some((warning) => warning.includes('stale locale MDX'))).toBe(true);
+    const fallbackRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'de', 'retry.mdx'), 'utf8');
+    expect(fallbackRoute).toContain('docstubeSourceFallback: true');
+    expect(fallbackRoute).toContain('defaults to 3');
+    expect(fallbackRoute).not.toContain('ist standardmäßig 3');
+    expect(fallbackRoute).toContain('docstubeClaimsChecked: 1');
+    expect(fallbackRoute).toContain('docstubeClaimsTotal: 1');
+    expect(fallbackRoute).not.toContain('docstubeUnverified');
+    // The raw markdown mirror serves the fallback bytes too, never the stale translation.
+    const deMirror = await readFile(join(repoRoot, 'docs-site', 'public', 'de', 'retry.md'), 'utf8');
+    expect(deMirror).not.toContain('ist standardmäßig 3');
+  }, 180_000);
 });

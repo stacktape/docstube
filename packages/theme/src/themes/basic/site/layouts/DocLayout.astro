@@ -33,6 +33,7 @@ const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
 const uncheckedClaims = frontmatter.docstubeUncheckedClaims ?? [];
 const reviewedFor = frontmatter.docstubeReviewedFor;
 const unverifiedPage = frontmatter.docstubeUnverified === true;
+const sourceFallback = frontmatter.docstubeSourceFallback === true;
 const locale = frontmatter.docstubeLocale ?? sourceLocale;
 const alternates = frontmatter.docstubeAlternates ?? [];
 const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
@@ -110,7 +111,7 @@ const nav = navByLocale[locale] ?? navByLocale[sourceLocale] ?? [];
               ))}
             </nav>
           ) : null}
-          <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} />
+          <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} />
         </header>
         <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />
         <DocstubeEntity entityId={frontmatter.docstubePageId}>

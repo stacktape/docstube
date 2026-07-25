@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { ConfigFamily, ManifestStore } from '@docstube/core';
@@ -47,8 +47,9 @@ export type EmitCurrentSiteResult = {
   emitted: boolean;
   // Theme-owned files the user modified: preserved/skipped, reported by the calling command.
   themeConflicts: string[];
-  // MDX↔shard binding failures: pages whose persisted MDX no longer matches the shard's recorded
-  // mdxContentHash (or whose shard predates the hash) rendered UNVERIFIED. Printed loudly.
+  // MDX↔shard binding failures (pages rendered UNVERIFIED because the persisted MDX no longer
+  // matches the shard's recorded mdxContentHash, or the shard predates the hash) plus ignored
+  // stale locale MDX for failed translations (routes served the source fallback). Printed loudly.
   warnings: string[];
 };
 
@@ -62,26 +63,70 @@ export const emitCurrentSite = async (input: {
   if (index === undefined) {
     return { emitted: false, themeConflicts: [], warnings: [] };
   }
-  const readPages = async (locale: string): Promise<EmitSitePage[]> => {
+  const fallbackWarnings: string[] = [];
+  const readSourcePages = async (): Promise<EmitSitePage[]> => {
     const pages: EmitSitePage[] = [];
     for (const entry of index.pages) {
-      const shard = await store.readPageShard({ locale, pageId: entry.id });
+      const shard = await store.readPageShard({ locale: family.config.locales.source, pageId: entry.id });
       if (shard === undefined) {
         continue;
       }
-      const mdxPath = locale === family.config.locales.source ? entry.path : `content/${locale}/${entry.slug}.mdx`;
       try {
-        const mdx = await readFile(join(workspaceDir, family.config.outDir, mdxPath), 'utf8');
+        const mdx = await readFile(join(workspaceDir, family.config.outDir, entry.path), 'utf8');
         pages.push({ shard, mdx });
       } catch {
-        // A shard without its MDX (e.g. a flagged translation that never shipped) is skipped.
+        // A shard without its MDX is skipped.
       }
     }
     return pages;
   };
 
-  const pages = await readPages(family.config.locales.source);
-  const translations = (await Promise.all(family.config.locales.targets.map(readPages))).flat();
+  const pages = await readSourcePages();
+  const sourceByPageId = new Map(pages.map((page) => [page.shard.page.id, page]));
+
+  const readLocalePages = async (locale: string): Promise<EmitSitePage[]> => {
+    const localePages: EmitSitePage[] = [];
+    for (const entry of index.pages) {
+      const shard = await store.readPageShard({ locale, pageId: entry.id });
+      if (shard === undefined) {
+        continue;
+      }
+      const mdxPath = `content/${locale}/${entry.slug}.mdx`;
+      // STALE LOCALE MDX NEVER SERVED (wave 2b close; i18n-lifecycle-v2 decision 1): a HASHLESS
+      // locale shard means the pipeline persisted no locale bytes this state can vouch for — a
+      // failed translation or retranslation. Any locale MDX still on disk is a PRIOR run's
+      // artifact and must not be read; the route serves the fresh SOURCE content as the designed
+      // fallback (with the canonical shard's proof and a visible not-yet-translated notice). The
+      // stale file is ignored and reported, never silently rendered and never deleted here.
+      if (shard.mdxContentHash === undefined) {
+        const source = sourceByPageId.get(entry.id);
+        if (source === undefined) {
+          continue;
+        }
+        try {
+          await stat(join(workspaceDir, family.config.outDir, mdxPath));
+          fallbackWarnings.push(
+            `page "${entry.slug}" (${locale}): the translation failed, so the stale locale MDX at ${mdxPath} is ` +
+              'ignored — the route serves the source-locale content with a not-yet-translated notice. Re-run ' +
+              '`docstube generate` to retranslate'
+          );
+        } catch {
+          // No stale file: the fallback is the ordinary not-yet-translated state, nothing to report.
+        }
+        localePages.push({ shard, mdx: source.mdx, sourceFallback: true });
+        continue;
+      }
+      try {
+        const mdx = await readFile(join(workspaceDir, family.config.outDir, mdxPath), 'utf8');
+        localePages.push({ shard, mdx });
+      } catch {
+        // A shard without its MDX is skipped.
+      }
+    }
+    return localePages;
+  };
+
+  const translations = (await Promise.all(family.config.locales.targets.map(readLocalePages))).flat();
   const frozenVersions = index.versions
     .filter((version) => version.status === 'frozen')
     .map((version) => version.label);
@@ -106,6 +151,6 @@ export const emitCurrentSite = async (input: {
         ? `${conflict.path} — modified by you, kept (the previous theme's copy was not deleted)`
         : `${conflict.path} — modified by you, not overwritten with the theme's copy`
     ),
-    warnings: result.warnings
+    warnings: [...fallbackWarnings, ...result.warnings]
   };
 };

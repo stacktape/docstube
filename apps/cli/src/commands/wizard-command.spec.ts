@@ -117,4 +117,66 @@ describe('createWizardControlPlane', () => {
     expect(route).not.toContain('docstubeUnverified');
     expect(lines.filter((line) => line.includes('unverified'))).toEqual([]);
   }, 120_000);
+
+  it('still emits the site when the pipeline throws AFTER pages were persisted — routes match the new shards', async () => {
+    const lines: string[] = [];
+    const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
+
+    // Run 1: an ordinary successful generate establishes the manifest and the rendered routes.
+    const first = createWizardControlPlane(
+      { workspaceDir: repoRoot, taskRunner: { runTask: scriptedRunTask, toolDescriptors: [] } },
+      output
+    );
+    await (first.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
+    const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
+    await vi.waitFor(() => readFile(routePath, 'utf8'), { timeout: 90_000, interval: 500 });
+
+    // Run 2: a target locale is configured, the writer produces an UPDATED page (two claims), and
+    // the translate transport explodes — the pipeline throws AFTER the source page was persisted.
+    await writeFile(
+      join(repoRoot, 'docstube.yml'),
+      'schemaVersion: 1\ndocType: external-library\npersonas:\n  - id: app-developer\n    description: Builds apps\n' +
+        'site:\n  title: Greeter Docs\nlocales:\n  source: en\n  targets: [de]\n'
+    );
+    const updatedMdx = mdx.replace(
+      '<Claim id="c1">The library exposes a single `greet` function.</Claim>',
+      '<Claim id="c1">The library exposes a single `greet` function.</Claim>\n\nAlso, <Claim id="c2">`greet` returns a string.</Claim>'
+    );
+    const failingRunTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'translate-page') {
+        throw new Error('translate transport exploded');
+      }
+      if (spec.kind === 'review-page') {
+        return scriptedRunTask(spec);
+      }
+      const base = await scriptedRunTask(spec);
+      return { ...base, result: { type: 'mdx-ledger', mdx: updatedMdx, ledger: ledgerFor(updatedMdx) } };
+    };
+    const second = createWizardControlPlane(
+      { workspaceDir: repoRoot, taskRunner: { runTask: failingRunTask, toolDescriptors: [] } },
+      output
+    );
+    await (second.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
+
+    // The failure is surfaced AFTER emission — once the error line appears, the routes are final.
+    await vi.waitFor(
+      () => {
+        if (!lines.some((line) => line.includes('background generate run failed'))) {
+          throw new Error('run not failed yet');
+        }
+      },
+      { timeout: 90_000, interval: 500 }
+    );
+    expect(lines.some((line) => line.includes('translate transport exploded'))).toBe(true);
+
+    // The re-emitted route matches the NEW shard persisted before the throw (two claims), not the
+    // pre-run rendering (one claim) — the exact drift the finally-shaped emission closes.
+    const route = await readFile(routePath, 'utf8');
+    expect(route).toContain('docstubeClaimsTotal: 2');
+    expect(route).toContain('`greet` returns a string.');
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard?.ledger?.claims).toHaveLength(2);
+  }, 180_000);
 });

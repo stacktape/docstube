@@ -1474,6 +1474,15 @@ html[data-mobile-nav-open] .stp-mobile-nav {
   font-weight: 700;
   padding: 3px 10px;
 }
+.dt-source-fallback {
+  background: rgba(90, 150, 220, 0.12);
+  border: 1px solid rgba(90, 150, 220, 0.4);
+  border-radius: 999px;
+  color: #7db2e8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
 .dt-contradictions {
   color: #ff6b60;
   background: rgba(255, 107, 96, 0.1);

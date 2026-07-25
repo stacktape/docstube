@@ -67,6 +67,12 @@ export type MarkerScan = {
 // agree byte-for-byte with block source ranges.
 const markerProcessor = unified().use(remarkParse).use(remarkMdx).use(remarkGfm).use(remarkFrontmatter, ['yaml']);
 
+// Script/style TAG match for raw-html and expression sources (wave 2b close): the tag name must
+// END at whitespace, '/', or '>' — a custom element like <style-guide> is legal MDX, never a
+// page-script hit. Computed construction (e.g. createElement('script')) is pathological-input
+// territory: deliberate self-forging is out of scope per ARCHITECTURE §4.4.
+const scriptStyleTagPattern = /<\s*\/?\s*(?:script|style)(?=[\s/>])/iu;
+
 const markerIdOf = (attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>): string | undefined => {
   for (const attribute of attributes) {
     if (attribute.type === 'mdxJsxAttribute' && attribute.name === 'id' && typeof attribute.value === 'string') {
@@ -295,7 +301,7 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       });
       return;
     }
-    if (node.type === 'html' && typeof node.value === 'string' && /<\s*\/?\s*(?:script|style)\b/iu.test(node.value)) {
+    if (node.type === 'html' && typeof node.value === 'string' && scriptStyleTagPattern.test(node.value)) {
       errors.push({
         code: 'page-script',
         message:
@@ -310,7 +316,7 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       // the raw element — the {…} wrapper must not launder it past the page-script prohibition.
       // Tag match (<script, <style) on the expression source, never a word match: a string like
       // 'the script ran' stays legal prose.
-      if (typeof node.value === 'string' && /<\s*\/?\s*(?:script|style)\b/iu.test(node.value)) {
+      if (typeof node.value === 'string' && scriptStyleTagPattern.test(node.value)) {
         errors.push({
           code: 'page-script',
           message:

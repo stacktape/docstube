@@ -519,6 +519,48 @@ describe('runGenerate', () => {
     expect(deShard?.mdxContentHash).toBeUndefined();
   }, 60_000);
 
+  it('fails a translation that renames a Claim marker id — the rendition inventory must equal the source (isomorphism)', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), `${configYaml}locales:\n  source: en\n  targets: [de]\n`);
+    // Structurally valid translation whose only defect is a marker rename c1→c9: scanning passes
+    // (the marker itself is well-formed) and block alignment passes (paragraphs are not
+    // byte-checked), so only the inventory comparison can catch it. Shipped, the locale route
+    // would attach the canonical c1 trust marks to nothing.
+    const renamedTranslation = goodMdx
+      .replace('# Getting started', '# Erste Schritte')
+      .replace(
+        '<Claim id="c1">The library exposes a single `greet` function.</Claim>',
+        '<Claim id="c9">Die Bibliothek stellt eine einzige `greet`-Funktion bereit.</Claim>'
+      );
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      const mdx = spec.kind === 'translate-page' ? renamedTranslation : goodMdx;
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
+        result: spec.kind === 'translate-page' ? { type: 'mdx', mdx } : writeResult(mdx)
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    // Nonblocking: the source page is unaffected; the translation fails with the precise error.
+    expect(summary.pages[0]?.status).toBe('passed');
+    expect(summary.translations[0]?.status).toBe('flagged');
+    expect(summary.translations[0]?.findings[0]?.check).toBe('translation-hygiene');
+    expect(summary.translations[0]?.findings[0]?.message).toContain('marker-isomorphism');
+    expect(summary.translations[0]?.findings[0]?.message).toContain('"c1"');
+    expect(summary.translations[0]?.findings[0]?.message).toContain('"c9"');
+    // The renamed rendition never ships under the locale path; its shard persists hashless.
+    await expect(readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8')).rejects.toThrow(
+      /ENOENT/
+    );
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const deShard = await store.readPageShard({ locale: 'de', pageId: index?.pages[0]?.id ?? '' });
+    expect(deShard?.mdxContentHash).toBeUndefined();
+  }, 60_000);
+
   it('site-scope findings land as open system flags on the named page shard, deduped across runs', async () => {
     // A dead internal link passes per-page verification (internal-links is site-scope only) but
     // fails the topology pass — the shard must carry the flag or `docstube status` lies.

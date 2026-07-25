@@ -127,7 +127,7 @@ export const alignTranslatedEntities = (
 // could inject script/style (raw, or expression-wrapped) or malform the Claim markers. The same
 // page-level checks run here before persistence; a failure fails the TRANSLATION (nonblocking —
 // the source page is unaffected), never ships.
-export const translationHygieneErrors = (mdx: string): string[] => {
+export const translationHygieneErrors = (mdx: string, sourceMarkerIds: readonly string[]): string[] => {
   const scan = scanClaimMarkers(mdx);
   const errors = scan.errors.map((error) => `[${error.code}] ${error.message}`);
   const markerCounts = new Map<string, number>();
@@ -138,6 +138,26 @@ export const translationHygieneErrors = (mdx: string): string[] => {
     if (count > 1) {
       errors.push(`[marker-duplicate-id] marker "${markerId}" appears ${count} times — every marker id is unique`);
     }
+  }
+  // MARKER ISOMORPHISM (wave 2b close; i18n-lifecycle-v2 decision 4): renditions share the
+  // canonical claim inventory — the source page's marker ids, exactly, no renames, no additions,
+  // no removals. The locale route inherits the CANONICAL shard's per-claim marks by marker id at
+  // emission, so a drifted inventory would attach trust marks to prose that asserts something
+  // else (or to nothing). Set equality here plus the duplicate check above is exact inventory
+  // equality (same ids, same count).
+  const sourceIds = new Set(sourceMarkerIds);
+  const translatedIds = new Set(markerCounts.keys());
+  const removed = [...sourceIds].filter((markerId) => !translatedIds.has(markerId));
+  const added = [...translatedIds].filter((markerId) => !sourceIds.has(markerId));
+  if (removed.length > 0 || added.length > 0) {
+    const removedNote =
+      removed.length > 0 ? `missing source marker(s) ${removed.map((id) => `"${id}"`).join(', ')}` : '';
+    const addedNote = added.length > 0 ? `unknown marker(s) ${added.map((id) => `"${id}"`).join(', ')}` : '';
+    errors.push(
+      `[marker-isomorphism] the translated Claim marker inventory does not match the source page's markers ` +
+        `(${[removedNote, addedNote].filter((note) => note !== '').join('; ')}) — a rendition must carry exactly ` +
+        'the canonical marker ids, translated in place, never renamed, added, or removed'
+    );
   }
   return errors;
 };
@@ -157,6 +177,8 @@ export const translateArtifact = async (
 ): Promise<Array<{ outcome: TranslationOutcome; artifact: PageArtifact; shard: PageShard }>> => {
   const results: Array<{ outcome: TranslationOutcome; artifact: PageArtifact; shard: PageShard }> = [];
   const maxAttempts = 2;
+  // The canonical marker inventory every rendition must reproduce exactly (marker isomorphism).
+  const sourceMarkerIds = scanClaimMarkers(sourceArtifact.mdx).markers.map((marker) => marker.markerId);
 
   for (const targetLocale of ctx.config.locales.targets) {
     let findings: Finding[] = [];
@@ -185,7 +207,7 @@ export const translateArtifact = async (
         );
       }
       const mdx = unwrapMdxFence(transcript.result.mdx);
-      const hygieneErrors = translationHygieneErrors(mdx);
+      const hygieneErrors = translationHygieneErrors(mdx, sourceMarkerIds);
       if (hygieneErrors.length > 0) {
         findings = hygieneErrors.map((message) => ({
           source: 'verifier' as const,

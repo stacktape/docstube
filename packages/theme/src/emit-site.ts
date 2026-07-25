@@ -30,6 +30,10 @@ import type { ThemeBuild, ThemeBundle } from './theme-manifest.ts';
 export type EmitSitePage = {
   shard: PageShard;
   mdx: string;
+  // SOURCE FALLBACK route (i18n-lifecycle-v2 decision 1): a locale entry whose translation failed
+  // (hashless shard) serves the SOURCE MDX bytes under the locale route with a visible
+  // not-yet-translated notice — `mdx` holds the source bytes, never a stale locale file.
+  sourceFallback?: boolean;
 };
 
 export type EmitSiteInput = {
@@ -235,24 +239,38 @@ type PageRouteContext = {
   renderers: Record<string, string>;
 };
 
-const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext, onWarning: (warning: string) => void): string => {
+const pageRouteMdx = (
+  page: EmitSitePage,
+  context: PageRouteContext,
+  onWarning: (warning: string) => void,
+  // The source-locale page for a translated rendition: the canonical shard its proof derives from.
+  canonical?: EmitSitePage
+): string => {
   const { frontmatter, body } = splitFrontmatter(page.mdx);
   const locale = page.shard.locale;
   const isSourceLocale = locale === context.sourceLocale;
   const slug = page.shard.page.slug;
   const depth = slug.split('/').length + (isSourceLocale ? 0 : 1);
   const up = '../'.repeat(depth);
+  // RENDITIONS INHERIT CANONICAL PROOF (i18n-lifecycle-v2 decisions 3/4, strict isomorphism):
+  // the reader-facing correctness proof of a locale route derives from the CANONICAL source
+  // shard's ledger/evidence — claim state is language-independent and marker ids are identical
+  // across renditions (enforced by translation hygiene). The locale shard contributes only the
+  // translation dimension (fidelity/fallback state), never its own claim counts.
+  const proofShard = canonical?.shard ?? page.shard;
   // MDX↔SHARD BINDING at emission (wave 2b close final): the trust spine may only project over
-  // the EXACT MDX it was computed for. A mismatch (post-persistence edit) or a missing hash (old
-  // shard) renders the loud UNVERIFIED state with a surfaced warning — never stale claim counts
-  // over changed prose.
-  const binding = checkShardMdxBinding(page.shard, page.mdx);
+  // prose the persisted state can vouch for. Translated routes keep the binding check against the
+  // LOCALE shard's hash over the LOCALE MDX bytes; a source-fallback route serves the SOURCE
+  // bytes, so it binds against the canonical shard instead. A mismatch (post-persistence edit) or
+  // a missing hash (old shard) renders the loud UNVERIFIED state with a surfaced warning — never
+  // stale claim counts over changed prose.
+  const binding = checkShardMdxBinding(page.sourceFallback === true ? proofShard : page.shard, page.mdx);
   if (!binding.ok) {
     onWarning(binding.reason);
   }
   // LITERAL proof surface (impl-07 finding 4): claim counts, contradiction facts, and per-claim
   // contradicted markers straight from ClaimEvidence — the guarantee-label ladder is gone.
-  const proof = binding.ok ? projectShardProof(page.shard) : projectUnboundShardProof(page.shard);
+  const proof = binding.ok ? projectShardProof(proofShard) : projectUnboundShardProof(proofShard);
   const alternates = context.alternatesBySlug.get(slug) ?? [];
   const sources = collectPageSources(page.shard.page).map((ref) => ({
     file: ref.file,
@@ -273,6 +291,8 @@ const pageRouteMdx = (page: EmitSitePage, context: PageRouteContext, onWarning: 
     `docstubeClaimsContradicted: ${proof.contradictedClaims}`,
     // A page without a persisted trust spine renders a LOUD unverified warning (impl-08).
     ...(proof.state === 'unverified' ? ['docstubeUnverified: true'] : []),
+    // Source-fallback rendition: themes render the visible not-yet-translated notice from this.
+    ...(page.sourceFallback === true ? ['docstubeSourceFallback: true'] : []),
     ...(proof.contradictedMarkers.length > 0
       ? [`docstubeContradictedClaims: ${JSON.stringify(proof.contradictedMarkers)}`]
       : []),
@@ -572,13 +592,16 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
       writeTextFile(join(siteRoot, 'public', `${slug}.md`), page.mdx)
     );
   }
+  // Canonical source page by page id — the shard a translated rendition's proof derives from
+  // (locale is an address dimension: identical page ids across locales).
+  const sourceByPageId = new Map(input.pages.map((page) => [page.shard.page.id, page]));
   for (const translation of translations) {
     const slug = translation.shard.page.slug;
     const locale = translation.shard.locale;
     writes.push(
       writeTextFile(
         join(siteRoot, 'src/pages', locale, `${slug}.mdx`),
-        pageRouteMdx(translation, routeContext, collectWarning)
+        pageRouteMdx(translation, routeContext, collectWarning, sourceByPageId.get(translation.shard.page.id))
       ),
       writeTextFile(join(siteRoot, 'public', locale, `${slug}.md`), translation.mdx)
     );

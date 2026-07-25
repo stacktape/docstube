@@ -104,10 +104,28 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
       // `refresh` is gone (pipeline-v2 decision 1): generate IS the reconciler.
       const run = mode === 'generate' ? runGenerate(common) : runRefine(common);
       // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
-      // A completed run re-emits the site so rendered routes never drift from the shards.
-      void run
-        .then(() => emitWizardSite(input.workspaceDir, output))
-        .catch((error: unknown) => output.error(`background ${mode} run failed: ${(error as Error).message}`));
+      // EMISSION AFTER PARTIAL FAILURE (wave 2b close): the site is re-emitted whether the run
+      // resolved OR threw — a pipeline can fail on a translation/transport error AFTER pages were
+      // persisted, and the rendered routes must still be reconciled with those shards.
+      // emitCurrentSite consumes only committed state (and no-ops when no manifest was ever
+      // persisted), so the emitted site is consistent; the run error is surfaced afterwards and
+      // an emission failure never masks it.
+      void (async () => {
+        let runError: unknown;
+        try {
+          await run;
+        } catch (error) {
+          runError = error;
+        }
+        try {
+          await emitWizardSite(input.workspaceDir, output);
+        } catch (error) {
+          output.error(`site emission after the ${mode} run failed: ${(error as Error).message}`);
+        }
+        if (runError !== undefined) {
+          output.error(`background ${mode} run failed: ${(runError as Error).message}`);
+        }
+      })();
       return { runId };
     }
   };

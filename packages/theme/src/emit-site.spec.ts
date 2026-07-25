@@ -118,7 +118,7 @@ describe('emitSite', () => {
     expect(warning).toContain("classList.add('dt-claim--unchecked')");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain(
-      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} />'
+      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} />'
     );
     expect(layout).toContain(
       '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />'
@@ -157,6 +157,61 @@ describe('emitSite', () => {
     expect(await readFile(join(siteRoot, 'public/de/getting-started/installation.md'), 'utf8')).toContain(
       'Installiere mit npm.'
     );
+  });
+
+  it('locale routes inherit the CANONICAL proof: source shard counts/marks, never a 0/0-unverified locale projection', async () => {
+    // The de shard carries no ledger of its own (renditions never do — i18n-lifecycle-v2 decision
+    // 4): its proof derives from the SOURCE shard (1/2 checked, c2 unchecked), marker ids being
+    // identical across renditions by strict isomorphism.
+    const installDe = await readFile(join(siteRoot, 'src/pages/de/getting-started/installation.mdx'), 'utf8');
+    expect(installDe).toContain('docstubeClaimsChecked: 1');
+    expect(installDe).toContain('docstubeClaimsTotal: 2');
+    expect(installDe).toContain('docstubeUncheckedClaims: ["c2"]');
+    expect(installDe).not.toContain('docstubeUnverified');
+    expect(installDe).not.toContain('docstubeSourceFallback');
+  });
+
+  it('contradicted markers mark the SAME ids in both locales — the canonical evidence decides everywhere', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-contra-locale-'));
+    await emitSite(buildFixtureInput(repoRoot, { withTranslation: true, withContradiction: true }));
+    const en = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    const de = await readFile(join(repoRoot, 'docs-site/src/pages/de/getting-started/installation.mdx'), 'utf8');
+    for (const route of [en, de]) {
+      expect(route).toContain('docstubeClaimsContradicted: 1');
+      expect(route).toContain('docstubeContradictedClaims: ["c3"]');
+      expect(route).toContain('docstubeClaimsTotal: 3');
+    }
+  });
+
+  it('a source-fallback rendition serves the SOURCE bytes with the canonical proof and the fallback marker', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-fallback-'));
+    const input = buildFixtureInput(repoRoot, { withTranslation: true });
+    const translation = input.translations?.[0];
+    if (translation === undefined) {
+      throw new Error('fixture translation missing');
+    }
+    // A failed (re)translation: the locale shard persists HASHLESS and the caller passes the
+    // SOURCE MDX as the fallback content (emit never reads a stale locale file).
+    const { mdxContentHash: _dropped, ...hashlessShard } = translation.shard;
+    input.translations = [{ shard: hashlessShard, mdx: installMdx, sourceFallback: true }];
+    const result = await emitSite(input);
+    expect(result.warnings).toEqual([]);
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/de/getting-started/installation.mdx'), 'utf8');
+    expect(route).toContain('docstubeSourceFallback: true');
+    expect(route).toContain('docstubeLocale: "de"');
+    expect(route).toContain('Install with npm.');
+    expect(route).not.toContain('Installiere mit npm.');
+    // Canonical proof rides along: the source shard's 1/2 checked state, not loud-unverified.
+    expect(route).toContain('docstubeClaimsChecked: 1');
+    expect(route).toContain('docstubeClaimsTotal: 2');
+    expect(route).not.toContain('docstubeUnverified');
+    // The chip primitive renders the visible not-yet-translated notice from the marker.
+    const chip = await readFile(join(repoRoot, 'docs-site/src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('dt-source-fallback');
+    expect(chip).toContain('Not yet translated');
+    const layout = await readFile(join(repoRoot, 'docs-site/src/layouts/DocLayout.astro'), 'utf8');
+    expect(layout).toContain('frontmatter.docstubeSourceFallback === true');
+    expect(layout).toContain('sourceFallback={sourceFallback}');
   });
 
   it('injects locale alternates for translated pages only and renders the switcher + hreflang', async () => {

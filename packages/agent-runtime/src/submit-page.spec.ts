@@ -198,6 +198,27 @@ describe('scanClaimMarkers', () => {
     expect(inlineWord.errors).toEqual([]);
   });
 
+  it('leaves custom elements whose name merely STARTS with script/style legal — the tag name must end at whitespace, "/", or ">"', () => {
+    // <style-guide> is an ordinary custom element, not a <style> tag: the old \b boundary matched
+    // "style" before the hyphen and rejected legal pages (wave 2b close, tag-regex precision).
+    const customElement = scanClaimMarkers('Text.\n\n<style-guide>Read the guide.</style-guide>\n');
+    expect(customElement.errors).toEqual([]);
+
+    const customExpression = scanClaimMarkers("Text.\n\n{'see the <style-guide> element for details'}\n");
+    expect(customExpression.errors).toEqual([]);
+
+    const scriptedTable = scanClaimMarkers("Text with {'a <scripted-table> column'} inline.\n");
+    expect(scriptedTable.errors).toEqual([]);
+
+    // The real tags stay rejected in every terminator form: '>', whitespace, and '/'.
+    const bareScript = scanClaimMarkers('Text.\n\n{<script>alert(1)</script>}\n');
+    expect(bareScript.errors[0]?.code).toBe('page-script');
+    const attributed = scanClaimMarkers('Text.\n\n{\'<script src="evil.js">\'}\n');
+    expect(attributed.errors[0]?.code).toBe('page-script');
+    const selfClosed = scanClaimMarkers("Text.\n\n{'<style/>'}\n");
+    expect(selfClosed.errors[0]?.code).toBe('page-script');
+  });
+
   it('leaves code FENCES and inline code containing <script>/<style> untouched — examples are text, not elements', () => {
     const fence = scanClaimMarkers(
       [
