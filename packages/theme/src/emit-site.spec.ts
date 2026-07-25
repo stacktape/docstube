@@ -151,7 +151,7 @@ describe('emitSite', () => {
     // DEFENSIVE RECOMPUTE (impl-24): the complete state is re-derived from the rendered numbers,
     // never taken on the `complete` flag's word alone.
     expect(chip).toContain(
-      'const isComplete = complete === true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
+      'const isComplete = complete === true && dirtyWorkingTree !== true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
     );
     // HONEST BADGE SEMANTICS (impl-24, PRODUCT §1.2): the popover states what complete means and,
     // just as importantly, what it does not.
@@ -166,7 +166,7 @@ describe('emitSite', () => {
     expect(warning).toContain("classList.add('dt-claim--unchecked')");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain(
-      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />'
+      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} dirtyWorkingTree={dirtyWorkingTree} translationAssurance={translationAssurance} />'
     );
     expect(layout).toContain(
       '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />'
@@ -345,7 +345,9 @@ describe('emitSite', () => {
     expect(chipInjector).toContain('dt-section-claims');
     expect(chipInjector).toContain('dt-section-chip');
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
-    expect(layout).toContain('<DocstubeSources sources={sources} repoUrl={repoUrl} />');
+    expect(layout).toContain(
+      '<DocstubeSources sources={sources} repoUrl={repoUrl} dirtyWorkingTree={dirtyWorkingTree} />'
+    );
     expect(layout).toContain('<DocstubeSectionChips sections={sections} />');
     const siteData = await readFile(join(siteRoot, 'src/site-data.mjs'), 'utf8');
     expect(siteData).toContain('export const repoUrl = "https://github.com/acme/fixture";');

@@ -73,6 +73,33 @@ const markerProcessor = unified().use(remarkParse).use(remarkMdx).use(remarkGfm)
 // territory: deliberate self-forging is out of scope per ARCHITECTURE §4.4.
 const scriptStyleTagPattern = /<\s*\/?\s*(?:script|style)(?=[\s/>])/iu;
 
+// SCRIPT/STYLE INSIDE ATTRIBUTE VALUES (wave 2b close final — Sol's set:html probe): the element
+// and expression scans below read tag names and expression source, but never what an attribute
+// CARRIES. `<div set:html="<script>…</script>">` is an ordinary element with an ordinary string
+// attribute, so it walked straight through — and its markup executes at render time, able to
+// rewrite the very claim text the ledger vouches for. Attribute values are scanned with the SAME
+// tag regex, in every spelling: a string literal value, an expression value ({…}), and a
+// {...spread}. Returns the attribute's name (for the error message) or undefined.
+const attributeCarryingMarkup = (
+  attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>
+): string | undefined => {
+  const carries = (value: unknown): boolean => typeof value === 'string' && scriptStyleTagPattern.test(value);
+  for (const attribute of attributes) {
+    if (attribute.type === 'mdxJsxExpressionAttribute') {
+      if (carries(attribute.value)) {
+        return 'a {…} spread';
+      }
+      continue;
+    }
+    const value = attribute.value;
+    // A string literal value, or the expression source of `attr={…}` (mdxJsxAttributeValueExpression).
+    if (carries(value) || (value !== null && typeof value === 'object' && carries(value.value))) {
+      return `the "${attribute.name}" attribute`;
+    }
+  }
+  return undefined;
+};
+
 const markerIdOf = (attributes: Array<MdxJsxAttribute | MdxJsxExpressionAttribute>): string | undefined => {
   for (const attribute of attributes) {
     if (attribute.type === 'mdxJsxAttribute' && attribute.name === 'id' && typeof attribute.value === 'string') {
@@ -307,6 +334,22 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
           'styling. Remove the element (a code FENCE showing example markup is fine) and resubmit'
       });
       return;
+    }
+    if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
+      // Same prohibition, applied to what the element's attributes carry — the element itself is
+      // innocuous, its attribute value is the executable payload. Reported under the SAME
+      // page-script code; the visit continues so one pass still lists every other problem.
+      const carrier = attributeCarryingMarkup(node.attributes ?? []);
+      if (carrier !== undefined) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `the page has ${carrier} of <${node.name ?? 'element'}> carrying a <script>/<style> tag at offset ` +
+            `${node.position?.start?.offset ?? 0} — generated pages must not carry executable or style elements, ` +
+            'in markup OR in attribute values; the theme owns page behavior and styling. Remove the markup from ' +
+            'the attribute (a code FENCE showing example markup is fine) and resubmit'
+        });
+      }
     }
     if (node.type === 'html' && typeof node.value === 'string' && scriptStyleTagPattern.test(node.value)) {
       errors.push({

@@ -59,6 +59,15 @@ detector structurally cannot see — is the job of the evidence-fed **risk criti
 decision 4), which ships in the review-routing wave. Until then the floor stands on its own: an
 uncovered span still forbids completeness, so ledger omission can never manufacture a green badge.
 
+**A dirty working tree cannot mint the complete state.** The badge asserts a claim about
+*committed* source, so completeness additionally requires a clean tree: when a run reads
+uncommitted changes (or a checkout with no HEAD), the page renders its **true counts** — the checks
+are content-hash bound and genuinely happened — plus an explicit **"checked against uncommitted
+changes"** note, and never the complete/green state. No reader surface presents the HEAD commit as
+that page's source revision either, because HEAD did not contain the bytes that were checked; the
+uncommitted-tree wording takes the commit's place. This is a local-development state: CI runs on
+clean checkouts are unaffected, and committing the source and regenerating restores the badge.
+
 Trust vocabulary is **three orthogonal public axes** (the old proven / scored / out-of-domain
 ladder is removed from all public surfaces):
 

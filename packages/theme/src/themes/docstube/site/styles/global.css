@@ -824,6 +824,17 @@ samp {
   font-weight: 600;
   padding: 3px 10px;
 }
+/* Checked against uncommitted changes (PRODUCT §1.2): honest counts, never the complete look —
+   deliberately styled as a caution, distinct from the green complete state. */
+.dt-uncommitted {
+  background: color-mix(in srgb, #d8b34a 14%, transparent);
+  border: 1px solid color-mix(in srgb, #d8b34a 45%, transparent);
+  border-radius: 999px;
+  color: #d8b34a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
 /* The translation dimension: its own visible line beside the correctness counts, never merged. */
 .dt-translation-assurance {
   background: color-mix(in srgb, #8b7bd8 14%, transparent);

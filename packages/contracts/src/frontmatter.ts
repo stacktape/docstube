@@ -39,6 +39,12 @@ export type FrontmatterSplit = {
   // (markers, block source ranges); nothing may mix them with offsets into the raw source, which is
   // why the canonical text travels with the split instead of being recomputed per call site.
   canonicalSource: string;
+  // Offset of the frontmatter text WITHIN canonicalSource — i.e. the length of the opening
+  // delimiter line. A YAML parser only ever sees the fenced block, so every diagnostic it reports
+  // is frontmatter-relative; shifting one onto source coordinates needs exactly this number, and
+  // recomputing it at the call site would be a second definition of the delimiter rule. 0 for a
+  // document without frontmatter.
+  frontmatterOffset: number;
 };
 
 // U+FEFF, written as an escape so the source file itself never carries a stray BOM character.
@@ -50,7 +56,13 @@ const closeDelimiter = /^---[ \t]*(?:\r?\n|$)/mu;
 
 export const splitFrontmatter = (source: string): FrontmatterSplit => {
   const text = source.startsWith(byteOrderMark) ? source.slice(byteOrderMark.length) : source;
-  const absent: FrontmatterSplit = { frontmatter: '', body: text, hadFrontmatter: false, canonicalSource: text };
+  const absent: FrontmatterSplit = {
+    frontmatter: '',
+    body: text,
+    hadFrontmatter: false,
+    canonicalSource: text,
+    frontmatterOffset: 0
+  };
   const blank = leadingBlankLines.exec(text)?.[0] ?? '';
   const afterBlank = text.slice(blank.length);
   const open = openDelimiter.exec(afterBlank);
@@ -66,7 +78,8 @@ export const splitFrontmatter = (source: string): FrontmatterSplit => {
     frontmatter: rest.slice(0, close.index).replace(/\r?\n$/u, ''),
     body: rest.slice(close.index + close[0].length),
     hadFrontmatter: true,
-    canonicalSource: afterBlank
+    canonicalSource: afterBlank,
+    frontmatterOffset: open[0].length
   };
 };
 

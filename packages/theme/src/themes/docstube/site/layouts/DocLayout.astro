@@ -43,6 +43,10 @@ const uncheckedClaims = frontmatter.docstubeUncheckedClaims ?? [];
 const reviewedFor = frontmatter.docstubeReviewedFor;
 const unverifiedPage = frontmatter.docstubeUnverified === true;
 const sourceFallback = frontmatter.docstubeSourceFallback === true;
+// DIRTY WORKING TREE (PRODUCT §1.2): the run read uncommitted bytes, so the page shows its true
+// counts plus an explicit note and never the complete state, and the sources footer withholds the
+// commit HEAD cannot vouch for.
+const dirtyWorkingTree = frontmatter.docstubeDirtyWorkingTree === true;
 // Translation assurance (i18n-lifecycle-v2 decision 3): a SECOND proof dimension, rendered as its
 // own line beside the correctness counts — never collapsed into them.
 const translationAssurance = frontmatter.docstubeTranslationAssurance;
@@ -177,13 +181,13 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         <div class="dt-article">
           <div class="dt-page-meta">
             {breadcrumb ? <p class="dt-breadcrumb">{breadcrumb}</p> : null}
-            <DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />
+            <DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} dirtyWorkingTree={dirtyWorkingTree} translationAssurance={translationAssurance} />
           </div>
           <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />
           <DocstubeEntity entityId={frontmatter.docstubePageId}>
             <slot />
           </DocstubeEntity>
-          <DocstubeSources sources={sources} repoUrl={repoUrl} />
+          <DocstubeSources sources={sources} repoUrl={repoUrl} dirtyWorkingTree={dirtyWorkingTree} />
           {footerCredit ? (
             <footer class="dt-footer">Docs by <a href="https://docstube.dev">docstube</a></footer>
           ) : null}

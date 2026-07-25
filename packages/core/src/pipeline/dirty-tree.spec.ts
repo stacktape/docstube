@@ -17,6 +17,7 @@ import { createRunJournal } from '../state/run-journal.ts';
 import {
   checkWorkingTreeDirty,
   dirtyTreeEndOfRunSweep,
+  dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
   resolveSourceRevision
 } from './generate.ts';
@@ -131,6 +132,10 @@ describe('working-tree dirtiness', () => {
     expect(updated?.provenance?.lineage.dirtyWorkingTree).toBe(true);
     const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', journal.runId, 'journal.jsonl'), 'utf8');
     expect(journalRaw).toContain('became dirty DURING the run');
+    // The warning states the READER-FACING consequence (PRODUCT §1.2, spine finding): those pages
+    // keep their true counts but can never render the complete state.
+    expect(journalRaw).toContain('checked against uncommitted changes');
+    expect(journalRaw).toContain('never the complete state');
     await git('checkout', '--', 'file.txt');
   });
 
@@ -183,5 +188,16 @@ describe('working-tree dirtiness', () => {
     expect(docstubeOwnOutputPrefixes({ outDir: './docs/site/' })).toEqual(['docs/site', '.docstube']);
     // A prefix never swallows sibling paths that merely share the leading characters.
     expect(docstubeOwnOutputPrefixes({ outDir: 'docs' })).toEqual(['docs', '.docstube']);
+  });
+});
+
+// The badge rule is a PRODUCT rule, so the run-start warning says it in words too: a dirty run
+// still produces genuine, content-hash-bound checks — what it cannot produce is the complete state.
+describe('dirtyWorkingTreeWarning', () => {
+  it('names the commit AND the reader-facing consequence', () => {
+    const warning = dirtyWorkingTreeWarning('a'.repeat(40));
+    expect(warning.severity).toBe('warning');
+    expect(warning.message).toContain('checked against uncommitted changes');
+    expect(warning.message).toContain('never the complete state');
   });
 });

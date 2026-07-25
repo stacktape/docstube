@@ -87,6 +87,33 @@ describe('mdx-compile', () => {
     expect(result.findings[0]?.message).not.toMatch(/\(\d+:\d+/u);
   });
 
+  it('reports YAML errors at SOURCE line numbers in both the message and the span', async () => {
+    // The broken key is the THIRD frontmatter line, which is source line 4 — the YAML parser only
+    // ever sees the fenced block, so an unshifted position (line 3) next to a hardcoded span
+    // ([1,1]) pointed a human at two different, both-wrong lines.
+    const mdx = ['---', 'title: Fine', 'description: Fine too', 'bad: value: nope', '---', '', 'Body.', ''].join('\n');
+    expect(mdx.split('\n')[3]).toBe('bad: value: nope');
+
+    const result = await mdxCompileVerifier.verify(makeContext(), [makeArtifact(makePage({ slug: 'yaml-pos' }), mdx)]);
+
+    expect(result.status).toBe('fail');
+    expect(result.findings[0]?.message).toContain('frontmatter is not valid YAML at line 4');
+    expect(result.findings[0]?.span).toEqual([4, 4]);
+    // The parser's own frontmatter-relative position is REPLACED, never left beside the shifted one.
+    expect(result.findings[0]?.message).not.toContain('at line 3');
+  });
+
+  it('shifts YAML positions past a BOM and blank lines above the delimiter, like the compiler does', async () => {
+    const mdx = `${String.fromCharCode(0xfeff)}\n\n---\ntitle: Fine\nbad: value: nope\n---\n\nBody.\n`;
+    // Source lines: 1 BOM+blank, 2 blank, 3 '---', 4 title, 5 the broken key.
+    expect(mdx.split('\n')[4]).toBe('bad: value: nope');
+
+    const result = await mdxCompileVerifier.verify(makeContext(), [makeArtifact(makePage({ slug: 'yaml-bom' }), mdx)]);
+
+    expect(result.findings[0]?.message).toContain('at line 5');
+    expect(result.findings[0]?.span).toEqual([5, 5]);
+  });
+
   it('reports malformed frontmatter as a YAML error, never as an MDX compile error', async () => {
     const mdx = '---\ntitle: Configuration\ndescription: unquoted: colon\n---\n\n# Fine body\n\nPlain prose.\n';
 

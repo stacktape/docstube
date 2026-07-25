@@ -79,11 +79,39 @@ const bodyLineOffset = (source: string, body: string): number => {
   return prefixLength <= 0 ? 0 : source.slice(0, prefixLength).split('\n').length - 1;
 };
 
+// YAML diagnostics are FRONTMATTER-relative — the parser only ever sees the fenced block — so a
+// position it reports (structured in `linePos`, and repeated in its message text) is shifted onto
+// SOURCE lines before a human reads it, exactly as compiler positions are. Leaving them unshifted
+// next to a hardcoded span pointed at two different, both-wrong lines.
+const yamlPositionInMessage = /\s*at line (\d+), column (\d+):?\s*$/u;
+
+const yamlErrorPoint = (error: unknown, reason: string): { line: number; column: number | undefined } | undefined => {
+  const linePos = error && typeof error === 'object' ? (error as { linePos?: unknown }).linePos : undefined;
+  const start = Array.isArray(linePos) ? (linePos[0] as { line?: unknown; col?: unknown } | undefined) : undefined;
+  if (start !== undefined && typeof start.line === 'number') {
+    return { line: start.line, column: typeof start.col === 'number' ? start.col : undefined };
+  }
+  const match = yamlPositionInMessage.exec(reason);
+  return match ? { line: Number(match[1]), column: Number(match[2]) } : undefined;
+};
+
+// The frontmatter block is a slice of the raw source: the BOM and blank lines the canonical split
+// removed, plus the opening delimiter line (frontmatterOffset, from the shared splitter). The lines
+// the YAML parser never saw are exactly the newlines in that prefix.
+const frontmatterLineOffset = (source: string, split: FrontmatterSplit): number => {
+  const prefixLength = source.length - split.canonicalSource.length + split.frontmatterOffset;
+  return prefixLength <= 0 ? 0 : source.slice(0, prefixLength).split('\n').length - 1;
+};
+
 // remark treats the frontmatter fence as opaque, so @mdx-js/mdx compiles pages whose frontmatter
 // is broken YAML — and those pages crash any downstream YAML consumer (live-hit: an unquoted
 // description containing ": "). Validate the fenced block ourselves, using the shared splitter so
 // the verifier vets exactly the block emission will vet (wave 2b close).
-const frontmatterFinding = (artifact: PageArtifact, split: FrontmatterSplit): Finding | undefined => {
+const frontmatterFinding = (
+  artifact: PageArtifact,
+  split: FrontmatterSplit,
+  lineOffset: number
+): Finding | undefined => {
   if (!split.hadFrontmatter) {
     return undefined;
   }
@@ -91,15 +119,29 @@ const frontmatterFinding = (artifact: PageArtifact, split: FrontmatterSplit): Fi
     parseYaml(split.frontmatter);
     return undefined;
   } catch (error) {
-    const reason = error instanceof Error ? (error.message.split('\n')[0] ?? 'invalid YAML') : 'invalid YAML';
+    const raw = error instanceof Error ? (error.message.split('\n')[0] ?? 'invalid YAML') : 'invalid YAML';
+    const point = yamlErrorPoint(error, raw);
+    // The parser's own position text is REPLACED, not kept beside the shifted one: two conflicting
+    // line numbers in one message point a human at the wrong line half the time.
+    const reason = raw.replace(yamlPositionInMessage, '');
+    // No reported position (a shape this yaml version does not carry one for): the block's own
+    // first line is the honest span, and the message stays silent about the position rather than
+    // inventing one.
+    const line = (point?.line ?? 1) + lineOffset;
+    const position =
+      point === undefined
+        ? ''
+        : point.column === undefined
+          ? ` at line ${line}`
+          : ` at line ${line}, column ${point.column}`;
     return {
       source: 'verifier',
       check: verifierId,
       severity: 'error',
-      message: `frontmatter is not valid YAML (${reason}) — quote values that contain ":" or "#"`,
+      message: `frontmatter is not valid YAML${position} (${reason}) — quote values that contain ":" or "#"`,
       entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
       file: artifact.mdxPath,
-      span: [1, 1]
+      span: [line, line]
     };
   }
 };
@@ -120,7 +162,7 @@ export const mdxCompileVerifier: VerifierDefinition = {
         // so a correct authored value like `description: "Use <Widget> literally"` failed as an
         // unclosed JSX tag on a page Astro accepts. Each half is checked by its own parser.
         const split = splitFrontmatter(artifact.mdx);
-        const frontmatterError = frontmatterFinding(artifact, split);
+        const frontmatterError = frontmatterFinding(artifact, split, frontmatterLineOffset(artifact.mdx, split));
         if (frontmatterError) {
           findings.push(frontmatterError);
         }

@@ -185,7 +185,7 @@ describe('proof conformance (basic theme)', () => {
     // The complete class can only appear when the linter found nothing — and the chip re-derives
     // it from the numbers it renders rather than trusting the flag (impl-24 defensive recompute).
     expect(chip).toContain(
-      'const isComplete = complete === true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
+      'const isComplete = complete === true && dirtyWorkingTree !== true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
     );
     expect(chip).toContain('dt-claims--complete');
     // HONEST BADGE SEMANTICS (impl-24, PRODUCT §1.2 / harness-state-v2 decisions 4-5): wherever the
@@ -245,6 +245,77 @@ describe('proof conformance (basic theme)', () => {
     const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
     expect(route).toContain('docstubeUncoveredAssertions: 1');
     expect(route).not.toContain('docstubeClaimsComplete');
+  });
+
+  // A DIRTY WORKING TREE CANNOT MINT THE COMPLETE STATE (PRODUCT §1.2, spine finding): honest
+  // counts plus an explicit note, never the green state, and no unvouched commit on any reader
+  // surface — a conformance contract across every theme, exactly like the counts themselves.
+  it('renders the uncommitted-changes note, withholds complete, and never presents the HEAD commit', async () => {
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('checked against uncommitted changes');
+    expect(chip).toContain('data-docstube-dirty-working-tree="true"');
+    // The defensive recompute refuses the green state on its own, without trusting the flag.
+    expect(chip).toContain(
+      'const isComplete = complete === true && dirtyWorkingTree !== true && total > 0 && checked === total && uncovered === 0 && contradicted === 0;'
+    );
+    // The sources footer withholds the commit label AND the /blob/<commit> link: HEAD did not
+    // contain the bytes that were checked.
+    const sources = await readFile(join(siteRoot, 'src/docstube/DocstubeSources.astro'), 'utf8');
+    expect(sources).toContain('repoUrl && !dirtyWorkingTree');
+    expect(sources).toContain('{dirtyWorkingTree ? null : <span class="dt-source-commit">');
+    expect(sources).toContain('checked against uncommitted changes');
+    // Every built-in theme threads the dimension into both primitives and styles the note.
+    for (const bundle of Object.values(builtinThemes)) {
+      const files = (await bundle()).files;
+      const layout = files.find((file) => file.path === 'src/layouts/DocLayout.astro');
+      const content = layout && 'content' in layout ? layout.content : '';
+      expect(content).toContain('const dirtyWorkingTree = frontmatter.docstubeDirtyWorkingTree === true;');
+      expect(content).toContain('<DocstubeClaims');
+      expect(content).toContain('dirtyWorkingTree={dirtyWorkingTree}');
+      expect(content).toContain(
+        '<DocstubeSources sources={sources} repoUrl={repoUrl} dirtyWorkingTree={dirtyWorkingTree} />'
+      );
+      const css = files.find((file) => file.path === 'src/styles/global.css');
+      expect(css && 'content' in css ? css.content : '').toContain('.dt-uncommitted');
+    }
+  });
+
+  it('emits the dirty-tree marker on the route and withholds complete even at N/N with nothing uncovered', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-proof-dirty-'));
+    const input = buildFixtureInput(repoRoot);
+    const install = input.pages[0]!;
+    const provenance = install.shard.provenance;
+    if (provenance === undefined) {
+      throw new Error('fixture shard is missing its trust spine');
+    }
+    // Every claim checked, nothing uncovered — the exact shape that WOULD be complete — with the
+    // dirty-tree lineage marker as the only difference.
+    const allChecked = {
+      ...provenance,
+      claimEvidence: provenance.claimEvidence.map((record) => ({ ...record, correctness: 'checked' as const }))
+    };
+    input.pages[0] = {
+      ...install,
+      shard: {
+        ...install.shard,
+        provenance: { ...allChecked, lineage: { ...provenance.lineage, dirtyWorkingTree: true } }
+      }
+    };
+    await emitSite(input);
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(route).toContain('docstubeDirtyWorkingTree: true');
+    expect(route).not.toContain('docstubeClaimsComplete');
+    // The counts are NOT hidden: the checks genuinely happened.
+    expect(route).toContain('docstubeClaimsChecked: 2');
+    expect(route).toContain('docstubeClaimsTotal: 2');
+
+    // The same shard with a clean tree is complete, and carries no note.
+    const clean = buildFixtureInput(repoRoot);
+    clean.pages[0] = { ...install, shard: { ...install.shard, provenance: allChecked } };
+    await emitSite(clean);
+    const cleanRoute = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(cleanRoute).toContain('docstubeClaimsComplete: true');
+    expect(cleanRoute).not.toContain('docstubeDirtyWorkingTree');
   });
 
   it('renders a first-generation contradiction LOUD: warning frontmatter and per-claim marker ids', async () => {

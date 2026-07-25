@@ -517,6 +517,12 @@ const pageRouteMdx = (
   // rides beside the counts and gates the complete state — a page with any unmarked assertion
   // can never present as done, so ledger omission cannot manufacture "100% checked".
   set('docstubeUncoveredAssertions', proof.uncoveredAssertions);
+  // DIRTY-TREE HONESTY ON THE READER SURFACE (wave 2b close — the spine finding): the run read
+  // bytes no commit contains, so the page renders its true counts PLUS the uncommitted-changes
+  // note, never the complete state, and the sources footer withholds the (unvouched) commit.
+  if (proof.dirtyWorkingTree) {
+    set('docstubeDirtyWorkingTree', true);
+  }
   if (proof.complete) {
     set('docstubeClaimsComplete', true);
   }

@@ -32,9 +32,18 @@ export type ShardProofProjection = {
   // the writer marked, so without this number a page that simply omitted its markers would present
   // as fully checked. Rendered next to the counts and, decisively, it gates `complete` below.
   uncoveredAssertions: number;
+  // A DIRTY WORKING TREE CANNOT MINT THE COMPLETE STATE (wave 2b close — the spine finding): this
+  // run read working-tree bytes that exist in no commit (uncommitted changes, or no HEAD at all),
+  // recorded as provenance.lineage.dirtyWorkingTree. The checks themselves are genuine — they are
+  // content-hash bound — so the counts stay honest and visible; what degrades is the CLAIM. The
+  // badge asserts something about committed source, so the complete state is withheld, the reader
+  // is told the run covered uncommitted changes, and no surface presents HEAD as the revision the
+  // page was checked at. CI (clean checkouts) is unaffected.
+  dirtyWorkingTree: boolean;
   // The ONLY state a reader surface may present as done: every ledger claim checked, nothing
-  // contradicted, and nothing assertion-shaped left unmarked. A page with any uncovered span can
-  // never be complete, however clean its ledger looks.
+  // contradicted, nothing assertion-shaped left unmarked, and a clean working tree. A page with
+  // any uncovered span — or checked against uncommitted changes — can never be complete, however
+  // clean its ledger looks.
   complete: boolean;
   // Persona id when a primary-gating review genuinely completed WITH at least one evaluated
   // criterion; the "reviewed for <persona>" label is withheld otherwise (harness-state-v2
@@ -111,7 +120,13 @@ export const checkShardMdxBinding = (shard: PageShard, mdx: string): ShardMdxBin
 // state must never accompany changed prose.
 export const projectUnboundShardProof = (shard: PageShard): ShardProofProjection => {
   const { ledger: _ledger, provenance: _provenance, claimMatching: _claimMatching, ...stripped } = shard;
-  return projectShardProof(stripped as PageShard);
+  // The lineage marker survives the strip: an unbound page whose run also read uncommitted bytes
+  // says both things, and dropping the dirty-tree note here would be the one place it could be
+  // laundered away.
+  return {
+    ...projectShardProof(stripped as PageShard),
+    dirtyWorkingTree: shard.provenance?.lineage.dirtyWorkingTree === true
+  };
 };
 
 export const projectShardProof = (shard: PageShard): ShardProofProjection => {
@@ -161,6 +176,7 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
   );
 
   const uncoveredAssertions = shard.ledger?.coverageLint.uncovered.length ?? 0;
+  const dirtyWorkingTree = shard.provenance?.lineage.dirtyWorkingTree === true;
 
   return {
     state: unverified ? 'unverified' : 'verified',
@@ -169,8 +185,10 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
     contradictedClaims,
     uncheckedClaims: totalClaims - checkedClaims - contradictedClaims,
     uncoveredAssertions,
+    dirtyWorkingTree,
     complete:
       !unverified &&
+      !dirtyWorkingTree &&
       totalClaims > 0 &&
       checkedClaims === totalClaims &&
       contradictedClaims === 0 &&

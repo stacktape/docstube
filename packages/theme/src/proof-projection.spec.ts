@@ -183,6 +183,52 @@ describe('projectShardProof — coverage lint gates the complete state', () => {
   });
 });
 
+// A DIRTY WORKING TREE CANNOT MINT THE COMPLETE STATE (wave 2b close, spine finding): the checks
+// are content-hash bound and genuinely happened, so the COUNTS stay honest — what degrades is the
+// CLAIM, because the badge asserts something about committed source.
+const withDirtyTree = (shard: PageShard, dirty: boolean): PageShard => {
+  if (shard.provenance === undefined) {
+    throw new Error('fixture shard is missing its trust spine');
+  }
+  return {
+    ...shard,
+    provenance: {
+      ...shard.provenance,
+      lineage: dirty
+        ? { ...shard.provenance.lineage, dirtyWorkingTree: true }
+        : { ...shard.provenance.lineage, dirtyWorkingTree: false }
+    }
+  };
+};
+
+describe('projectShardProof — a dirty working tree withholds the complete state', () => {
+  it('keeps the true counts at N/N with zero uncovered, but is never complete', () => {
+    const projection = projectShardProof(withDirtyTree(allChecked(installShard()), true));
+    expect(projection).toMatchObject({
+      state: 'verified',
+      checkedClaims: 2,
+      totalClaims: 2,
+      contradictedClaims: 0,
+      uncoveredAssertions: 0,
+      dirtyWorkingTree: true,
+      complete: false
+    });
+  });
+
+  it('is complete for the SAME shard once the tree is clean — the flag is the only difference', () => {
+    const projection = projectShardProof(withDirtyTree(allChecked(installShard()), false));
+    expect(projection).toMatchObject({ checkedClaims: 2, totalClaims: 2, dirtyWorkingTree: false, complete: true });
+  });
+
+  it('carries the marker through the UNBOUND projection too — it can never be laundered away', () => {
+    expect(projectUnboundShardProof(withDirtyTree(allChecked(installShard()), true))).toMatchObject({
+      state: 'unverified',
+      dirtyWorkingTree: true,
+      complete: false
+    });
+  });
+});
+
 // UNRENDERABLE ANCHORS ARE CHIPLESS (impl-23 finding 3): a punctuation-only heading renders as
 // id="" in Astro, so no chip could ever resolve there — shipping one would let it land on whatever
 // element answered the lookup instead.

@@ -34,6 +34,9 @@ type ClaimCounts = {
   // Coverage-linter spans (PRODUCT §1.2): assertion-shaped prose no <Claim> marker covers. Page
   // scope only — the linter reports per block, but the reviewer decision it informs is the page's.
   uncovered?: number;
+  // The run read working-tree bytes that exist in no commit (PRODUCT §1.2). The counts are real,
+  // so they render in full; the complete state is withheld and the note says why. Page scope.
+  dirtyWorkingTree?: boolean;
 };
 
 type ShardProof = {
@@ -67,7 +70,8 @@ const projectShard = (shard: PageShard): ShardProof => {
       total: records.length,
       contradicted: records.filter((record) => record.correctness === 'contradicted').length,
       unchecked: records.filter((record) => record.correctness === 'unchecked').length,
-      uncovered: shard.ledger?.coverageLint.uncovered.length ?? 0
+      uncovered: shard.ledger?.coverageLint.uncovered.length ?? 0,
+      dirtyWorkingTree: shard.provenance?.lineage.dirtyWorkingTree === true
     },
     claimsByBlockId
   };
@@ -84,7 +88,7 @@ const countsOf = (claims: ClaimView[]): ClaimCounts => ({
 // claims get a quiet-but-visible exception count so they never read as ordinary checked content.
 function ClaimCountChip({ counts }: { counts: ClaimCounts }) {
   const uncovered = counts.uncovered ?? 0;
-  if (counts.total === 0 && uncovered === 0) {
+  if (counts.total === 0 && uncovered === 0 && counts.dirtyWorkingTree !== true) {
     return null;
   }
   // NO HIDDEN DENOMINATOR (PRODUCT §1.2): unmarked assertions ride beside the ledger counts, so a
@@ -92,7 +96,17 @@ function ClaimCountChip({ counts }: { counts: ClaimCounts }) {
   // A contradiction is the alarm, but it must never SUBTRACT information (impl-24 finding): the
   // chip used to collapse to "⚠ N contradicted" and hide the checked/total and unchecked counts
   // entirely, so the reviewer with the most to decide saw the least. The warning is now additive.
-  const complete = counts.total > 0 && counts.checked === counts.total && uncovered === 0 && counts.contradicted === 0;
+  // A DIRTY WORKING TREE CANNOT MINT THE COMPLETE STATE (PRODUCT §1.2, spine finding): the run
+  // read bytes no commit contains. The counts are content-hash bound and therefore real, so they
+  // render in full — what degrades is the CLAIM: the green treatment is withheld and the chip says
+  // "checked against uncommitted changes", the same wording every theme uses.
+  const dirtyWorkingTree = counts.dirtyWorkingTree === true;
+  const complete =
+    !dirtyWorkingTree &&
+    counts.total > 0 &&
+    counts.checked === counts.total &&
+    uncovered === 0 &&
+    counts.contradicted === 0;
   // The complete state means: every ledger claim checked and no unmarked assertion detected — NOT
   // that the page contains no unverified statement (PRODUCT §1.2; the semantic job is the risk
   // critic's, harness-state-v2 decision 4).
@@ -108,13 +122,21 @@ function ClaimCountChip({ counts }: { counts: ClaimCounts }) {
       title={
         complete
           ? 'Every claim in this page’s ledger is checked and no unmarked assertion was detected. It does not mean the page contains no unverified statement.'
-          : undefined
+          : dirtyWorkingTree
+            ? 'This page was checked against uncommitted changes in the working tree, so no commit contains the checked source. The counts are real; the complete state is withheld until the source is committed and the page regenerated.'
+            : undefined
       }
     >
       {counts.contradicted > 0 && <span className="font-semibold">⚠ {counts.contradicted} contradicted · </span>}
       {counts.total > 0 ? `${counts.checked}/${counts.total} checked` : 'no claims recorded'}
       {counts.unchecked > 0 && <span className="text-neutral-500"> · {counts.unchecked} unchecked</span>}
       {uncovered > 0 && <span className="text-amber-400"> · {uncovered} unmarked</span>}
+      {dirtyWorkingTree && (
+        <span className="text-amber-400" data-docstube-dirty-working-tree="true">
+          {' '}
+          · checked against uncommitted changes
+        </span>
+      )}
     </span>
   );
 }

@@ -1493,6 +1493,17 @@ html[data-mobile-nav-open] .stp-mobile-nav {
   font-weight: 600;
   padding: 3px 10px;
 }
+/* Checked against uncommitted changes (PRODUCT §1.2): honest counts, never the complete look —
+   deliberately styled as a caution, distinct from the green complete state. */
+.dt-uncommitted {
+  background: rgba(220, 180, 90, 0.12);
+  border: 1px solid rgba(220, 180, 90, 0.4);
+  border-radius: 999px;
+  color: #e0be76;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
 /* The translation dimension: its own visible line beside the correctness counts, never merged. */
 .dt-translation-assurance {
   background: rgba(150, 130, 220, 0.12);

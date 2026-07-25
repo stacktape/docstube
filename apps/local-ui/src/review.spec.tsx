@@ -218,6 +218,22 @@ describe('review UI', () => {
     expect(screen.getAllByText(/· 1 unmarked/).length).toBeGreaterThan(0);
   });
 
+  it('says "checked against uncommitted changes" and withholds the complete look on a dirty-tree run', async () => {
+    // A DIRTY WORKING TREE CANNOT MINT THE COMPLETE STATE (PRODUCT §1.2, spine finding): the run
+    // read bytes no commit contains. The counts are content-hash bound, so they stay — the green
+    // treatment does not, and the reviewer is told why, in the same wording every theme uses.
+    const shard = buildShard('checked') as { provenance: { lineage: Record<string, unknown> } };
+    shard.provenance.lineage = { dirtyWorkingTree: true };
+    renderReview(buildClient(vi.fn(noopSubmit), shard));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+    const chip = screen.getAllByText(/checked against uncommitted changes/)[0]?.closest('span[class*="rounded"]');
+    expect(chip?.textContent).toContain('1/1 checked');
+    expect(chip?.textContent).toContain('checked against uncommitted changes');
+    // 1/1 checked with nothing unmarked would otherwise be the complete/green state.
+    expect(chip?.className).not.toContain('emerald');
+  });
+
   it('renders a shard WITHOUT a trust spine as explicitly unverified — never a silent 0/0 (impl-08)', async () => {
     renderReview(buildClient(vi.fn(noopSubmit), buildShard('checked', false)));
     fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));

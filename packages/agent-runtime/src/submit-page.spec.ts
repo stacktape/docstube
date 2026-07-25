@@ -239,6 +239,38 @@ describe('scanClaimMarkers', () => {
     expect(selfClosed.errors[0]?.code).toBe('page-script');
   });
 
+  it('rejects <script>/<style> markup carried in a JSX ATTRIBUTE VALUE (page-script, Sol set:html probe)', () => {
+    // The element and expression scans read tag names and expression source, never what an
+    // attribute CARRIES — so a renderer directive like set:html could smuggle a script past them
+    // and rewrite checked claim text after rendering.
+    const setHtml = scanClaimMarkers(
+      'Text.\n\n<div set:html="<script>document.body.innerHTML = \'lie\'</script>" />\n'
+    );
+    expect(setHtml.errors[0]?.code).toBe('page-script');
+    expect(setHtml.errors[0]?.message).toContain('theme owns page behavior');
+    expect(setHtml.errors[0]?.message).toContain('set:html');
+
+    // Expression-valued attributes and {...spreads} are the same channel.
+    const expressionValue = scanClaimMarkers("Text.\n\n<Callout body={'<style>.dt-claim{display:none}</style>'} />\n");
+    expect(expressionValue.errors[0]?.code).toBe('page-script');
+
+    const spread = scanClaimMarkers('Text.\n\n<Callout {...{ html: \'<script src="evil.js">\' }} />\n');
+    expect(spread.errors[0]?.code).toBe('page-script');
+
+    // Inline (text-level) elements are scanned too, not only flow ones.
+    const inline = scanClaimMarkers('Prose with <Badge label="<script>alert(1)</script>">x</Badge> inside.\n');
+    expect(inline.errors.some((error) => error.code === 'page-script')).toBe(true);
+
+    // ORDINARY attribute values stay legal, including ones that merely MENTION the words.
+    const ordinary = scanClaimMarkers(
+      'Text.\n\n<Callout title="Run the script" tone="info" note={\'mind the style guide\'}>Body.</Callout>\n'
+    );
+    expect(ordinary.errors).toEqual([]);
+
+    const customElementName = scanClaimMarkers('Text.\n\n<Callout title="see <style-guide> for details" />\n');
+    expect(customElementName.errors).toEqual([]);
+  });
+
   it('leaves code FENCES and inline code containing <script>/<style> untouched — examples are text, not elements', () => {
     const fence = scanClaimMarkers(
       [
@@ -348,6 +380,24 @@ describe('validateSubmission', () => {
       proposedEvidence: [],
       proposedSubscriptions: []
     });
+  });
+
+  it('REJECTS a submission whose attribute value carries script markup, and accepts one that merely mentions it', () => {
+    const rejected = validateSubmission({
+      mdx: mdxWith('<Claim id="c1">`retries` defaults to 3.</Claim>\n\n<div set:html="<script>rewrite()</script>" />'),
+      ledger: ledgerWith([claim('c1')])
+    });
+    expect(rejected.accepted).toBeUndefined();
+    expect(rejected.errors.some((error) => error.includes('theme owns page behavior'))).toBe(true);
+
+    const accepted = validateSubmission({
+      mdx: mdxWith(
+        '<Claim id="c1">`retries` defaults to 3.</Claim>\n\n<Callout title="Run the script">Body.</Callout>'
+      ),
+      ledger: ledgerWith([claim('c1')])
+    });
+    expect(accepted.errors).toEqual([]);
+    expect(accepted.accepted).toBeDefined();
   });
 
   it('accepts a hash-less file-content subscription proposal (conservative fallback shape)', () => {

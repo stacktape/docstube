@@ -222,6 +222,17 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     // The completed primary-gating review earns the reviewed-for label.
     expect(route).toContain('docstubeReviewedFor: "app-developer"');
 
+    // DIRTY-TREE HONESTY SURVIVES THE WHOLE PATH (PRODUCT §1.2, spine finding): this fixture is a
+    // bare temp directory with no git HEAD, so the run could not attribute the bytes it read to any
+    // commit — the shard records the lineage marker and emission puts it on the route. The claim
+    // degrades, the counts do not: 1/1 checked is still rendered, but the page is NOT complete.
+    const lineageShard = JSON.parse(
+      await readFile(join(repoRoot, '.docstube', 'manifest', 'pages', 'en', `${pageId}.json`), 'utf8')
+    ) as { provenance?: { lineage: { dirtyWorkingTree?: boolean } } };
+    expect(lineageShard.provenance?.lineage.dirtyWorkingTree).toBe(true);
+    expect(route).toContain('docstubeDirtyWorkingTree: true');
+    expect(route).not.toContain('docstubeClaimsComplete');
+
     // MDX↔SHARD BINDING (wave 2b close final): edit the persisted MDX after persistence and
     // re-emit — the page must render the loud UNVERIFIED state with a warning naming the
     // mismatch, never its stale checked counts over changed prose.

@@ -52,6 +52,26 @@ describe('splitFrontmatter', () => {
   });
 });
 
+// The offset diagnostics are shifted by: a YAML parser only sees the fenced block, so a position
+// it reports is frontmatter-relative until this number puts it back on source coordinates.
+describe('splitFrontmatter — frontmatterOffset', () => {
+  it('locates the block inside the canonical source, for every accepted opening form', () => {
+    for (const source of [
+      `---\ntitle: Installation\n---\n\n${body}`,
+      `${BOM}---\ntitle: Installation\n---\n\n${body}`,
+      `\n\n---\ntitle: Installation\n---\n\n${body}`,
+      '---\r\ntitle: Installation\r\n---\r\n\r\nBody.\r\n'
+    ]) {
+      const split = splitFrontmatter(source);
+      expect(split.canonicalSource.slice(split.frontmatterOffset).startsWith(split.frontmatter)).toBe(true);
+    }
+  });
+
+  it('is zero for a document without frontmatter', () => {
+    expect(splitFrontmatter(body).frontmatterOffset).toBe(0);
+  });
+});
+
 describe('canonicalMdxSource', () => {
   it('strips only what stops a parser from seeing the block', () => {
     const source = `${BOM}\n\n---\ntitle: Installation\n---\n\n${body}`;
