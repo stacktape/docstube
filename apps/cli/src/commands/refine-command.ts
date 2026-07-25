@@ -1,11 +1,7 @@
-import {
-  CoreError,
-  createManifestStore,
-  createTaskRunnerFromConfig,
-  loadConfigFamily,
-  runRefine
-} from '@docstube/core';
-import { emitCurrentSite } from './emit-current-site.ts';
+import { CoreError, createTaskRunnerFromConfig, loadConfigFamily, runRefine } from '@docstube/core';
+import type { RefineSummary, TaskRunner } from '@docstube/core';
+import type { ToolDescriptor } from '@docstube/contracts';
+import { emitPersistedSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { countRunFailureModes } from '../runtime-telemetry.ts';
 import { reportRunSpend } from './run-spend.ts';
@@ -17,24 +13,53 @@ export type RefineCommandInput = {
   maxPages?: number | undefined;
   maxRoundsPerPage?: number | undefined;
   totalRounds?: number | undefined;
+  // Tests: a scripted task runner instead of the configured transport (CI never calls live agents).
+  taskRunner?: { runTask: TaskRunner; toolDescriptors: ToolDescriptor[] } | undefined;
 };
 
 export const runRefineCommand = async (input: RefineCommandInput, output: CliOutput): Promise<CliCommandResult> => {
   try {
     const family = await loadConfigFamily(input.workspaceDir);
-    const runner = createTaskRunnerFromConfig(family.config, input.workspaceDir);
-    output.info(`refining with ${runner.transportId} (${runner.model})…`);
+    const configuredRunner =
+      input.taskRunner === undefined ? createTaskRunnerFromConfig(family.config, input.workspaceDir) : undefined;
+    if (configuredRunner !== undefined) {
+      output.info(`refining with ${configuredRunner.transportId} (${configuredRunner.model})…`);
+    }
+    const runner = input.taskRunner ?? configuredRunner;
+    if (runner === undefined) {
+      throw new CoreError('pipeline-failed', 'no task runner available');
+    }
 
-    const summary = await runRefine({
-      repoRoot: input.workspaceDir,
-      runTask: runner.runTask,
-      toolDescriptors: runner.toolDescriptors,
-      target: input.target,
-      failedOnly: input.failedOnly,
-      maxPages: input.maxPages,
-      maxRoundsPerPage: input.maxRoundsPerPage,
-      totalRounds: input.totalRounds
-    });
+    let summary: RefineSummary;
+    try {
+      summary = await runRefine({
+        repoRoot: input.workspaceDir,
+        runTask: runner.runTask,
+        toolDescriptors: runner.toolDescriptors,
+        target: input.target,
+        failedOnly: input.failedOnly,
+        maxPages: input.maxPages,
+        maxRoundsPerPage: input.maxRoundsPerPage,
+        totalRounds: input.totalRounds
+      });
+    } catch (runError) {
+      // EMISSION AFTER PARTIAL FAILURE (wave 2b close final): refine persists page by page, so a
+      // later page throwing leaves EARLIER pages committed with fresh shards while the rendered
+      // routes still show the pre-refine state — current shards disagreeing with stale routes.
+      // Same finally-shaped emission as generate: emission consumes only committed state, so what
+      // it emits is consistent; it no-ops when no manifest was ever persisted. The run error is
+      // surfaced AFTER emission, and an emission failure must never mask it.
+      try {
+        const emitted = await emitPersistedSite(input.workspaceDir, family, output);
+        if (emitted.emitted) {
+          output.info(`run failed — site re-emitted to ${family.config.outDir}/ from the persisted state`);
+        }
+      } catch (emitError) {
+        output.error(`site emission after the failed run also failed: ${(emitError as Error).message}`);
+      }
+      throw runError;
+    }
+
     if (summary.refined.length === 0) {
       output.info(`nothing to refine (${summary.consideredCount} page(s) considered)`);
       return { exitCode: 0 };
@@ -45,15 +70,7 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
       );
     }
 
-    const store = createManifestStore(input.workspaceDir, family.config.versions.current);
-    const emitResult = await emitCurrentSite({ workspaceDir: input.workspaceDir, family, store });
-    for (const conflict of emitResult.themeConflicts) {
-      output.info(`  theme-conflict  ${conflict}`);
-    }
-    // MDX↔shard binding failures: the named pages rendered UNVERIFIED instead of stale trust state.
-    for (const warning of emitResult.warnings) {
-      output.error(`  unverified  ${warning}`);
-    }
+    await emitPersistedSite(input.workspaceDir, family, output);
     reportRunSpend(output, summary);
     output.info(`run ${summary.runId}: ${summary.outcome}`);
     // RefineSummary carries no findings or flag kinds (owned by another workstream); only the

@@ -163,6 +163,16 @@ pre {
   font-weight: 600;
   padding: 3px 10px;
 }
+/* The translation dimension: its own visible line beside the correctness counts, never merged. */
+.dt-translation-assurance {
+  background: #f3f0fa;
+  border: 1px solid #cfc4e6;
+  border-radius: 999px;
+  color: #52407e;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
 .dt-contradictions {
   background: #fdeaea;
   border: 1px solid #eec1c1;

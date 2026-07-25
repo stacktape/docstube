@@ -1,3 +1,4 @@
+import GithubSlugger, { slug as githubSlug } from 'github-slugger';
 import type { Heading, Root, RootContent } from 'mdast';
 import type { MdxJsxAttribute, MdxJsxExpressionAttribute, MdxJsxFlowElement } from 'mdast-util-mdx-jsx';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -47,11 +48,15 @@ const nodeText = (node: unknown): string => {
   return (record.children ?? []).map(nodeText).join('');
 };
 
-export const slugifyAnchor = (title: string): string =>
-  title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'section';
+// ASTRO-ALIGNED HEADING ANCHORS (wave 2b close): section anchors are not a docstube convention —
+// they must be byte-identical to the ids Astro actually puts on the rendered headings, or the
+// per-section claim chips (which resolve by `document.getElementById(anchor)`) silently attach to
+// nothing, or worse, to a later heading. Astro's `rehypeHeadingIds` slugs EVERY heading with
+// github-slugger, so docstube slugs with the same library. The one deliberate divergence: a
+// heading whose text slugs to the empty string (pure punctuation, e.g. "."), which Astro renders
+// as `id=""`, gets the 'section' fallback here — the manifest schema requires a non-empty anchor,
+// and such a heading has no resolvable id in the built HTML either way.
+export const slugifyAnchor = (title: string): string => githubSlug(title) || 'section';
 
 const sliceSource = (mdx: string, node: RootContent): string => {
   const start = node.position?.start.offset;
@@ -167,14 +172,13 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
   let description: string | undefined;
   const preamble: BlockEntity[] = [];
   const sections: SectionEntity[] = [];
-  const anchorCounts = new Map<string, number>();
   let sawTitleHeading = false;
-
-  const uniqueAnchor = (base: string): string => {
-    const count = anchorCounts.get(base) ?? 0;
-    anchorCounts.set(base, count + 1);
-    return count === 0 ? base : `${base}-${count + 1}`;
-  };
+  // One document-scoped slugger, exactly like Astro's rehypeHeadingIds: repeated heading text
+  // disambiguates as `foo`, `foo-1`, `foo-2` (github-slugger's own scheme, NOT a docstube one),
+  // and the h1 page-title heading — which docstube does not turn into a section but Astro DOES
+  // slug — is consumed below so later duplicates land on the same suffix Astro emits.
+  const slugger = new GithubSlugger();
+  const uniqueAnchor = (headingText: string): string => slugger.slug(headingText) || slugger.slug('section');
 
   for (const node of tree.children) {
     if (node.type === 'yaml') {
@@ -193,6 +197,8 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
       // The first level-1 heading is the page title, not a section.
       if (heading.depth === 1 && !sawTitleHeading) {
         sawTitleHeading = true;
+        // Astro slugs the title heading too, so it occupies its slug in the document's slugger.
+        slugger.slug(headingText);
         title = title ?? headingText;
         continue;
       }
@@ -201,7 +207,7 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
         kind: 'section',
         title: headingText,
         level: heading.depth,
-        anchor: uniqueAnchor(slugifyAnchor(headingText)),
+        anchor: uniqueAnchor(headingText),
         blocks: []
       });
       continue;

@@ -145,6 +145,7 @@ export {
   manifestVersionSchema,
   coverageStatsSchema,
   manifestIndexSchema,
+  translationAssuranceStateSchema,
   claimMatchDriftReasonSchema,
   claimMatchRecordSchema,
   claimOrphanRecordSchema,
@@ -154,6 +155,7 @@ export {
 } from './manifest-schema.ts';
 export type {
   ManifestIndex,
+  TranslationAssuranceState,
   ClaimMatchDriftReason,
   ClaimMatchRecord,
   ClaimOrphanRecord,

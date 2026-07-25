@@ -1,3 +1,4 @@
+import GithubSlugger, { slug as githubSlug } from 'github-slugger';
 import { describe, expect, it } from 'vitest';
 import { extractPageEntity, slugifyAnchor } from './extract-entities.ts';
 
@@ -53,10 +54,10 @@ describe('extractPageEntity', () => {
     expect(codeBlock?.contentHash).toBe(contentHash('npm install -g docstube'));
   });
 
-  it('deduplicates repeated section anchors', () => {
+  it('deduplicates repeated section anchors exactly the way github-slugger does', () => {
     const mdx = '## Usage\n\ntext\n\n## Usage\n\nmore\n';
     const page = extractPageEntity({ mdx, slug: 'x' });
-    expect(page.sections.map((section) => section.anchor)).toEqual(['usage', 'usage-2']);
+    expect(page.sections.map((section) => section.anchor)).toEqual(['usage', 'usage-1']);
   });
 
   it('treats the inline Claim marker as transparent — the owning block type never changes', () => {
@@ -99,9 +100,46 @@ describe('extractPageEntity', () => {
   });
 });
 
-describe('slugifyAnchor', () => {
-  it('produces url-safe anchors', () => {
-    expect(slugifyAnchor('Getting Started (v2)!')).toBe('getting-started-v2');
-    expect(slugifyAnchor('---')).toBe('section');
+// ASTRO-ALIGNED ANCHORS (wave 2b close): section anchors must be byte-identical to the ids Astro
+// puts on the rendered headings, or the per-section claim chips (resolved with
+// getElementById(anchor)) attach to nothing — or, with repeated headings, to the wrong heading.
+// Astro's rehypeHeadingIds runs ONE github-slugger over every heading in document order; these
+// tests re-run that exact algorithm as the oracle.
+describe('slugifyAnchor / github-slugger parity', () => {
+  it('produces the same slug github-slugger does, including Unicode', () => {
+    for (const heading of ['Getting Started (v2)!', 'Configuración avanzada', '日本語の見出し', 'C++ / C#', '---']) {
+      expect(slugifyAnchor(heading)).toBe(githubSlug(heading));
+    }
+  });
+
+  it('falls back to "section" only where Astro itself would emit an unusable empty id', () => {
+    expect(githubSlug('.')).toBe('');
+    expect(slugifyAnchor('.')).toBe('section');
+  });
+
+  it('matches the ids Astro derives for a whole document, h1 title included', () => {
+    // The h1 is docstube's page title, not a section — but Astro still slugs it, so it occupies
+    // "setup" and the identically-titled h2 must disambiguate to "setup-1".
+    const mdx = [
+      '# Setup',
+      '',
+      '## Setup',
+      '',
+      'a',
+      '',
+      '## Configuración avanzada',
+      '',
+      'b',
+      '',
+      '## Setup',
+      '',
+      'c',
+      ''
+    ].join('\n');
+    const astro = new GithubSlugger();
+    const expected = ['Setup', 'Setup', 'Configuración avanzada', 'Setup'].map((text) => astro.slug(text)).slice(1);
+    const page = extractPageEntity({ mdx, slug: 'x' });
+    expect(page.sections.map((section) => section.anchor)).toEqual(expected);
+    expect(expected).toEqual(['setup-1', 'configuración-avanzada', 'setup-2']);
   });
 });

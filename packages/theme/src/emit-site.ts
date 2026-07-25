@@ -2,7 +2,12 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
-import { checkShardMdxBinding, projectShardProof, projectUnboundShardProof } from './proof-projection.ts';
+import {
+  checkShardMdxBinding,
+  projectShardProof,
+  projectTranslationAssurance,
+  projectUnboundShardProof
+} from './proof-projection.ts';
 import type { ThemeConflict } from './apply-theme-bundle.ts';
 import { docsMcpReadmeMd, docsMcpServerMjs } from './mcp-server-source.ts';
 import {
@@ -288,6 +293,13 @@ const pageRouteMdx = (
           return { ...section, anchor: localeSection.anchor, title: localeSection.title };
         })
       : proof.sections;
+  // TWO-DIMENSION PROOF UI (i18n-lifecycle-v2 decision 3): the translation dimension travels
+  // beside the correctness counts above, never folded into them.
+  const translationAssurance = projectTranslationAssurance({
+    shard: page.shard,
+    isRendition: !isSourceLocale,
+    sourceFallback: page.sourceFallback === true
+  });
   const alternates = context.alternatesBySlug.get(slug) ?? [];
   const sources = collectPageSources(page.shard.page).map((ref) => ({
     file: ref.file,
@@ -310,6 +322,10 @@ const pageRouteMdx = (
     ...(proof.state === 'unverified' ? ['docstubeUnverified: true'] : []),
     // Source-fallback rendition: themes render the visible not-yet-translated notice from this.
     ...(page.sourceFallback === true ? ['docstubeSourceFallback: true'] : []),
+    // The translation dimension of a served rendition, rendered as its own line by every theme.
+    ...(translationAssurance === undefined
+      ? []
+      : [`docstubeTranslationAssurance: ${JSON.stringify(translationAssurance)}`]),
     ...(proof.contradictedMarkers.length > 0
       ? [`docstubeContradictedClaims: ${JSON.stringify(proof.contradictedMarkers)}`]
       : []),

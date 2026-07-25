@@ -318,6 +318,15 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(deRoute).not.toContain('docstubeUnverified');
     expect(deRoute).not.toContain('docstubeSourceFallback');
     expect(deRoute).toContain('ist standardmäßig 3');
+    // TWO-DIMENSION PROOF UI (i18n-lifecycle-v2 decision 3): the rendition inherits the canonical
+    // 1/1 checked count AND states, separately, that the TRANSLATION itself has not been reviewed
+    // — the bilingual fidelity review of decision 2 is not implemented in 0.1.0, so a translation
+    // that flipped a negation must never read as fully checked.
+    expect(deRoute).toContain('docstubeTranslationAssurance: "not-reviewed"');
+    // The source route is not a translation of anything: no translation dimension at all.
+    expect(await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8')).not.toContain(
+      'docstubeTranslationAssurance'
+    );
     // LOCALE SECTION ANCHORS (impl-21 fix 3): the de route's section chips reference the de
     // document's own heading anchor (the id Astro derives from "## Verwendung"), mapped
     // positionally onto the canonical section counts — never the source anchor, which does not
@@ -346,6 +355,9 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(fallbackRoute).toContain('docstubeClaimsChecked: 1');
     expect(fallbackRoute).toContain('docstubeClaimsTotal: 1');
     expect(fallbackRoute).not.toContain('docstubeUnverified');
+    // A fallback route already says "not yet translated" — the translation dimension is that
+    // notice, never additionally a "not yet reviewed" line about a translation nobody is serving.
+    expect(fallbackRoute).not.toContain('docstubeTranslationAssurance');
     // A fallback route renders the SOURCE headings, so it keeps the canonical anchors.
     expect(fallbackRoute).toContain('"anchor":"usage"');
     expect(fallbackRoute).not.toContain('"anchor":"verwendung"');
@@ -393,6 +405,46 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(fallbackRoute).toContain('Call the function with options.');
     expect(fallbackRoute).not.toContain('ist standardmäßig 3');
     expect(fallbackRoute).not.toContain('docstubeUnverified');
+  }, 180_000);
+
+  it('a configured locale with NO shard for a page still gets a source-fallback route — never a 404', async () => {
+    // Generate WITHOUT any target locale: only en shards exist.
+    const ledger = await buildValueLedger();
+    const first = await runGenerate({
+      repoRoot,
+      runTask: scriptedRunner({ sourceMdx: mdx, ledger }),
+      toolDescriptors: []
+    });
+    expect(first.outcome).toBe('passed');
+
+    // The user now adds `de` to docstube.yml and emits before generate ever translated anything.
+    // i18n-lifecycle-v2 decision 1: no 404s, no hidden locales — every configured locale shows
+    // EVERYTHING, with untranslated pages marked. A missing locale shard must therefore behave
+    // exactly like a failed one: source bytes, canonical proof, the not-yet-translated notice.
+    await writeFile(join(repoRoot, 'docstube.yml'), localesConfigYaml);
+    const family = await loadConfigFamily(repoRoot);
+    const store = createManifestStore(repoRoot, family.config.versions.current);
+    const index = await store.readIndex();
+    expect(index?.pages).toHaveLength(1);
+    for (const page of index?.pages ?? []) {
+      expect(await store.readPageShard({ locale: 'de', pageId: page.id })).toBeUndefined();
+    }
+
+    const emit = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(emit.emitted).toBe(true);
+    expect(emit.warnings.some((warning) => warning.includes('no translation exists yet'))).toBe(true);
+
+    // Every route exists under /de/ as a source fallback with the notice and the canonical proof.
+    const deRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'de', 'retry.mdx'), 'utf8');
+    expect(deRoute).toContain('docstubeLocale: "de"');
+    expect(deRoute).toContain('docstubeSourceFallback: true');
+    expect(deRoute).toContain('defaults to 3');
+    expect(deRoute).toContain('docstubeClaimsChecked: 1');
+    expect(deRoute).toContain('docstubeClaimsTotal: 1');
+    expect(deRoute).not.toContain('docstubeUnverified');
+    // The locale nav lists the page too, so nothing is hidden from the de reader.
+    const siteData = await readFile(join(repoRoot, 'docs-site', 'src', 'site-data.mjs'), 'utf8');
+    expect(siteData).toContain('"/de/retry/"');
   }, 180_000);
 
   it('locale revision gate: refine updating only source artifacts makes the old translation stale at emission', async () => {

@@ -3,7 +3,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { ConfigFamily, ManifestStore } from '@docstube/core';
-import { configError } from '@docstube/core';
+import { configError, createManifestStore } from '@docstube/core';
+import type { CliOutput } from '../cli-output.ts';
 import { builtinThemes, emitSite } from '@docstube/theme';
 import type { EmitSitePage, ThemeBundle } from '@docstube/theme';
 
@@ -89,11 +90,33 @@ export const emitCurrentSite = async (input: {
     const localePages: EmitSitePage[] = [];
     for (const entry of index.pages) {
       const shard = await store.readPageShard({ locale, pageId: entry.id });
-      if (shard === undefined) {
-        continue;
-      }
       const mdxPath = `content/${locale}/${entry.slug}.mdx`;
       const source = sourceByPageId.get(entry.id);
+      // NO 404s IN A CONFIGURED LOCALE (wave 2b close final; i18n-lifecycle-v2 decision 1): a page
+      // with NO shard for this locale was never translated — a newly added locale, a page added
+      // after the last localization pass, or a run that froze before reaching it. Skipping it
+      // would leave a hole in the locale's nav and a missing route, which decision 1 forbids: every
+      // configured locale shows EVERYTHING, untranslated pages marked. The route is built exactly
+      // like the failed/stale case — source bytes, canonical proof, the not-yet-translated
+      // notice — from a synthetic hashless locale shard (never persisted; it exists only to
+      // address the route under this locale).
+      if (shard === undefined) {
+        if (source === undefined) {
+          continue;
+        }
+        const {
+          mdxContentHash: _hash,
+          sourceContentRevision: _revision,
+          translationAssurance: _assurance,
+          ...unbound
+        } = source.shard;
+        fallbackWarnings.push(
+          `page "${entry.slug}" (${locale}): no translation exists yet, so the route serves the source-locale ` +
+            'content with a not-yet-translated notice. Re-run `docstube generate` to translate it'
+        );
+        localePages.push({ shard: { ...unbound, locale, flags: [] }, mdx: source.mdx, sourceFallback: true });
+        continue;
+      }
       // STALE LOCALE MDX NEVER SERVED (wave 2b close; i18n-lifecycle-v2 decision 1): a HASHLESS
       // locale shard means the pipeline persisted no locale bytes this state can vouch for — a
       // failed translation or retranslation. Any locale MDX still on disk is a PRIOR run's
@@ -178,4 +201,25 @@ export const emitCurrentSite = async (input: {
     ),
     warnings: [...fallbackWarnings, ...result.warnings]
   };
+};
+
+// The shared assemble step WITH its reporting, used by every command that mutates docs state
+// (generate, refine, wizard) on BOTH the success path and the partial-failure path — so a run
+// that throws mid-way still reconciles the rendered routes with whatever was persisted.
+export const emitPersistedSite = async (
+  workspaceDir: string,
+  family: ConfigFamily,
+  output: CliOutput
+): Promise<EmitCurrentSiteResult> => {
+  const store = createManifestStore(workspaceDir, family.config.versions.current);
+  const result = await emitCurrentSite({ workspaceDir, family, store });
+  for (const conflict of result.themeConflicts) {
+    output.info(`  theme-conflict  ${conflict}`);
+  }
+  // Binding failures / ignored stale locale files / untranslated locale routes: the named pages
+  // rendered UNVERIFIED or as source fallbacks instead of stale state.
+  for (const warning of result.warnings) {
+    output.error(`  unverified  ${warning}`);
+  }
+  return result;
 };

@@ -66,6 +66,24 @@ export type ManifestIndex = z.infer<typeof manifestIndexSchema>;
 // match records the CARRIED claim id and its threading confidence. Ambiguity is a drift marker —
 // every carried human thread renders "content changed substantially since this was written" —
 // and must name why; an exact match must not.
+// TRANSLATION ASSURANCE — the SECOND proof dimension (i18n-lifecycle-v2 decision 3): source
+// correctness (claims checked, language-independent) and translation assurance are separate
+// dimensions and must NEVER collapse into one number. A rendition inherits the canonical shard's
+// checked counts because claim state is language-independent — but that says nothing about
+// whether the TRANSLATION preserved meaning, so the state must be carried and rendered
+// explicitly, or a translation that flipped a negation or changed "3" to "5" would read as fully
+// checked.
+//
+// The bilingual fidelity review itself (i18n-lifecycle-v2 decision 2, one review per page-locale
+// revision, modelled by `translationFidelitySchema`) is NOT implemented in 0.1.0 — it lands with
+// the i18n wave. Until then every shipped translation records 'not-reviewed', which maps onto the
+// fidelity lifecycle's `pending` state; 'reviewed' maps onto `passed`, and 'fallback' marks a
+// page-locale whose route serves the source content instead. The full record cannot live on a
+// locale shard yet: `provenance` may only persist together with a `ledger`, and renditions carry
+// no ledger of their own (the canonical claim ledger is the source locale's).
+export const translationAssuranceStateSchema = z.enum(['not-reviewed', 'reviewed', 'fallback']);
+export type TranslationAssuranceState = z.infer<typeof translationAssuranceStateSchema>;
+
 export const claimMatchDriftReasonSchema = z.enum(['equal-candidates', 'block-thread-inexact']);
 export type ClaimMatchDriftReason = z.infer<typeof claimMatchDriftReasonSchema>;
 
@@ -166,6 +184,9 @@ export const pageShardSchema = z
     // fallback, so generate/refine never need to proactively invalidate locale shards. Absent on
     // source-locale shards and on pre-field or failed locale shards (which therefore fall back).
     sourceContentRevision: contentHashSchema.optional(),
+    // The translation dimension of this page-locale (see translationAssuranceStateSchema above).
+    // Absent on source-locale shards — the source locale is not a translation of anything.
+    translationAssurance: translationAssuranceStateSchema.optional(),
     ledger: claimLedgerSchema.optional(),
     provenance: provenanceV2Schema.optional(),
     claimMatching: claimMatchingSchema.optional(),

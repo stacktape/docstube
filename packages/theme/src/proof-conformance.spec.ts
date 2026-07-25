@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { emitSite } from './emit-site.ts';
 import { buildFixtureInput } from './emit-site-fixture.ts';
+import { builtinThemes } from './theme-manifest.ts';
 
 // Proof rendering is a conformance contract, not a theme choice (knowledge/design/theming.md):
 // the emitted site must carry the kernel primitives — the LITERAL claims chip ("N of M claims
@@ -44,6 +45,29 @@ describe('proof conformance (basic theme)', () => {
     for (const banned of ['proven', 'scored', 'out-of-domain', '"verified"', '"unverified"', 'guarantee']) {
       expect(chip).not.toContain(banned);
     }
+  });
+
+  it('renders translation assurance as its OWN dimension, never folded into the checked counts', async () => {
+    // i18n-lifecycle-v2 decision 3: source correctness and translation assurance are separate and
+    // never collapsed. A rendition inherits the canonical checked counts, so without this line an
+    // unreviewed translation reads as fully checked. The bilingual fidelity review (decision 2) is
+    // implemented in the i18n wave; "not yet reviewed" is the honest interim surface.
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('Translation: not yet reviewed');
+    expect(chip).toContain('data-docstube-translation-assurance={translationAssurance}');
+    // Its own element, separate from the counts chip and from the fallback notice.
+    expect(chip).toContain('class="dt-translation-assurance"');
+    expect(chip.indexOf('dt-translation-assurance')).toBeGreaterThan(chip.indexOf('claims checked'));
+    // Every built-in theme threads the dimension into the primitive — a conformance contract, not
+    // a theme choice.
+    for (const bundle of Object.values(builtinThemes)) {
+      const layout = (await bundle()).files.find((file) => file.path === 'src/layouts/DocLayout.astro');
+      expect(layout && 'content' in layout ? layout.content : '').toContain(
+        'translationAssurance={translationAssurance}'
+      );
+    }
+    const css = await readFile(join(siteRoot, 'src/styles/global.css'), 'utf8');
+    expect(css).toContain('.dt-translation-assurance');
   });
 
   it('renders the contradiction warning banner and per-claim contradicted marks', async () => {

@@ -1483,6 +1483,16 @@ html[data-mobile-nav-open] .stp-mobile-nav {
   font-weight: 600;
   padding: 3px 10px;
 }
+/* The translation dimension: its own visible line beside the correctness counts, never merged. */
+.dt-translation-assurance {
+  background: rgba(150, 130, 220, 0.12);
+  border: 1px solid rgba(150, 130, 220, 0.4);
+  border-radius: 999px;
+  color: #a396e6;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
 .dt-contradictions {
   color: #ff6b60;
   background: rgba(255, 107, 96, 0.1);

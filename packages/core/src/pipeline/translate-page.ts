@@ -2,7 +2,7 @@ import type { PageArtifact } from '@docstube/plugin-sdk';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Finding, PageEntity, PageShard } from '@docstube/contracts';
 import { agentTaskSpecSchema, contentHash, contentHashSchema, idPrefixes, mintId } from '@docstube/contracts';
-import { extractPageEntity, parseMdx } from '../entities/extract-entities.ts';
+import { blockSourceRanges, extractPageEntity, parseMdx } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
 import type { PageRunContext } from './page-runner.ts';
 import { contentRelativePath, unwrapMdxFence } from './page-runner.ts';
@@ -131,6 +131,25 @@ export const headingInventory = (mdx: string): number[] =>
 const renderHeadingDepths = (depths: readonly number[]): string =>
   depths.length === 0 ? '(none)' : depths.map((depth) => `h${depth}`).join(' ');
 
+// WHERE a marker sits, not just that it exists: the index of the content block that owns it, in
+// the same extraction order extractPageEntity emits (headings/frontmatter/ESM are not blocks, so
+// the index is stable across renditions once the heading inventory matches). -1 means the marker
+// sits outside any content block.
+export type MarkerPlacement = { blockIndex: number; markerId: string };
+
+export const markerPlacements = (mdx: string): MarkerPlacement[] => {
+  const ranges = blockSourceRanges(mdx);
+  return scanClaimMarkers(mdx).markers.map((marker) => ({
+    blockIndex: ranges.findIndex(([start, end]) => marker.offset >= start && marker.offset < end),
+    markerId: marker.markerId
+  }));
+};
+
+const renderPlacements = (placements: readonly MarkerPlacement[]): string =>
+  placements.length === 0
+    ? '(none)'
+    : placements.map((placement) => `"${placement.markerId}"@block${placement.blockIndex}`).join(', ');
+
 // Page hygiene for translated MDX (wave 2b close): the writer's submission passes the marker
 // scanner in-session, but a translation is a fresh artifact the scanner never saw — a translator
 // could inject script/style (raw, or expression-wrapped) or malform the Claim markers. The same
@@ -138,9 +157,30 @@ const renderHeadingDepths = (depths: readonly number[]): string =>
 // the source page is unaffected), never ships.
 export const translationHygieneErrors = (
   mdx: string,
-  sourceMarkerIds: readonly string[],
+  sourcePlacements: readonly MarkerPlacement[],
   sourceHeadingDepths: readonly number[]
 ): string[] => {
+  // NO TRANSLATION CAN THROW THE RUN (wave 2b close): every artifact scanned here is raw MODEL
+  // output. A malformed rendition can make any parser in this function throw, and a translation
+  // failure is NONBLOCKING by design (i18n-lifecycle-v2 decision 5) — so an exception becomes a
+  // hygiene failure for THIS page-locale, leaving the source page and every other locale intact.
+  try {
+    return hygieneErrors(mdx, sourcePlacements, sourceHeadingDepths);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return [
+      `[malformed-mdx] the translated document could not be parsed or scanned: ${detail} — a rendition must be ` +
+        'valid MDX with the same structure as the source page'
+    ];
+  }
+};
+
+const hygieneErrors = (
+  mdx: string,
+  sourcePlacements: readonly MarkerPlacement[],
+  sourceHeadingDepths: readonly number[]
+): string[] => {
+  const sourceMarkerIds = sourcePlacements.map((placement) => placement.markerId);
   const scan = scanClaimMarkers(mdx);
   const errors = scan.errors.map((error) => `[${error.code}] ${error.message}`);
   const markerCounts = new Map<string, number>();
@@ -174,15 +214,31 @@ export const translationHygieneErrors = (
         'the canonical marker ids, translated in place, never renamed, added, or removed'
     );
   } else if (!hasDuplicates) {
-    // ORDERED MARKER EQUALITY (wave 2b close, impl-21): set equality is not enough — swapping or
-    // relocating two ids between translated assertions passes the set check while attaching each
-    // canonical mark to the WRONG prose. The rendition must carry the marker ids in the source's
-    // document order, so marker N provably wraps the translation of the sentence marker N wrapped.
-    const translatedSequence = scan.markers.map((marker) => marker.markerId);
+    // BLOCK-SCOPED ORDERED EQUALITY (wave 2b close final): set equality is not enough — swapping
+    // or relocating two ids between translated assertions passes the set check while attaching
+    // each canonical mark to the WRONG prose. Global sequence alone is not enough either: a
+    // marker can move into ANOTHER same-typed block (paragraph 2 → paragraph 3) and keep the
+    // document-order sequence intact while now annotating different prose. The rendition must
+    // therefore reproduce the source's (owning block index, marker id) pairs EXACTLY — same ids,
+    // same order, each in the same structural position.
+    const translatedPlacements = markerPlacements(mdx);
+    const translatedSequence = translatedPlacements.map((placement) => placement.markerId);
     const sameOrder =
       translatedSequence.length === sourceMarkerIds.length &&
       translatedSequence.every((markerId, index) => markerId === sourceMarkerIds[index]);
-    if (!sameOrder) {
+    if (sameOrder) {
+      const sameBlocks = translatedPlacements.every(
+        (placement, index) => placement.blockIndex === sourcePlacements[index]?.blockIndex
+      );
+      if (!sameBlocks) {
+        errors.push(
+          `[marker-block] the translated Claim markers keep the source order but sit in different content blocks ` +
+            `(translated: ${renderPlacements(translatedPlacements)}; source: ${renderPlacements(sourcePlacements)}) — ` +
+            'a marker moved into another block annotates prose the canonical claim never described; each marker ' +
+            'must stay inside the translation of its own block'
+        );
+      }
+    } else {
       errors.push(
         `[marker-order] the translated Claim markers appear in a different order than the source page's ` +
           `(translated: ${translatedSequence.map((id) => `"${id}"`).join(', ')}; source: ` +
@@ -223,9 +279,9 @@ export const translateArtifact = async (
 ): Promise<Array<{ outcome: TranslationOutcome; artifact: PageArtifact; shard: PageShard }>> => {
   const results: Array<{ outcome: TranslationOutcome; artifact: PageArtifact; shard: PageShard }> = [];
   const maxAttempts = 2;
-  // The canonical marker inventory every rendition must reproduce exactly — same ids in the same
-  // document order (ordered marker equality) — plus the heading skeleton it must preserve.
-  const sourceMarkerIds = scanClaimMarkers(sourceArtifact.mdx).markers.map((marker) => marker.markerId);
+  // The canonical marker inventory every rendition must reproduce exactly — same ids, same
+  // document order, same owning block (block-scoped ordered equality) — plus the heading skeleton.
+  const sourcePlacements = markerPlacements(sourceArtifact.mdx);
   const sourceHeadingDepths = headingInventory(sourceArtifact.mdx);
   // The canonical revision this translation is made from: the exact source artifact bytes, hashed
   // the same way persistence mints the canonical shard's mdxContentHash. Recorded on the locale
@@ -260,9 +316,9 @@ export const translateArtifact = async (
         );
       }
       const mdx = unwrapMdxFence(transcript.result.mdx);
-      const hygieneErrors = translationHygieneErrors(mdx, sourceMarkerIds, sourceHeadingDepths);
-      if (hygieneErrors.length > 0) {
-        findings = hygieneErrors.map((message) => ({
+      const hygiene = translationHygieneErrors(mdx, sourcePlacements, sourceHeadingDepths);
+      if (hygiene.length > 0) {
+        findings = hygiene.map((message) => ({
           source: 'verifier' as const,
           check: 'translation-hygiene',
           severity: 'error' as const,
@@ -270,11 +326,29 @@ export const translateArtifact = async (
         }));
         continue;
       }
-      const extracted = extractPageEntity({
-        mdx,
-        slug: sourceArtifact.page.slug,
-        fallbackTitle: sourceArtifact.page.title
-      });
+      // Extraction parses model output too — same nonblocking rule as hygiene above: a rendition
+      // that hygiene somehow let through but extraction chokes on fails ITS page-locale, never
+      // the run.
+      let extracted: PageEntity;
+      try {
+        extracted = extractPageEntity({
+          mdx,
+          slug: sourceArtifact.page.slug,
+          fallbackTitle: sourceArtifact.page.title
+        });
+      } catch (error) {
+        findings = [
+          {
+            source: 'verifier',
+            check: 'translation-hygiene',
+            severity: 'error',
+            message:
+              `translation to ${targetLocale} failed page hygiene: [malformed-mdx] the translated document could ` +
+              `not be extracted: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ];
+        continue;
+      }
       const alignment = alignTranslatedEntities(sourceArtifact.page, extracted);
       if ('mismatch' in alignment) {
         findings = [
@@ -340,6 +414,14 @@ export const translateArtifact = async (
             sourceContentRevision: sourceRevision
           }
         : {}),
+      // TRANSLATION ASSURANCE (i18n-lifecycle-v2 decision 3, the second proof dimension): a
+      // shipped rendition inherits the CANONICAL shard's checked counts — claim state is
+      // language-independent — but nothing here has judged whether the translation preserved
+      // meaning. The bilingual fidelity review of decision 2 is implemented in the i18n wave; in
+      // 0.1.0 every shipped translation records 'not-reviewed' so the reader sees the honest
+      // second dimension instead of a rendition that reads as fully checked. A failed
+      // translation's route serves the source fallback, which is exactly 'fallback'.
+      translationAssurance: passed ? ('not-reviewed' as const) : ('fallback' as const),
       flags: passed
         ? []
         : [

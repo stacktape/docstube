@@ -22,6 +22,13 @@ outcomes, never approval gates.**
    rerun per locale. Same-model fidelity review is acceptable (founder call — simplicity over
    routing complexity); the assurance record notes the model used. One correction cycle on
    failure (failed candidate + findings fed back), then fallback.
+   **Status (wave 2b close, 0.1.0):** the review itself is NOT implemented — it is built in the
+   i18n wave, against `translationFidelitySchema`. What ships now is the honest interim surface
+   required by decision 3: every shipped translation records `translationAssurance:
+   'not-reviewed'` on its locale shard and every theme renders "Translation: not yet reviewed" as
+   a distinct line beside the inherited correctness counts. Without it, a translation that flipped
+   a negation or changed a number would read as fully checked, because renditions inherit the
+   canonical shard's checked counts.
 
 3. **Two-dimension proof UI.** Source correctness (claims checked — language-independent, per
    trust-model-v2) and translation assurance (fidelity-reviewed / pending / fallback) are shown

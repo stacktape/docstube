@@ -51,6 +51,24 @@ describe('manifest shards', () => {
     expect(pageShardSchema.safeParse({ ...shard, sourceContentRevision: 'not-a-hash' }).success).toBe(false);
   });
 
+  it('carries the translation-assurance dimension as an explicit state, never a boolean or free text', () => {
+    // i18n-lifecycle-v2 decision 3: translation assurance is its own dimension beside source
+    // correctness. 'not-reviewed' is what 0.1.0 records for every shipped translation (the
+    // bilingual fidelity review of decision 2 lands with the i18n wave); 'reviewed' and
+    // 'fallback' complete the lifecycle the theme projection renders.
+    const shard = { ...buildFixturePageShard(buildFixturePage()), locale: 'de' };
+    for (const state of ['not-reviewed', 'reviewed', 'fallback']) {
+      expect(pageShardSchema.safeParse({ ...shard, translationAssurance: state }).success).toBe(true);
+    }
+    expect(pageShardSchema.parse({ ...shard, translationAssurance: 'not-reviewed' }).translationAssurance).toBe(
+      'not-reviewed'
+    );
+    // Absent on source-locale shards; never an invented state.
+    expect(pageShardSchema.parse(shard).translationAssurance).toBeUndefined();
+    expect(pageShardSchema.safeParse({ ...shard, translationAssurance: 'probably-fine' }).success).toBe(false);
+    expect(pageShardSchema.safeParse({ ...shard, translationAssurance: true }).success).toBe(false);
+  });
+
   it('requires at least one declared version in the index', () => {
     const index = {
       schemaVersion: 1,

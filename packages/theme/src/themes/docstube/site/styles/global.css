@@ -814,6 +814,17 @@ samp {
   font-weight: 600;
   padding: 3px 10px;
 }
+/* The translation dimension: its own visible line beside the correctness counts, never merged. */
+.dt-translation-assurance {
+  background: color-mix(in srgb, #8b7bd8 14%, transparent);
+  border: 1px solid color-mix(in srgb, #8b7bd8 45%, transparent);
+  border-radius: 999px;
+  color: #a396e6;
+  font-family: var(--font-code, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
 .dt-contradictions {
   background: color-mix(in srgb, #e5484d 12%, transparent);
   border: 1px solid color-mix(in srgb, #e5484d 45%, transparent);

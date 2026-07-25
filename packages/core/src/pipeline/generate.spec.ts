@@ -417,6 +417,12 @@ describe('runGenerate', () => {
     // the exact source bytes translated, so it equals the canonical shard's own binding hash —
     // the emission revision gate serves the translation only while the two still agree.
     expect(deShard?.sourceContentRevision).toBe(enShard?.mdxContentHash);
+    // TRANSLATION ASSURANCE (i18n-lifecycle-v2 decision 3): a shipped rendition inherits the
+    // canonical checked counts, so it must also carry the honest second dimension. The bilingual
+    // fidelity review of decision 2 is not implemented in 0.1.0 — every translation is
+    // 'not-reviewed', and the source locale carries no translation dimension at all.
+    expect(deShard?.translationAssurance).toBe('not-reviewed');
+    expect(enShard?.translationAssurance).toBeUndefined();
     // Locale is an address dimension for anchors too: the de sections carry their own localized
     // anchors (input to the positional locale-anchor projection at emission).
     expect(deShard?.page.sections.map((section) => section.anchor)).toEqual(['verwendung']);
@@ -457,6 +463,38 @@ describe('runGenerate', () => {
     // No locale MDX was written, so the shard must persist HASHLESS: minting a hash here would
     // bind trust state to bytes that never existed — emission must render loud-unverified instead.
     expect(deShard?.mdxContentHash).toBeUndefined();
+    // The translation dimension of a failed page-locale is exactly what its route serves.
+    expect(deShard?.translationAssurance).toBe('fallback');
+  }, 60_000);
+
+  it('fails a MALFORMED translation nonblockingly — the source page and the run survive', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), `${configYaml}locales:\n  source: en\n  targets: [de]\n`);
+    // Raw model output can be syntactically broken MDX. Parsing it must never throw out of the
+    // pipeline: a translation failure is nonblocking (i18n-lifecycle-v2 decision 5), so it fails
+    // ITS page-locale and leaves the source page's own verified state completely intact.
+    const malformed = `${goodMdx}\n<Broken attr="\n`;
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      const mdx = spec.kind === 'translate-page' ? malformed : goodMdx;
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
+        result: spec.kind === 'translate-page' ? { type: 'mdx', mdx } : writeResult(mdx)
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+    expect(summary.translations[0]?.status).toBe('flagged');
+    expect(summary.translations[0]?.findings[0]?.check).toBe('translation-hygiene');
+    expect(summary.translations[0]?.findings[0]?.message).toMatch(/malformed-mdx|mdx-parse-error/u);
+    // The SOURCE page is untouched: it shipped with its ledger and its MDX↔shard binding hash.
+    expect(summary.pages[0]?.status).toBe('passed');
+    const store = createManifestStore(repoRoot, 'latest');
+    const pageId = (await store.readIndex())?.pages[0]?.id ?? '';
+    const enShard = await store.readPageShard({ locale: 'en', pageId });
+    expect(enShard?.ledger?.claims).toHaveLength(1);
+    expect(enShard?.mdxContentHash).toBeDefined();
   }, 60_000);
 
   it('rejects a translation that alters a code block — byte-identical or flagged, never downgraded', async () => {

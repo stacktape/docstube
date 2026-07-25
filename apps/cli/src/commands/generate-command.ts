@@ -1,14 +1,7 @@
-import {
-  CoreError,
-  createManifestStore,
-  createTaskRunnerFromConfig,
-  loadConfigFamily,
-  runGenerate
-} from '@docstube/core';
-import type { ConfigFamily, GenerateSummary, TaskRunner } from '@docstube/core';
+import { CoreError, createTaskRunnerFromConfig, loadConfigFamily, runGenerate } from '@docstube/core';
+import type { GenerateSummary, TaskRunner } from '@docstube/core';
 import type { ToolDescriptor } from '@docstube/contracts';
-import { emitCurrentSite } from './emit-current-site.ts';
-import type { EmitCurrentSiteResult } from './emit-current-site.ts';
+import { emitPersistedSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { countRunFailureModes } from '../runtime-telemetry.ts';
 import { reportRunSpend } from './run-spend.ts';
@@ -18,26 +11,6 @@ export type GenerateCommandInput = {
   maxAttempts?: number | undefined;
   // Tests: a scripted task runner instead of the configured transport (CI never calls live agents).
   taskRunner?: { runTask: TaskRunner; toolDescriptors: ToolDescriptor[] } | undefined;
-};
-
-// The shared assemble step, with its reporting: reused by the success path AND the
-// partial-failure path so both emit the same way.
-const emitPersistedSite = async (
-  workspaceDir: string,
-  family: ConfigFamily,
-  output: CliOutput
-): Promise<EmitCurrentSiteResult> => {
-  const store = createManifestStore(workspaceDir, family.config.versions.current);
-  const result = await emitCurrentSite({ workspaceDir, family, store });
-  for (const conflict of result.themeConflicts) {
-    output.info(`  theme-conflict  ${conflict}`);
-  }
-  // Binding failures / ignored stale locale files: the named pages rendered UNVERIFIED or as
-  // source fallbacks instead of stale state.
-  for (const warning of result.warnings) {
-    output.error(`  unverified  ${warning}`);
-  }
-  return result;
 };
 
 export const runGenerateCommand = async (input: GenerateCommandInput, output: CliOutput): Promise<CliCommandResult> => {

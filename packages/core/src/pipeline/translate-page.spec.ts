@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { headingInventory, translationHygieneErrors } from './translate-page.ts';
+import { headingInventory, markerPlacements, translationHygieneErrors } from './translate-page.ts';
 
-// Ordered marker equality + heading inventory (wave 2b close, impl-21): set equality alone lets a
-// translator swap two marker ids between sentences — the canonical marks would then annotate the
-// wrong prose. The hygiene check compares the marker id SEQUENCE and the heading skeleton.
+// Block-scoped ordered marker equality + heading inventory (wave 2b close): set equality alone
+// lets a translator swap two marker ids between sentences, and global sequence equality still
+// lets a marker slide into another same-typed block — both attach the canonical marks to prose the
+// claim never described. The hygiene check compares the (owning block, marker id) pairs in
+// document order plus the heading skeleton, and it NEVER throws: malformed model output becomes a
+// nonblocking hygiene failure for that page-locale.
 
 const sourceMdx = `---
 title: Getting started
@@ -18,7 +21,7 @@ title: Getting started
 <Claim id="c2">The default retry count is 3.</Claim>
 `;
 
-const sourceMarkerIds = ['c1', 'c2'];
+const sourceMarkerIds = markerPlacements(sourceMdx);
 const sourceHeadings = headingInventory(sourceMdx);
 
 describe('translationHygieneErrors — ordered marker equality', () => {
@@ -80,6 +83,73 @@ describe('translationHygieneErrors — heading inventory', () => {
         error.includes('[heading-inventory]')
       )
     ).toBe(true);
+  });
+});
+
+describe('translationHygieneErrors — block-scoped placement', () => {
+  // Two same-typed (paragraph) blocks under one heading: moving c2 from the second into the first
+  // keeps the GLOBAL marker sequence "c1, c2" intact, so the order check alone passes — while c2's
+  // canonical trust mark now annotates a completely different sentence.
+  const twoParagraphSource = `---
+title: Getting started
+---
+
+# Getting started
+
+<Claim id="c1">The library exposes a single \`greet\` function.</Claim>
+
+## Usage
+
+Plain lead-in prose with <Claim id="c2">the default retry count is 3</Claim>.
+
+A second paragraph that says something else entirely.
+`;
+  const placements = markerPlacements(twoParagraphSource);
+  const headings = headingInventory(twoParagraphSource);
+
+  it('records the owning block index of every marker in document order', () => {
+    expect(placements).toEqual([
+      { blockIndex: 0, markerId: 'c1' },
+      { blockIndex: 1, markerId: 'c2' }
+    ]);
+  });
+
+  it('fails a marker relocated into ANOTHER same-typed block, even with the global order preserved', () => {
+    const relocated = twoParagraphSource
+      .replace('Plain lead-in prose with <Claim id="c2">the default retry count is 3</Claim>.', 'Plain lead-in prose.')
+      .replace(
+        'A second paragraph that says something else entirely.',
+        'A second paragraph with <Claim id="c2">the default retry count is 3</Claim>.'
+      );
+    const errors = translationHygieneErrors(relocated, placements, headings);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('[marker-block]');
+    expect(errors[0]).toContain('"c2"@block2');
+    expect(errors[0]).toContain('"c2"@block1');
+    // The marker id sequence itself never changed — only the block it sits in.
+    expect(errors[0]).not.toContain('[marker-order]');
+  });
+
+  it('passes a rendition that keeps every marker inside the translation of its own block', () => {
+    const translated = twoParagraphSource
+      .replace('Plain lead-in prose with', 'Einleitender Text mit')
+      .replace('the default retry count is 3', 'die Standardanzahl der Wiederholungen ist 3')
+      .replace('A second paragraph that says something else entirely.', 'Ein zweiter Absatz mit ganz anderem Inhalt.');
+    expect(translationHygieneErrors(translated, placements, headings)).toEqual([]);
+  });
+});
+
+describe('translationHygieneErrors — malformed translations are nonblocking, never thrown', () => {
+  it('converts unparsable translated MDX into a hygiene failure instead of throwing', () => {
+    // A translator that emits a stray unclosed JSX tag: remark throws while parsing. Translation
+    // failures are nonblocking (i18n-lifecycle-v2 decision 5) — the source page is untouched.
+    const malformed = sourceMdx.replace('## Usage', '## Usage\n\n<Broken attr="');
+    let errors: string[] = [];
+    expect(() => {
+      errors = translationHygieneErrors(malformed, sourceMarkerIds, sourceHeadings);
+    }).not.toThrow();
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.join('\n')).toMatch(/\[malformed-mdx\]|\[mdx-parse-error\]/u);
   });
 });
 

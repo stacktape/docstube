@@ -118,7 +118,7 @@ describe('emitSite', () => {
     expect(warning).toContain("classList.add('dt-claim--unchecked')");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain(
-      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} />'
+      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />'
     );
     expect(layout).toContain(
       '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />'

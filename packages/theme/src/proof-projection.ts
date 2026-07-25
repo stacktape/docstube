@@ -1,5 +1,5 @@
 import { contentHash } from '@docstube/contracts';
-import type { PageShard } from '@docstube/contracts';
+import type { PageShard, TranslationAssuranceState } from '@docstube/contracts';
 
 // INTERIM READER SURFACE (wave 2b-iii round 2, until the full trust-chip wave): the theme
 // consumes shards ONLY through this projection, and the projection is LITERAL — claim counts,
@@ -39,6 +39,30 @@ export type ShardProofProjection = {
   // lighter than a contradiction, never an alarm. Distinct list from contradictedMarkers.
   uncheckedMarkers: string[];
   sections: SectionClaimsChip[];
+};
+
+// THE SECOND PROOF DIMENSION (i18n-lifecycle-v2 decision 3): source correctness and translation
+// assurance are shown separately and NEVER collapsed. A rendition inherits the canonical shard's
+// checked counts (claim state is language-independent), so without this the reader cannot tell an
+// unreviewed translation — one that may have flipped a negation or changed a number — from fully
+// checked content.
+//
+// The bilingual fidelity review of decision 2 is NOT implemented in 0.1.0; it lands with the i18n
+// wave. This is the honest interim surface: every shipped translation records 'not-reviewed' and
+// the theme says so in words. Returns undefined where the dimension does not apply — a
+// source-locale route is not a translation, and a source-fallback route already renders the
+// not-yet-translated notice, which IS its translation state.
+export const projectTranslationAssurance = (input: {
+  shard: PageShard;
+  isRendition: boolean;
+  sourceFallback: boolean;
+}): TranslationAssuranceState | undefined => {
+  if (!input.isRendition || input.sourceFallback) {
+    return undefined;
+  }
+  // A shard predating the field shipped without any review either — 'not-reviewed' is the honest
+  // reading, never silence.
+  return input.shard.translationAssurance ?? 'not-reviewed';
 };
 
 // MDX↔SHARD BINDING CHECK (wave 2b close final): the shard's trust spine describes ONE exact MDX
