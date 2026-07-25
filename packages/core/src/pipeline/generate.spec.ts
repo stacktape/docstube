@@ -411,6 +411,8 @@ describe('runGenerate', () => {
     expect(enShard?.ledger?.claims).toHaveLength(1);
     const deMdx = await readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8');
     expect(deMdx).toContain('# Erste Schritte');
+    // The MDX↔shard binding hash is minted from the EXACT locale bytes the pipeline persisted.
+    expect(deShard?.mdxContentHash).toBe(contentHash(deMdx));
   }, 60_000);
 
   it('flags a translation that breaks document structure instead of shipping it silently', async () => {
@@ -442,6 +444,9 @@ describe('runGenerate', () => {
     const index = await store.readIndex();
     const deShard = await store.readPageShard({ locale: 'de', pageId: index?.pages[0]?.id ?? '' });
     expect(deShard?.flags.some((flag) => flag.status === 'open')).toBe(true);
+    // No locale MDX was written, so the shard must persist HASHLESS: minting a hash here would
+    // bind trust state to bytes that never existed — emission must render loud-unverified instead.
+    expect(deShard?.mdxContentHash).toBeUndefined();
   }, 60_000);
 
   it('rejects a translation that alters a code block — byte-identical or flagged, never downgraded', async () => {
@@ -471,6 +476,47 @@ describe('runGenerate', () => {
     await expect(readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8')).rejects.toThrow(
       /ENOENT/
     );
+  }, 60_000);
+
+  it('fails a translation that injects script — page hygiene reruns on the translated artifact, shard hashless', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), `${configYaml}locales:\n  source: en\n  targets: [de]\n`);
+    // Structure-preserving injection: an expression-wrapped <script> inside an EXISTING paragraph
+    // keeps block counts and types identical, so alignment alone would ship it — only the page
+    // hygiene scan on the translated artifact catches it.
+    const injectedTranslation = goodMdx
+      .replace('# Getting started', '# Erste Schritte')
+      .replace(
+        'The library exposes a single `greet` function.</Claim>',
+        "The library exposes a single `greet` function.</Claim> {<script>document.title = 'lie'</script>}"
+      );
+    const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'review-page') {
+        return passingReview(spec);
+      }
+      const mdx = spec.kind === 'translate-page' ? injectedTranslation : goodMdx;
+      return {
+        ...baseTranscript(spec),
+        turns: [{ role: 'assistant', blocks: [{ type: 'text', text: mdx }] }],
+        result: spec.kind === 'translate-page' ? { type: 'mdx', mdx } : writeResult(mdx)
+      };
+    };
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    // Nonblocking: the SOURCE page is unaffected; only the translation fails, precisely.
+    expect(summary.pages[0]?.status).toBe('passed');
+    expect(summary.translations[0]?.status).toBe('flagged');
+    expect(summary.translations[0]?.findings[0]?.check).toBe('translation-hygiene');
+    expect(summary.translations[0]?.findings[0]?.message).toContain('page-script');
+    // The injected script never ships under the locale path…
+    await expect(readFile(join(repoRoot, 'docs-site', 'content', 'de', 'getting-started.mdx'), 'utf8')).rejects.toThrow(
+      /ENOENT/
+    );
+    // …and the failed translation's shard persists HASHLESS (no locale bytes were written).
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const deShard = await store.readPageShard({ locale: 'de', pageId: index?.pages[0]?.id ?? '' });
+    expect(deShard?.flags.some((flag) => flag.status === 'open')).toBe(true);
+    expect(deShard?.mdxContentHash).toBeUndefined();
   }, 60_000);
 
   it('site-scope findings land as open system flags on the named page shard, deduped across runs', async () => {

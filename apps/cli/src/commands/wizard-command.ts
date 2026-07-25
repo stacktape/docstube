@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { standardToolDescriptors } from '@docstube/agent-runtime';
 import { buildCodemap } from '@docstube/codemap';
 import {
+  createManifestStore,
   createPluginHost,
   createTaskRunnerFromConfig,
   loadConfigFamily,
@@ -14,7 +15,9 @@ import {
   startLocalServer
 } from '@docstube/core';
 import type { ControlPlaneInjection } from '@docstube/core';
+import type { AgentTaskSpec, ToolDescriptor, Transcript } from '@docstube/contracts';
 import { idPrefixes, mintId } from '@docstube/contracts';
+import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { pathExists } from '../workspace-paths.ts';
 
@@ -40,21 +43,42 @@ const stagedUiDir = async (): Promise<string | undefined> => {
   return undefined;
 };
 
-export const runWizardCommand = async (input: WizardCommandInput, output: CliOutput): Promise<CliCommandResult> => {
-  const uiDistDir = input.uiDevServerUrl === undefined ? await stagedUiDir() : undefined;
-  if (input.uiDevServerUrl === undefined && uiDistDir === undefined) {
-    output.error(
-      'no built local UI found next to the CLI and no dev server configured — reinstall docstube or run via `pnpm dev wizard`'
-    );
-    return { exitCode: 1 };
+// The wizard's background run must end with the SAME assemble step the CLI generate/refine
+// commands run (emit-current-site.ts): updating content and shards without re-emitting routes
+// would leave rendered counts stale against the shard. Warnings surface the same way the CLI
+// commands surface them.
+export const emitWizardSite = async (workspaceDir: string, output: CliOutput): Promise<void> => {
+  const family = await loadConfigFamily(workspaceDir);
+  const store = createManifestStore(workspaceDir, family.config.versions.current);
+  const result = await emitCurrentSite({ workspaceDir, family, store });
+  for (const conflict of result.themeConflicts) {
+    output.info(`  theme-conflict  ${conflict}`);
   }
+  // MDX↔shard binding failures: the named pages rendered UNVERIFIED instead of stale trust state.
+  for (const warning of result.warnings) {
+    output.error(`  unverified  ${warning}`);
+  }
+};
+
+export type WizardControlPlaneInput = {
+  workspaceDir: string;
+  // Tests: a scripted task runner instead of the configured transport (CI never calls live agents).
+  taskRunner?: { runTask: (spec: AgentTaskSpec) => Promise<Transcript>; toolDescriptors: ToolDescriptor[] } | undefined;
+};
+
+// Exported for the wizard spec: the control-plane wiring IS the behavior under test (launchRun →
+// pipeline → site emission), independent of the HTTP server around it.
+export const createWizardControlPlane = (input: WizardControlPlaneInput, output: CliOutput): ControlPlaneInjection => {
   // Agent-backed mutations resolve config lazily: the wizard can start pre-scaffold and the
   // runner only materializes when the UI first needs it.
   const lazyRunner = async () => {
+    if (input.taskRunner !== undefined) {
+      return input.taskRunner;
+    }
     const family = await loadConfigFamily(input.workspaceDir);
     return createTaskRunnerFromConfig(family.config, input.workspaceDir);
   };
-  const controlPlane: ControlPlaneInjection = {
+  return {
     runTask: async (spec) => (await lazyRunner()).runTask(spec),
     toolDescriptors: standardToolDescriptors(),
     codemapProvider: async () => {
@@ -80,10 +104,24 @@ export const runWizardCommand = async (input: WizardCommandInput, output: CliOut
       // `refresh` is gone (pipeline-v2 decision 1): generate IS the reconciler.
       const run = mode === 'generate' ? runGenerate(common) : runRefine(common);
       // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
-      void run.catch((error: unknown) => output.error(`background ${mode} run failed: ${(error as Error).message}`));
+      // A completed run re-emits the site so rendered routes never drift from the shards.
+      void run
+        .then(() => emitWizardSite(input.workspaceDir, output))
+        .catch((error: unknown) => output.error(`background ${mode} run failed: ${(error as Error).message}`));
       return { runId };
     }
   };
+};
+
+export const runWizardCommand = async (input: WizardCommandInput, output: CliOutput): Promise<CliCommandResult> => {
+  const uiDistDir = input.uiDevServerUrl === undefined ? await stagedUiDir() : undefined;
+  if (input.uiDevServerUrl === undefined && uiDistDir === undefined) {
+    output.error(
+      'no built local UI found next to the CLI and no dev server configured — reinstall docstube or run via `pnpm dev wizard`'
+    );
+    return { exitCode: 1 };
+  }
+  const controlPlane = createWizardControlPlane({ workspaceDir: input.workspaceDir }, output);
 
   const server = await startLocalServer({
     repoRoot: input.workspaceDir,

@@ -306,6 +306,20 @@ export const scanClaimMarkers = (mdx: string): MarkerScan => {
       return;
     }
     if (node.type === 'mdxFlowExpression' || node.type === 'mdxTextExpression') {
+      // Expression-wrapped script/style ({<script>…</script>}) compiles and executes exactly like
+      // the raw element — the {…} wrapper must not launder it past the page-script prohibition.
+      // Tag match (<script, <style) on the expression source, never a word match: a string like
+      // 'the script ran' stays legal prose.
+      if (typeof node.value === 'string' && /<\s*\/?\s*(?:script|style)\b/iu.test(node.value)) {
+        errors.push({
+          code: 'page-script',
+          message:
+            `the page contains a JSX expression with a <script>/<style> tag at offset ${node.position?.start?.offset ?? 0} — ` +
+            'generated pages must not carry executable or style elements; the theme owns page behavior and ' +
+            'styling. Remove the expression (a code FENCE showing example markup is fine) and resubmit'
+        });
+        return;
+      }
       if (typeof node.value === 'string' && node.value.includes('<Claim')) {
         errors.push({
           code: 'marker-in-expression',

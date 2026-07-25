@@ -174,6 +174,30 @@ describe('scanClaimMarkers', () => {
     expect(selfClosing.errors[0]?.code).toBe('page-script');
   });
 
+  it('rejects expression-wrapped <script>/<style> ({…} forms) as page-script — the braces must not launder them', () => {
+    // {<script>…</script>} compiles and executes exactly like the raw element (Sol's
+    // expression-bypass probe): flow and inline forms, case-insensitive, style included.
+    const flowExpression = scanClaimMarkers('Text.\n\n{<script>document.title = "lie"</script>}\n');
+    expect(flowExpression.errors[0]?.code).toBe('page-script');
+    expect(flowExpression.errors[0]?.message).toContain('theme owns page behavior');
+
+    const inlineExpression = scanClaimMarkers('Text with {<script>alert(1)</script>} inline.\n');
+    expect(inlineExpression.errors.some((error) => error.code === 'page-script')).toBe(true);
+
+    const styleExpression = scanClaimMarkers('Text.\n\n{<style>{".claim { display: none; }"}</style>}\n');
+    expect(styleExpression.errors[0]?.code).toBe('page-script');
+
+    const upperCaseExpression = scanClaimMarkers('Text.\n\n{<SCRIPT src="evil.js" />}\n');
+    expect(upperCaseExpression.errors[0]?.code).toBe('page-script');
+
+    // TAG match, never a WORD match: the word "script" inside an expression string is legal.
+    const wordOnly = scanClaimMarkers("Text.\n\n{'the script ran'}\n");
+    expect(wordOnly.errors).toEqual([]);
+
+    const inlineWord = scanClaimMarkers("The tool said {'the style guide applies'} here.\n");
+    expect(inlineWord.errors).toEqual([]);
+  });
+
   it('leaves code FENCES and inline code containing <script>/<style> untouched — examples are text, not elements', () => {
     const fence = scanClaimMarkers(
       [

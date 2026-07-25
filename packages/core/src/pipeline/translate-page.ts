@@ -1,4 +1,5 @@
 import type { PageArtifact } from '@docstube/plugin-sdk';
+import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Finding, PageEntity, PageShard } from '@docstube/contracts';
 import { agentTaskSpecSchema, contentHash, contentHashSchema, idPrefixes, mintId } from '@docstube/contracts';
 import { extractPageEntity } from '../entities/extract-entities.ts';
@@ -121,6 +122,26 @@ export const alignTranslatedEntities = (
   };
 };
 
+// Page hygiene for translated MDX (wave 2b close): the writer's submission passes the marker
+// scanner in-session, but a translation is a fresh artifact the scanner never saw — a translator
+// could inject script/style (raw, or expression-wrapped) or malform the Claim markers. The same
+// page-level checks run here before persistence; a failure fails the TRANSLATION (nonblocking —
+// the source page is unaffected), never ships.
+export const translationHygieneErrors = (mdx: string): string[] => {
+  const scan = scanClaimMarkers(mdx);
+  const errors = scan.errors.map((error) => `[${error.code}] ${error.message}`);
+  const markerCounts = new Map<string, number>();
+  for (const marker of scan.markers) {
+    markerCounts.set(marker.markerId, (markerCounts.get(marker.markerId) ?? 0) + 1);
+  }
+  for (const [markerId, count] of markerCounts) {
+    if (count > 1) {
+      errors.push(`[marker-duplicate-id] marker "${markerId}" appears ${count} times — every marker id is unique`);
+    }
+  }
+  return errors;
+};
+
 export type TranslationOutcome = {
   locale: string;
   slug: string;
@@ -164,6 +185,16 @@ export const translateArtifact = async (
         );
       }
       const mdx = unwrapMdxFence(transcript.result.mdx);
+      const hygieneErrors = translationHygieneErrors(mdx);
+      if (hygieneErrors.length > 0) {
+        findings = hygieneErrors.map((message) => ({
+          source: 'verifier' as const,
+          check: 'translation-hygiene',
+          severity: 'error' as const,
+          message: `translation to ${targetLocale} failed page hygiene: ${message}`
+        }));
+        continue;
+      }
       const extracted = extractPageEntity({
         mdx,
         slug: sourceArtifact.page.slug,
@@ -220,8 +251,12 @@ export const translateArtifact = async (
       sourceCommit: ctx.commit,
       generatedAt: new Date().toISOString(),
       page: lastArtifact.page,
-      // MDX↔shard binding for the translated artifact bytes (same rule as source shards).
-      mdxContentHash: contentHashSchema.parse(contentHash(lastArtifact.mdx)),
+      // MDX↔shard binding for the translated artifact bytes (same rule as source shards) — minted
+      // ONLY when the translation passed, because only then does the caller persist the locale
+      // MDX. A failed translation writes no locale file, so its shard must stay HASHLESS: any
+      // later emission of a fallback or stale file renders loud-UNVERIFIED instead of binding to
+      // bytes that were never written.
+      ...(passed ? { mdxContentHash: contentHashSchema.parse(contentHash(lastArtifact.mdx)) } : {}),
       flags: passed
         ? []
         : [
