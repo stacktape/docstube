@@ -271,6 +271,23 @@ const pageRouteMdx = (
   // LITERAL proof surface (impl-07 finding 4): claim counts, contradiction facts, and per-claim
   // contradicted markers straight from ClaimEvidence — the guarantee-label ladder is gone.
   const proof = binding.ok ? projectShardProof(proofShard) : projectUnboundShardProof(proofShard);
+  // LOCALE SECTION ANCHORS (wave 2b close, impl-21): the canonical proof carries the SOURCE
+  // page's section anchors, but a translated route renders the LOCALE document — its headings get
+  // their own anchors, so chips projected wholesale would target ids that do not exist in the
+  // rendered HTML. Translation hygiene guarantees an identical heading inventory (count + order),
+  // so canonical sections map onto locale sections POSITIONALLY; the locale anchor/title come
+  // from the locale shard's own sections, derived from the translated headings by the same
+  // extraction slugger that derives the source anchors the source route relies on. A
+  // source-fallback route renders the SOURCE bytes, so it keeps the canonical anchors; a
+  // length mismatch (pre-inventory shard) falls back to canonical rather than guessing.
+  const localeSections = page.shard.page.sections;
+  const sections =
+    canonical !== undefined && page.sourceFallback !== true && proof.sections.length === localeSections.length
+      ? proof.sections.map((section, index) => {
+          const localeSection = localeSections[index]!;
+          return { ...section, anchor: localeSection.anchor, title: localeSection.title };
+        })
+      : proof.sections;
   const alternates = context.alternatesBySlug.get(slug) ?? [];
   const sources = collectPageSources(page.shard.page).map((ref) => ({
     file: ref.file,
@@ -305,7 +322,7 @@ const pageRouteMdx = (
     // JSON is valid YAML flow syntax, so these round-trip through Astro's frontmatter parser.
     ...(alternates.length > 1 ? [`docstubeAlternates: ${JSON.stringify(alternates)}`] : []),
     ...(sources.length > 0 ? [`docstubeSources: ${JSON.stringify(sources)}`] : []),
-    ...(proof.sections.length > 0 ? [`docstubeSections: ${JSON.stringify(proof.sections)}`] : [])
+    ...(sections.length > 0 ? [`docstubeSections: ${JSON.stringify(sections)}`] : [])
   ];
   return [
     '---',

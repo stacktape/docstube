@@ -413,12 +413,22 @@ describe('runGenerate', () => {
     expect(deMdx).toContain('# Erste Schritte');
     // The MDX↔shard binding hash is minted from the EXACT locale bytes the pipeline persisted.
     expect(deShard?.mdxContentHash).toBe(contentHash(deMdx));
+    // The locale→canonical revision binding (impl-21 fix 2): minted at translation success from
+    // the exact source bytes translated, so it equals the canonical shard's own binding hash —
+    // the emission revision gate serves the translation only while the two still agree.
+    expect(deShard?.sourceContentRevision).toBe(enShard?.mdxContentHash);
+    // Locale is an address dimension for anchors too: the de sections carry their own localized
+    // anchors (input to the positional locale-anchor projection at emission).
+    expect(deShard?.page.sections.map((section) => section.anchor)).toEqual(['verwendung']);
+    expect(enShard?.page.sections.map((section) => section.anchor)).toEqual(['usage']);
   }, 60_000);
 
   it('flags a translation that breaks document structure instead of shipping it silently', async () => {
     await writeFile(join(repoRoot, 'docstube.yml'), `${configYaml}locales:\n  source: en\n  targets: [de]\n`);
-    // The "translation" drops the Usage section entirely — ids cannot align.
-    const brokenTranslation = goodMdx.split('## Usage')[0] ?? '';
+    // The "translation" keeps every heading and marker (so hygiene passes — a dropped heading
+    // would already fail the heading-inventory check) but drops the code block: block counts
+    // cannot align, so ids cannot be carried.
+    const brokenTranslation = goodMdx.replace(/```ts[\s\S]*?```\n/u, '');
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
       if (spec.kind === 'review-page') {
         return passingReview(spec);
@@ -559,6 +569,9 @@ describe('runGenerate', () => {
     const index = await store.readIndex();
     const deShard = await store.readPageShard({ locale: 'de', pageId: index?.pages[0]?.id ?? '' });
     expect(deShard?.mdxContentHash).toBeUndefined();
+    // No revision binding either: a failed translation cannot vouch for rendering ANY canonical
+    // revision, so the emission revision gate keeps the shard inert.
+    expect(deShard?.sourceContentRevision).toBeUndefined();
   }, 60_000);
 
   it('site-scope findings land as open system flags on the named page shard, deduped across runs', async () => {

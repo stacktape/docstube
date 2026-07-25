@@ -2,7 +2,7 @@ import type { PageArtifact } from '@docstube/plugin-sdk';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Finding, PageEntity, PageShard } from '@docstube/contracts';
 import { agentTaskSpecSchema, contentHash, contentHashSchema, idPrefixes, mintId } from '@docstube/contracts';
-import { extractPageEntity } from '../entities/extract-entities.ts';
+import { extractPageEntity, parseMdx } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
 import type { PageRunContext } from './page-runner.ts';
 import { contentRelativePath, unwrapMdxFence } from './page-runner.ts';
@@ -122,20 +122,35 @@ export const alignTranslatedEntities = (
   };
 };
 
+// Depth of every heading in document order (h1 title included) — the structural skeleton a
+// rendition must reproduce exactly for canonical sections and locale sections to correspond
+// positionally (the locale-anchor projection at emission maps them by index).
+export const headingInventory = (mdx: string): number[] =>
+  parseMdx(mdx).children.flatMap((node) => (node.type === 'heading' ? [node.depth] : []));
+
+const renderHeadingDepths = (depths: readonly number[]): string =>
+  depths.length === 0 ? '(none)' : depths.map((depth) => `h${depth}`).join(' ');
+
 // Page hygiene for translated MDX (wave 2b close): the writer's submission passes the marker
 // scanner in-session, but a translation is a fresh artifact the scanner never saw — a translator
 // could inject script/style (raw, or expression-wrapped) or malform the Claim markers. The same
 // page-level checks run here before persistence; a failure fails the TRANSLATION (nonblocking —
 // the source page is unaffected), never ships.
-export const translationHygieneErrors = (mdx: string, sourceMarkerIds: readonly string[]): string[] => {
+export const translationHygieneErrors = (
+  mdx: string,
+  sourceMarkerIds: readonly string[],
+  sourceHeadingDepths: readonly number[]
+): string[] => {
   const scan = scanClaimMarkers(mdx);
   const errors = scan.errors.map((error) => `[${error.code}] ${error.message}`);
   const markerCounts = new Map<string, number>();
   for (const marker of scan.markers) {
     markerCounts.set(marker.markerId, (markerCounts.get(marker.markerId) ?? 0) + 1);
   }
+  let hasDuplicates = false;
   for (const [markerId, count] of markerCounts) {
     if (count > 1) {
+      hasDuplicates = true;
       errors.push(`[marker-duplicate-id] marker "${markerId}" appears ${count} times — every marker id is unique`);
     }
   }
@@ -143,8 +158,8 @@ export const translationHygieneErrors = (mdx: string, sourceMarkerIds: readonly 
   // canonical claim inventory — the source page's marker ids, exactly, no renames, no additions,
   // no removals. The locale route inherits the CANONICAL shard's per-claim marks by marker id at
   // emission, so a drifted inventory would attach trust marks to prose that asserts something
-  // else (or to nothing). Set equality here plus the duplicate check above is exact inventory
-  // equality (same ids, same count).
+  // else (or to nothing). Set equality plus the duplicate check above gives exact inventory
+  // equality; the SEQUENCE check below additionally rejects relocations.
   const sourceIds = new Set(sourceMarkerIds);
   const translatedIds = new Set(markerCounts.keys());
   const removed = [...sourceIds].filter((markerId) => !translatedIds.has(markerId));
@@ -157,6 +172,37 @@ export const translationHygieneErrors = (mdx: string, sourceMarkerIds: readonly 
       `[marker-isomorphism] the translated Claim marker inventory does not match the source page's markers ` +
         `(${[removedNote, addedNote].filter((note) => note !== '').join('; ')}) — a rendition must carry exactly ` +
         'the canonical marker ids, translated in place, never renamed, added, or removed'
+    );
+  } else if (!hasDuplicates) {
+    // ORDERED MARKER EQUALITY (wave 2b close, impl-21): set equality is not enough — swapping or
+    // relocating two ids between translated assertions passes the set check while attaching each
+    // canonical mark to the WRONG prose. The rendition must carry the marker ids in the source's
+    // document order, so marker N provably wraps the translation of the sentence marker N wrapped.
+    const translatedSequence = scan.markers.map((marker) => marker.markerId);
+    const sameOrder =
+      translatedSequence.length === sourceMarkerIds.length &&
+      translatedSequence.every((markerId, index) => markerId === sourceMarkerIds[index]);
+    if (!sameOrder) {
+      errors.push(
+        `[marker-order] the translated Claim markers appear in a different order than the source page's ` +
+          `(translated: ${translatedSequence.map((id) => `"${id}"`).join(', ')}; source: ` +
+          `${sourceMarkerIds.map((id) => `"${id}"`).join(', ')}) — a swapped or relocated marker attaches the ` +
+          'canonical trust mark to the wrong prose; each marker must stay on the translation of its own sentence'
+      );
+    }
+  }
+  // HEADING INVENTORY (wave 2b close, impl-21): the rendition must reproduce the exact heading
+  // skeleton — same count, same depths, same order — so section structure provably matches and
+  // canonical sections map onto locale sections (and their localized anchors) by position.
+  const translatedHeadings = headingInventory(mdx);
+  const sameHeadings =
+    translatedHeadings.length === sourceHeadingDepths.length &&
+    translatedHeadings.every((depth, index) => depth === sourceHeadingDepths[index]);
+  if (!sameHeadings) {
+    errors.push(
+      `[heading-inventory] the translated heading structure (${renderHeadingDepths(translatedHeadings)}) does not ` +
+        `match the source page's (${renderHeadingDepths(sourceHeadingDepths)}) — a rendition keeps every heading ` +
+        'at its depth and position (translating only the text), so sections correspond one-to-one across locales'
     );
   }
   return errors;
@@ -177,8 +223,15 @@ export const translateArtifact = async (
 ): Promise<Array<{ outcome: TranslationOutcome; artifact: PageArtifact; shard: PageShard }>> => {
   const results: Array<{ outcome: TranslationOutcome; artifact: PageArtifact; shard: PageShard }> = [];
   const maxAttempts = 2;
-  // The canonical marker inventory every rendition must reproduce exactly (marker isomorphism).
+  // The canonical marker inventory every rendition must reproduce exactly — same ids in the same
+  // document order (ordered marker equality) — plus the heading skeleton it must preserve.
   const sourceMarkerIds = scanClaimMarkers(sourceArtifact.mdx).markers.map((marker) => marker.markerId);
+  const sourceHeadingDepths = headingInventory(sourceArtifact.mdx);
+  // The canonical revision this translation is made from: the exact source artifact bytes, hashed
+  // the same way persistence mints the canonical shard's mdxContentHash. Recorded on the locale
+  // shard at translation success; the emission revision gate compares it against the CURRENT
+  // canonical shard and serves the source fallback on any drift.
+  const sourceRevision = contentHashSchema.parse(contentHash(sourceArtifact.mdx));
 
   for (const targetLocale of ctx.config.locales.targets) {
     let findings: Finding[] = [];
@@ -207,7 +260,7 @@ export const translateArtifact = async (
         );
       }
       const mdx = unwrapMdxFence(transcript.result.mdx);
-      const hygieneErrors = translationHygieneErrors(mdx, sourceMarkerIds);
+      const hygieneErrors = translationHygieneErrors(mdx, sourceMarkerIds, sourceHeadingDepths);
       if (hygieneErrors.length > 0) {
         findings = hygieneErrors.map((message) => ({
           source: 'verifier' as const,
@@ -277,8 +330,16 @@ export const translateArtifact = async (
       // ONLY when the translation passed, because only then does the caller persist the locale
       // MDX. A failed translation writes no locale file, so its shard must stay HASHLESS: any
       // later emission of a fallback or stale file renders loud-UNVERIFIED instead of binding to
-      // bytes that were never written.
-      ...(passed ? { mdxContentHash: contentHashSchema.parse(contentHash(lastArtifact.mdx)) } : {}),
+      // bytes that were never written. The locale→canonical revision binding
+      // (sourceContentRevision) is minted under the same condition: it vouches that THIS
+      // translation renders the canonical artifact at that exact revision, which is only true for
+      // a shipped translation.
+      ...(passed
+        ? {
+            mdxContentHash: contentHashSchema.parse(contentHash(lastArtifact.mdx)),
+            sourceContentRevision: sourceRevision
+          }
+        : {}),
       flags: passed
         ? []
         : [

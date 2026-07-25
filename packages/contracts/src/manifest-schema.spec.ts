@@ -37,6 +37,20 @@ describe('manifest shards', () => {
     expect(pageShardSchema.safeParse({ ...shard, sourceCommit: 'c'.repeat(65) }).success).toBe(false);
   });
 
+  it('carries the optional locale→canonical revision binding (sourceContentRevision) as a content hash', () => {
+    // The locale revision gate (wave 2b close): a target-locale shard records the canonical
+    // shard's mdxContentHash at translation success; emission compares it against the CURRENT
+    // canonical hash and serves the source fallback on any drift.
+    const shard = { ...buildFixturePageShard(buildFixturePage()), locale: 'de' };
+    expect(pageShardSchema.safeParse({ ...shard, sourceContentRevision: 'a'.repeat(64) }).success).toBe(true);
+    expect(pageShardSchema.parse({ ...shard, sourceContentRevision: 'a'.repeat(64) }).sourceContentRevision).toBe(
+      'a'.repeat(64)
+    );
+    // Optional (absent on source-locale and pre-field shards), but never malformed.
+    expect(pageShardSchema.safeParse(shard).success).toBe(true);
+    expect(pageShardSchema.safeParse({ ...shard, sourceContentRevision: 'not-a-hash' }).success).toBe(false);
+  });
+
   it('requires at least one declared version in the index', () => {
     const index = {
       schemaVersion: 1,

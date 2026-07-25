@@ -137,7 +137,14 @@ export const buildFixtureInput = (repoRoot: string, options?: FixtureInputOption
     configHash: 'a'.repeat(64),
     iaHash: 'b'.repeat(64)
   });
-  const installPageDe: PageEntity = { ...installPage, title: 'Installation (DE)' };
+  // The de rendition the alignment step produces: SAME entity ids and blocks, localized section
+  // titles — and therefore localized anchors, derived from the translated headings by the same
+  // extraction slugger that derives source anchors.
+  const installPageDe: PageEntity = {
+    ...installPage,
+    title: 'Installation (DE)',
+    sections: installPage.sections.map((section) => ({ ...section, title: 'Anforderungen', anchor: 'anforderungen' }))
+  };
   return {
     repoRoot,
     outDir: 'docs-site',

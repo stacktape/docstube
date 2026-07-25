@@ -214,6 +214,37 @@ describe('emitSite', () => {
     expect(layout).toContain('sourceFallback={sourceFallback}');
   });
 
+  it('locale section chips carry the LOCALE anchors positionally, with the canonical counts (impl-21 fix 3)', async () => {
+    // The de shard's sections are the aligned rendition: same ids, translated titles, anchors
+    // derived from the translated headings. The route's docstubeSections must reference THOSE
+    // anchors (the ids that exist in the rendered locale HTML), while the claim counts stay the
+    // canonical shard's — proof is language-independent, anchors are not.
+    const installDe = await readFile(join(siteRoot, 'src/pages/de/getting-started/installation.mdx'), 'utf8');
+    expect(installDe).toContain(
+      '"anchor":"anforderungen","title":"Anforderungen","checked":1,"total":1,"contradicted":0'
+    );
+    expect(installDe).not.toContain('"anchor":"requirements"');
+    // The source route is unchanged: canonical anchors, canonical counts.
+    const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(install).toContain('"anchor":"requirements","title":"Requirements","checked":1,"total":1,"contradicted":0');
+  });
+
+  it('a source-fallback rendition keeps the CANONICAL section anchors — it renders the source headings', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-fallback-anchors-'));
+    const input = buildFixtureInput(repoRoot, { withTranslation: true });
+    const translation = input.translations?.[0];
+    if (translation === undefined) {
+      throw new Error('fixture translation missing');
+    }
+    const { mdxContentHash: _dropped, ...hashlessShard } = translation.shard;
+    input.translations = [{ shard: hashlessShard, mdx: installMdx, sourceFallback: true }];
+    await emitSite(input);
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/de/getting-started/installation.mdx'), 'utf8');
+    // The fallback serves the SOURCE bytes, so the source anchors are the ones in the HTML.
+    expect(route).toContain('"anchor":"requirements"');
+    expect(route).not.toContain('"anchor":"anforderungen"');
+  });
+
   it('injects locale alternates for translated pages only and renders the switcher + hreflang', async () => {
     const install = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
     expect(install).toContain('docstubeAlternates: ');

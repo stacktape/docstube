@@ -157,6 +157,15 @@ export const pageShardSchema = z
     // without the hash) renders the page in the loud UNVERIFIED state — stale trust state must
     // never accompany changed prose. Optional only for pre-hash shards; new persists always mint.
     mdxContentHash: contentHashSchema.optional(),
+    // LOCALE→CANONICAL REVISION BINDING (wave 2b close): on a TARGET-locale shard, the content
+    // hash of the exact SOURCE MDX artifact the translation was made from — i.e. the canonical
+    // shard's mdxContentHash at translation time — minted only at translation success. Emission
+    // serves the translated MDX only while this equals the CURRENT canonical shard's
+    // mdxContentHash; any drift (source regenerated or refined, a failed/frozen retranslation
+    // leaving an old shard behind) makes the locale shard inert and the route serves the source
+    // fallback, so generate/refine never need to proactively invalidate locale shards. Absent on
+    // source-locale shards and on pre-field or failed locale shards (which therefore fall back).
+    sourceContentRevision: contentHashSchema.optional(),
     ledger: claimLedgerSchema.optional(),
     provenance: provenanceV2Schema.optional(),
     claimMatching: claimMatchingSchema.optional(),

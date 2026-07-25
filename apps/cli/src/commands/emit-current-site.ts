@@ -48,8 +48,9 @@ export type EmitCurrentSiteResult = {
   // Theme-owned files the user modified: preserved/skipped, reported by the calling command.
   themeConflicts: string[];
   // MDX↔shard binding failures (pages rendered UNVERIFIED because the persisted MDX no longer
-  // matches the shard's recorded mdxContentHash, or the shard predates the hash) plus ignored
-  // stale locale MDX for failed translations (routes served the source fallback). Printed loudly.
+  // matches the shard's recorded mdxContentHash, or the shard predates the hash) plus locale
+  // routes that served the source fallback instead of a failed or REVISION-STALE translation
+  // (locale shard's sourceContentRevision != current canonical mdxContentHash). Printed loudly.
   warnings: string[];
 };
 
@@ -92,6 +93,7 @@ export const emitCurrentSite = async (input: {
         continue;
       }
       const mdxPath = `content/${locale}/${entry.slug}.mdx`;
+      const source = sourceByPageId.get(entry.id);
       // STALE LOCALE MDX NEVER SERVED (wave 2b close; i18n-lifecycle-v2 decision 1): a HASHLESS
       // locale shard means the pipeline persisted no locale bytes this state can vouch for — a
       // failed translation or retranslation. Any locale MDX still on disk is a PRIOR run's
@@ -99,7 +101,6 @@ export const emitCurrentSite = async (input: {
       // fallback (with the canonical shard's proof and a visible not-yet-translated notice). The
       // stale file is ignored and reported, never silently rendered and never deleted here.
       if (shard.mdxContentHash === undefined) {
-        const source = sourceByPageId.get(entry.id);
         if (source === undefined) {
           continue;
         }
@@ -113,6 +114,30 @@ export const emitCurrentSite = async (input: {
         } catch {
           // No stale file: the fallback is the ordinary not-yet-translated state, nothing to report.
         }
+        localePages.push({ shard, mdx: source.mdx, sourceFallback: true });
+        continue;
+      }
+      // LOCALE REVISION GATE (wave 2b close, impl-21): the translated MDX is served ONLY while
+      // the locale shard's recorded canonical revision (sourceContentRevision, minted at
+      // translation success from the exact source bytes translated) equals the CURRENT canonical
+      // shard's mdxContentHash. Any drift — a source change whose retranslation then failed,
+      // froze, or was skipped; `docstube refine` updating only source artifacts — means the
+      // canonical proof now describes DIFFERENT prose than the translation renders, so attaching
+      // that proof to the old locale bytes would mark the wrong text. The route serves the source
+      // fallback instead. This is deliberately STRICTER than i18n-lifecycle-v2 decision 1's
+      // "stale-but-verified stays reachable with a warning": keeping the old prose reachable
+      // honestly requires the retained HISTORICAL proof at the old revision, which is
+      // reconciler-wave work — until then the gate fails closed. It also means generate/refine
+      // never need to proactively invalidate locale shards: a stale shard is inert by comparison.
+      if (source !== undefined && shard.sourceContentRevision !== source.shard.mdxContentHash) {
+        fallbackWarnings.push(
+          `page "${entry.slug}" (${locale}): the translation is stale — ` +
+            (shard.sourceContentRevision === undefined
+              ? 'the locale shard records no canonical source revision (pre-gate translation), '
+              : 'the source page changed after it was translated, ') +
+            `so the translated MDX at ${mdxPath} is not served; the route serves the current source-locale ` +
+            'content with a not-yet-translated notice. Re-run `docstube generate` to retranslate'
+        );
         localePages.push({ shard, mdx: source.mdx, sourceFallback: true });
         continue;
       }

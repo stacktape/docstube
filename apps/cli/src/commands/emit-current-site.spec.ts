@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildCodemap } from '@docstube/codemap';
 import { typescriptLanguagePack } from '@docstube/lang-typescript';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
-import { createManifestStore, loadConfigFamily, runGenerate } from '@docstube/core';
+import { createManifestStore, loadConfigFamily, runGenerate, runRefine } from '@docstube/core';
 import { emitCurrentSite } from './emit-current-site.ts';
 
 // The wave 2b-iii trust-spine E2E: generate on a real fixture repo → canonical JSON shards
@@ -24,6 +24,10 @@ description: "Retry defaults."
 # Retry
 
 <Claim id="v1">\`DEFAULT_RETRIES\` defaults to 3.</Claim>
+
+## Usage
+
+Call the function.
 `;
 
 beforeEach(async () => {
@@ -52,7 +56,79 @@ const germanMdx = mdx
   .replace(
     '<Claim id="v1">`DEFAULT_RETRIES` defaults to 3.</Claim>',
     '<Claim id="v1">`DEFAULT_RETRIES` ist standardmäßig 3.</Claim>'
-  );
+  )
+  .replace('## Usage', '## Verwendung')
+  .replace('Call the function.', 'Rufe die Funktion auf.');
+
+const localesConfigYaml =
+  'schemaVersion: 1\ndocType: external-library\npersonas:\n  - id: app-developer\n    description: Builds apps\n' +
+  'site:\n  title: Retry Docs\nlocales:\n  source: en\n  targets: [de]\n';
+
+// The one-claim writer ledger over the fixture symbol, resolved from a fresh codemap.
+const buildValueLedger = async (): Promise<WriterClaimLedger> => {
+  const codemap = await buildCodemap({
+    repoRoot,
+    commit: 'a'.repeat(40),
+    packs: [typescriptLanguagePack],
+    logger: { info: () => {}, warn: () => {} }
+  });
+  const symbolHash = codemap.symbols.find((symbol) => symbol.name === 'DEFAULT_RETRIES')?.hash;
+  if (symbolHash === undefined) {
+    throw new Error('fixture symbol missing from codemap');
+  }
+  return {
+    schemaVersion: 1,
+    claims: [
+      {
+        markerId: 'v1',
+        class: 'value',
+        predicate: 'DEFAULT_RETRIES defaults to 3',
+        proposedEvidence: [{ kind: 'symbol', symbol: symbolHash }],
+        proposedSubscriptions: [{ kind: 'cited-value', symbolHash, valueName: 'DEFAULT_RETRIES', citedValue: '3' }]
+      }
+    ]
+  } as WriterClaimLedger;
+};
+
+// Scripted transport: passing review, the given source MDX for writer tasks, and — when a
+// translation is provided — that MDX for translate tasks. Without one, a translate task CRASHES,
+// which both simulates a translator dying mid-run and asserts that refine issues no translations.
+const scriptedRunner =
+  (input: { sourceMdx: string; ledger: WriterClaimLedger; translation?: string }) =>
+  async (spec: AgentTaskSpec): Promise<Transcript> => {
+    const base = {
+      schemaVersion: 1 as const,
+      taskId: spec.id,
+      cacheKey: 'test',
+      transport: 'replay',
+      model: 'scripted',
+      observedReads: [{ file: 'src/retry.ts', contentHash: '0'.repeat(64) }],
+      usage: { inputTokens: 1, outputTokens: 1, cacheHit: false },
+      stopReason: 'complete' as const,
+      turns: []
+    };
+    if (spec.kind === 'review-page') {
+      return {
+        ...base,
+        observedReads: [],
+        result: {
+          type: 'structured',
+          value: {
+            persona: 'app-developer',
+            criteria: [{ criterion: 'audience-fit', outcome: 'met', reasoning: 'fits' }],
+            findings: []
+          }
+        }
+      };
+    }
+    if (spec.kind === 'translate-page') {
+      if (input.translation === undefined) {
+        throw new Error('translator crashed');
+      }
+      return { ...base, result: { type: 'mdx', mdx: input.translation } };
+    }
+    return { ...base, result: { type: 'mdx-ledger', mdx: input.sourceMdx, ledger: input.ledger } };
+  };
 
 describe('generate → JSON shards → emit (trust-spine E2E)', () => {
   it('emits the site with claim-count proof frontmatter projected from the shard ClaimEvidence', async () => {
@@ -242,6 +318,14 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(deRoute).not.toContain('docstubeUnverified');
     expect(deRoute).not.toContain('docstubeSourceFallback');
     expect(deRoute).toContain('ist standardmäßig 3');
+    // LOCALE SECTION ANCHORS (impl-21 fix 3): the de route's section chips reference the de
+    // document's own heading anchor (the id Astro derives from "## Verwendung"), mapped
+    // positionally onto the canonical section counts — never the source anchor, which does not
+    // exist in the rendered de HTML. The source route keeps its own anchors.
+    expect(deRoute).toContain('"anchor":"verwendung"');
+    expect(deRoute).not.toContain('"anchor":"usage"');
+    const enRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8');
+    expect(enRoute).toContain('"anchor":"usage"');
 
     // Run 2: the retranslation fails (marker renamed v1→v9 — isomorphism violation). The stale de
     // MDX from run 1 remains on disk against the now-hashless de shard.
@@ -262,8 +346,85 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(fallbackRoute).toContain('docstubeClaimsChecked: 1');
     expect(fallbackRoute).toContain('docstubeClaimsTotal: 1');
     expect(fallbackRoute).not.toContain('docstubeUnverified');
+    // A fallback route renders the SOURCE headings, so it keeps the canonical anchors.
+    expect(fallbackRoute).toContain('"anchor":"usage"');
+    expect(fallbackRoute).not.toContain('"anchor":"verwendung"');
     // The raw markdown mirror serves the fallback bytes too, never the stale translation.
     const deMirror = await readFile(join(repoRoot, 'docs-site', 'public', 'de', 'retry.md'), 'utf8');
     expect(deMirror).not.toContain('ist standardmäßig 3');
+  }, 180_000);
+
+  it('locale revision gate: a translator crash after the source persisted leaves a stale shard that emission makes inert', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), localesConfigYaml);
+    const ledger = await buildValueLedger();
+
+    // Run 1: source + translation both ship; the de route serves the translated bytes.
+    const first = await runGenerate({
+      repoRoot,
+      runTask: scriptedRunner({ sourceMdx: mdx, ledger, translation: germanMdx }),
+      toolDescriptors: []
+    });
+    expect(first.outcome).toBe('passed');
+    const family = await loadConfigFamily(repoRoot);
+    const store = createManifestStore(repoRoot, family.config.versions.current);
+    const firstEmit = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(firstEmit.warnings).toEqual([]);
+    expect(await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'de', 'retry.mdx'), 'utf8')).toContain(
+      'ist standardmäßig 3'
+    );
+
+    // Run 2: the source page CHANGES and the translator crashes AFTER the source artifact
+    // persisted — exactly the window where run 1's hash-bearing de shard (old
+    // sourceContentRevision) survives against a fresh canonical shard.
+    const updatedMdx = mdx.replace('Call the function.', 'Call the function with options.');
+    await expect(
+      runGenerate({ repoRoot, runTask: scriptedRunner({ sourceMdx: updatedMdx, ledger }), toolDescriptors: [] })
+    ).rejects.toThrow('translator crashed');
+    const staleDe = await readFile(join(repoRoot, 'docs-site', 'content', 'de', 'retry.mdx'), 'utf8');
+    expect(staleDe).toContain('ist standardmäßig 3');
+
+    // The pipeline never invalidated the locale shard — the EMISSION revision gate compares its
+    // recorded canonical revision with the current canonical shard, refuses the stale prose, and
+    // serves the fresh source under the locale route with a warning naming the staleness.
+    const secondEmit = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(secondEmit.warnings.some((warning) => warning.includes('stale'))).toBe(true);
+    const fallbackRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'de', 'retry.mdx'), 'utf8');
+    expect(fallbackRoute).toContain('docstubeSourceFallback: true');
+    expect(fallbackRoute).toContain('Call the function with options.');
+    expect(fallbackRoute).not.toContain('ist standardmäßig 3');
+    expect(fallbackRoute).not.toContain('docstubeUnverified');
+  }, 180_000);
+
+  it('locale revision gate: refine updating only source artifacts makes the old translation stale at emission', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), localesConfigYaml);
+    const ledger = await buildValueLedger();
+    const first = await runGenerate({
+      repoRoot,
+      runTask: scriptedRunner({ sourceMdx: mdx, ledger, translation: germanMdx }),
+      toolDescriptors: []
+    });
+    expect(first.outcome).toBe('passed');
+    const family = await loadConfigFamily(repoRoot);
+    const store = createManifestStore(repoRoot, family.config.versions.current);
+    expect((await emitCurrentSite({ workspaceDir: repoRoot, family, store })).warnings).toEqual([]);
+
+    // refine rewrites the SOURCE page only — it issues no translate tasks (the scripted runner
+    // would crash on one), so the locale shard is untouched by design, not by accident.
+    const refinedMdx = mdx.replace('Call the function.', 'Call the function early.');
+    const refined = await runRefine({
+      repoRoot,
+      runTask: scriptedRunner({ sourceMdx: refinedMdx, ledger }),
+      toolDescriptors: []
+    });
+    expect(refined.refined).toHaveLength(1);
+
+    // The untouched locale shard's recorded canonical revision no longer matches the refined
+    // canonical shard: the route serves the refined source content as the fallback.
+    const emit = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
+    expect(emit.warnings.some((warning) => warning.includes('stale'))).toBe(true);
+    const deRoute = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'de', 'retry.mdx'), 'utf8');
+    expect(deRoute).toContain('docstubeSourceFallback: true');
+    expect(deRoute).toContain('Call the function early.');
+    expect(deRoute).not.toContain('ist standardmäßig 3');
   }, 180_000);
 });
