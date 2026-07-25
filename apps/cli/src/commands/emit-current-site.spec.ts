@@ -209,6 +209,8 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     const result = await emitCurrentSite({ workspaceDir: repoRoot, family, store });
     expect(result.emitted).toBe(true);
     expect(result.warnings).toEqual([]);
+    // Nothing obsolete on a first emit — the reconciler prunes only routes that left the manifest.
+    expect(result.pruned).toEqual([]);
 
     const route = await readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'retry.mdx'), 'utf8');
     // Literal counts only — the guarantee-label projection is gone (impl-07 finding 4).
@@ -366,7 +368,7 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     expect(deMirror).not.toContain('ist standardmäßig 3');
   }, 180_000);
 
-  it('locale revision gate: a translator crash after the source persisted leaves a stale shard that emission makes inert', async () => {
+  it('a translator transport crash is NONBLOCKING: the source page ships and emission makes the stale locale inert', async () => {
     await writeFile(join(repoRoot, 'docstube.yml'), localesConfigYaml);
     const ledger = await buildValueLedger();
 
@@ -389,9 +391,16 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
     // persisted — exactly the window where run 1's hash-bearing de shard (old
     // sourceContentRevision) survives against a fresh canonical shard.
     const updatedMdx = mdx.replace('Call the function.', 'Call the function with options.');
-    await expect(
-      runGenerate({ repoRoot, runTask: scriptedRunner({ sourceMdx: updatedMdx, ledger }), toolDescriptors: [] })
-    ).rejects.toThrow('translator crashed');
+    // A translator transport failure is NONBLOCKING (impl-23 finding 4): the run completes, the
+    // source page ships, and only the de locale is flagged.
+    const second = await runGenerate({
+      repoRoot,
+      runTask: scriptedRunner({ sourceMdx: updatedMdx, ledger }),
+      toolDescriptors: []
+    });
+    expect(second.outcome).toBe('flagged');
+    expect(second.pages.every((page) => page.status === 'passed')).toBe(true);
+    expect(second.translations).toEqual([expect.objectContaining({ locale: 'de', status: 'flagged' })]);
     const staleDe = await readFile(join(repoRoot, 'docs-site', 'content', 'de', 'retry.mdx'), 'utf8');
     expect(staleDe).toContain('ist standardmäßig 3');
 

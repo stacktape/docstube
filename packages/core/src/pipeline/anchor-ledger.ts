@@ -30,6 +30,7 @@ import {
   symbolSourceKeySchema
 } from '@docstube/contracts';
 import { blockSourceRanges } from '../entities/extract-entities.ts';
+import { coverageLintHint, lintUncoveredAssertions } from './coverage-lint.ts';
 
 // The kernel anchoring stage (ARCHITECTURE §4.1): the accepted writer artifact (MDX + writer
 // ledger, already validated by submit_page) becomes the committed kernel ledger. The kernel —
@@ -669,14 +670,19 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
     return { ok: false, errors, rejectedProposals, warnings };
   }
 
+  // THE COVERAGE LINTER (harness-state-v2 decision 5, PRODUCT §1.2): assertion-shaped prose that
+  // no marker covers is recorded on the committed ledger, so the reader surfaces can never present
+  // a page as complete on the strength of a ledger the writer simply kept short. Reported as a
+  // NON-BLOCKING journal hint — never a repair error (minimal-review tenet).
+  const uncovered = lintUncoveredAssertions({ mdx: input.mdx, page: input.page });
+  warnings.push(...coverageLintHint(uncovered));
+
   const ledger = claimLedgerSchema.parse({
     schemaVersion: 1,
     pageId: input.page.id,
     sourceRevision: gitCommitSchema.parse(input.commit),
     claims: anchored.map((entry) => entry.claim),
-    // The deterministic coverage linter is a later wave; the field exists so shards never need a
-    // schema migration when it lands.
-    coverageLint: { uncovered: [] }
+    coverageLint: { uncovered }
   });
   return { ok: true, ledger, anchored, evidence, rejectedProposals, warnings };
 };

@@ -1,5 +1,6 @@
 import GithubSlugger, { slug as githubSlug } from 'github-slugger';
 import { describe, expect, it } from 'vitest';
+import { isRenderableAnchor, unrenderableAnchorPrefix } from '@docstube/contracts';
 import { extractPageEntity, slugifyAnchor } from './extract-entities.ts';
 
 const sampleMdx = `---
@@ -112,9 +113,13 @@ describe('slugifyAnchor / github-slugger parity', () => {
     }
   });
 
-  it('falls back to "section" only where Astro itself would emit an unusable empty id', () => {
+  it('falls back to a SYNTHETIC unrenderable anchor where Astro itself would emit an empty id', () => {
     expect(githubSlug('.')).toBe('');
-    expect(slugifyAnchor('.')).toBe('section');
+    // Never a real word: a substituted 'section' would collide with a genuine "## Section" heading
+    // and mis-target its chip (impl-23 finding 3).
+    expect(slugifyAnchor('.')).toBe(`${unrenderableAnchorPrefix}0`);
+    expect(isRenderableAnchor(slugifyAnchor('.'))).toBe(false);
+    expect(isRenderableAnchor(slugifyAnchor('Section'))).toBe(true);
   });
 
   it('matches the ids Astro derives for a whole document, h1 title included', () => {
@@ -141,5 +146,23 @@ describe('slugifyAnchor / github-slugger parity', () => {
     const page = extractPageEntity({ mdx, slug: 'x' });
     expect(page.sections.map((section) => section.anchor)).toEqual(expected);
     expect(expected).toEqual(['setup-1', 'configuración-avanzada', 'setup-2']);
+  });
+
+  it('a punctuation-only heading CONSUMES its slugger slot without stealing a real slug (impl-23 finding 3)', () => {
+    // Astro slugs "## ." to the empty string and records that slot; the following "## Section"
+    // therefore keeps the plain "section" id. Substituting a real word for the empty slug would
+    // consume "section" and push the real heading onto "section-1" — a chip aimed at nothing.
+    const mdx = ['# Title', '', '## .', '', 'a', '', '## Section', '', 'b', ''].join('\n');
+    const astro = new GithubSlugger();
+    const astroIds = ['Title', '.', 'Section'].map((text) => astro.slug(text));
+    expect(astroIds).toEqual(['title', '', 'section']);
+
+    const page = extractPageEntity({ mdx, slug: 'x' });
+    const [punctuation, real] = page.sections;
+    expect(real?.anchor).toBe('section');
+    expect(isRenderableAnchor(real?.anchor ?? '')).toBe(true);
+    // The punctuation heading gets a synthetic, never-colliding anchor and is chipless.
+    expect(punctuation?.anchor.startsWith(unrenderableAnchorPrefix)).toBe(true);
+    expect(isRenderableAnchor(punctuation?.anchor ?? '')).toBe(false);
   });
 });

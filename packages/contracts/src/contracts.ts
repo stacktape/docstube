@@ -102,7 +102,9 @@ export {
   sectionEntitySchema,
   pageEntitySchema,
   entityAddressSchema,
-  listPageEntityIds
+  listPageEntityIds,
+  unrenderableAnchorPrefix,
+  isRenderableAnchor
 } from './entity-schema.ts';
 export type {
   CoreBlockType,

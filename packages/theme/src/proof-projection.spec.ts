@@ -123,6 +123,84 @@ describe('projectShardProof', () => {
   });
 });
 
+// NO HIDDEN DENOMINATOR (harness-state-v2 decision 5, PRODUCT §1.2): a complete badge means the
+// ledger is fully checked AND the coverage linter found nothing assertion-shaped left unmarked.
+const allChecked = (shard: PageShard): PageShard => {
+  if (shard.ledger === undefined || shard.provenance === undefined) {
+    throw new Error('fixture shard is missing its trust spine');
+  }
+  return {
+    ...shard,
+    provenance: {
+      ...shard.provenance,
+      claimEvidence: shard.provenance.claimEvidence.map((record) => ({ ...record, correctness: 'checked' as const }))
+    }
+  };
+};
+
+const withUncovered = (shard: PageShard, count: number): PageShard => {
+  const ledger = shard.ledger;
+  if (ledger === undefined) {
+    throw new Error('fixture shard is missing its ledger');
+  }
+  return {
+    ...shard,
+    ledger: {
+      ...ledger,
+      coverageLint: {
+        uncovered: Array.from({ length: count }, (_, index) => ({
+          blockId: ledger.claims[0]!.anchor.blockId,
+          excerpt: `The \`option${index}\` defaults to 5.`,
+          detector: 'identifier-with-numeric-literal'
+        }))
+      }
+    }
+  };
+};
+
+describe('projectShardProof — coverage lint gates the complete state', () => {
+  it('is complete only when every claim is checked and nothing is left unmarked', () => {
+    const projection = projectShardProof(allChecked(installShard()));
+    expect(projection).toMatchObject({ checkedClaims: 2, totalClaims: 2, uncoveredAssertions: 0, complete: true });
+  });
+
+  it('is NEVER complete while an unmarked assertion exists — the ledger alone cannot mint the badge', () => {
+    const projection = projectShardProof(withUncovered(allChecked(installShard()), 2));
+    // Identical ledger state as above; the only difference is the linter's report.
+    expect(projection.checkedClaims).toBe(2);
+    expect(projection.totalClaims).toBe(2);
+    expect(projection.uncoveredAssertions).toBe(2);
+    expect(projection.complete).toBe(false);
+  });
+
+  it('a partially checked page is not complete either, uncovered or not', () => {
+    expect(projectShardProof(installShard()).complete).toBe(false);
+  });
+
+  it('an unverified shard reports zero uncovered assertions and is never complete', () => {
+    const projection = projectUnboundShardProof(withUncovered(allChecked(installShard()), 3));
+    expect(projection).toMatchObject({ state: 'unverified', uncoveredAssertions: 0, complete: false });
+  });
+});
+
+// UNRENDERABLE ANCHORS ARE CHIPLESS (impl-23 finding 3): a punctuation-only heading renders as
+// id="" in Astro, so no chip could ever resolve there — shipping one would let it land on whatever
+// element answered the lookup instead.
+describe('projectShardProof — section chips skip unrenderable anchors', () => {
+  it('omits the chip for a section whose heading slugged to nothing', () => {
+    const shard = installShard();
+    const withPunctuationHeading: PageShard = {
+      ...shard,
+      page: {
+        ...shard.page,
+        sections: [...shard.page.sections, { ...shard.page.sections[0]!, anchor: '#unrenderable-1', blocks: [] }]
+      }
+    };
+    const anchors = projectShardProof(withPunctuationHeading).sections.map((section) => section.anchor);
+    expect(anchors).toEqual(['requirements']);
+  });
+});
+
 describe('checkShardMdxBinding + projectUnboundShardProof (MDX↔shard binding, wave 2b close final)', () => {
   it('accepts the matched pair: the shard hash equals the persisted MDX content hash', () => {
     expect(checkShardMdxBinding(installShard(), installMdx)).toEqual({ ok: true });

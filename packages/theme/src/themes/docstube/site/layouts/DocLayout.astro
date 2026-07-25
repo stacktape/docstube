@@ -30,6 +30,10 @@ const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undef
 const claimsChecked = frontmatter.docstubeClaimsChecked ?? 0;
 const claimsTotal = frontmatter.docstubeClaimsTotal ?? 0;
 const claimsContradicted = frontmatter.docstubeClaimsContradicted ?? 0;
+// Coverage lint (PRODUCT §1.2, no hidden denominator): assertion-shaped prose no <Claim> marker
+// covers. The complete state is gated on it, so unmarked facts never read as a fully checked page.
+const uncoveredAssertions = frontmatter.docstubeUncoveredAssertions ?? 0;
+const claimsComplete = frontmatter.docstubeClaimsComplete === true;
 const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
 const uncheckedClaims = frontmatter.docstubeUncheckedClaims ?? [];
 const reviewedFor = frontmatter.docstubeReviewedFor;
@@ -169,7 +173,7 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         <div class="dt-article">
           <div class="dt-page-meta">
             {breadcrumb ? <p class="dt-breadcrumb">{breadcrumb}</p> : null}
-            <DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />
+            <DocstubeClaims checked={claimsChecked} total={claimsTotal} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />
           </div>
           <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />
           <DocstubeEntity entityId={frontmatter.docstubePageId}>

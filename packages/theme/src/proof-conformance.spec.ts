@@ -175,6 +175,67 @@ describe('proof conformance (basic theme)', () => {
     expect(page).toContain("import Claim from '../../docstube/DocstubeClaim.astro';");
   });
 
+  // NO HIDDEN DENOMINATOR (harness-state-v2 decision 5, PRODUCT §1.2): the coverage linter's count
+  // reaches the reader, and the complete/green state is gated on it — a page that simply left its
+  // facts unmarked can never present as done.
+  it('threads the unmarked-assertion count into the chip and gates the complete state on it', async () => {
+    const chip = await readFile(join(siteRoot, 'src/docstube/DocstubeClaims.astro'), 'utf8');
+    expect(chip).toContain('unmarked assertion');
+    expect(chip).toContain('data-docstube-uncovered-assertions={uncovered}');
+    // The complete class can only appear when the linter found nothing.
+    expect(chip).toContain('const isComplete = complete === true && uncovered === 0;');
+    expect(chip).toContain('dt-claims--complete');
+    // Every built-in theme threads both props and styles the complete state — a conformance
+    // contract, not a theme choice.
+    for (const bundle of Object.values(builtinThemes)) {
+      const files = (await bundle()).files;
+      const layout = files.find((file) => file.path === 'src/layouts/DocLayout.astro');
+      const content = layout && 'content' in layout ? layout.content : '';
+      expect(content).toContain('uncovered={uncoveredAssertions}');
+      expect(content).toContain('complete={claimsComplete}');
+      const css = files.find((file) => file.path === 'src/styles/global.css');
+      expect(css && 'content' in css ? css.content : '').toContain('.dt-claims--complete');
+    }
+  });
+
+  it('emits the unmarked-assertion count on every route and withholds complete when any exist', async () => {
+    // The fixture install page is 1-of-2 checked with no uncovered spans: honest, not complete.
+    const page = await readFile(join(siteRoot, 'src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(page).toContain('docstubeUncoveredAssertions: 0');
+    expect(page).not.toContain('docstubeClaimsComplete');
+
+    // Same ledger, one uncovered span recorded: the count ships and complete stays withheld.
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-proof-uncovered-'));
+    const input = buildFixtureInput(repoRoot);
+    const install = input.pages[0]!;
+    const ledger = install.shard.ledger;
+    if (ledger === undefined) {
+      throw new Error('fixture shard is missing its ledger');
+    }
+    input.pages[0] = {
+      ...install,
+      shard: {
+        ...install.shard,
+        ledger: {
+          ...ledger,
+          coverageLint: {
+            uncovered: [
+              {
+                blockId: ledger.claims[0]!.anchor.blockId,
+                excerpt: 'The `retryLimit` defaults to 5.',
+                detector: 'identifier-with-numeric-literal'
+              }
+            ]
+          }
+        }
+      }
+    };
+    await emitSite(input);
+    const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
+    expect(route).toContain('docstubeUncoveredAssertions: 1');
+    expect(route).not.toContain('docstubeClaimsComplete');
+  });
+
   it('renders a first-generation contradiction LOUD: warning frontmatter and per-claim marker ids', async () => {
     const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-proof-contra-'));
     await emitSite(buildFixtureInput(repoRoot, { withContradiction: true }));

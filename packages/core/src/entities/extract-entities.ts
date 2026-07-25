@@ -8,7 +8,7 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { parse as parseYaml } from 'yaml';
 import type { BlockEntity, PageEntity, SectionEntity } from '@docstube/contracts';
-import { componentBlockType, contentHash, idPrefixes, mintId } from '@docstube/contracts';
+import { componentBlockType, contentHash, idPrefixes, mintId, unrenderableAnchorPrefix } from '@docstube/contracts';
 
 // Deterministic extraction pass (ARCHITECTURE.md §3.4): MDX → entity tree. IDs live in the
 // manifest sidecar, never inline in MDX — the writer agent produces clean MDX and the kernel owns
@@ -52,11 +52,11 @@ const nodeText = (node: unknown): string => {
 // they must be byte-identical to the ids Astro actually puts on the rendered headings, or the
 // per-section claim chips (which resolve by `document.getElementById(anchor)`) silently attach to
 // nothing, or worse, to a later heading. Astro's `rehypeHeadingIds` slugs EVERY heading with
-// github-slugger, so docstube slugs with the same library. The one deliberate divergence: a
-// heading whose text slugs to the empty string (pure punctuation, e.g. "."), which Astro renders
-// as `id=""`, gets the 'section' fallback here — the manifest schema requires a non-empty anchor,
-// and such a heading has no resolvable id in the built HTML either way.
-export const slugifyAnchor = (title: string): string => githubSlug(title) || 'section';
+// github-slugger, so docstube slugs with the same library. A heading whose text slugs to the empty
+// string (pure punctuation or emoji, e.g. ".") renders as `id=""` in Astro, so it gets the
+// SYNTHETIC unrenderable anchor — non-empty for the schema, impossible to collide with a real
+// slug, and omitted from every chip surface (see isRenderableAnchor).
+export const slugifyAnchor = (title: string): string => githubSlug(title) || `${unrenderableAnchorPrefix}0`;
 
 const sliceSource = (mdx: string, node: RootContent): string => {
   const start = node.position?.start.offset;
@@ -178,7 +178,20 @@ export const extractPageEntity = ({ mdx, slug, fallbackTitle }: ExtractPageInput
   // and the h1 page-title heading — which docstube does not turn into a section but Astro DOES
   // slug — is consumed below so later duplicates land on the same suffix Astro emits.
   const slugger = new GithubSlugger();
-  const uniqueAnchor = (headingText: string): string => slugger.slug(headingText) || slugger.slug('section');
+  // EVERY heading consumes exactly ONE slugger slot, exactly like Astro (impl-23 finding 3): a
+  // punctuation-only heading slugs to '' and Astro records that empty slot, so later duplicates
+  // land on the same suffix. Substituting a real word here ('section') would consume a DIFFERENT
+  // slot and push every later heading onto the wrong Astro id. The empty result becomes a
+  // synthetic per-heading anchor instead — never rendered, never chipped.
+  let unrenderableCount = 0;
+  const uniqueAnchor = (headingText: string): string => {
+    const headingSlug = slugger.slug(headingText);
+    if (headingSlug !== '') {
+      return headingSlug;
+    }
+    unrenderableCount += 1;
+    return `${unrenderableAnchorPrefix}${unrenderableCount}`;
+  };
 
   for (const node of tree.children) {
     if (node.type === 'yaml') {

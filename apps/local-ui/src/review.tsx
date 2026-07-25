@@ -26,7 +26,15 @@ type ClaimView = {
   correctness: ClaimCorrectness;
 };
 
-type ClaimCounts = { checked: number; total: number; contradicted: number; unchecked: number };
+type ClaimCounts = {
+  checked: number;
+  total: number;
+  contradicted: number;
+  unchecked: number;
+  // Coverage-linter spans (PRODUCT §1.2): assertion-shaped prose no <Claim> marker covers. Page
+  // scope only — the linter reports per block, but the reviewer decision it informs is the page's.
+  uncovered?: number;
+};
 
 type ShardProof = {
   // 'unverified' = the shard persists WITHOUT a ledger/provenance trust spine (failed
@@ -58,7 +66,8 @@ const projectShard = (shard: PageShard): ShardProof => {
       checked: records.filter((record) => record.correctness === 'checked').length,
       total: records.length,
       contradicted: records.filter((record) => record.correctness === 'contradicted').length,
-      unchecked: records.filter((record) => record.correctness === 'unchecked').length
+      unchecked: records.filter((record) => record.correctness === 'unchecked').length,
+      uncovered: shard.ledger?.coverageLint.uncovered.length ?? 0
     },
     claimsByBlockId
   };
@@ -74,7 +83,8 @@ const countsOf = (claims: ClaimView[]): ClaimCounts => ({
 // Mirrors the theme's proof surface (impl-09 finding 2): contradictions are the alarm; unchecked
 // claims get a quiet-but-visible exception count so they never read as ordinary checked content.
 function ClaimCountChip({ counts }: { counts: ClaimCounts }) {
-  if (counts.total === 0) {
+  const uncovered = counts.uncovered ?? 0;
+  if (counts.total === 0 && uncovered === 0) {
     return null;
   }
   if (counts.contradicted > 0) {
@@ -84,10 +94,18 @@ function ClaimCountChip({ counts }: { counts: ClaimCounts }) {
       </span>
     );
   }
+  // NO HIDDEN DENOMINATOR (PRODUCT §1.2): unmarked assertions ride beside the ledger counts, so a
+  // page whose writer simply omitted markers never reads as a fully checked page here either.
+  const complete = counts.total > 0 && counts.checked === counts.total && uncovered === 0;
   return (
-    <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-300">
-      {counts.checked}/{counts.total} checked
+    <span
+      className={`rounded px-1.5 py-0.5 text-[11px] ${
+        complete ? 'bg-emerald-950 text-emerald-300' : 'bg-neutral-800 text-neutral-300'
+      }`}
+    >
+      {counts.total > 0 ? `${counts.checked}/${counts.total} checked` : 'no claims recorded'}
       {counts.unchecked > 0 && <span className="text-neutral-500"> · {counts.unchecked} unchecked</span>}
+      {uncovered > 0 && <span className="text-amber-400"> · {uncovered} unmarked</span>}
     </span>
   );
 }

@@ -832,4 +832,37 @@ More text <Claim id="c1">second assertion.</Claim>
       )
     ).toBe(true);
   });
+
+  // NO HIDDEN DENOMINATOR (harness-state-v2 decision 5, PRODUCT §1.2): the committed ledger
+  // carries the coverage linter's uncovered spans, and their presence is reported as a NON-BLOCKING
+  // hint — never a repair error that could spiral the bounded retry loop.
+  it('records unmarked assertion-shaped prose on the committed ledger as a non-blocking hint', () => {
+    const uncoveredMdx = `# Retry\n\n<Claim id="c1">\`retries\` defaults to 3.</Claim>\n\nThe \`backoffFactor\` is set to 2.\n`;
+    const result = expectOk(
+      anchorWriterLedger({
+        mdx: uncoveredMdx,
+        writerLedger: ledger([draft('c1')]),
+        page: extractPageEntity({ mdx: uncoveredMdx, slug: 'retry' }),
+        fingerprints,
+        codemap,
+        observedReads,
+        commit: COMMIT
+      })
+    );
+    expect(result.ledger.claims).toHaveLength(1);
+    expect(result.ledger.coverageLint.uncovered).toHaveLength(1);
+    expect(result.ledger.coverageLint.uncovered[0]?.excerpt).toBe('The `backoffFactor` is set to 2.');
+    // Reported, never blocking: anchoring still succeeded with the writer's full claim inventory.
+    expect(result.warnings.some((warning) => warning.includes('not covered by any <Claim> marker'))).toBe(true);
+  });
+
+  it('records NO uncovered spans when every assertion carries a marker', () => {
+    const result = expectOk(
+      anchorWriterLedger(
+        anchorInput([draft('c1'), draft('c2', { class: 'intent-history', proposedSubscriptions: [] })])
+      )
+    );
+    expect(result.ledger.coverageLint.uncovered).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
 });

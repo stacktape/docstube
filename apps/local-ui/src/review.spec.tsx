@@ -188,6 +188,19 @@ describe('review UI', () => {
     expect(screen.getByText('unchecked')).toBeDefined();
   });
 
+  it('surfaces unmarked assertions beside the counts — ledger omission never reads as a checked page', async () => {
+    // NO HIDDEN DENOMINATOR (PRODUCT §1.2): the coverage linter's spans ride the shard ledger, and
+    // the reviewer surface reports them next to the checked counts exactly as the theme does.
+    const shard = buildShard('checked') as { ledger: { coverageLint: { uncovered: unknown[] } } };
+    shard.ledger.coverageLint = {
+      uncovered: [{ blockId, excerpt: 'The `retryLimit` defaults to 5.', detector: 'identifier-with-numeric-literal' }]
+    };
+    renderReview(buildClient(vi.fn(noopSubmit), shard));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    await screen.findByText('Requirements');
+    expect(screen.getAllByText(/· 1 unmarked/).length).toBeGreaterThan(0);
+  });
+
   it('renders a shard WITHOUT a trust spine as explicitly unverified — never a silent 0/0 (impl-08)', async () => {
     renderReview(buildClient(vi.fn(noopSubmit), buildShard('checked', false)));
     fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));

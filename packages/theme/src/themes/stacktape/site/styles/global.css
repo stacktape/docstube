@@ -1458,6 +1458,16 @@ html[data-mobile-nav-open] .stp-mobile-nav {
     0 0 0 1px rgba(255, 255, 255, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
+/* The COMPLETE state (PRODUCT §1.2): every ledger claim checked, nothing contradicted, and no
+   unmarked assertion left by the coverage linter. Gated by the kernel primitive — a page with
+   uncovered assertion-shaped prose never receives this class. */
+.dt-claims--complete {
+  color: var(--color-fc-secondary);
+  background: rgba(24, 153, 144, 0.14);
+  box-shadow:
+    0 0 0 1px rgba(24, 153, 144, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
 .dt-reviewed {
   color: var(--color-fc-secondary);
   background: rgba(24, 153, 144, 0.14);

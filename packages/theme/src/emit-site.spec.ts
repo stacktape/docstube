@@ -118,7 +118,7 @@ describe('emitSite', () => {
     expect(warning).toContain("classList.add('dt-claim--unchecked')");
     const layout = await readFile(join(siteRoot, 'src/layouts/DocLayout.astro'), 'utf8');
     expect(layout).toContain(
-      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />'
+      '<DocstubeClaims checked={claimsChecked} total={claimsTotal} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} translationAssurance={translationAssurance} />'
     );
     expect(layout).toContain(
       '<DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />'
@@ -402,6 +402,74 @@ describe('emitSite', () => {
     const route = await readFile(join(repoRoot, 'docs-site/src/pages/getting-started/installation.mdx'), 'utf8');
     expect(route).toContain('docstubeUnverified: true');
     expect(route).toContain('docstubeClaimsChecked: 0');
+  });
+
+  // EMISSION IS A RECONCILER (impl-23 finding 2): writing the desired routes without removing the
+  // ones that disappeared leaves deleted pages and old slugs fully renderable, serving prose and
+  // proof that no current shard describes.
+  it('prunes the route and the .md twin of a page that left the manifest', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-prune-removed-'));
+    await emitSite(buildFixtureInput(repoRoot));
+    const emitted = join(repoRoot, 'docs-site');
+    await expect(stat(join(emitted, 'src/pages/guides/setup.mdx'))).resolves.toBeDefined();
+    await expect(stat(join(emitted, 'public/guides/setup.md'))).resolves.toBeDefined();
+
+    // The setup page is removed from the manifest; only installation remains.
+    const second = buildFixtureInput(repoRoot);
+    second.pages = second.pages.slice(0, 1);
+    second.index = { ...second.index, pages: second.index.pages.slice(0, 1) };
+    const result = await emitSite(second);
+
+    await expect(stat(join(emitted, 'src/pages/guides/setup.mdx'))).rejects.toThrow(/ENOENT/u);
+    await expect(stat(join(emitted, 'public/guides/setup.md'))).rejects.toThrow(/ENOENT/u);
+    expect(result.pruned).toEqual(['public/guides/setup.md', 'src/pages/guides/setup.mdx']);
+    // The surviving page is untouched, and nothing outside the route namespaces is considered.
+    await expect(stat(join(emitted, 'src/pages/getting-started/installation.mdx'))).resolves.toBeDefined();
+    await expect(stat(join(emitted, 'public/llms.txt'))).resolves.toBeDefined();
+    await expect(stat(join(emitted, 'src/layouts/DocLayout.astro'))).resolves.toBeDefined();
+  });
+
+  it('a slug change leaves ONLY the new route — the old one never keeps serving', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-prune-slug-'));
+    await emitSite(buildFixtureInput(repoRoot));
+    const emitted = join(repoRoot, 'docs-site');
+    await expect(stat(join(emitted, 'src/pages/guides/setup.mdx'))).resolves.toBeDefined();
+
+    const renamed = buildFixtureInput(repoRoot);
+    const setup = renamed.pages[1]!;
+    renamed.pages[1] = { ...setup, shard: { ...setup.shard, page: { ...setup.shard.page, slug: 'guides/install' } } };
+    renamed.index = {
+      ...renamed.index,
+      pages: renamed.index.pages.map((entry) =>
+        entry.slug === 'guides/setup' ? { ...entry, slug: 'guides/install' } : entry
+      )
+    };
+    const result = await emitSite(renamed);
+
+    await expect(stat(join(emitted, 'src/pages/guides/install.mdx'))).resolves.toBeDefined();
+    await expect(stat(join(emitted, 'public/guides/install.md'))).resolves.toBeDefined();
+    await expect(stat(join(emitted, 'src/pages/guides/setup.mdx'))).rejects.toThrow(/ENOENT/u);
+    await expect(stat(join(emitted, 'public/guides/setup.md'))).rejects.toThrow(/ENOENT/u);
+    expect(result.pruned).toEqual(['public/guides/setup.md', 'src/pages/guides/setup.mdx']);
+  });
+
+  it('prunes an obsolete LOCALE route when the locale stops being emitted', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-prune-locale-'));
+    await emitSite(buildFixtureInput(repoRoot, { withTranslation: true }));
+    const emitted = join(repoRoot, 'docs-site');
+    await expect(stat(join(emitted, 'src/pages/de/getting-started/installation.mdx'))).resolves.toBeDefined();
+
+    const result = await emitSite(buildFixtureInput(repoRoot));
+    await expect(stat(join(emitted, 'src/pages/de/getting-started/installation.mdx'))).rejects.toThrow(/ENOENT/u);
+    expect(result.pruned).toContain('src/pages/de/getting-started/installation.mdx');
+    expect(result.pruned).toContain('public/de/getting-started/installation.md');
+  });
+
+  it('prunes nothing on a repeat emit of the same manifest — idempotent reconciliation', async () => {
+    const repoRoot = await mkdtemp(join(tmpdir(), 'docstube-theme-prune-idempotent-'));
+    await emitSite(buildFixtureInput(repoRoot));
+    const result = await emitSite(buildFixtureInput(repoRoot));
+    expect(result.pruned).toEqual([]);
   });
 
   it('omits sitemap.xml and robots.txt without a baseUrl', async () => {

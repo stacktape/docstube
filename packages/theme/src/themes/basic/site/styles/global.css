@@ -140,6 +140,14 @@ pre {
   background: var(--surface-muted);
   color: var(--text-muted);
 }
+/* The COMPLETE state (PRODUCT §1.2): every ledger claim checked, nothing contradicted, and no
+   unmarked assertion left by the coverage linter. Gated by the kernel primitive — a page with
+   uncovered assertion-shaped prose never receives this class. */
+.dt-claims--complete {
+  background: #e7f5ec;
+  border-color: #b6dfc4;
+  color: var(--success);
+}
 .dt-reviewed {
   background: #e7f5ec;
   border-color: #b6dfc4;

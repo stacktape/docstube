@@ -131,25 +131,32 @@ describe('createWizardControlPlane', () => {
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
     await vi.waitFor(() => readFile(routePath, 'utf8'), { timeout: 90_000, interval: 500 });
 
-    // Run 2: a target locale is configured, the writer produces an UPDATED page (two claims), and
-    // the translate transport explodes — the pipeline throws AFTER the source page was persisted.
+    // Run 2: a SECOND page joins the IA, the writer produces an UPDATED first page (two claims),
+    // and the WRITER transport explodes on the second page — the pipeline throws AFTER page one
+    // was persisted. (A translator transport failure is nonblocking by design, impl-23 finding 4,
+    // so it can no longer stand in for a run-level throw.)
     await writeFile(
-      join(repoRoot, 'docstube.yml'),
-      'schemaVersion: 1\ndocType: external-library\npersonas:\n  - id: app-developer\n    description: Builds apps\n' +
-        'site:\n  title: Greeter Docs\nlocales:\n  source: en\n  targets: [de]\n'
+      join(repoRoot, 'ia.yml'),
+      'schemaVersion: 1\ntree:\n  - title: Getting started\n    slug: getting-started\n    brief: Install and greet.\n' +
+        '  - title: Advanced\n    slug: advanced\n    brief: Go deeper.\n'
     );
     const updatedMdx = mdx.replace(
       '<Claim id="c1">The library exposes a single `greet` function.</Claim>',
       '<Claim id="c1">The library exposes a single `greet` function.</Claim>\n\nAlso, <Claim id="c2">`greet` returns a string.</Claim>'
     );
+    let writePageCalls = 0;
     const failingRunTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
-      if (spec.kind === 'translate-page') {
-        throw new Error('translate transport exploded');
-      }
       if (spec.kind === 'review-page') {
         return scriptedRunTask(spec);
       }
       const base = await scriptedRunTask(spec);
+      if (spec.kind !== 'write-page') {
+        return base;
+      }
+      writePageCalls += 1;
+      if (writePageCalls > 1) {
+        throw new Error('writer transport exploded');
+      }
       return { ...base, result: { type: 'mdx-ledger', mdx: updatedMdx, ledger: ledgerFor(updatedMdx) } };
     };
     const second = createWizardControlPlane(
@@ -167,7 +174,7 @@ describe('createWizardControlPlane', () => {
       },
       { timeout: 90_000, interval: 500 }
     );
-    expect(lines.some((line) => line.includes('translate transport exploded'))).toBe(true);
+    expect(lines.some((line) => line.includes('writer transport exploded'))).toBe(true);
 
     // The re-emitted route matches the NEW shard persisted before the throw (two claims), not the
     // pre-run rendering (one claim) — the exact drift the finally-shaped emission closes.

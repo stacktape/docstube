@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { mkdir, readdir, rm, rmdir, writeFile } from 'node:fs/promises';
+import { dirname, join, posix, relative, sep } from 'node:path';
 import type { DocstubeConfig, ManifestIndex, PageEntity, PageShard, SourceRef } from '@docstube/contracts';
 import { applyThemeBundle } from './apply-theme-bundle.ts';
 import {
@@ -72,6 +72,9 @@ export type EmitSiteResult = {
   // MDX↔shard binding failures (tampered MDX or a pre-hash shard): each named page rendered in
   // the loud UNVERIFIED state instead of its recorded trust state. The CLI prints/journals these.
   warnings: string[];
+  // Site-relative paths of obsolete routes and .md twins deleted this emit (a removed page or a
+  // changed slug). Reported, never silent — a deletion the user did not ask for must be visible.
+  pruned: string[];
 };
 
 // Kernel invariants pinned exactly (no ranges): a generated site must build identically whenever
@@ -318,6 +321,11 @@ const pageRouteMdx = (
     `docstubeClaimsChecked: ${proof.checkedClaims}`,
     `docstubeClaimsTotal: ${proof.totalClaims}`,
     `docstubeClaimsContradicted: ${proof.contradictedClaims}`,
+    // Coverage lint (harness-state-v2 decision 5): assertion-shaped prose no marker covers. It
+    // rides beside the counts and gates the complete state — a page with any unmarked assertion
+    // can never present as done, so ledger omission cannot manufacture "100% checked".
+    `docstubeUncoveredAssertions: ${proof.uncoveredAssertions}`,
+    ...(proof.complete ? ['docstubeClaimsComplete: true'] : []),
     // A page without a persisted trust spine renders a LOUD unverified warning (impl-08).
     ...(proof.state === 'unverified' ? ['docstubeUnverified: true'] : []),
     // Source-fallback rendition: themes render the visible not-yet-translated notice from this.
@@ -557,6 +565,72 @@ const writeTextFile = async (path: string, content: string): Promise<void> => {
   await writeFile(path, content, 'utf8');
 };
 
+// ROUTE PRUNING (impl-23 finding 2). Emission is a RECONCILER, not an appender: writing the
+// desired routes without removing the ones that disappeared leaves a deleted page — or the old
+// slug of a renamed one — fully renderable, serving prose and proof that no current manifest shard
+// describes. `docstube generate` is the single idempotent reconciler (PRODUCT §9), so the rendered
+// route tree must equal the desired set exactly.
+//
+// SCOPE IS DELIBERATELY NARROW — only the two file classes emission itself writes per route:
+//   src/pages/**/*.mdx   the generated routes (theme bundles are forbidden from this namespace)
+//   public/**/*.md       the raw-markdown twins (a theme may never own a public/**.md either)
+// Both are in apply-theme-bundle's protected list, so nothing here can ever be theme- or
+// user-authored. Every other file under outDir — theme assets, public/*.txt, sitemap, mcp/,
+// node_modules, dist — is untouched, and nothing outside outDir is ever considered.
+const collectFiles = async (root: string, extension: string): Promise<string[]> => {
+  const found: string[] = [];
+  const walk = async (directory: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return; // the tree does not exist yet: nothing to prune
+    }
+    for (const entry of entries) {
+      const absolute = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(absolute);
+      } else if (entry.isFile() && entry.name.endsWith(extension)) {
+        found.push(absolute);
+      }
+    }
+  };
+  await walk(root);
+  return found;
+};
+
+// Directories the prune emptied are removed too, so a deleted section leaves no hollow tree.
+// rmdir without recursive fails on a non-empty directory, which is exactly the guard wanted.
+const removeEmptyParents = async (from: string, stopAt: string): Promise<void> => {
+  let directory = dirname(from);
+  while (directory.startsWith(stopAt) && directory !== stopAt) {
+    try {
+      await rmdir(directory);
+    } catch {
+      return;
+    }
+    directory = dirname(directory);
+  }
+};
+
+const pruneObsoleteFiles = async (
+  siteRoot: string,
+  root: string,
+  extension: string,
+  desired: ReadonlySet<string>
+): Promise<string[]> => {
+  const pruned: string[] = [];
+  for (const absolute of await collectFiles(root, extension)) {
+    if (desired.has(absolute)) {
+      continue;
+    }
+    await rm(absolute, { force: true });
+    await removeEmptyParents(absolute, root);
+    pruned.push(relative(siteRoot, absolute).split(sep).join(posix.sep));
+  }
+  return pruned;
+};
+
 export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> => {
   const siteRoot = join(input.repoRoot, input.outDir);
   const theme = input.theme;
@@ -617,12 +691,20 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
   const collectWarning = (warning: string): void => {
     warnings.push(warning);
   };
+  // The DESIRED route set, accumulated as the routes are written — the exact inventory the prune
+  // below reconciles the emitted tree against.
+  const desiredRoutes = new Set<string>();
+  const desiredTwins = new Set<string>();
   for (const page of input.pages) {
     const slug = page.shard.page.slug;
+    const routePath = join(siteRoot, 'src/pages', `${slug}.mdx`);
+    const twinPath = join(siteRoot, 'public', `${slug}.md`);
+    desiredRoutes.add(routePath);
+    desiredTwins.add(twinPath);
     writes.push(
-      writeTextFile(join(siteRoot, 'src/pages', `${slug}.mdx`), pageRouteMdx(page, routeContext, collectWarning)),
+      writeTextFile(routePath, pageRouteMdx(page, routeContext, collectWarning)),
       // Raw markdown mirror at every doc URL, for agents and curl users.
-      writeTextFile(join(siteRoot, 'public', `${slug}.md`), page.mdx)
+      writeTextFile(twinPath, page.mdx)
     );
   }
   // Canonical source page by page id — the shard a translated rendition's proof derives from
@@ -631,12 +713,16 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
   for (const translation of translations) {
     const slug = translation.shard.page.slug;
     const locale = translation.shard.locale;
+    const routePath = join(siteRoot, 'src/pages', locale, `${slug}.mdx`);
+    const twinPath = join(siteRoot, 'public', locale, `${slug}.md`);
+    desiredRoutes.add(routePath);
+    desiredTwins.add(twinPath);
     writes.push(
       writeTextFile(
-        join(siteRoot, 'src/pages', locale, `${slug}.mdx`),
+        routePath,
         pageRouteMdx(translation, routeContext, collectWarning, sourceByPageId.get(translation.shard.page.id))
       ),
-      writeTextFile(join(siteRoot, 'public', locale, `${slug}.md`), translation.mdx)
+      writeTextFile(twinPath, translation.mdx)
     );
   }
 
@@ -654,5 +740,11 @@ export const emitSite = async (input: EmitSiteInput): Promise<EmitSiteResult> =>
   }
 
   await Promise.all(writes);
-  return { themeConflicts: applied.conflicts, warnings };
+  // Reconcile AFTER the desired routes exist, so an interrupted write never leaves a page with
+  // neither its old route nor its new one.
+  const pruned = [
+    ...(await pruneObsoleteFiles(siteRoot, join(siteRoot, 'src/pages'), '.mdx', desiredRoutes)),
+    ...(await pruneObsoleteFiles(siteRoot, join(siteRoot, 'public'), '.md', desiredTwins))
+  ].toSorted((left, right) => left.localeCompare(right));
+  return { themeConflicts: applied.conflicts, warnings, pruned };
 };

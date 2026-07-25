@@ -8,9 +8,12 @@ import { runGenerateCommand } from './generate-command.ts';
 import type { CliOutput } from '../cli-output.ts';
 
 // EMISSION AFTER PARTIAL FAILURE (wave 2b close): the pipeline can throw AFTER pages were
-// persisted (translation/transport errors). The generate command must still run the shared
-// assemble step over the consistent persisted state before surfacing the run error — otherwise an
-// old rendered route keeps disagreeing with the new shard.
+// persisted (a writer transport failing on a later page). The generate command must still run the
+// shared assemble step over the consistent persisted state before surfacing the run error —
+// otherwise an old rendered route keeps disagreeing with the new shard.
+//
+// The throw vehicle is deliberately a WRITER transport failure on the second page: a TRANSLATOR
+// transport failure is nonblocking by design (impl-23 finding 4) and no longer fails a run.
 
 let repoRoot: string;
 
@@ -40,9 +43,9 @@ const ledgerFor = (source: string): WriterClaimLedger => ({
   }))
 });
 
-const scriptedRunTask =
-  (pageMdx: string, translate: 'pass' | 'throw') =>
-  async (spec: AgentTaskSpec): Promise<Transcript> => {
+const scriptedRunTask = (pageMdx: string, writer: 'pass' | 'throw-on-second-page') => {
+  let writePageCalls = 0;
+  return async (spec: AgentTaskSpec): Promise<Transcript> => {
     const base = {
       schemaVersion: 1 as const,
       taskId: spec.id,
@@ -55,9 +58,6 @@ const scriptedRunTask =
       turns: []
     };
     if (spec.kind === 'translate-page') {
-      if (translate === 'throw') {
-        throw new Error('translate transport exploded');
-      }
       return { ...base, result: { type: 'mdx', mdx: pageMdx } };
     }
     if (spec.kind === 'review-page') {
@@ -74,8 +74,13 @@ const scriptedRunTask =
         }
       };
     }
+    writePageCalls += 1;
+    if (writer === 'throw-on-second-page' && writePageCalls > 1) {
+      throw new Error('writer transport exploded');
+    }
     return { ...base, result: { type: 'mdx-ledger', mdx: pageMdx, ledger: ledgerFor(pageMdx) } };
   };
+};
 
 beforeEach(async () => {
   repoRoot = await mkdtemp(join(tmpdir(), 'docstube-gen-cmd-'));
@@ -113,19 +118,22 @@ describe('runGenerateCommand', () => {
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
     expect(await readFile(routePath, 'utf8')).toContain('docstubeClaimsTotal: 1');
 
-    // Run 2: a target locale is configured, the writer produces an UPDATED page (two claims), and
-    // the translate transport explodes AFTER the source page was persisted.
+    // Run 2: a SECOND page joins the IA, the writer produces an UPDATED first page (two claims),
+    // and the writer transport explodes on the second page — AFTER page one was persisted.
     await writeFile(
-      join(repoRoot, 'docstube.yml'),
-      'schemaVersion: 1\ndocType: external-library\npersonas:\n  - id: app-developer\n    description: Builds apps\n' +
-        'site:\n  title: Greeter Docs\nlocales:\n  source: en\n  targets: [de]\n'
+      join(repoRoot, 'ia.yml'),
+      'schemaVersion: 1\ntree:\n  - title: Getting started\n    slug: getting-started\n    brief: Install and greet.\n' +
+        '  - title: Advanced\n    slug: advanced\n    brief: Go deeper.\n'
     );
     await expect(
       runGenerateCommand(
-        { workspaceDir: repoRoot, taskRunner: { runTask: scriptedRunTask(updatedMdx, 'throw'), toolDescriptors: [] } },
+        {
+          workspaceDir: repoRoot,
+          taskRunner: { runTask: scriptedRunTask(updatedMdx, 'throw-on-second-page'), toolDescriptors: [] }
+        },
         output
       )
-    ).rejects.toThrow('translate transport exploded');
+    ).rejects.toThrow('writer transport exploded');
 
     // The finally-shaped emission ran before the error escaped: the route matches the NEW shard
     // (two claims), never the stale pre-run rendering.

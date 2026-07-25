@@ -301,21 +301,43 @@ export const translateArtifact = async (
         slug: sourceArtifact.page.slug
       });
       await ctx.journal.append({ type: 'task-started', taskId: task.id, pageId: sourceArtifact.page.id });
-      const transcript = await ctx.options.runTask(task);
-      await ctx.journal.append({
-        type: 'task-completed',
-        taskId: task.id,
-        pageId: sourceArtifact.page.id,
-        usage: transcript.usage
-      });
-      ctx.costTracker.add(transcript.usage);
-      if (transcript.result?.type !== 'mdx') {
-        throw new CoreError(
-          'pipeline-failed',
-          `translate-page task for "${sourceArtifact.page.slug}" (${targetLocale}) returned no MDX`
-        );
+      // NO TRANSLATION CAN THROW THE RUN (i18n-lifecycle-v2 decision 5; impl-23 finding 4): a
+      // transport rejection (provider outage, auth failure, budget refusal, subprocess crash) and
+      // a transcript that carries no MDX are the SAME nonblocking class as the hygiene/extraction
+      // failures below — this page-locale fails, the source page and every other locale are
+      // untouched, and the locale route falls back to the source content. Escaping here would
+      // abort a whole generate run over one unreachable translator.
+      let mdx: string;
+      try {
+        const transcript = await ctx.options.runTask(task);
+        await ctx.journal.append({
+          type: 'task-completed',
+          taskId: task.id,
+          pageId: sourceArtifact.page.id,
+          usage: transcript.usage
+        });
+        ctx.costTracker.add(transcript.usage);
+        if (transcript.result?.type !== 'mdx') {
+          throw new CoreError(
+            'pipeline-failed',
+            `the translator returned no MDX (stop: ${transcript.stopReason ?? 'unknown'})`
+          );
+        }
+        mdx = unwrapMdxFence(transcript.result.mdx);
+      } catch (error) {
+        findings = [
+          {
+            source: 'verifier',
+            check: 'translation-transport',
+            severity: 'error',
+            message:
+              `translation to ${targetLocale} could not be produced: ` +
+              `${error instanceof Error ? error.message : String(error)} — the locale route serves the ` +
+              'source-locale content until the translation succeeds'
+          }
+        ];
+        continue;
       }
-      const mdx = unwrapMdxFence(transcript.result.mdx);
       const hygiene = translationHygieneErrors(mdx, sourcePlacements, sourceHeadingDepths);
       if (hygiene.length > 0) {
         findings = hygiene.map((message) => ({

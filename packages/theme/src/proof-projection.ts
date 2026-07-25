@@ -1,4 +1,4 @@
-import { contentHash } from '@docstube/contracts';
+import { contentHash, isRenderableAnchor } from '@docstube/contracts';
 import type { PageShard, TranslationAssuranceState } from '@docstube/contracts';
 
 // INTERIM READER SURFACE (wave 2b-iii round 2, until the full trust-chip wave): the theme
@@ -27,6 +27,15 @@ export type ShardProofProjection = {
   totalClaims: number;
   contradictedClaims: number;
   uncheckedClaims: number;
+  // COVERAGE LINT (harness-state-v2 decision 5, PRODUCT §1.2 "no hidden denominator"): how many
+  // assertion-shaped sentences on this page no <Claim> marker covers. The ledger bounds only what
+  // the writer marked, so without this number a page that simply omitted its markers would present
+  // as fully checked. Rendered next to the counts and, decisively, it gates `complete` below.
+  uncoveredAssertions: number;
+  // The ONLY state a reader surface may present as done: every ledger claim checked, nothing
+  // contradicted, and nothing assertion-shaped left unmarked. A page with any uncovered span can
+  // never be complete, however clean its ledger looks.
+  complete: boolean;
   // Persona id when a primary-gating review genuinely completed WITH at least one evaluated
   // criterion; the "reviewed for <persona>" label is withheld otherwise (harness-state-v2
   // decision 3) — there is NO fallback-to-reviewed.
@@ -128,16 +137,21 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
     .filter((claim) => (correctnessByClaimId.get(claim.claimId) ?? 'unchecked') === 'unchecked')
     .map((claim) => claim.anchor.markerId);
 
-  const sections: SectionClaimsChip[] = shard.page.sections.map((section) => {
-    const sectionClaimIds = section.blocks.flatMap((block) => claimsByBlockId.get(block.id) ?? []);
-    return {
-      anchor: section.anchor,
-      title: section.title,
-      checked: sectionClaimIds.filter((claimId) => correctnessByClaimId.get(claimId) === 'checked').length,
-      total: sectionClaimIds.length,
-      contradicted: sectionClaimIds.filter((claimId) => correctnessByClaimId.get(claimId) === 'contradicted').length
-    };
-  });
+  // UNRENDERABLE ANCHORS ARE CHIPLESS (impl-23 finding 3): a punctuation-only heading renders as
+  // `id=""` in Astro, so its chip could never resolve — and shipping it would let the injector
+  // attach a section's counts to whatever element answered the lookup instead.
+  const sections: SectionClaimsChip[] = shard.page.sections
+    .filter((section) => isRenderableAnchor(section.anchor))
+    .map((section) => {
+      const sectionClaimIds = section.blocks.flatMap((block) => claimsByBlockId.get(block.id) ?? []);
+      return {
+        anchor: section.anchor,
+        title: section.title,
+        checked: sectionClaimIds.filter((claimId) => correctnessByClaimId.get(claimId) === 'checked').length,
+        total: sectionClaimIds.length,
+        contradicted: sectionClaimIds.filter((claimId) => correctnessByClaimId.get(claimId) === 'contradicted').length
+      };
+    });
 
   // A completed review must carry evaluated criteria (impl-08 new defect): completion alone does
   // not prove required criteria were evaluated — an empty-criteria "completed" review earns no
@@ -146,12 +160,21 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
     (review) => review.role === 'primary-gating' && review.completion === 'completed' && review.criteria.length > 0
   );
 
+  const uncoveredAssertions = shard.ledger?.coverageLint.uncovered.length ?? 0;
+
   return {
     state: unverified ? 'unverified' : 'verified',
     checkedClaims,
     totalClaims,
     contradictedClaims,
     uncheckedClaims: totalClaims - checkedClaims - contradictedClaims,
+    uncoveredAssertions,
+    complete:
+      !unverified &&
+      totalClaims > 0 &&
+      checkedClaims === totalClaims &&
+      contradictedClaims === 0 &&
+      uncoveredAssertions === 0,
     reviewedFor: completedPrimaryReview?.persona,
     contradictedMarkers,
     uncheckedMarkers,

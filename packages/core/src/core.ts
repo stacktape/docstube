@@ -69,6 +69,8 @@ export type {
   AnchorLedgerResult,
   RejectedProposal
 } from './pipeline/anchor-ledger.ts';
+export { lintUncoveredAssertions, coverageLintHint, coverageLintRules } from './pipeline/coverage-lint.ts';
+export type { CoverageLintInput } from './pipeline/coverage-lint.ts';
 export { matchClaimIds } from './pipeline/match-claims.ts';
 export type { ClaimMatch, ClaimMatchConfidence, MatchClaimIdsInput, MatchedClaimIds } from './pipeline/match-claims.ts';
 export { translateArtifact, buildTranslatePageTask, alignTranslatedEntities } from './pipeline/translate-page.ts';

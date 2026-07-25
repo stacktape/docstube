@@ -57,6 +57,17 @@ export const blockEntitySchema = z.object({
 });
 export type BlockEntity = z.infer<typeof blockEntitySchema>;
 
+// UNRENDERABLE SECTION ANCHORS (wave 2b close, impl-23 finding 3): Astro's rehypeHeadingIds slugs
+// every heading with github-slugger, and a heading whose text slugs to the empty string (pure
+// punctuation or emoji, e.g. "## .") renders as `id=""` — nothing can ever resolve it with
+// getElementById. The manifest schema requires a non-empty anchor, so such a section gets a
+// SYNTHETIC anchor carrying this prefix. The '#' can never appear in a github slug, so the value
+// cannot collide with a real anchor, and every reader surface omits its chip instead of attaching
+// it to whatever heading happens to answer the id.
+export const unrenderableAnchorPrefix = '#unrenderable-';
+
+export const isRenderableAnchor = (anchor: string): boolean => !anchor.startsWith(unrenderableAnchorPrefix);
+
 // Sections are stored flat with a heading level; the tree is derived. Flat storage keeps shards
 // diff-friendly and the matching pass simple.
 export const sectionEntitySchema = z.object({

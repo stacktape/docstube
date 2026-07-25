@@ -53,6 +53,8 @@ export type EmitCurrentSiteResult = {
   // routes that served the source fallback instead of a failed or REVISION-STALE translation
   // (locale shard's sourceContentRevision != current canonical mdxContentHash). Printed loudly.
   warnings: string[];
+  // Obsolete routes and .md twins removed because their page left the manifest or changed slug.
+  pruned: string[];
 };
 
 export const emitCurrentSite = async (input: {
@@ -63,7 +65,7 @@ export const emitCurrentSite = async (input: {
   const { workspaceDir, family, store } = input;
   const index = await store.readIndex();
   if (index === undefined) {
-    return { emitted: false, themeConflicts: [], warnings: [] };
+    return { emitted: false, themeConflicts: [], warnings: [], pruned: [] };
   }
   const fallbackWarnings: string[] = [];
   const readSourcePages = async (): Promise<EmitSitePage[]> => {
@@ -199,7 +201,8 @@ export const emitCurrentSite = async (input: {
         ? `${conflict.path} — modified by you, kept (the previous theme's copy was not deleted)`
         : `${conflict.path} — modified by you, not overwritten with the theme's copy`
     ),
-    warnings: [...fallbackWarnings, ...result.warnings]
+    warnings: [...fallbackWarnings, ...result.warnings],
+    pruned: result.pruned
   };
 };
 
@@ -215,6 +218,10 @@ export const emitPersistedSite = async (
   const result = await emitCurrentSite({ workspaceDir, family, store });
   for (const conflict of result.themeConflicts) {
     output.info(`  theme-conflict  ${conflict}`);
+  }
+  // Obsolete routes reconciled away (a removed page or a changed slug): reported, never silent.
+  for (const path of result.pruned) {
+    output.info(`  pruned  ${path} — no page in the current manifest routes here`);
   }
   // Binding failures / ignored stale locale files / untranslated locale routes: the named pages
   // rendered UNVERIFIED or as source fallbacks instead of stale state.
