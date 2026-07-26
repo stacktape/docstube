@@ -201,10 +201,17 @@ export const checkWorkingTreeDirty = async (repoRoot: string, ownOutputPrefixes:
   (await probeWorkingTree(repoRoot, ownOutputPrefixes)) !== 'clean';
 
 // UNVERSIONED SOURCES ARE UNCOMMITTED (wave 2b close — the spine finding): `git status
-// --porcelain` never reports IGNORED files, but the codemap walker scans them anyway (this repo's
-// own gitignored dist-dogfood/**/*.ts reproduces it), so a run could check evidence against bytes
-// that exist in NO commit while the tree reported clean. Trackedness is resolved with ONE
-// `git ls-files` call, set-diffed in memory — never a probe per file.
+// --porcelain` never reports IGNORED files, so a run could check evidence against bytes that exist
+// in NO commit while the tree reported clean. Trackedness is resolved with ONE `git ls-files` call,
+// set-diffed in memory — never a probe per file.
+//
+// STILL LOAD-BEARING AFTER walkRepoFiles STOPPED WALKING GITIGNORED PATHS. The original trigger was
+// the codemap scanning ignored build output (this repo's own dist-dogfood/** and apps/cli/local-ui/**
+// reproduced it); the walker now excludes those, which is why this check is no longer a blanket
+// "every repo with a dist/ is dirty" rule. Two genuine causes remain and MUST keep marking the run:
+// an untracked-but-not-ignored source file the author has not added yet (real source, absent from
+// every commit — porcelain reports it too, so the tree also reads dirty), and an agent observed-read
+// of a gitignored path, which porcelain never reports at all.
 const gitTrackedPaths = async (repoRoot: string): Promise<Set<string> | undefined> => {
   try {
     // -z: NUL-separated and never quoted, so paths with spaces/UTF-8 survive verbatim. Run from
@@ -300,7 +307,8 @@ export const dirtyWorkingTreeWarning = (
         ? `${unversionedCause}, and \`git status\` reported the working tree dirty as well`
         : treeState === 'unknown'
           ? `${unversionedCause}, and ${unknownTree}`
-          : `${unversionedCause}, and \`git status\` never reports ignored files, so the tree looked clean`;
+          : `${unversionedCause}, and \`git status\` never reports ignored files, so the tree looked clean — the ` +
+            'codemap no longer walks gitignored paths, so these were read outside the versioned source tree';
   return {
     source: 'verifier',
     check: 'source-revision',

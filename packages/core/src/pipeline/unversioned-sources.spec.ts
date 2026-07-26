@@ -9,11 +9,15 @@ import { createManifestStore } from '../state/manifest-store.ts';
 import { dirtyWorkingTreeWarning, readSourceFiles, runGenerate, unversionedReadSources } from './generate.ts';
 
 // UNVERSIONED SOURCES ARE UNCOMMITTED (wave 2b close — the spine finding). `git status --porcelain`
-// reports nothing about IGNORED files, while the codemap walker scans them (this repository's own
-// gitignored dist-dogfood/**/*.ts is the live reproduction), so a run could bind evidence to bytes
-// that exist in no commit while the tree reported perfectly clean. The dirtyWorkingTree lineage
-// marker is what gates the complete state everywhere it is rendered (proof-projection.spec.ts and
-// review.spec.tsx prove that half), so a run over unversioned sources must set it.
+// reports nothing about IGNORED files, so a run could bind evidence to bytes that exist in no commit
+// while the tree reported perfectly clean. The dirtyWorkingTree lineage marker is what gates the
+// complete state everywhere it is rendered (proof-projection.spec.ts and review.spec.tsx prove that
+// half), so a run over unversioned sources must set it.
+//
+// The original reproduction was the codemap WALKER scanning gitignored build output. walkRepoFiles
+// now excludes gitignored paths outright (walk.spec.ts), which is what makes the complete badge
+// reachable in a repo that has a dist/ — so the surviving causes are the two proved here: an
+// untracked-but-not-ignored source file, and an agent observed-read of an ignored path.
 
 const execFileAsync = promisify(execFile);
 
@@ -93,14 +97,35 @@ describe('unversioned read sources', () => {
     expect((await shardLineage())?.dirtyWorkingTree).toBeUndefined();
   }, 60_000);
 
-  it('marks a run that READ an IGNORED source file dirty, though `git status` reports clean', async () => {
+  it('leaves gitignored build output alone: the walker never reads it, so the run stays complete-eligible', async () => {
+    // THE BADGE-KILLER (the codemap-walk finding). Every real repo has gitignored build output; the
+    // walker used to scan it, which made every read set unversioned and therefore every run dirty.
     await mkdir(join(repoRoot, 'dist-dogfood'), { recursive: true });
     await writeFile(join(repoRoot, 'dist-dogfood', 'lib.ts'), 'export const shipped = (): number => 41;\n');
-    // The tree still reports clean: porcelain omits ignored files entirely.
     const { stdout } = await git('status', '--porcelain');
     expect(stdout.trim()).toBe('');
 
     const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+    expect(summary.outcome).toBe('passed');
+    expect((await shardLineage())?.dirtyWorkingTree).toBeUndefined();
+    const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', summary.runId, 'journal.jsonl'), 'utf8');
+    expect(journalRaw).not.toContain('dist-dogfood/lib.ts');
+    expect(journalRaw).not.toContain('git does not version');
+  }, 60_000);
+
+  it('marks a run whose agent OBSERVED-READ an ignored file dirty, though `git status` reports clean', async () => {
+    // The rule survives the walker fix for the cause the walker cannot cover: the agent's own reads.
+    // Porcelain still says nothing about an ignored path, so this is the case that may say "clean".
+    await mkdir(join(repoRoot, 'dist-dogfood'), { recursive: true });
+    await writeFile(join(repoRoot, 'dist-dogfood', 'lib.ts'), 'export const shipped = (): number => 41;\n');
+    const { stdout } = await git('status', '--porcelain');
+    expect(stdout.trim()).toBe('');
+
+    const readingTask = async (spec: AgentTaskSpec): Promise<Transcript> => ({
+      ...(await runTask(spec)),
+      observedReads: [{ file: 'dist-dogfood/lib.ts', contentHash: '4'.repeat(64) }]
+    });
+    const summary = await runGenerate({ repoRoot, runTask: readingTask, toolDescriptors: [] });
     expect((await shardLineage())?.dirtyWorkingTree).toBe(true);
 
     const journalRaw = await readFile(join(repoRoot, '.docstube', 'runs', summary.runId, 'journal.jsonl'), 'utf8');
@@ -153,6 +178,11 @@ describe('unversioned read sources', () => {
     expect(sampled.message).toContain('dist-dogfood/lib.ts');
     // An ignored file IS invisible to porcelain, so this is the case that may say "looked clean".
     expect(sampled.message).toContain('so the tree looked clean');
+    // …and now that walkRepoFiles excludes gitignored paths, a clean tree with unversioned reads can
+    // only mean the read happened outside the versioned source tree. The sentence says so, instead
+    // of leaving an operator to suspect the codemap scanned build output again.
+    expect(sampled.message).toContain('codemap no longer walks gitignored paths');
+    expect(sampled.message).toContain('read outside the versioned source tree');
   });
 
   it('resolves trackedness over the BOUNDED read set and excludes docstube’s own outputs', async () => {
