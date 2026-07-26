@@ -5,43 +5,50 @@ tree:
     slug: getting-started
     brief: >-
       Install docstube (npm package or standalone binary via installs.docstube.dev), run the setup
-      wizard, and generate the first docs site. Show the three-command happy path and what the
-      user sees after the first run (docs-site/, .docstube/manifest/). Audience: first contact.
+      wizard, and generate the first docs site. Show the happy path and what the user sees after
+      the first run (docs-site/, .docstube/manifest/). Audience: first contact.
     depth: standard
   - title: How verification works
     slug: how-verification-works
     brief: >-
-      The core promise: every entity carries a guarantee level (proven / scored / out-of-domain).
-      Explain the pipeline stages (codemap, write, per-persona review, deterministic verifiers,
-      claim grounding, gate with bounded retries), what each built-in verifier checks, and why
-      flagged-but-visible beats silently wrong. Ground everything in the verifier ids that exist.
+      The core promise, grounded in the code that implements it. The writer emits a page together
+      with a claim ledger: every factual assertion is wrapped in an inline Claim marker and listed
+      with its class and proposed evidence. The kernel anchors those markers to blocks, mints claim
+      ids, and verification assigns each claim a correctness state (checked / unchecked /
+      contradicted) with the evidence kind that decided it. Explain what makes a claim checkable —
+      the canonical assertion forms, the requirement that the claim's subject and value appear in
+      the visible prose — and what each built-in verifier checks. Explain the coverage linter: prose
+      that asserts a fact without a claim is reported as an unmarked assertion and prevents the
+      complete badge. State plainly what the badge means and does not mean. Ground everything in
+      the verifier ids and code that exist.
     depth: deep
   - title: Configuration
     slug: configuration
     brief: >-
       The config family: docstube.yml (intent only), ia.yml (information architecture with page
-      briefs), glossary.yaml. Cover the agents block (transports and models, budgets incl.
-      maxRunUsd cap-freeze), locales and versions, components, plugins list. Note that programmatic
-      edits preserve comments.
+      briefs), glossary.yaml. Cover the agents block (transports and models, budgets incl. the run
+      cap), locales, components, plugins list. Note that programmatic edits preserve comments.
     depth: deep
   - title: CLI reference
     slug: cli-reference
     brief: >-
-      Every command with its purpose and key flags: wizard, generate, refresh, refine (budget
-      flags), audit, answer, check (kinds derive from registered verifier plugins), status, doctor,
-      plugin scaffold, validate, upgrade. One short usage example each.
+      Every command with its purpose and key flags: wizard, generate (the single idempotent command
+      that both creates and updates docs), refine, audit, answer, status, preview, doctor, version.
+      One short usage example each. Derive the list and flags from the registered commands, not from
+      memory.
     depth: deep
   - title: Writing plugins
     slug: writing-plugins
     brief: >-
-      The @docstube/plugin-sdk surface: definePlugin, the seven hook kinds with a worked verifier
-      example, permissions (network / exec / writableRoots), loading from npm packages or local
-      paths, and the plugin-authoring skill that scaffolds all of it.
+      The @docstube/plugin-sdk surface: definePlugin, the hook kinds with a worked verifier example,
+      permissions (network / exec / writableRoots), loading from npm packages or local paths, and
+      the plugin-authoring skill that scaffolds all of it.
     depth: standard
   - title: CI and the GitHub Action
     slug: github-action
     brief: >-
-      Running docstube in CI: the committed manifest as the lockfile of the docs, refresh on code
-      change, auto-merging PRs gated on the hardcoded flag rules, flag PR comments, and the
-      tribal-knowledge digest issue.
+      Running docstube in CI: the committed manifest as the lockfile of the docs, running generate
+      on code change, the PR the Action opens and the verified delta it reports, how auto-merge is
+      gated, flag PR comments, and the tribal-knowledge digest issue. Describe the behavior the
+      Action code actually implements today.
     depth: standard
