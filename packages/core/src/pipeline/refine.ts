@@ -15,6 +15,7 @@ import {
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
+  prunedShardsFinding,
   readSourceFiles,
   resolveSourceRevision,
   unversionedReadSources
@@ -276,7 +277,14 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
     }
 
     // The index survives (same pages, same ids); only its input hashes may drift.
-    await store.writeIndex({ ...index, configHash: hashValue(family.raw.config), iaHash: hashValue(family.raw.ia) });
+    const { pruned } = await store.writeIndex({
+      ...index,
+      configHash: hashValue(family.raw.config),
+      iaHash: hashValue(family.raw.ia)
+    });
+    if (pruned.length > 0) {
+      await journal.append({ type: 'findings', findings: [prunedShardsFinding(pruned)] });
+    }
 
     // Dirty-tree honesty, end-of-run recheck (impl-09 finding 3): refine writes evidence-bearing
     // shards exactly like generate/maintain, so a tree that mutated mid-run marks every shard this

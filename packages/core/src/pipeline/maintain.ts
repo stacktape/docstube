@@ -32,6 +32,7 @@ import {
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
   docstubeOwnOutputPrefixes,
+  prunedShardsFinding,
   readSourceFiles,
   resolveSourceRevision,
   unversionedReadSources
@@ -213,7 +214,9 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 
     const store = createManifestStore(repoRoot, version);
-    const previousIndex = await store.readIndex();
+    // Like generate, maintain REPAIRS a manifest whose shards went missing (a page with no shard
+    // counts as affected and is regenerated), so it reads without the strict shard requirement.
+    const previousIndex = await store.readIndex({ requireShards: false });
     if (previousIndex === undefined) {
       throw new CoreError('state-corrupt', 'no committed manifest found — run `docstube generate` first', {
         repoRoot,
@@ -324,7 +327,12 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
           carriedShardFlagged = carriedShardFlagged || shardHasOpenFlags(shard);
           artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
         }
-        indexEntries.push(entry);
+        // "Keep shipping the existing page" only means something while the page still EXISTS: an
+        // entry whose shard is gone would record an index that outruns its shards, which every
+        // reader now rejects. The structural flag above still names it.
+        if (shard !== undefined) {
+          indexEntries.push(entry);
+        }
         continue;
       }
 
@@ -347,7 +355,11 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
         if (shard !== undefined && mdx !== undefined) {
           artifacts.push({ page: shard.page, mdx, mdxPath: entry.path, locale, version });
         }
-        indexEntries.push(entry);
+        // A frozen page keeps its shipped state — but only if that state is on disk. A page whose
+        // shard is missing was never shipped, so the freeze carries nothing for it.
+        if (shard !== undefined) {
+          indexEntries.push(entry);
+        }
         continue;
       }
 
@@ -487,11 +499,10 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       ...(coverageStats === undefined ? {} : { coverage: coverageStats }),
       systemFlags: [...carriedSystemFlags, ...newSystemFlags]
     };
-    await store.writeIndex(index);
-    await store.pruneOrphanShards({
-      keepPageIds: index.pages.map((entry) => entry.id),
-      locales: [locale, ...config.locales.targets]
-    });
+    const { pruned } = await store.writeIndex(index);
+    if (pruned.length > 0) {
+      await journal.append({ type: 'findings', findings: [prunedShardsFinding(pruned)] });
+    }
 
     // Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim; own outputs excluded).
     await dirtyTreeEndOfRunSweep({

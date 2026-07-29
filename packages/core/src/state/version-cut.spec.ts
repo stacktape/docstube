@@ -88,8 +88,8 @@ describe('cutVersionSnapshot', () => {
     await store.writeIndex(indexFor([kept, removed]));
     await cutVersionSnapshot({ repoRoot, label: '1.x', currentVersion: 'latest' });
 
-    // A page vanishes from the current docs, then the label is re-cut (fixing old defects).
-    await store.pruneOrphanShards({ keepPageIds: [kept.page.id], locales: ['en'] });
+    // A page vanishes from the current docs (recording the smaller index prunes its shard), then
+    // the label is re-cut (fixing old defects).
     await store.writeIndex(indexFor([kept]));
     const result = await cutVersionSnapshot({ repoRoot, label: '1.x', currentVersion: 'latest' });
 

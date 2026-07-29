@@ -321,6 +321,19 @@ export const dirtyWorkingTreeWarning = (
   };
 };
 
+// Writing the index reconciles the committed shard tree against it (manifest-store). What that
+// reconciliation DELETED is committed state leaving the repo, so it is journaled by name — a silent
+// prune is how an operator ends up staring at a diff nothing in the run explains.
+export const prunedShardsFinding = (pruned: readonly string[]): Finding => ({
+  source: 'verifier',
+  check: 'manifest-integrity',
+  severity: 'info',
+  message:
+    `reconciled the committed manifest: ${pruned.length} shard file${pruned.length === 1 ? '' : 's'} under ` +
+    `.docstube/manifest/ ${pruned.length === 1 ? 'was' : 'were'} not referenced by the index this run recorded and ` +
+    `${pruned.length === 1 ? 'was' : 'were'} removed (${pruned.join(', ')})`
+});
+
 // Same honesty rule at the END sweep: an unreadable `git status` is not an observed dirty tree.
 const dirtyAtRunEndWarning = (commit: string, treeState: WorkingTreeState = 'dirty'): Finding => ({
   source: 'verifier',
@@ -563,7 +576,10 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 
     const store = createManifestStore(repoRoot, version);
-    const previousIndex = await store.readIndex();
+    // generate IS the remedy for an index that outruns its shards, so it must be able to READ one:
+    // it rewrites the index and reconciles the shard tree at the end of the run. Every consumer
+    // that would publish or reason from the manifest keeps the strict read.
+    const previousIndex = await store.readIndex({ requireShards: false });
     const slugToPageId = new Map((previousIndex?.pages ?? []).map((entry) => [entry.slug, entry.id]));
 
     // Tribal-knowledge lifecycle: persist any human-answered flags into the knowledge store, then
@@ -711,7 +727,18 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     // survive, or the freeze would silently delete finished docs (live-hit: the first cap-freeze
     // pruned three committed shards). Only pages this run actually regenerated replace their entry.
     const reachedSlugs = new Set(artifacts.map((artifact) => artifact.page.slug));
-    const carriedEntries = frozen ? (previousIndex?.pages ?? []).filter((entry) => !reachedSlugs.has(entry.slug)) : [];
+    const carriedCandidates = frozen
+      ? (previousIndex?.pages ?? []).filter((entry) => !reachedSlugs.has(entry.slug))
+      : [];
+    // …but only entries whose shard actually survives: carrying an entry with no shard would
+    // record an index that outruns the shards on disk, which every reader is now entitled to
+    // reject. A dropped entry is regenerated from its IA node on the next unfrozen run.
+    const carriedEntries: typeof carriedCandidates = [];
+    for (const entry of carriedCandidates) {
+      if ((await store.readPageShard({ locale, pageId: entry.id })) !== undefined) {
+        carriedEntries.push(entry);
+      }
+    }
     const index: ManifestIndex = {
       schemaVersion: 1,
       docstubeVersion,
@@ -734,11 +761,10 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       iaHash: hashValue(family.raw.ia),
       systemFlags: []
     };
-    await store.writeIndex(index);
-    await store.pruneOrphanShards({
-      keepPageIds: index.pages.map((entry) => entry.id),
-      locales: [locale, ...config.locales.targets]
-    });
+    const { pruned } = await store.writeIndex(index);
+    if (pruned.length > 0) {
+      await journal.append({ type: 'findings', findings: [prunedShardsFinding(pruned)] });
+    }
 
     // Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim): a clean-at-start tree
     // that mutated mid-run still gets the marker + journal warning.
