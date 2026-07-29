@@ -79,16 +79,31 @@ export {
   assessClaimCheckability,
   canonicalizeAssertionText,
   existenceAssertionForms,
+  isScalarLiteralSpelling,
+  parseSchemaDefaultAssertionText,
+  parseSchemaPresenceAssertionText,
   parseValueAssertionText,
-  renderValuePathSubject
+  renderValuePathSubject,
+  schemaPresenceVerbs
 } from './checkability-grammar.ts';
 export type {
   CheckabilityAssessment,
   CheckabilityInput,
   CheckabilityStyle,
   ExistenceAssertionForm,
-  ParsedValueAssertion
+  ParsedSchemaDefaultAssertion,
+  ParsedSchemaPresenceAssertion,
+  ParsedValueAssertion,
+  SchemaPresenceVerb
 } from './checkability-grammar.ts';
+
+export {
+  declaredSchemaShapeSchema,
+  resolveSchemaField,
+  schemaShapeFieldSchema,
+  serializeSchemaShape
+} from './schema-shape-schema.ts';
+export type { DeclaredSchemaShape, SchemaShapeField } from './schema-shape-schema.ts';
 
 export {
   sourceRefSchema,

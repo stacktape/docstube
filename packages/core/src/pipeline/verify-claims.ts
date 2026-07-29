@@ -4,6 +4,7 @@ import type {
   ClaimEvidence,
   ClaimLedger,
   Codemap,
+  DeclaredSchemaShape,
   EvidenceRecord,
   Finding,
   FingerprintSnapshot,
@@ -14,6 +15,7 @@ import {
   assessClaimCheckability,
   bindCitedValue,
   bindClaimSubject,
+  canonicalizeAssertionText,
   claimEvidenceSchema,
   claimLedgerSchema,
   evidenceRecordSchema,
@@ -21,6 +23,10 @@ import {
   idPrefixes,
   mintId,
   normalizeCitedValue,
+  parseSchemaDefaultAssertionText,
+  parseSchemaPresenceAssertionText,
+  resolveSchemaField,
+  serializeSchemaShape,
   sha256Hex,
   symbolSourceKeySchema
 } from '@docstube/contracts';
@@ -65,6 +71,14 @@ export const CLAIM_VERIFICATION_CHECK = 'claim-verification';
 // can extract cited values at verify time expose extractCitedValues (lang-typescript does).
 type CitedValueExtractor = (input: { file: string; content: string; symbol?: string }) => Record<string, string>;
 
+// The same additive, duck-typed pattern for declared schema shapes (impl-16 gap 3): packs that can
+// read a validation schema statically expose extractSchemaShapes (lang-typescript does).
+type SchemaShapeExtractor = (input: {
+  file: string;
+  content: string;
+  symbol?: string;
+}) => Record<string, DeclaredSchemaShape>;
+
 export type VerifyClaimsInput = {
   ledger: ClaimLedger;
   anchored: AnchoredClaim[];
@@ -106,6 +120,30 @@ const citedValueExtractorFor = (packs: LanguagePackDefinition[], file: string): 
   return undefined;
 };
 
+type SchemaDecision =
+  | { outcome: 'unchecked'; warning: string }
+  | { outcome: 'checked'; record: EvidenceRecord }
+  | { outcome: 'contradicted'; record: EvidenceRecord; finding: Finding };
+
+const unresolvedSchema = (markerId: string, reason: string): SchemaDecision => ({
+  outcome: 'unchecked',
+  warning:
+    `claim "${markerId}": the schema-shape verifier could not decide this claim — ${reason}. No schema evidence ` +
+    'minted; the claim stays unchecked (no-checker-available)'
+});
+
+const schemaShapeExtractorFor = (packs: LanguagePackDefinition[], file: string): SchemaShapeExtractor | undefined => {
+  for (const pack of packs) {
+    if (pack.fileExtensions.some((extension) => file.endsWith(extension))) {
+      const capability = (pack as { extractSchemaShapes?: unknown }).extractSchemaShapes;
+      if (typeof capability === 'function') {
+        return capability as SchemaShapeExtractor;
+      }
+    }
+  }
+  return undefined;
+};
+
 export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClaimsResult> => {
   const now = new Date().toISOString();
   const commit = gitCommitSchema.parse(input.commit);
@@ -116,6 +154,9 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
   const anchorEvidenceById = new Map(input.anchorEvidence.map((record) => [record.evidenceId, record]));
   const snapshotValuePrints = new Map(
     input.fingerprints.symbols.map((symbol) => [symbol.symbolHash as string, symbol.valuePrints])
+  );
+  const snapshotShapePrints = new Map(
+    input.fingerprints.symbols.map((symbol) => [symbol.symbolHash as string, symbol.schemaShapePrint])
   );
 
   // Grounding failures are hard defects for EVERY class (trust-model-v2 decision 3): a claim that
@@ -147,6 +188,171 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
     return fileContentCache.get(file);
   };
 
+  // THE SCHEMA-SHAPE VERIFIER (impl-16 gap 3). Config and API reference pages assert mostly SHAPE
+  // facts — which fields a declared schema has, which are required, what the optional ones default
+  // to — and every one of them shipped unchecked because nothing extracted shape. The decision
+  // mirrors the value-predicate verifier exactly: compare the claim's canonical assertion against
+  // the STATICALLY extracted shape; agreement → checked, disagreement → CONTRADICTED, anything
+  // unresolvable → unchecked, never guessed.
+  //
+  // ABSENCE IS UNRESOLVABLE, NOT A CONTRADICTION (deliberate, 0.1.0). A field the extractor did
+  // not find might genuinely not exist — or might arrive through composition the parser refuses to
+  // read (`.extend`, `.merge`, a spread, a cross-module reference). Static extraction cannot tell
+  // those apart, and reporting "the docs are lying" on the strength of an incomplete read is
+  // exactly the failure this trust spine exists to prevent. So a field that does not resolve leaves
+  // the claim unchecked with a journaled note; only a field that RESOLVES and disagrees contradicts.
+  const decideSchemaClaim = async (
+    entry: AnchoredClaim,
+    resolved: SymbolRecord[],
+    style: 'schema-presence' | 'schema-default'
+  ): Promise<SchemaDecision | undefined> => {
+    const claim = entry.claim;
+    const parsed =
+      style === 'schema-presence'
+        ? parseSchemaPresenceAssertionText(claim.predicate)
+        : parseSchemaDefaultAssertionText(claim.predicate);
+    if (parsed === undefined) {
+      // Not a schema assertion at all — the caller falls through to its own path.
+      return undefined;
+    }
+    const symbol = resolved.find((record) => record.name === parsed.subject);
+    if (symbol === undefined) {
+      return unresolvedSchema(
+        entry.markerId,
+        `no grounding symbol named "${parsed.subject}" resolved for this claim (the subject must resolve to ` +
+          'exactly one codemap symbol)'
+      );
+    }
+    const subjectBinding = bindClaimSubject({
+      subjectName: symbol.name,
+      markerText: entry.visibleText,
+      predicate: claim.predicate
+    });
+    if (!subjectBinding.ok || subjectBinding.negated) {
+      return unresolvedSchema(
+        entry.markerId,
+        `the visible prose ("${entry.visibleText}") and the predicate do not BOTH positively name "${symbol.name}"`
+      );
+    }
+    const checkability = assessClaimCheckability({
+      style,
+      subjectName: symbol.name,
+      markerPureText: entry.pureText,
+      markerText: entry.visibleText,
+      predicate: claim.predicate
+    });
+    if (!checkability.checkable) {
+      return unresolvedSchema(entry.markerId, `OUTSIDE THE CANONICAL CHECKABLE GRAMMAR — ${checkability.reason}`);
+    }
+    const content = await readRepoFile(symbol.file);
+    const extractor = schemaShapeExtractorFor(input.packs, symbol.file);
+    if (content === undefined || extractor === undefined) {
+      return unresolvedSchema(entry.markerId, `${symbol.file} could not be read by a schema-shape-capable pack`);
+    }
+    const shape = extractor({ file: symbol.file, content, symbol: symbol.name })[symbol.name];
+    if (shape === undefined) {
+      return unresolvedSchema(
+        entry.markerId,
+        `"${symbol.name}" is not a statically readable schema declaration (an unrecognized factory, a computed ` +
+          'field list, or a shape-altering combinator)'
+      );
+    }
+    // SNAPSHOT AGREEMENT, exactly as the value path enforces it: evidence is never minted from
+    // bytes the run's fingerprint snapshot never saw.
+    const snapshotPrint = snapshotShapePrints.get(symbol.hash);
+    if (snapshotPrint === undefined || sha256Hex(serializeSchemaShape(shape)) !== snapshotPrint) {
+      return unresolvedSchema(
+        entry.markerId,
+        `the declared shape of "${symbol.name}" in ${symbol.file} no longer matches the fingerprint snapshot this ` +
+          'run was planned against (the working tree moved mid-run); rerun generate against a settled tree'
+      );
+    }
+    const resolvedField = resolveSchemaField(shape, parsed.field);
+    if (resolvedField === undefined) {
+      return unresolvedSchema(
+        entry.markerId,
+        `"${parsed.field}" does not resolve to exactly one field of "${symbol.name}" — an absent or ambiguously ` +
+          'nested field name is never decided, because static extraction cannot prove a field set is exhaustive'
+      );
+    }
+    const check = canonicalizeAssertionText(claim.predicate);
+    const presence = 'verb' in parsed ? parsed : undefined;
+    const schemaDefault = 'valueSpelling' in parsed ? parsed : undefined;
+    let asserted: string | undefined;
+    if (schemaDefault !== undefined) {
+      if (resolvedField.field.defaultValue === undefined) {
+        return unresolvedSchema(
+          entry.markerId,
+          `"${symbol.name}.${resolvedField.path}" carries ${
+            resolvedField.field.defaultUnknown ? 'a default the parser cannot read as a literal' : 'no default at all'
+          } — a default is decided by comparing literals, never inferred`
+        );
+      }
+      asserted = normalizeCitedValue(schemaDefault.valueSpelling).canonical;
+      // Defense in depth behind the exact-canonical-match grammar: the asserted scalar must be
+      // provably present, un-negated, in BOTH the visible prose and the predicate.
+      if (!bindCitedValue(asserted, { markerText: entry.visibleText, predicate: claim.predicate }).ok) {
+        return unresolvedSchema(
+          entry.markerId,
+          `the asserted default ${asserted} does not bind to both the visible prose and the predicate`
+        );
+      }
+    }
+    const passes =
+      presence === undefined
+        ? asserted === resolvedField.field.defaultValue
+        : presence.verb !== 'requires' || !resolvedField.field.optional;
+    const detail =
+      presence === undefined
+        ? passes
+          ? `docs assert ${asserted} as the default of ${symbol.name}.${resolvedField.path}; the declaration agrees`
+          : `docs assert ${asserted} as the default of ${symbol.name}.${resolvedField.path}, the declaration says ${resolvedField.field.defaultValue}`
+        : passes
+          ? `the declaration of ${symbol.name} carries the field "${resolvedField.path}"${
+              presence.verb === 'requires' ? ' and a caller must supply it' : ''
+            }`
+          : `the declaration of ${symbol.name} carries "${resolvedField.path}", but a caller may omit it (it is optional or defaulted) — the docs assert it is required`;
+    const record = evidenceRecordSchema.parse({
+      evidenceId: mintId(idPrefixes.evidence),
+      ref: {
+        kind: 'schema-check',
+        check,
+        symbol: symbolSourceKeySchema.parse(symbol.hash),
+        field: resolvedField.path,
+        ...(asserted === undefined ? {} : { assertedValue: asserted, extractedValue: resolvedField.field.defaultValue })
+      },
+      checkedAt: now,
+      sourceRevision: commit,
+      outcome: passes ? 'pass' : 'fail',
+      detail
+    });
+    if (passes) {
+      return { outcome: 'checked', record };
+    }
+    return {
+      outcome: 'contradicted',
+      record,
+      finding: {
+        source: 'verifier',
+        check: CLAIM_VERIFICATION_CHECK,
+        severity: 'error',
+        message:
+          `claim "${entry.markerId}" is CONTRADICTED by the declared schema — predicate: "${claim.predicate}"; ` +
+          `${detail} (${symbol.file}). Correct the documented shape to match the declaration`,
+        file: symbol.file,
+        data: {
+          markerId: entry.markerId,
+          kind: 'contradiction',
+          symbol: symbol.hash,
+          field: resolvedField.path,
+          ...(asserted === undefined
+            ? {}
+            : { assertedValue: asserted, extractedValue: resolvedField.field.defaultValue })
+        }
+      }
+    };
+  };
+
   const verifiedAnchored: AnchoredClaim[] = [];
   for (const entry of input.anchored) {
     const claim = entry.claim;
@@ -170,6 +376,24 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
       const resolved = candidateSymbols
         .map((hash) => symbolByHash.get(hash))
         .filter((record): record is SymbolRecord => record !== undefined);
+      // SCHEMA SHAPE FIRST (impl-16 gap 3): a claim about a DECLARED SCHEMA's fields is a
+      // code-structure claim that codemap presence cannot decide — presence proves the schema
+      // symbol exists, never that it has the field the sentence names. When the predicate is a
+      // canonical schema-presence assertion the schema-shape verifier owns the decision, and the
+      // existence path below goes inert (a predicate can never be both: an existence assertion
+      // ends in one of the four existence forms, a presence assertion in a field path).
+      const schemaDecision = await decideSchemaClaim(entry, resolved, 'schema-presence');
+      if (schemaDecision !== undefined && schemaDecision.outcome === 'unchecked') {
+        warnings.push(schemaDecision.warning);
+      } else if (schemaDecision !== undefined) {
+        minted.push(schemaDecision.record);
+        correctness = schemaDecision.outcome;
+        disposition = null;
+        decidingEvidenceId = schemaDecision.record.evidenceId;
+        if (schemaDecision.outcome === 'contradicted') {
+          findings.push(schemaDecision.finding);
+        }
+      }
       // SUBJECT BINDING re-check (impl-09 finding 1 + impl-10 finding 1 + the polarity finding,
       // defense in depth behind anchoring): grounding may only mint from a symbol BOTH the visible
       // prose AND the predicate actually NAME, with AGREEING POLARITY — otherwise
@@ -210,9 +434,12 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
               })
             : undefined
       }));
-      const groundedEntry = assessed.find(({ checkability }) => checkability?.checkable === true);
+      const groundedEntry =
+        schemaDecision === undefined
+          ? assessed.find(({ checkability }) => checkability?.checkable === true)
+          : undefined;
       const grounded = groundedEntry?.record;
-      if (grounded === undefined && resolved.length > 0) {
+      if (schemaDecision === undefined && grounded === undefined && resolved.length > 0) {
         const negated = bindings.find(({ binding }) => binding.ok && binding.negated);
         const mismatch = bindings.find(({ binding }) => !binding.ok && binding.code === 'polarity-mismatch');
         const outsideGrammar = assessed.find(
@@ -531,6 +758,27 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
         correctness = 'checked';
         disposition = null;
         decidingEvidenceId = firstPass.evidenceId;
+      } else if (!bindingViolated) {
+        // SCHEMA DEFAULTS (impl-16 gap 3): "`agentsConfigSchema` defaults `transport` to
+        // claude-cli" states a value the cited-value ladder cannot see — a Zod field default lives
+        // inside a schema call, not in a plain object literal. It is decided against the declared
+        // shape instead, and only when the cited-value path decided nothing.
+        const symbolCandidates = claim.subscriptions
+          .flatMap((subscription) => (subscription.kind === 'file-content' ? [] : [subscription.symbolHash as string]))
+          .map((hash) => symbolByHash.get(hash))
+          .filter((record): record is SymbolRecord => record !== undefined);
+        const schemaDecision = await decideSchemaClaim(entry, symbolCandidates, 'schema-default');
+        if (schemaDecision !== undefined && schemaDecision.outcome === 'unchecked') {
+          warnings.push(schemaDecision.warning);
+        } else if (schemaDecision !== undefined) {
+          minted.push(schemaDecision.record);
+          correctness = schemaDecision.outcome;
+          disposition = null;
+          decidingEvidenceId = schemaDecision.record.evidenceId;
+          if (schemaDecision.outcome === 'contradicted') {
+            findings.push(schemaDecision.finding);
+          }
+        }
       }
     }
     // behavior: deliberately NO checker in 0.1.0 — the claim stays unchecked with disposition

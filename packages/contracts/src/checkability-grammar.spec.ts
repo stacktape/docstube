@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   assessClaimCheckability,
   canonicalizeAssertionText,
+  parseSchemaDefaultAssertionText,
+  parseSchemaPresenceAssertionText,
   parseValueAssertionText,
-  renderValuePathSubject
+  renderValuePathSubject,
+  schemaPresenceVerbs
 } from './checkability-grammar.ts';
 
 // EXACT CANONICAL VISIBLE MATCH (wave 2b close FINAL, impl-13/impl-14): existence/value evidence
@@ -392,5 +395,112 @@ describe('parseValueAssertionText', () => {
     expect(parseValueAssertionText('action.yml uses node24')).toBeUndefined();
     expect(parseValueAssertionText('the DEFAULT_RETRIES option is 3')).toBeUndefined();
     expect(parseValueAssertionText('greet exists')).toBeUndefined();
+  });
+});
+
+describe('quoted-key path segments (impl-16 gap 2)', () => {
+  it('parses hyphenated object keys and enum members, which the extractor already emits', () => {
+    expect(parseValueAssertionText('defaultModels.claude-cli is sonnet')).toEqual({
+      subject: 'defaultModels.claude-cli',
+      verb: 'is',
+      valueSpelling: 'sonnet'
+    });
+    expect(parseValueAssertionText('models.openai-compatible defaults to gpt')).toMatchObject({
+      subject: 'models.openai-compatible'
+    });
+    // The rendered path is the ONE accepted spelling, and it round-trips through the parser.
+    expect(parseValueAssertionText(`${renderValuePathSubject('models.claude-cli')} is sonnet`)).toMatchObject({
+      subject: 'models.claude-cli'
+    });
+  });
+
+  it('still fails closed on everything a hyphen is not: leading, trailing, doubled, or spaced', () => {
+    expect(parseValueAssertionText('foo.-bad is 1')).toBeUndefined();
+    expect(parseValueAssertionText('foo.bad- is 1')).toBeUndefined();
+    expect(parseValueAssertionText('foo.a--b is 1')).toBeUndefined();
+    expect(parseValueAssertionText('foo.a b is 1')).toBeUndefined();
+  });
+});
+
+const presence = (markerText: string, predicate: string, subjectName = 'docstubeConfigSchema') =>
+  assessClaimCheckability({ style: 'schema-presence', subjectName, markerPureText: true, markerText, predicate });
+
+const schemaDefault = (markerText: string, predicate: string, subjectName = 'agentsConfigSchema') =>
+  assessClaimCheckability({ style: 'schema-default', subjectName, markerPureText: true, markerText, predicate });
+
+describe('schema assertions (impl-16 gap 3)', () => {
+  it('parses each canonical presence verb, with dotted and hyphenated field paths', () => {
+    for (const verb of schemaPresenceVerbs) {
+      expect(parseSchemaPresenceAssertionText(`s ${verb} f`)).toEqual({ subject: 's', verb, field: 'f' });
+    }
+    expect(parseSchemaPresenceAssertionText('agentsConfigSchema defines budgets.maxRunUsd')).toMatchObject({
+      field: 'budgets.maxRunUsd'
+    });
+    expect(parseSchemaPresenceAssertionText('transportIdSchema defines claude-cli')).toMatchObject({
+      field: 'claude-cli'
+    });
+  });
+
+  it('refuses verbs outside the closed set and fields that are not field paths', () => {
+    expect(parseSchemaPresenceAssertionText('s exposes f')).toBeUndefined();
+    expect(parseSchemaPresenceAssertionText('s has f')).toBeUndefined();
+    // Prose fields ("an action argument", "--port") are how CLI/flag claims read — never schemas.
+    expect(parseSchemaPresenceAssertionText('plugin requires an action argument')).toBeUndefined();
+    expect(parseSchemaPresenceAssertionText('wizard accepts --port')).toBeUndefined();
+    // A dotted SUBJECT is not a schema symbol name.
+    expect(parseSchemaPresenceAssertionText('VerifierDefinition.scope accepts block')).toBeUndefined();
+  });
+
+  it('parses both documented default spellings and nothing else', () => {
+    expect(parseSchemaDefaultAssertionText('agentsConfigSchema defaults transport to claude-cli')).toEqual({
+      subject: 'agentsConfigSchema',
+      field: 'transport',
+      valueSpelling: 'claude-cli'
+    });
+    expect(parseSchemaDefaultAssertionText('docstubeConfigSchema.outDir defaults to docs-site')).toEqual({
+      subject: 'docstubeConfigSchema',
+      field: 'outDir',
+      valueSpelling: 'docs-site'
+    });
+    expect(parseSchemaDefaultAssertionText('docstubeConfigSchema defaults to docs-site')).toBeUndefined();
+  });
+
+  it('decides only when the visible prose IS the canonical assertion about the bound subject', () => {
+    expect(presence('docstubeConfigSchema requires docType.', 'docstubeConfigSchema requires docType')).toEqual({
+      checkable: true,
+      presence: { subject: 'docstubeConfigSchema', verb: 'requires', field: 'docType' }
+    });
+    // Extra visible words fail the exact match, as they do for every other style.
+    expect(presence('The config, since v1, requires docType.', 'docstubeConfigSchema requires docType')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-visible'
+    });
+    // A predicate about a DIFFERENT schema never rides the bound subject.
+    expect(presence('iaSchema requires tree', 'iaSchema requires tree')).toMatchObject({
+      checkable: false,
+      gate: 'canonical-predicate'
+    });
+    // Impure markers are refused before any grammar runs.
+    expect(
+      assessClaimCheckability({
+        style: 'schema-presence',
+        subjectName: 'docstubeConfigSchema',
+        markerPureText: false,
+        markerText: 'docstubeConfigSchema requires docType',
+        predicate: 'docstubeConfigSchema requires docType'
+      })
+    ).toMatchObject({ checkable: false, gate: 'marker-impure' });
+  });
+
+  it('refuses descriptive defaults: a default is decided by comparing literals', () => {
+    expect(
+      schemaDefault('agentsConfigSchema defaults maxRunUsd to 20.', 'agentsConfigSchema defaults maxRunUsd to 20')
+    ).toMatchObject({ checkable: true, schemaDefault: { field: 'maxRunUsd', valueSpelling: '20' } });
+    expect(
+      schemaDefault(
+        'agentsConfigSchema defaults roles to an empty object.',
+        'agentsConfigSchema defaults roles to an empty object'
+      )
+    ).toMatchObject({ checkable: false, gate: 'canonical-predicate' });
   });
 });

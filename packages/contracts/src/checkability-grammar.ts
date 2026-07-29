@@ -21,6 +21,17 @@
 //               (longest-first alternation so 'is' never swallows 'is set to'; <value> must
 //               normalize — via the shared cited-value normalization — to EXACTLY the claim's
 //               bound citedValue: same kind, same canonical bytes.)
+//   schema
+//   presence:   <bound-schema-subject> (requires | accepts | defines | records | stores) <field>
+//               (impl-16 gap 3 — the shape of a declared validation schema. 'requires' additionally
+//               asserts the field is NOT input-optional; the other four assert presence only. The
+//               verb set is exactly the one the live corpus uses; a synonym outside it fails the
+//               exact match and the claim stays unchecked.)
+//   schema
+//   default:    <bound-schema-subject> defaults <field> to <value>
+//               <bound-schema-subject>.<field> defaults to <value>
+//               (the same fact in the two spellings documentation actually uses. <value> must
+//               normalize to the field's statically extracted literal default.)
 //
 // VALUE-PATH SUBJECT (wave 2b close final, impl-14): the value assertion's subject must be the
 // FULL bound cited-value path in its ONE documented rendering — renderValuePathSubject below:
@@ -97,6 +108,17 @@ export const renderValuePathSubject = (valueName: string): string => {
   return valueName;
 };
 
+// QUOTED-KEY SEGMENTS (impl-16 gap 2). Cited-value extraction already emits paths for quoted
+// object keys and enum members, and those keys routinely contain hyphens ('claude-cli',
+// 'openai-compatible', 'anthropic-api'). A hyphen is NOT an identifier character, so the plain
+// identifier segment truncated such a path and the OPEN parsers below simply refused the whole
+// assertion — the fact was extractable and citable, but unspellable. A segment is therefore an
+// identifier optionally continued by hyphen-joined identifier chunks: hyphens may never lead,
+// trail, or double, and NOTHING else widens — whitespace, quotes, slashes, and every other
+// character still fail closed, so arbitrary text can never pass as a path.
+const PATH_SEGMENT = '[A-Za-z_$][A-Za-z0-9_$]*(?:-[A-Za-z0-9_$]+)*';
+const PATH = `${PATH_SEGMENT}(?:\\.${PATH_SEGMENT})*`;
+
 // Longest alternative first: JS alternation is ordered, and a bare 'is' matching ahead of
 // 'is set to' would leave 'set to …' glued onto the value.
 const VALUE_VERBS = ['is set to', 'defaults to', 'equals', 'is'] as const;
@@ -120,8 +142,9 @@ const parseValueAssertion = (subjectPaths: string[], text: string): ParsedValueA
 };
 
 // Identifier path / call-shaped subject, in the SAME two spellings renderValuePathSubject emits:
-// 'DEFAULT_RETRIES', 'retryDefaults.backoff.factor', 'createClient(retries)'.
-const OPEN_SUBJECT = '[A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*(?:\\([A-Za-z_$][A-Za-z0-9_$]*\\))?';
+// 'DEFAULT_RETRIES', 'retryDefaults.backoff.factor', 'defaultModels.claude-cli',
+// 'createClient(retries)'.
+const OPEN_SUBJECT = `${PATH}(?:\\(${PATH_SEGMENT}\\))?`;
 
 // THE OPEN VALUE-ASSERTION PARSER (kernel cited-value resolution): parses a canonical value
 // assertion WITHOUT knowing the subject in advance, so the kernel can read the value PATH the
@@ -140,7 +163,66 @@ export const parseValueAssertionText = (text: string): ParsedValueAssertion | un
   return { subject: match[1]!, verb: match[2]!, valueSpelling: match[3]! };
 };
 
-export type CheckabilityStyle = 'existence' | 'value';
+// THE SCHEMA-PRESENCE VERB SET (impl-16 gap 3). Chosen from the live corpus, not invented: these
+// are the five verbs documentation actually uses to state that a declared schema has a field.
+// 'requires' additionally asserts the field is NOT input-optional; the other four assert presence
+// only, so they hold for optional and defaulted fields alike. The set is CLOSED — a synonym
+// ('exposes', 'has', 'declares') fails the exact match and the claim stays honestly unchecked.
+export const schemaPresenceVerbs = ['requires', 'accepts', 'defines', 'records', 'stores'] as const;
+export type SchemaPresenceVerb = (typeof schemaPresenceVerbs)[number];
+
+export type ParsedSchemaPresenceAssertion = { subject: string; verb: SchemaPresenceVerb; field: string };
+export type ParsedSchemaDefaultAssertion = { subject: string; field: string; valueSpelling: string };
+
+// The schema SUBJECT is always a single segment: it names a declared schema symbol, and codemap
+// display names are bare identifiers. Keeping the subject single-segment is what makes the dotted
+// 'default' spelling ('<schema>.<field> defaults to <value>') unambiguously splittable.
+const SCHEMA_PRESENCE_PATTERN = new RegExp(`^(${PATH_SEGMENT}) (${schemaPresenceVerbs.join('|')}) (${PATH})$`, 'u');
+const SCHEMA_DEFAULT_SPLIT_PATTERN = new RegExp(`^(${PATH_SEGMENT}) defaults (${PATH}) to (.+)$`, 'u');
+const SCHEMA_DEFAULT_PATH_PATTERN = new RegExp(`^(${PATH_SEGMENT})\\.(${PATH}) defaults to (.+)$`, 'u');
+
+// OPEN schema-presence parser (kernel subject resolution): reads the schema symbol and the field a
+// claim asserts WITHOUT knowing either in advance, so the kernel can resolve the subject in the
+// codemap itself. It only NOMINATES — every binding, snapshot, and grammar check still runs after.
+export const parseSchemaPresenceAssertionText = (text: string): ParsedSchemaPresenceAssertion | undefined => {
+  const match = canonicalizeAssertionText(text).match(SCHEMA_PRESENCE_PATTERN);
+  if (match === null) {
+    return undefined;
+  }
+  return { subject: match[1]!, verb: match[2]! as SchemaPresenceVerb, field: match[3]! };
+};
+
+// OPEN schema-default parser, accepting BOTH documented spellings of the same fact:
+//   'agentsConfigSchema defaults transport to claude-cli'
+//   'docstubeConfigSchema.outDir defaults to docs-site'
+// The split spelling is tried first: a dotted subject in the split form ('a.b defaults c to d') is
+// still a split assertion, and the path form requires the literal ' defaults to '.
+export const parseSchemaDefaultAssertionText = (text: string): ParsedSchemaDefaultAssertion | undefined => {
+  const canonical = canonicalizeAssertionText(text);
+  const split = canonical.match(SCHEMA_DEFAULT_SPLIT_PATTERN);
+  if (split !== null) {
+    return { subject: split[1]!, field: split[2]!, valueSpelling: split[3]! };
+  }
+  const path = canonical.match(SCHEMA_DEFAULT_PATH_PATTERN);
+  if (path === null) {
+    return undefined;
+  }
+  return { subject: path[1]!, field: path[2]!, valueSpelling: path[3]! };
+};
+
+// A spelling that is UNAMBIGUOUSLY A SCALAR LITERAL: a quoted string, or a single whitespace-free
+// token. Descriptive predicates ("an empty array", "the user's login") are refused, so a
+// kernel-derived comparison can never manufacture a contradiction out of prose that was never a
+// literal value assertion. Shared by kernel cited-value resolution and the schema-default verifier.
+export const isScalarLiteralSpelling = (spelling: string): boolean => {
+  const quoteChars = ['"', "'", '`'];
+  const isQuoted = quoteChars.some(
+    (quote) => spelling.length >= 2 && spelling.startsWith(quote) && spelling.endsWith(quote)
+  );
+  return isQuoted || !/\s/u.test(spelling);
+};
+
+export type CheckabilityStyle = 'existence' | 'value' | 'schema-presence' | 'schema-default';
 
 export type CheckabilityInput = {
   // Which evidence style would decide the claim: codemap grounding (existence) or the
@@ -168,7 +250,14 @@ export type CheckabilityAssessment =
   // `form` reports WHICH canonical existence assertion matched (undefined for value claims):
   // claim verification needs it because 'is exported' additionally requires the symbol record to
   // affirmatively indicate exportedness before grounding may decide the claim.
-  | { checkable: true; form?: ExistenceAssertionForm }
+  // `presence`/`schemaDefault` carry the parsed schema assertion so the verifier reads the field
+  // and verb from the SAME parse the grammar vouched for, never from a second, looser one.
+  | {
+      checkable: true;
+      form?: ExistenceAssertionForm;
+      presence?: ParsedSchemaPresenceAssertion;
+      schemaDefault?: ParsedSchemaDefaultAssertion;
+    }
   | { checkable: false; gate: 'marker-impure' | 'canonical-predicate' | 'canonical-visible'; reason: string };
 
 const notCheckable = (
@@ -215,6 +304,50 @@ export const assessClaimCheckability = (input: CheckabilityInput): CheckabilityA
       );
     }
     return { checkable: true, form: matchedForm };
+  }
+
+  // SCHEMA ASSERTIONS (impl-16 gap 3) use the same exact-canonical-visible-match discipline as
+  // existence: the predicate must BE one canonical schema assertion about the kernel-bound schema
+  // subject, and the visible marked prose must be exactly that same assertion. What the assertion
+  // says about the field is decided afterwards, against the statically extracted shape.
+  if (input.style === 'schema-presence' || input.style === 'schema-default') {
+    const parsed =
+      input.style === 'schema-presence'
+        ? parseSchemaPresenceAssertionText(predicate)
+        : parseSchemaDefaultAssertionText(predicate);
+    if (parsed === undefined || parsed.subject !== subject) {
+      return notCheckable(
+        'canonical-predicate',
+        `the predicate "${input.predicate}" is not a canonical schema ` +
+          `${input.style === 'schema-presence' ? 'presence' : 'default'} assertion about "${subject}" — canonical ` +
+          `forms: ${
+            input.style === 'schema-presence'
+              ? schemaPresenceVerbs.map((verb) => `"${subject} ${verb} <field>"`).join(', ')
+              : `"${subject} defaults <field> to <value>", "${subject}.<field> defaults to <value>"`
+          }`
+      );
+    }
+    if (
+      input.style === 'schema-default' &&
+      'valueSpelling' in parsed &&
+      !isScalarLiteralSpelling(parsed.valueSpelling)
+    ) {
+      return notCheckable(
+        'canonical-predicate',
+        `the predicate "${input.predicate}" states a DESCRIPTIVE default ("${parsed.valueSpelling}"), not a scalar ` +
+          'literal — a schema default is decided by comparing literals, so descriptive phrasing stays unchecked'
+      );
+    }
+    if (visible !== predicate) {
+      return notCheckable(
+        'canonical-visible',
+        `the visible marked prose "${input.markerText}" is not exactly the canonical assertion "${predicate}" — ` +
+          'the marker must wrap ONLY the canonical assertion; every other word goes outside the marker'
+      );
+    }
+    return input.style === 'schema-presence'
+      ? { checkable: true, presence: parsed as ParsedSchemaPresenceAssertion }
+      : { checkable: true, schemaDefault: parsed as ParsedSchemaDefaultAssertion };
   }
 
   if (input.citedValue === undefined) {

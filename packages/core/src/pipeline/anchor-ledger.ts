@@ -20,6 +20,7 @@ import {
   assessClaimCheckability,
   bindCitedValue,
   bindClaimSubject,
+  canonicalizeAssertionText,
   claimLedgerSchema,
   contentHashSchema,
   entityRevisionSchema,
@@ -27,8 +28,11 @@ import {
   existenceAssertionForms,
   gitCommitSchema,
   idPrefixes,
+  isScalarLiteralSpelling,
   mintId,
   normalizeCitedValue,
+  parseSchemaDefaultAssertionText,
+  parseSchemaPresenceAssertionText,
   parseValueAssertionText,
   renderValuePathSubject,
   symbolSourceKeySchema
@@ -283,17 +287,9 @@ const buildValuePathIndex = (fingerprints: FingerprintSnapshot): ValuePathIndex 
 // spelling that is unambiguously a SCALAR LITERAL: a quoted string, or a single whitespace-free
 // token. Descriptive predicates ("an empty array", "derived from builtinComponents") and the
 // existence forms are refused, and the claim keeps its conservative whole-file dependency.
-const assertedScalarIsLiteral = (assertion: ParsedValueAssertion): boolean => {
-  if (existenceAssertionForms.some((form) => `${assertion.verb} ${assertion.valueSpelling}` === form)) {
-    return false;
-  }
-  const spelling = assertion.valueSpelling;
-  const quoteChars = ['"', "'", '`'];
-  const isQuoted = quoteChars.some(
-    (quote) => spelling.length >= 2 && spelling.startsWith(quote) && spelling.endsWith(quote)
-  );
-  return isQuoted || !/\s/u.test(spelling);
-};
+const assertedScalarIsLiteral = (assertion: ParsedValueAssertion): boolean =>
+  !existenceAssertionForms.some((form) => `${assertion.verb} ${assertion.valueSpelling}` === form) &&
+  isScalarLiteralSpelling(assertion.valueSpelling);
 
 // KERNEL CITED-VALUE RESOLUTION (impl-15 finding 2). Proposing a `cited-value` subscription
 // requires a SYMBOL HASH the writer usually does not have — a repo of 1200+ symbols only ever
@@ -351,6 +347,86 @@ const resolveCitedValueFromClaimText = (
     return undefined;
   }
   return { kind: 'cited-value', symbolHash: symbolSourceKeySchema.parse(symbolHash), valueName, citedValue };
+};
+
+// KERNEL SUBJECT RESOLUTION (impl-16 gaps 1 and 3). Sibling of the cited-value resolution above,
+// and the same finding one level up: a canonically phrased claim ("`loadConfigFamily` exists.",
+// "`docstubeConfigSchema` requires `schemaVersion`.") carries everything the kernel needs to check
+// it, yet shipped unchecked because the WRITER never proposed a symbol hash — a repo of 1200+
+// symbols only ever shows it a slice, so the claim fell back to a whole-file subscription and no
+// grounding symbol ever reached verification.
+//
+// The kernel resolves the subject ITSELF: it reads the subject out of the claim's own canonical
+// assertion, looks that display name up in the codemap, and — when it resolves to EXACTLY ONE
+// symbol — subscribes the claim to that symbol's facet so verification can decide it through the
+// unchanged evidence paths. The facet follows the assertion:
+//   existence         → 'signature' (the symbol's presence and public shape);
+//   schema presence   → 'body'      (the schema's field set lives in its initializer, not its
+//   schema default    → 'body'       declaration head, so the signature print would not move).
+//
+// AMBIGUITY IS NOT GUESSED: two symbols sharing a display name leave the claim unchecked. Every
+// existing guard still gates the result — the symbol must subject-bind positively on BOTH sides,
+// the fingerprint snapshot must carry the facet, and the checkability grammar still decides at
+// verification — so this can only ever ADD a resolvable dependency, never a verdict.
+const SINGLE_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/u;
+
+type SubjectNomination = { subject: string; facet: 'signature' | 'body' };
+
+const nominateClaimSubject = (draft: DraftClaim): SubjectNomination | undefined => {
+  if (draft.class === 'code-structure') {
+    const canonical = canonicalizeAssertionText(draft.predicate);
+    const form = existenceAssertionForms.find((assertion) => canonical.endsWith(` ${assertion}`));
+    if (form !== undefined) {
+      const subject = canonical.slice(0, -(form.length + 1));
+      // Codemap display names are bare identifiers; a dotted subject ("PluginFs.readFile") names
+      // something the codemap does not carry, so there is nothing to resolve.
+      return SINGLE_IDENTIFIER.test(subject) ? { subject, facet: 'signature' } : undefined;
+    }
+    const presence = parseSchemaPresenceAssertionText(draft.predicate);
+    return presence === undefined ? undefined : { subject: presence.subject, facet: 'body' };
+  }
+  if (draft.class === 'value') {
+    const schemaDefault = parseSchemaDefaultAssertionText(draft.predicate);
+    return schemaDefault === undefined ? undefined : { subject: schemaDefault.subject, facet: 'body' };
+  }
+  return undefined;
+};
+
+const resolveSubjectFromClaimText = (
+  draft: DraftClaim,
+  visibleText: string,
+  ctx: ResolutionContext
+): { subscription: DependencySubscription; subject: string } | undefined => {
+  const nomination = nominateClaimSubject(draft);
+  if (nomination === undefined) {
+    return undefined;
+  }
+  const distinct = [
+    ...new Map(
+      ctx.codemap.symbols.filter((symbol) => symbol.name === nomination.subject).map((symbol) => [symbol.hash, symbol])
+    ).values()
+  ];
+  const record = distinct.length === 1 ? distinct[0] : undefined;
+  if (record === undefined) {
+    return undefined;
+  }
+  const binding = bindClaimSubject({
+    subjectName: record.name,
+    markerText: visibleText,
+    predicate: draft.predicate
+  });
+  if (!binding.ok || binding.negated) {
+    return undefined;
+  }
+  const fingerprint = ctx.fingerprints.symbols.find((symbol) => (symbol.symbolHash as string) === record.hash);
+  const print = nomination.facet === 'signature' ? fingerprint?.signaturePrint : fingerprint?.bodyPrint;
+  if (print === undefined) {
+    return undefined;
+  }
+  return {
+    subscription: { kind: nomination.facet, symbolHash: symbolSourceKeySchema.parse(record.hash) },
+    subject: record.name
+  };
 };
 
 // Conservative dependency fallback (kernel-derived, never invented from model output): when a
@@ -797,6 +873,20 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
           `claim "${draft.markerId}": the kernel resolved the cited value "${derived.valueName}" from the claim's ` +
             `own assertion and subscribed it to the fingerprint snapshot — the value-predicate verifier decides ` +
             'this claim instead of the conservative whole-file dependency'
+        );
+      }
+    }
+    // Kernel subject resolution — fires only when NOTHING symbol-bearing resolved (no symbol
+    // evidence, no symbol subscription), so a writer that did propose a hash always wins, and
+    // BEFORE the whole-file fallback below.
+    if (claimEvidence.length === 0 && !subscriptions.some((subscription) => subscription.kind !== 'file-content')) {
+      const subject = resolveSubjectFromClaimText(draft, marker.visibleText, ctx);
+      if (subject !== undefined) {
+        subscriptions = [...subscriptions, subject.subscription];
+        warnings.push(
+          `claim "${draft.markerId}": the kernel resolved the subject "${subject.subject}" from the claim's own ` +
+            `canonical assertion and subscribed it to the ${subject.subscription.kind} facet — verification can ` +
+            'decide this claim instead of leaning on the conservative whole-file dependency'
         );
       }
     }

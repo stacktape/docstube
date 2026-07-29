@@ -1,10 +1,11 @@
 import { normalizeDeclaration } from '@docstube/codemap';
 import type { PackFingerprints } from '@docstube/codemap';
-import { sha256Hex, symbolFingerprintSchema } from '@docstube/contracts';
-import type { SymbolFingerprint } from '@docstube/contracts';
+import { serializeSchemaShape, sha256Hex, symbolFingerprintSchema } from '@docstube/contracts';
+import type { DeclaredSchemaShape, SymbolFingerprint } from '@docstube/contracts';
 import type { LanguagePackContext } from '@docstube/plugin-sdk';
 import ts from 'typescript';
 import { collectCitedValues, unwrapExpression } from './cited-values.ts';
+import { collectSchemaShapes } from './schema-shape.ts';
 import type { ExportedDeclaration } from './ts-ast.ts';
 import {
   collectExportedDeclarations,
@@ -261,6 +262,7 @@ const fingerprintOf = (input: {
   file: string;
   hashSymbol: LanguagePackContext['hashSymbol'];
   citedValues: Map<string, Record<string, string>>;
+  schemaShapes: Map<string, DeclaredSchemaShape>;
   signatureOnly: boolean;
 }): SymbolFingerprint => {
   const { declaration, sourceFile, file } = input;
@@ -286,6 +288,13 @@ const fingerprintOf = (input: {
     const bodyText = bodyTextOf(declaration, sourceFile);
     if (bodyText !== undefined) {
       candidate.bodyPrint = print(normalizeDeclaration(bodyText));
+    }
+    // The declared-schema facet: present only for readable validation-schema declarations. The
+    // verifier hashes its own re-extraction against this print, so schema evidence is never minted
+    // from bytes the run's snapshot never saw.
+    const shape = input.schemaShapes.get(symbolPathOf(declaration, file));
+    if (shape !== undefined) {
+      candidate.schemaShapePrint = print(serializeSchemaShape(shape));
     }
   }
   return symbolFingerprintSchema.parse(candidate);
@@ -315,9 +324,18 @@ export const extractFingerprints = async (ctx: LanguagePackContext): Promise<Pac
     const citedValues = signatureOnly
       ? new Map<string, Record<string, string>>()
       : collectCitedValues(sourceFile, file);
+    const schemaShapes = signatureOnly ? new Map<string, DeclaredSchemaShape>() : collectSchemaShapes(sourceFile, file);
     for (const declaration of declarations) {
       symbols.push(
-        fingerprintOf({ declaration, sourceFile, file, hashSymbol: ctx.hashSymbol, citedValues, signatureOnly })
+        fingerprintOf({
+          declaration,
+          sourceFile,
+          file,
+          hashSymbol: ctx.hashSymbol,
+          citedValues,
+          schemaShapes,
+          signatureOnly
+        })
       );
     }
     parsedFiles.push(file);

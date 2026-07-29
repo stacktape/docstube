@@ -99,7 +99,19 @@ export const evidenceRefSchema = z.discriminatedUnion('kind', [
     check: z.string().min(1),
     environment: executionEnvironmentSchema
   }),
-  z.object({ kind: z.literal('schema-check'), check: z.string().min(1) }),
+  // Schema-shape evidence (impl-16 gap 3): a claim about a DECLARED validation schema decided
+  // against the statically extracted shape. `check` names the assertion that ran; the optional
+  // payload records which symbol/field it resolved to and, for default assertions, both sides of
+  // the comparison — the same shape the value-predicate ref carries, so reader surfaces can render
+  // a contradiction without re-deriving anything.
+  z.object({
+    kind: z.literal('schema-check'),
+    check: z.string().min(1),
+    symbol: symbolSourceKeySchema.optional(),
+    field: z.string().min(1).optional(),
+    assertedValue: z.string().optional(),
+    extractedValue: z.string().optional()
+  }),
   z.object({ kind: z.literal('owner-attestation'), author: z.string().min(1), at: isoTimestampSchema }),
   // A cited external fact (platform limit, upstream default…). factId links back to the knowledge
   // fact the citation came from, so the kernel can revalidate its origin (dx-knowledge-v2).

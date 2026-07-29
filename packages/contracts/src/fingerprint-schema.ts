@@ -17,7 +17,12 @@ export const symbolFingerprintSchema = z.object({
   signaturePrint: fingerprintPrintSchema.optional(),
   // Named cited values (e.g. a default, a constant) → hash of the normalized value text.
   valuePrints: z.record(z.string().min(1), fingerprintPrintSchema).default({}),
-  bodyPrint: fingerprintPrintSchema.optional()
+  bodyPrint: fingerprintPrintSchema.optional(),
+  // Hash of the symbol's DECLARED SCHEMA SHAPE, when the pack could read one statically
+  // (schema-shape-schema.ts). Present only for validation-schema declarations; it is what the
+  // schema-shape verifier checks re-extraction against, so evidence is never minted from bytes
+  // this run's snapshot never saw.
+  schemaShapePrint: fingerprintPrintSchema.optional()
 });
 export type SymbolFingerprint = z.infer<typeof symbolFingerprintSchema>;
 
