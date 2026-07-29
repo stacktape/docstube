@@ -59,7 +59,11 @@ export const buildCodemap = async (options: BuildCodemapOptions): Promise<Codema
       logger
     };
     const records = await pack.extractSymbols(context);
-    logger.info(`pack "${pack.id}": ${records.length} symbols from ${files.length} files`);
+    // Both denominators are reported so the line cannot be misread as coverage loss: most walked
+    // files export nothing documentable, so "N symbols from M/T files" is the healthy shape.
+    logger.info(
+      `pack "${pack.id}": ${records.length} symbols from ${new Set(records.map((record) => record.file)).size}/${files.length} files`
+    );
     return records.map((record) => {
       const candidate = options.project === undefined ? record : { ...record, project: options.project };
       const parsed = symbolRecordSchema.safeParse(candidate);

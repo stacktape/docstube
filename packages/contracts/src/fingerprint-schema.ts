@@ -38,6 +38,13 @@ export const fingerprintSnapshotSchema = z.object({
   schemaVersion: z.literal(1),
   commit: gitCommitSchema,
   symbols: z.array(symbolFingerprintSchema).default([]),
-  unparsedFiles: z.array(fileFingerprintSchema).default([])
+  unparsedFiles: z.array(fileFingerprintSchema).default([]),
+  // Whole-file hashes for the files a pack DID fingerprint. NOT part of the typed diff ladder —
+  // those files invalidate through their symbol prints, and diff-fingerprints ignores this list
+  // entirely. It exists so the kernel can derive an AUTHORITATIVE content hash for any walked repo
+  // file: a claim falling back to a conservative whole-file dependency on a normal source file
+  // ("the fact came from packages/skills/src/skills.ts") must not be rejected as an unknown file
+  // merely because that file parsed cleanly and the page happened not to read it.
+  parsedFiles: z.array(fileFingerprintSchema).default([])
 });
 export type FingerprintSnapshot = z.infer<typeof fingerprintSnapshotSchema>;

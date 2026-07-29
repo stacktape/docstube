@@ -58,6 +58,24 @@ describe('buildFingerprintSnapshot', () => {
     expect(snapshot.unparsedFiles[0]?.contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  // EVERY walked file gets an authoritative whole-file hash, parsed or not. Only `unparsedFiles`
+  // participates in the typed diff ladder; `parsedFiles` exists so the kernel can always answer
+  // "what is the content hash of this repo file?" — the question a claim's conservative
+  // whole-file dependency asks, and which used to be unanswerable for any file a pack parsed.
+  it('hashes PARSED files too, in a list the diff ladder does not consume', async () => {
+    const snapshot = await buildFingerprintSnapshot({
+      repoRoot,
+      commit: 'abc1234',
+      packs: [fingerprintPack],
+      logger: silentLogger
+    });
+    expect(snapshot.parsedFiles.map((record) => record.file)).toEqual(['src/alpha.txt']);
+    expect(snapshot.parsedFiles[0]?.contentHash).toBe(contentHash('alpha declaration body\n'));
+    // Every walked file appears exactly once across the two lists.
+    const files = [...snapshot.parsedFiles, ...snapshot.unparsedFiles].map((record) => record.file);
+    expect(files.toSorted()).toEqual(['src/alpha.txt', 'src/beta.txt']);
+  });
+
   it('is deterministic: two builds are byte-identical', async () => {
     const options = { repoRoot, commit: 'abc1234', packs: [fingerprintPack], logger: silentLogger };
     const first = await buildFingerprintSnapshot(options);

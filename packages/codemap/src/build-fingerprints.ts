@@ -121,18 +121,25 @@ export const buildFingerprintSnapshot = async (
     symbols.push(symbol);
   }
 
-  const fallbackFiles = allFiles.filter((file) => !parsedFiles.has(file));
-  const unparsedFiles = await Promise.all(
-    fallbackFiles.map(async (file) => ({
-      file,
-      contentHash: contentHash(await readFile(join(options.repoRoot, file), 'utf8'))
-    }))
-  );
+  // Every walked file gets a whole-file hash, split by whether a pack covered it with typed
+  // prints. `unparsedFiles` is the fallback LADDER (diff-fingerprints compares it); `parsedFiles`
+  // is not diffed at all — it is there so the kernel can always answer "what is the authoritative
+  // content hash of this repo file?" without re-reading the tree at anchoring time.
+  const hashOf = async (file: string) => ({
+    file,
+    contentHash: contentHash(await readFile(join(options.repoRoot, file), 'utf8'))
+  });
+  const byFile = (a: { file: string }, b: { file: string }): number => compareStrings(a.file, b.file);
+  const [unparsedFiles, parsedFileHashes] = await Promise.all([
+    Promise.all(allFiles.filter((file) => !parsedFiles.has(file)).map(hashOf)),
+    Promise.all(allFiles.filter((file) => parsedFiles.has(file)).map(hashOf))
+  ]);
 
   return fingerprintSnapshotSchema.parse({
     schemaVersion: 1,
     commit: options.commit,
     symbols,
-    unparsedFiles: unparsedFiles.toSorted((a, b) => compareStrings(a.file, b.file))
+    unparsedFiles: unparsedFiles.toSorted(byFile),
+    parsedFiles: parsedFileHashes.toSorted(byFile)
   });
 };
