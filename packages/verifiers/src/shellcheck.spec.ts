@@ -96,6 +96,28 @@ describe('shellcheck', () => {
     expect(result.coveredEntityIds).toEqual([]);
   });
 
+  it('still lints a shell fence that snippet-exec does not execute', async () => {
+    // Shell fences opt in to execution with `exec`; shellcheck never consults that policy, so a
+    // plain reader-instruction fence keeps its syntax check.
+    const code = 'cd docs-site && npm run build';
+    const block = makeBlock({ content: code, blockType: 'code-example', language: 'bash' });
+    const page = makePage({ slug: 'guide', preamble: [block] });
+    const linted: (string | undefined)[] = [];
+    const exec: PluginExec = async (_command, args, options) => {
+      if (args[0] === '--version') {
+        return { exitCode: 0, stdout: 'ShellCheck 0.10.0', stderr: '' };
+      }
+      linted.push(options?.input);
+      return { exitCode: 0, stdout: '[]', stderr: '' };
+    };
+
+    const result = await shellcheckVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('bash', code))]);
+
+    expect(linted).toEqual([code]);
+    expect(result.status).toBe('pass');
+    expect(result.coveredEntityIds).toEqual([block.id]);
+  });
+
   it('passes without probing shellcheck when no bash/sh blocks exist', async () => {
     const page = makePage({ slug: 'guide', preamble: [makeBlock({ content: 'plain text' })] });
     const calls: string[] = [];

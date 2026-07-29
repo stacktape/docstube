@@ -11,15 +11,38 @@ import { matchingCodeBlocks, missingFenceFinding, runVerifier } from './run-supp
 const verifierId = 'snippet-exec';
 
 const matchedLanguages = ['bash', 'sh', 'js', 'javascript', 'ts', 'typescript'];
-const bashLanguages = new Set(['bash', 'sh']);
+const shellLanguages = new Set(['bash', 'sh']);
 const tsLanguages = new Set(['ts', 'typescript']);
 
 const executionTimeoutMs = 15_000;
 const stderrTailLineCount = 10;
 
 // Fences opting out of execution (`no-exec` in the fence meta): illustrative fragments,
-// destructive commands, snippets needing credentials or a running service.
+// destructive commands, snippets needing credentials or a running service. `no-exec` always wins,
+// including over an `exec` opt-in on the same fence.
 const hasNoExecMeta = (fence: MdxCodeBlock): boolean => /(^|\s)no-exec(\s|$)/u.test(fence.meta);
+
+// Fences opting IN to execution (`exec` in the fence meta). Only shell fences need it — the
+// leading `-` in `no-exec` keeps that token from matching here.
+const hasExecMeta = (fence: MdxCodeBlock): boolean => /(^|\s)exec(\s|$)/u.test(fence.meta);
+
+// Execution evidence is only meaningful for a SELF-CONTAINED sample. A js/ts snippet in
+// documentation usually is one, so it executes by default and opts out with `no-exec`. A shell
+// block usually is NOT: it is a command the reader runs in their own environment, depending on
+// prior steps, network, and repo state the verifier does not have (`cd docs-site && npm run
+// build`, `curl … | sh`, `npx docstube wizard` — the last of which would recursively invoke
+// docstube inside its own verifier). Running such a block in a sandbox and calling the result
+// "verified" is plausibility theater. So shell fences are NOT executed unless the author opts in
+// with `exec`, which is a promise that the sample is self-contained — and then a failure is a
+// real finding. Better to execute nothing and claim nothing than to execute something meaningless
+// and claim it passed. Non-executed shell fences still go through the shellcheck verifier, which
+// never consults this policy.
+const shouldExecute = (language: string, fence: MdxCodeBlock): boolean => {
+  if (hasNoExecMeta(fence)) {
+    return false;
+  }
+  return shellLanguages.has(language) ? hasExecMeta(fence) : true;
+};
 
 // Fences opting back into full host-environment inheritance (`allow-env` in the fence meta):
 // samples that legitimately read configuration from the environment.
@@ -75,7 +98,7 @@ const runSnippet = async (
   allowEnv: boolean
 ): Promise<{ exitCode: number; stderr: string }> => {
   const envOption = allowEnv ? {} : { env: minimalSnippetEnv() };
-  if (bashLanguages.has(language)) {
+  if (shellLanguages.has(language)) {
     return ctx.exec('bash', ['-euo', 'pipefail', '-c', code], { cwd, timeoutMs: executionTimeoutMs, ...envOption });
   }
   const source = tsLanguages.has(language)
@@ -109,7 +132,7 @@ export const snippetExecVerifier: VerifierDefinition = {
   id: verifierId,
   title: 'Code samples execute',
   description:
-    'Every runnable code sample must actually execute (doctest-style): bash/sh via `bash -euo pipefail`, js via `node -e`, ts transpiled then run. Compile-level checks prove syntax; execution proves the sample works. Fences marked `no-exec` are skipped.',
+    'Self-contained code samples must actually execute (doctest-style): js/ts run by default via `node -e` (ts transpiled first) and opt out with `no-exec`. Shell fences are reader instructions by default — not executed, nothing claimed — and opt IN with `exec`, which runs them via `bash -euo pipefail` and makes a failure a real finding. Non-executed shell fences are still linted by the shellcheck verifier.',
   scope: 'block',
   appliesTo: { blockTypes: ['code-example'], languages: matchedLanguages },
   localeScope: 'source-only',
@@ -145,11 +168,13 @@ export const snippetExecVerifier: VerifierDefinition = {
             findings.push(missingFenceFinding(verifierId, artifact, block));
             continue;
           }
-          if (hasNoExecMeta(fence)) {
+          const language = (block.language ?? '').toLowerCase();
+          if (!shouldExecute(language, fence)) {
+            // Not executed, so nothing is proven: the block is left out of coveredEntityIds and
+            // no finding is raised. Silence is the honest outcome.
             continue;
           }
-          const language = (block.language ?? '').toLowerCase();
-          if (bashLanguages.has(language) && !(await bashIsAvailable())) {
+          if (shellLanguages.has(language) && !(await bashIsAvailable())) {
             skippedForMissingBash += 1;
             continue;
           }
@@ -163,9 +188,9 @@ export const snippetExecVerifier: VerifierDefinition = {
               // run (block-level evidence). It never covers claims: behavior claims stay
               // unchecked until the v1.x predicate verifiers (trust-model-v2 decision 3).
               coveredEntityIds.push(block.id);
-            } else if (!bashLanguages.has(language) && isModuleNotFound(run.stderr)) {
+            } else if (!shellLanguages.has(language) && isModuleNotFound(run.stderr)) {
               // Unresolvable import in the sandbox: not proven, not failed.
-            } else if (bashLanguages.has(language) && isCommandNotFound(run.exitCode, run.stderr)) {
+            } else if (shellLanguages.has(language) && isCommandNotFound(run.exitCode, run.stderr)) {
               // Binary not installed in the sandbox: not proven, not failed.
             } else {
               const tail = stderrTail(run.stderr);
@@ -198,8 +223,10 @@ export const snippetExecVerifier: VerifierDefinition = {
       return { findings, coveredEntityIds };
     });
 
-    // Every matching block was a bash block and bash is unavailable: the run proved nothing, and
-    // saying 'pass' would be dishonest. 'skipped' keeps the covered set empty and visible.
+    // Every block that asked to run was an `exec` shell block and bash is unavailable: the run
+    // proved nothing, and saying 'pass' would be dishonest. 'skipped' keeps the covered set empty
+    // and visible. Plain (non-executed) shell fences never reach this counter — they are policy,
+    // not a missing interpreter.
     if (result.status === 'pass' && executedCount === 0 && skippedForMissingBash > 0) {
       return { ...result, status: 'skipped' };
     }

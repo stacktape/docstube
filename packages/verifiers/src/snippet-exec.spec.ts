@@ -56,7 +56,9 @@ describe('snippet-exec', () => {
       return { exitCode: 1, stdout: '', stderr: 'about to fail\n' };
     };
 
-    const result = await snippetExecVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('bash', code))]);
+    const result = await snippetExecVerifier.verify(withExec(exec), [
+      makeArtifact(page, mdxWithFence('bash exec', code))
+    ]);
 
     expect(result.status).toBe('fail');
     const finding = result.findings[0];
@@ -67,17 +69,17 @@ describe('snippet-exec', () => {
     expect(result.coveredEntityIds).toEqual([]);
   });
 
-  it('leaves a bash block uncovered (not failed) when the invoked binary is not installed', async () => {
-    // Live regression from the self-dogfood: getting-started runs `docstube generate`, which is
-    // not installed in the sandbox — exit 127 means "unprovable here", never "wrong".
-    const code = 'docstube generate';
+  it('leaves an opted-in shell block uncovered (not failed) when the invoked binary is not installed', async () => {
+    const code = 'jq --version';
     const { block, page } = pageWithBlock(code, 'bash');
     const exec: PluginExec = async (_command, args) =>
       args[0] === '--version'
         ? { exitCode: 0, stdout: 'GNU bash', stderr: '' }
         : { exitCode: 127, stdout: '', stderr: `bash: line 1: ${code.split(' ')[0]}: command not found\n` };
 
-    const result = await snippetExecVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('bash', code))]);
+    const result = await snippetExecVerifier.verify(withExec(exec), [
+      makeArtifact(page, mdxWithFence('bash exec', code))
+    ]);
 
     expect(result.status).toBe('pass');
     expect(result.findings).toEqual([]);
@@ -91,7 +93,9 @@ describe('snippet-exec', () => {
     const exec: PluginExec = async (_command, args) =>
       args[0] === '--version' ? { exitCode: 0, stdout: '', stderr: '' } : { exitCode: 3, stdout: '', stderr };
 
-    const result = await snippetExecVerifier.verify(withExec(exec), [makeArtifact(page, mdxWithFence('sh', code))]);
+    const result = await snippetExecVerifier.verify(withExec(exec), [
+      makeArtifact(page, mdxWithFence('sh exec', code))
+    ]);
 
     const message = result.findings[0]?.message ?? '';
     expect(message).toContain('line-25');
@@ -127,16 +131,18 @@ describe('snippet-exec', () => {
     expect(result).not.toHaveProperty('claimExecutions');
   });
 
-  it('a passing bash block is covered as a block, nothing more', async () => {
+  it('a passing opted-in shell block is covered as a block, nothing more', async () => {
     const code = '[ 1 -eq 1 ]';
     const { block, page } = pageWithBlock(code, 'bash');
 
     const result = await snippetExecVerifier.verify(withExec(bashPassExec), [
-      makeArtifact(page, mdxWithFence('bash', code))
+      makeArtifact(page, mdxWithFence('bash exec', code))
     ]);
 
     expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
     expect(result.coveredEntityIds).toEqual([block.id]);
+    expect(result).not.toHaveProperty('claimExecutions');
   });
 
   it('transpiles and executes a TypeScript snippet', async () => {
@@ -164,9 +170,9 @@ describe('snippet-exec', () => {
     expect(result.findings[0]?.entity?.entityId).toBe(block.id);
   });
 
-  it('skips fences marked no-exec without spawning anything', async () => {
-    const code = 'rm -rf /important';
-    const { page } = pageWithBlock(code, 'bash');
+  it('skips js fences marked no-exec without spawning anything', async () => {
+    const code = "await fetch('https://example.com/live-service');";
+    const { page } = pageWithBlock(code, 'js');
     const calls: string[] = [];
     const exec: PluginExec = async (command) => {
       calls.push(command);
@@ -174,7 +180,7 @@ describe('snippet-exec', () => {
     };
 
     const result = await snippetExecVerifier.verify(withExec(exec), [
-      makeArtifact(page, mdxWithFence('bash title="danger" no-exec', code))
+      makeArtifact(page, mdxWithFence('js title="danger" no-exec', code))
     ]);
 
     expect(result.status).toBe('pass');
@@ -183,12 +189,12 @@ describe('snippet-exec', () => {
     expect(calls).toEqual([]);
   });
 
-  it('reports the whole run as skipped when bash is absent and only bash blocks match', async () => {
+  it('reports the whole run as skipped when bash is absent and only opted-in shell blocks match', async () => {
     const code = 'echo hello';
     const { page } = pageWithBlock(code, 'bash');
 
     const result = await snippetExecVerifier.verify(withExec(missingBashExec), [
-      makeArtifact(page, mdxWithFence('bash', code))
+      makeArtifact(page, mdxWithFence('bash exec', code))
     ]);
 
     expect(result.status).toBe('skipped');
@@ -202,7 +208,7 @@ describe('snippet-exec', () => {
     const bashBlock = makeBlock({ content: bashCode, blockType: 'code-example', language: 'bash' });
     const jsBlock = makeBlock({ content: jsCode, blockType: 'code-example', language: 'js' });
     const page = makePage({ slug: 'guide', preamble: [bashBlock, jsBlock] });
-    const mdx = `${mdxWithFence('bash', bashCode)}\n${mdxWithFence('js', jsCode)}`;
+    const mdx = `${mdxWithFence('bash exec', bashCode)}\n${mdxWithFence('js', jsCode)}`;
     const exec: PluginExec = async (command, args, options) => {
       if (command === 'bash') {
         throw Object.assign(new Error('spawn bash ENOENT'), { code: 'ENOENT' });
@@ -227,6 +233,103 @@ describe('snippet-exec', () => {
 
     expect(result.status).toBe('pass');
     expect(result.findings[0]?.severity).toBe('warning');
+    expect(result.coveredEntityIds).toEqual([]);
+  });
+});
+
+// A recording exec that fails every real invocation: if the policy ever executes one of these
+// fences, the test sees both the spawn and the resulting finding.
+const recordingFailExec =
+  (calls: string[]): PluginExec =>
+  async (command, args) => {
+    if (args[0] === '--version') {
+      return { exitCode: 0, stdout: 'GNU bash', stderr: '' };
+    }
+    calls.push(command);
+    return { exitCode: 1, stdout: '', stderr: 'boom\n' };
+  };
+
+describe('snippet-exec shell opt-in policy', () => {
+  it('does not execute a plain bash fence whose command would fail, and raises no finding', async () => {
+    const code = 'exit 1';
+    const { block, page } = pageWithBlock(code, 'bash');
+    const calls: string[] = [];
+
+    const result = await snippetExecVerifier.verify(withExec(recordingFailExec(calls)), [
+      makeArtifact(page, mdxWithFence('bash', code))
+    ]);
+
+    expect(calls).toEqual([]);
+    expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
+    // Not executed means no execution evidence: the block must never enter the covered set.
+    expect(result.coveredEntityIds).not.toContain(block.id);
+    expect(result.coveredEntityIds).toEqual([]);
+  });
+
+  it('executes the same fence when it opts in with `exec`, and its failure is a finding', async () => {
+    const code = 'exit 1';
+    const { block, page } = pageWithBlock(code, 'bash');
+    const calls: string[] = [];
+
+    const result = await snippetExecVerifier.verify(withExec(recordingFailExec(calls)), [
+      makeArtifact(page, mdxWithFence('bash exec', code))
+    ]);
+
+    expect(calls).toEqual(['bash']);
+    expect(result.status).toBe('fail');
+    expect(result.findings[0]?.severity).toBe('error');
+    expect(result.findings[0]?.message).toContain('exit code 1');
+    expect(result.findings[0]?.entity?.entityId).toBe(block.id);
+    expect(result.coveredEntityIds).toEqual([]);
+  });
+
+  it('lets `no-exec` win over `exec` on the same shell fence', async () => {
+    const code = 'exit 1';
+    const { page } = pageWithBlock(code, 'bash');
+    const calls: string[] = [];
+
+    const result = await snippetExecVerifier.verify(withExec(recordingFailExec(calls)), [
+      makeArtifact(page, mdxWithFence('bash exec no-exec', code))
+    ]);
+
+    expect(calls).toEqual([]);
+    expect(result.status).toBe('pass');
+    expect(result.coveredEntityIds).toEqual([]);
+  });
+
+  it('keeps `no-exec` from being read as an `exec` opt-in', async () => {
+    const code = 'exit 1';
+    const { page } = pageWithBlock(code, 'sh');
+    const calls: string[] = [];
+
+    const result = await snippetExecVerifier.verify(withExec(recordingFailExec(calls)), [
+      makeArtifact(page, mdxWithFence('sh no-exec', code))
+    ]);
+
+    expect(calls).toEqual([]);
+    expect(result.findings).toEqual([]);
+  });
+
+  it('passes the live dogfood reader instructions through clean, executing nothing', async () => {
+    // The exact payloads that burned two writer attempts in a real run: a build that assumes a
+    // prior `cd`, a network installer, and a command that would invoke docstube inside its own
+    // verifier. All three are reader instructions, none is a testable sample.
+    const payloads = [
+      'cd docs-site && npm run build',
+      'curl -fsSL https://installs.docstube.dev/linux.sh | sh',
+      'npx docstube wizard'
+    ];
+    const blocks = payloads.map((code) => makeBlock({ content: code, blockType: 'code-example', language: 'bash' }));
+    const page = makePage({ slug: 'getting-started', preamble: blocks });
+    const mdx = payloads.map((code) => mdxWithFence('bash', code)).join('\n');
+    const calls: string[] = [];
+
+    const result = await snippetExecVerifier.verify(withExec(recordingFailExec(calls)), [makeArtifact(page, mdx)]);
+
+    expect(calls).toEqual([]);
+    expect(result.status).toBe('pass');
+    expect(result.findings).toEqual([]);
     expect(result.coveredEntityIds).toEqual([]);
   });
 });

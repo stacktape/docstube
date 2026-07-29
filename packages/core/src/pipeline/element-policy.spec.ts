@@ -126,4 +126,16 @@ describe('buildWriterSystemPrompt', () => {
   it('tells a component-less project to use plain Markdown, matching the fail-closed policy', () => {
     expect(buildWriterSystemPrompt(promptInput([]))).toContain('no components are enabled for this project');
   });
+
+  it('states the snippet-exec fence policy the verifier enforces: shell fences opt in with `exec`', () => {
+    // PROMPT AND VERIFIER IN LOCKSTEP: snippet-exec executes js/ts by default (`no-exec` opts out)
+    // and never executes a shell fence unless its meta carries `exec`. Two live writer attempts
+    // were burned on reader-instruction shell blocks before the policy flipped.
+    const prompt = buildWriterSystemPrompt(promptInput(['Callout']));
+    expect(prompt).toContain('SHELL BLOCKS (```bash / ```sh) ARE READER INSTRUCTIONS AND ARE NOT EXECUTED');
+    expect(prompt).toContain('Add `exec` to the');
+    expect(prompt).toContain('fully self-contained');
+    expect(prompt).toContain('NEVER mark a command that invokes docstube itself');
+    expect(prompt).toContain('add `no-exec` to the fence meta only when it genuinely cannot run');
+  });
 });
