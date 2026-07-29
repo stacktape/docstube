@@ -158,8 +158,11 @@ describe('anchorWriterLedger', () => {
       draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
     ]);
     const result = expectOk(anchorWriterLedger(input));
+    // The whole-file hash comes from the observed reads; the canonical value claim additionally
+    // picks up the kernel-resolved cited-value subscription (impl-15 finding 2).
     expect(result.ledger.claims[0]?.subscriptions).toEqual([
-      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH },
+      { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'retries', citedValue: '3' }
     ]);
   });
 
@@ -182,10 +185,13 @@ describe('anchorWriterLedger', () => {
 
   it('derives the fallback from a known symbol named by a rejected facet subscription', () => {
     // The cited-value name is bogus but the SYMBOL is real: the grounded subject is the symbol's
-    // codemap file, and the observed-read hash for that exact file is derivable.
+    // codemap file, and the observed-read hash for that exact file is derivable. The predicate is
+    // deliberately outside the canonical value grammar so kernel cited-value resolution cannot
+    // fire — this probe is about the WHOLE-FILE fallback.
     const input = anchorInput([
       draft('c1', {
         class: 'value',
+        predicate: 'retries controls the attempt count',
         proposedSubscriptions: [{ kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'NOPE', citedValue: '3' }]
       } as Partial<DraftClaim>),
       draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
@@ -340,10 +346,30 @@ More text <Claim id="c1">second assertion.</Claim>
     expect(result.errors.some((issue) => issue.code === 'marker-duplicate' && issue.markerId === 'c1')).toBe(true);
   });
 
-  it("REJECTS Sol's subject probe 1: '`inventedFunction` exists' riding an unrelated real symbol", () => {
+  // AN UNBINDABLE SUBJECT DEGRADES TO UNCHECKED (impl-15 finding 1): the binding rule is
+  // unchanged — an unbound subject still mints NO evidence — but the consequence moved. The page
+  // PASSES, the claim ships unchecked, and the drop is recorded and journaled. Failing the page
+  // burned a full writer retry over documentation that correctly spells a public name
+  // ("docstube generate") whose implementing symbol is called something else.
+  const expectDegradedToUnchecked = (
+    result: AnchorLedgerResult,
+    markerId: string
+  ): Extract<AnchorLedgerResult, { ok: true }> => {
+    const ok = expectOk(result);
+    const claim = ok.ledger.claims.find((entry) => entry.anchor.markerId === markerId);
+    expect(claim).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    // The kernel refused to VOUCH: no source-linked evidence was minted for the unbound subject.
+    expect(claim?.evidence).toEqual([]);
+    expect(ok.evidence).toEqual([]);
+    expect(ok.rejectedProposals.some((rejected) => rejected.code === 'subject-unbound')).toBe(true);
+    expect(ok.warnings.some((warning) => warning.includes('SUBJECT-UNBOUND') && warning.includes(markerId))).toBe(true);
+    return ok;
+  };
+
+  it("Sol's subject probe 1: '`inventedFunction` exists' riding an unrelated real symbol ships UNCHECKED, page PASSES", () => {
     // The symbol resolves (it is real) but the visible prose and predicate name a DIFFERENT
-    // identifier — accepting it would let verification mint codemap-grounding evidence for a
-    // hallucinated subject. Repair-eligible: fix the prose or drop the wrong symbol.
+    // identifier — verification must never mint codemap-grounding evidence for it. The kernel
+    // drops the evidence proposal instead of failing the page.
     const probeMdx = `# Title\n\nText <Claim id="p1">\`inventedFunction\` exists.</Claim>\n`;
     const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
     const result = anchorWriterLedger({
@@ -363,16 +389,16 @@ More text <Claim id="c1">second assertion.</Claim>
       observedReads,
       commit: COMMIT
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
-    }
-    expect(result.errors[0]).toMatchObject({ code: 'subject-unbound', kernel: false, markerId: 'p1' });
-    expect(result.errors[0]?.message).toContain('"retries"');
-    expect(result.errors[0]?.message).toContain('inventedFunction');
+    const ok = expectDegradedToUnchecked(result, 'p1');
+    const warning = ok.warnings.find((entry) => entry.includes('SUBJECT-UNBOUND'))!;
+    expect(warning).toContain('"retries"');
+    expect(warning).toContain('inventedFunction');
+    expect(warning).toContain('never triggers a retry');
+    // The dependency still resolved — a degraded claim is never a dependency-less claim.
+    expect(ok.ledger.claims[0]?.subscriptions).toEqual([{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]);
   });
 
-  it("REJECTS Sol's impl-10 probe: predicate-only occurrence — visible prose asserts a subject the evidence never proves", () => {
+  it("Sol's impl-10 probe: a predicate-only occurrence still mints NO evidence — it degrades, it does not fail", () => {
     // The predicate quietly names the REAL symbol ('retries'), but the VISIBLE prose asserts
     // 'inventedFunction exists'. Readers never see the predicate, so a predicate-only occurrence
     // is laundering: the root identifier must occur in the visible marker text AND the predicate.
@@ -395,18 +421,16 @@ More text <Claim id="c1">second assertion.</Claim>
       observedReads,
       commit: COMMIT
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
-    }
-    expect(result.errors[0]).toMatchObject({ code: 'subject-unbound', kernel: false, markerId: 'p1' });
-    expect(result.errors[0]?.message).toContain('visible prose');
-    expect(result.errors[0]?.message).toContain('inventedFunction');
+    const ok = expectDegradedToUnchecked(result, 'p1');
+    const warning = ok.warnings.find((entry) => entry.includes('SUBJECT-UNBOUND'))!;
+    expect(warning).toContain('visible prose');
+    expect(warning).toContain('inventedFunction');
   });
 
-  it("REJECTS Sol's subject probe 2: '`INVENTED_DEFAULT` is 3' against an unrelated equal-valued name", () => {
+  it("Sol's subject probe 2: '`INVENTED_DEFAULT` is 3' against an unrelated equal-valued name ships UNCHECKED", () => {
     // The cited value resolves and equals 3 — scalar binding alone would pass. The subject rule
-    // rejects it: neither the record name nor any valueName segment is spelled by the sentence.
+    // still refuses to vouch: neither the record name nor any valueName segment is spelled by the
+    // sentence, so no evidence is minted and the claim ships unchecked.
     const probeMdx = `# Title\n\nText <Claim id="p2">\`INVENTED_DEFAULT\` is 3.</Claim>\n`;
     const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
     const result = anchorWriterLedger({
@@ -428,18 +452,14 @@ More text <Claim id="c1">second assertion.</Claim>
       observedReads,
       commit: COMMIT
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
-    }
-    expect(result.errors.every((issue) => issue.code === 'subject-unbound')).toBe(true);
-    expect(result.errors.some((issue) => issue.message.includes('"DEFAULT_RETRIES"'))).toBe(true);
+    const ok = expectDegradedToUnchecked(result, 'p2');
+    expect(ok.warnings.some((warning) => warning.includes('"DEFAULT_RETRIES"'))).toBe(true);
   });
 
-  it("REJECTS Sol's impl-10 common-leaf probe: a valueName segment named on both sides never substitutes for the root", () => {
+  it("Sol's impl-10 common-leaf probe: a valueName segment named on both sides never substitutes for the root", () => {
     // Both sides spell the value-path leaf 'DEFAULT_RETRIES', but the subject's root identifier
     // (the codemap record name 'retries') appears nowhere — a common leaf must not launder the
-    // claim onto an unrelated symbol.
+    // claim onto an unrelated symbol. Still no evidence; still not a page failure.
     const probeMdx = `# Title\n\nText <Claim id="p3">\`DEFAULT_RETRIES\` is 3.</Claim>\n`;
     const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
     const result = anchorWriterLedger({
@@ -461,13 +481,178 @@ More text <Claim id="c1">second assertion.</Claim>
       observedReads,
       commit: COMMIT
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
+    const ok = expectDegradedToUnchecked(result, 'p3');
+    const warning = ok.warnings.find((entry) => entry.includes('SUBJECT-UNBOUND'))!;
+    expect(warning).toContain('"retries"');
+    expect(warning).toContain('never substitutes for the root');
+  });
+
+  it('a page mixing an unbindable claim with a bindable one keeps the bindable claim fully grounded', () => {
+    // The live cli-reference shape: one claim documents the PUBLIC name while its evidence points
+    // at the implementing symbol; the neighbouring claim names the symbol properly. The page must
+    // pass with the first unchecked and the second still carrying its source-linked evidence.
+    const probeMdx =
+      `# Title\n\n` +
+      `Text <Claim id="p1">\`docstube generate\` generates docs from existing config.</Claim>\n\n` +
+      `More <Claim id="p2">\`retries\` exists.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = anchorWriterLedger({
+      mdx: probeMdx,
+      writerLedger: ledger([
+        {
+          markerId: 'p1',
+          class: 'behavior',
+          predicate: 'docstube generate generates docs from existing config',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'body', symbolHash: KNOWN_SYMBOL }]
+        },
+        {
+          markerId: 'p2',
+          class: 'code-structure',
+          predicate: 'retries exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: KNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'signature', symbolHash: KNOWN_SYMBOL }]
+        }
+      ]),
+      page,
+      fingerprints,
+      codemap,
+      observedReads,
+      commit: COMMIT
+    });
+    const ok = expectOk(result);
+    expect(ok.ledger.claims).toHaveLength(2);
+    expect(ok.ledger.claims[0]?.evidence).toEqual([]);
+    // Exactly one source-linked record was minted — for the bindable claim only.
+    expect(ok.evidence).toHaveLength(1);
+    expect(ok.ledger.claims[1]?.evidence).toEqual([ok.evidence[0]?.evidenceId]);
+    expect(ok.warnings.some((warning) => warning.includes('SUBJECT-UNBOUND') && warning.includes('p1'))).toBe(true);
+    expect(ok.warnings.some((warning) => warning.includes('p2'))).toBe(false);
+  });
+
+  it('KERNEL CITED-VALUE RESOLUTION: a canonical value claim with only a whole-file proposal gets a real cited-value subscription', () => {
+    // The live configuration-page shape: the writer phrased the claim perfectly but had no symbol
+    // hash, so it proposed the conservative whole-file dependency and the value-predicate verifier
+    // never ran. The kernel now reads the value path out of the claim's own predicate.
+    const probeMdx = `# Title\n\nText <Claim id="k1">\`retries\` defaults to 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = expectOk(
+      anchorWriterLedger({
+        mdx: probeMdx,
+        writerLedger: ledger([
+          {
+            markerId: 'k1',
+            class: 'value',
+            predicate: 'retries defaults to 3',
+            proposedEvidence: [],
+            proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+          }
+        ]),
+        page,
+        fingerprints,
+        codemap,
+        observedReads,
+        commit: COMMIT
+      })
+    );
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH },
+      { kind: 'cited-value', symbolHash: KNOWN_SYMBOL, valueName: 'retries', citedValue: '3' }
+    ]);
+    expect(result.warnings.some((warning) => warning.includes('kernel resolved the cited value'))).toBe(true);
+  });
+
+  it('kernel cited-value resolution NEVER guesses: an unknown path keeps the conservative whole-file dependency', () => {
+    const probeMdx = `# Title\n\nText <Claim id="k2">\`notAValue\` defaults to 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = expectOk(
+      anchorWriterLedger({
+        mdx: probeMdx,
+        writerLedger: ledger([
+          {
+            markerId: 'k2',
+            class: 'value',
+            predicate: 'notAValue defaults to 3',
+            proposedEvidence: [],
+            proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+          }
+        ]),
+        page,
+        fingerprints,
+        codemap,
+        observedReads,
+        commit: COMMIT
+      })
+    );
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+    ]);
+    expect(result.warnings.some((warning) => warning.includes('kernel resolved the cited value'))).toBe(false);
+  });
+
+  it('kernel cited-value resolution NEVER invents an assertion out of descriptive prose', () => {
+    // 'retries defaults to an empty array' names a REAL value path, but the asserted spelling is
+    // description, not a scalar literal. Deriving a citedValue from it would report a CONTRADICTION
+    // the writer never asserted. Same for the existence forms ('retries is exported'), which the
+    // open parser reads as a value assertion.
+    for (const [markerId, prose, predicate] of [
+      ['k4', '`retries` defaults to an empty array.', 'retries defaults to an empty array'],
+      ['k5', '`retries` is exported.', 'retries is exported']
+    ] as const) {
+      const probeMdx = `# Title\n\nText <Claim id="${markerId}">${prose}</Claim>\n`;
+      const result = expectOk(
+        anchorWriterLedger({
+          mdx: probeMdx,
+          writerLedger: ledger([
+            {
+              markerId,
+              class: 'value',
+              predicate,
+              proposedEvidence: [],
+              proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+            }
+          ]),
+          page: extractPageEntity({ mdx: probeMdx, slug: 'probe' }),
+          fingerprints,
+          codemap,
+          observedReads,
+          commit: COMMIT
+        })
+      );
+      expect(result.ledger.claims[0]?.subscriptions).toEqual([
+        { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+      ]);
     }
-    expect(result.errors.every((issue) => issue.code === 'subject-unbound')).toBe(true);
-    expect(result.errors[0]?.message).toContain('"retries"');
-    expect(result.errors[0]?.message).toContain('never substitutes for the root');
+  });
+
+  it('kernel cited-value resolution respects subject binding: a path whose root the prose never names stays unresolved', () => {
+    // 'DEFAULT_RETRIES' IS a real value path in the snapshot, but its owning symbol's root
+    // identifier ('retries') is named nowhere — resolving it would recreate the common-leaf
+    // laundering the subject rule exists to stop.
+    const probeMdx = `# Title\n\nText <Claim id="k3">\`DEFAULT_RETRIES\` is 3.</Claim>\n`;
+    const page = extractPageEntity({ mdx: probeMdx, slug: 'probe' });
+    const result = expectOk(
+      anchorWriterLedger({
+        mdx: probeMdx,
+        writerLedger: ledger([
+          {
+            markerId: 'k3',
+            class: 'value',
+            predicate: 'DEFAULT_RETRIES is 3',
+            proposedEvidence: [],
+            proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.ts' }]
+          }
+        ]),
+        page,
+        fingerprints,
+        codemap,
+        observedReads,
+        commit: COMMIT
+      })
+    );
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
+    ]);
   });
 
   it("REJECTS Sol's polarity probe: visible '`retries` does not exist.' over predicate 'retries exists'", () => {

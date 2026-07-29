@@ -33,6 +33,9 @@ const GREET_SYMBOL = `ts:${'7'.repeat(64)}`;
 const MODE_SYMBOL = `ts:${'6'.repeat(64)}`;
 const HIDDEN_SYMBOL = `ts:${'5'.repeat(64)}`;
 const NESTED_SYMBOL = `ts:${'4'.repeat(64)}`;
+// The live configuration-page shape (impl-15 finding 2): a value the writer phrases perfectly but
+// has no symbol hash for, so it can only propose a whole-file dependency.
+const CONFIG_SYMBOL = `ts:${'3'.repeat(64)}`;
 const PRINT = '8'.repeat(64);
 const READ_HASH = '9'.repeat(64);
 
@@ -47,6 +50,12 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
       symbolHash: NESTED_SYMBOL,
       signaturePrint: PRINT,
       valuePrints: { 'retryDefaults.backoff.factor': sha256Hex('2') },
+      bodyPrint: PRINT
+    },
+    {
+      symbolHash: CONFIG_SYMBOL,
+      signaturePrint: PRINT,
+      valuePrints: { 'configFileNames.config': sha256Hex('"docstube.yml"') },
       bodyPrint: PRINT
     }
   ],
@@ -85,13 +94,22 @@ const codemap: Codemap = codemapSchema.parse({
       name: 'retryDefaults',
       file: 'src/mode.ts',
       span: [2, 2]
+    },
+    {
+      hash: CONFIG_SYMBOL,
+      lang: 'ts',
+      kind: 'variable',
+      name: 'configFileNames',
+      file: 'src/config.ts',
+      span: [1, 1]
     }
   ]
 });
 
 const observedReads: ObservedRead[] = [
   { file: 'src/greet.ts', contentHash: READ_HASH },
-  { file: 'src/mode.ts', contentHash: READ_HASH }
+  { file: 'src/mode.ts', contentHash: READ_HASH },
+  { file: 'src/config.ts', contentHash: READ_HASH }
 ];
 
 let repoRoot: string;
@@ -103,6 +121,7 @@ beforeAll(async () => {
     join(repoRoot, 'src', 'mode.ts'),
     "export const MODE = 'linear';\nexport const retryDefaults = { backoff: { factor: 2 } };\n"
   );
+  await writeFile(join(repoRoot, 'src', 'config.ts'), "export const configFileNames = { config: 'docstube.yml' };\n");
 });
 
 afterAll(async () => {
@@ -147,6 +166,23 @@ const valueLedger = (
         predicate,
         proposedEvidence: [{ kind: 'symbol', symbol }],
         proposedSubscriptions: [{ kind: 'cited-value', symbolHash: symbol, valueName, citedValue }]
+      }
+    ]
+  });
+
+// The LIVE writer shape the kernel must now rescue (impl-15 finding 2): a canonically phrased
+// value claim whose only proposal is the conservative whole-file dependency, because proposing a
+// cited-value subscription would have needed a symbol hash the writer never saw.
+const hashlessValueLedger = (predicate: string, file = 'src/config.ts'): WriterClaimLedger =>
+  writerClaimLedgerSchema.parse({
+    schemaVersion: 1,
+    claims: [
+      {
+        markerId: 'g1',
+        class: 'value',
+        predicate,
+        proposedEvidence: [{ kind: 'file', file }],
+        proposedSubscriptions: [{ kind: 'file-content', file }]
       }
     ]
   });
@@ -556,6 +592,116 @@ Status: <Badge label="greet does not exist."><Claim id="g1">\`greet\` exists.</C
     expect(record).toMatchObject({ correctness: 'checked', disposition: null });
     const deciding = record?.evidence.find((entry) => entry.evidenceId === record.decidingEvidenceId);
     expect(deciding?.ref).toMatchObject({ kind: 'value-predicate', assertedValue: '2', extractedValue: '2' });
+  });
+
+  // KERNEL CITED-VALUE RESOLUTION (impl-15 finding 2). The live run's configuration page emitted
+  // claims in perfect canonical form and shipped every one of them unchecked, because a
+  // cited-value subscription needs a SYMBOL HASH the writer does not have. The value was always
+  // extractable; only the wiring was missing.
+  it("the live shape: '`configFileNames.config` is docstube.yml.' with only a whole-file proposal mints CHECKED end to end", async () => {
+    const { anchored, verified, shard } = await runSpine(
+      '`configFileNames.config` is docstube.yml.',
+      hashlessValueLedger('configFileNames.config is docstube.yml')
+    );
+    expect(anchored.warnings.some((warning) => warning.includes('kernel resolved the cited value'))).toBe(true);
+    expect(verified.findings).toEqual([]);
+    const record = shard.provenance?.claimEvidence[0];
+    expect(record).toMatchObject({ correctness: 'checked', disposition: null });
+    const deciding = record?.evidence.find((entry) => entry.evidenceId === record.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({
+      kind: 'value-predicate',
+      symbol: CONFIG_SYMBOL,
+      valueName: 'configFileNames.config',
+      assertedValue: '"docstube.yml"',
+      extractedValue: '"docstube.yml"'
+    });
+    // The kernel-minted subscription rides the committed ledger — the whole-file dependency stays
+    // alongside it, so the claim is never LESS invalidated than before.
+    expect(shard.ledger?.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/config.ts', contentHash: READ_HASH },
+      {
+        kind: 'cited-value',
+        symbolHash: CONFIG_SYMBOL,
+        valueName: 'configFileNames.config',
+        citedValue: '"docstube.yml"'
+      }
+    ]);
+  });
+
+  it('a kernel-resolved value that the docs got WRONG mints CONTRADICTED end to end — a caught lie, gating', async () => {
+    const { verified, shard } = await runSpine(
+      '`configFileNames.config` is docstube.yaml.',
+      hashlessValueLedger('configFileNames.config is docstube.yaml')
+    );
+    expect(verified.findings).toHaveLength(1);
+    expect(verified.findings[0]?.message).toContain('CONTRADICTED');
+    const record = shard.provenance?.claimEvidence[0];
+    expect(record).toMatchObject({ correctness: 'contradicted', disposition: null });
+    const deciding = record?.evidence.find((entry) => entry.evidenceId === record.decidingEvidenceId);
+    expect(deciding?.ref).toMatchObject({
+      kind: 'value-predicate',
+      assertedValue: '"docstube.yaml"',
+      extractedValue: '"docstube.yml"'
+    });
+  });
+
+  it('a value path the snapshot does not know keeps the whole-file fallback and stays UNCHECKED — the kernel never guesses', async () => {
+    const spine = await runSpine(
+      '`configFileNames.missing` is docstube.yml.',
+      hashlessValueLedger('configFileNames.missing is docstube.yml')
+    );
+    expect(spine.anchored.warnings.some((warning) => warning.includes('kernel resolved the cited value'))).toBe(false);
+    expect(spine.shard.ledger?.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/config.ts', contentHash: READ_HASH }
+    ]);
+    expectUnchecked(spine);
+  });
+
+  it("the writer's own valid cited-value proposal is still honored — the kernel adds nothing", async () => {
+    const { anchored, shard } = await runSpine(
+      '`MODE` defaults to linear.',
+      valueLedger('MODE defaults to linear', 'linear')
+    );
+    expect(anchored.warnings.some((warning) => warning.includes('kernel resolved the cited value'))).toBe(false);
+    expect(shard.ledger?.claims[0]?.subscriptions).toEqual([
+      { kind: 'cited-value', symbolHash: MODE_SYMBOL, valueName: 'MODE', citedValue: '"linear"' }
+    ]);
+    expect(shard.provenance?.claimEvidence[0]).toMatchObject({ correctness: 'checked' });
+  });
+
+  // AN UNBINDABLE SUBJECT DEGRADES TO UNCHECKED (impl-15 finding 1) — end to end.
+  it('the live cli-reference shape: prose naming the PUBLIC name over an implementation symbol PASSES, unchecked', async () => {
+    const mdx = `---
+title: "Greet"
+---
+
+# Greet
+
+Run it: <Claim id="g1">\`docstube welcome\` prints the greeting.</Claim>
+`;
+    const spine = await runSpineWithMdx(
+      mdx,
+      writerClaimLedgerSchema.parse({
+        schemaVersion: 1,
+        claims: [
+          {
+            markerId: 'g1',
+            class: 'behavior',
+            predicate: 'docstube welcome prints the greeting',
+            proposedEvidence: [{ kind: 'symbol', symbol: GREET_SYMBOL }],
+            proposedSubscriptions: [{ kind: 'body', symbolHash: GREET_SYMBOL }]
+          }
+        ]
+      })
+    );
+    // Anchoring PASSED (runSpineWithMdx throws otherwise) — no error, no retry, no flagged page.
+    expect(spine.anchored.warnings.some((warning) => warning.includes('SUBJECT-UNBOUND'))).toBe(true);
+    expect(spine.anchored.rejectedProposals.some((rejected) => rejected.code === 'subject-unbound')).toBe(true);
+    // The kernel refused to VOUCH: no source-linked evidence exists for the dropped subject.
+    expect(spine.anchored.evidence).toEqual([]);
+    expect(spine.verified.findings).toEqual([]);
+    expectUnchecked(spine);
+    expect(spine.shard.provenance?.claimEvidence[0]?.evidence).toEqual([]);
   });
 
   it("'`greet` is exported.' mints CHECKED end to end — the record affirms exportedness ('public')", async () => {

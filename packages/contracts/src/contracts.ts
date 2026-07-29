@@ -79,13 +79,15 @@ export {
   assessClaimCheckability,
   canonicalizeAssertionText,
   existenceAssertionForms,
+  parseValueAssertionText,
   renderValuePathSubject
 } from './checkability-grammar.ts';
 export type {
   CheckabilityAssessment,
   CheckabilityInput,
   CheckabilityStyle,
-  ExistenceAssertionForm
+  ExistenceAssertionForm,
+  ParsedValueAssertion
 } from './checkability-grammar.ts';
 
 export {

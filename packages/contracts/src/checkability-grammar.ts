@@ -101,7 +101,7 @@ export const renderValuePathSubject = (valueName: string): string => {
 // 'is set to' would leave 'set to …' glued onto the value.
 const VALUE_VERBS = ['is set to', 'defaults to', 'equals', 'is'] as const;
 
-type ParsedValueAssertion = { subject: string; verb: string; valueSpelling: string };
+export type ParsedValueAssertion = { subject: string; verb: string; valueSpelling: string };
 
 // Parse a canonicalized text as EXACTLY '<subject-or-bound-value-path> <verb> <value>' — the
 // whole string, nothing before, nothing after. Subject alternatives are the kernel-bound
@@ -113,6 +113,27 @@ const parseValueAssertion = (subjectPaths: string[], text: string): ParsedValueA
     .map((path) => escapeRegExp(path))
     .join('|');
   const match = text.match(new RegExp(`^(${subjectAlternatives}) (${VALUE_VERBS.join('|')}) (.+)$`, 'u'));
+  if (match === null) {
+    return undefined;
+  }
+  return { subject: match[1]!, verb: match[2]!, valueSpelling: match[3]! };
+};
+
+// Identifier path / call-shaped subject, in the SAME two spellings renderValuePathSubject emits:
+// 'DEFAULT_RETRIES', 'retryDefaults.backoff.factor', 'createClient(retries)'.
+const OPEN_SUBJECT = '[A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*(?:\\([A-Za-z_$][A-Za-z0-9_$]*\\))?';
+
+// THE OPEN VALUE-ASSERTION PARSER (kernel cited-value resolution): parses a canonical value
+// assertion WITHOUT knowing the subject in advance, so the kernel can read the value PATH the
+// claim itself asserts ('configFileNames.config is docstube.yml' → subject
+// 'configFileNames.config', value spelling 'docstube.yml') and look it up in the run's fingerprint
+// snapshot. parseValueAssertion above is the closed sibling: it proves a claim's phrasing against
+// an ALREADY-BOUND subject and remains the only thing that decides checkability. This one only
+// nominates a candidate — every binding, snapshot, and grammar check still runs afterwards.
+export const parseValueAssertionText = (text: string): ParsedValueAssertion | undefined => {
+  const match = canonicalizeAssertionText(text).match(
+    new RegExp(`^(${OPEN_SUBJECT}) (${VALUE_VERBS.join('|')}) (.+)$`, 'u')
+  );
   if (match === null) {
     return undefined;
   }

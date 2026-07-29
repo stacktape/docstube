@@ -12,20 +12,24 @@ import type {
   LedgerClaim,
   ObservedRead,
   PageEntity,
+  ParsedValueAssertion,
   SymbolRecord,
   WriterClaimLedger
 } from '@docstube/contracts';
 import {
   assessClaimCheckability,
+  bindCitedValue,
   bindClaimSubject,
   claimLedgerSchema,
   contentHashSchema,
   entityRevisionSchema,
   evidenceRecordSchema,
+  existenceAssertionForms,
   gitCommitSchema,
   idPrefixes,
   mintId,
   normalizeCitedValue,
+  parseValueAssertionText,
   renderValuePathSubject,
   symbolSourceKeySchema
 } from '@docstube/contracts';
@@ -45,6 +49,14 @@ import { coverageLintHint, lintUncoveredAssertions } from './coverage-lint.ts';
 // silently shrink the trust denominator, which is exactly what the writer ledger exists to
 // prevent. Resolution never invents: an unknown symbol, value name, or file becomes a
 // rejected-proposal record, and code claims fall back to a kernel-derived whole-file dependency.
+//
+// FAIL-CLOSED IS ABOUT VOUCHING, NOT PUBLISHING (impl-15 finding 1): an UNBINDABLE SUBJECT — the
+// visible prose documents the PUBLIC name ("docstube generate") while the evidence points at the
+// implementing identifier (runGenerateCommand) — is a pervasive, legitimate documentation shape
+// (CLI commands, config keys, HTTP routes, env vars). It is no longer a repair-eligible error:
+// the kernel DROPS the evidence proposal and the claim ships 'unchecked' / 'no-checker-available'
+// with a journaled warning, exactly as verification already does for the tamper case. The binding
+// rule itself is unchanged — an unbound subject still may never mint evidence.
 
 const flattenBlocks = (page: PageEntity): BlockEntity[] => [
   ...page.preamble,
@@ -73,7 +85,6 @@ export type AnchorIssueCode =
   | 'marker-missing' // ledger claim whose marker is absent from the accepted MDX
   | 'marker-duplicate' // the same marker id appears more than once in the accepted MDX
   | 'marker-unclaimed' // marker with no ledger entry — an unclaimed assertion shrinks nothing silently
-  | 'subject-unbound' // the visible prose or the predicate fails to name the referenced symbol's root identifier
   | 'polarity-mismatch' // one side negates the bound subject while the other asserts it — opposite facts
   | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
   // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
@@ -96,7 +107,12 @@ export type RejectedProposalCode =
   | 'unknown-value' // known symbol, unknown cited-value name
   | 'missing-facet' // known symbol without the subscribed signature/body print
   | 'unknown-file' // file in neither the snapshot nor the page's observed reads
-  | 'location-mismatch'; // writer-supplied file/span disagrees with the codemap record
+  | 'location-mismatch' // writer-supplied file/span disagrees with the codemap record
+  // The visible prose and/or the predicate never name the referenced symbol's root identifier.
+  // NOT a defect and NOT repair-eligible (impl-15 finding 1): documenting a public name that
+  // differs from the implementing identifier is normal. The evidence proposal is dropped and the
+  // claim ships unchecked — the kernel refuses to vouch, never to publish.
+  | 'subject-unbound';
 
 // A proposal the kernel refused to resolve into canonical state — recorded, never silently gone.
 export type RejectedProposal = {
@@ -241,6 +257,102 @@ const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): Depend
   return resolved;
 };
 
+// The run's cited-value paths, keyed by the ONE canonical rendering a claim may spell them with
+// (renderValuePathSubject): 'configFileNames.config', 'DEFAULT_RETRIES', 'createClient(retries)'.
+// Built once per anchoring pass from the fingerprint snapshot — the same valuePrints the
+// value-predicate verifier validates re-extraction against.
+type ValuePathIndex = ReadonlyMap<string, Array<{ symbolHash: string; valueName: string }>>;
+
+const buildValuePathIndex = (fingerprints: FingerprintSnapshot): ValuePathIndex => {
+  const index = new Map<string, Array<{ symbolHash: string; valueName: string }>>();
+  for (const symbol of fingerprints.symbols) {
+    for (const valueName of Object.keys(symbol.valuePrints)) {
+      const rendered = renderValuePathSubject(valueName);
+      const entry = { symbolHash: symbol.symbolHash as string, valueName };
+      index.set(rendered, [...(index.get(rendered) ?? []), entry]);
+    }
+  }
+  return index;
+};
+
+// THE INVENTED-ASSERTION GUARD. A writer-proposed citedValue is the writer's own assertion, so
+// comparing it against the source and reporting CONTRADICTED is honest. A KERNEL-derived one is
+// read out of prose that may not have been a value assertion at all — "docstubeConfigSchema.plugins
+// defaults to an empty array", "`FOO` is exported" — and turning that into a contradiction would
+// manufacture a lie the writer never told. The kernel therefore derives a value ONLY from a
+// spelling that is unambiguously a SCALAR LITERAL: a quoted string, or a single whitespace-free
+// token. Descriptive predicates ("an empty array", "derived from builtinComponents") and the
+// existence forms are refused, and the claim keeps its conservative whole-file dependency.
+const assertedScalarIsLiteral = (assertion: ParsedValueAssertion): boolean => {
+  if (existenceAssertionForms.some((form) => `${assertion.verb} ${assertion.valueSpelling}` === form)) {
+    return false;
+  }
+  const spelling = assertion.valueSpelling;
+  const quoteChars = ['"', "'", '`'];
+  const isQuoted = quoteChars.some(
+    (quote) => spelling.length >= 2 && spelling.startsWith(quote) && spelling.endsWith(quote)
+  );
+  return isQuoted || !/\s/u.test(spelling);
+};
+
+// KERNEL CITED-VALUE RESOLUTION (impl-15 finding 2). Proposing a `cited-value` subscription
+// requires a SYMBOL HASH the writer usually does not have — a repo of 1200+ symbols only ever
+// shows it a slice — so writers that phrase a value claim perfectly ("`configFileNames.config` is
+// `docstube.yml`") still fall back to a whole-file subscription, and the value-predicate verifier
+// never runs. The data was there the whole time; only the wiring was missing.
+//
+// So anchoring resolves it ITSELF, exactly as it already resolves evidence file/span from the
+// codemap instead of trusting writer-supplied locations: the candidate value PATH is read from
+// the claim's own predicate (the atomic assertion the ledger commits to — a predicate outside the
+// canonical grammar could never be checked anyway), looked up in the run's fingerprint snapshot,
+// and minted as a real cited-value subscription with the kernel-canonical citedValue. Verification
+// then proceeds through the unchanged value-predicate path, so the claim becomes genuinely
+// 'checked' — or 'contradicted' when the docs are wrong.
+//
+// Every existing guard still gates the result, so this can only ever ADD a resolvable dependency:
+// the path must be UNAMBIGUOUS in the snapshot, the symbol must subject-bind positively on BOTH
+// sides, and the asserted scalar must bind to the visible prose AND the predicate (so a
+// kernel-minted subscription can never manufacture a value-binding finding the writer never
+// caused). The writer's own resolvable proposal always wins; this fires only when none resolved,
+// and before the whole-file fallback.
+const resolveCitedValueFromClaimText = (
+  claim: DraftClaim,
+  visibleText: string,
+  index: ValuePathIndex,
+  ctx: ResolutionContext
+): DependencySubscription | undefined => {
+  const assertion = parseValueAssertionText(claim.predicate);
+  if (assertion === undefined || !assertedScalarIsLiteral(assertion)) {
+    return undefined;
+  }
+  const candidates = index.get(assertion.subject) ?? [];
+  const distinct = [...new Map(candidates.map((entry) => [`${entry.symbolHash} ${entry.valueName}`, entry]))];
+  if (distinct.length !== 1) {
+    // Unknown path, or the same rendered path under two symbols — never guess which one the
+    // sentence meant; the whole-file fallback stays.
+    return undefined;
+  }
+  const { symbolHash, valueName } = distinct[0]![1];
+  const record = ctx.codemap.symbols.find((symbol) => symbol.hash === symbolHash);
+  if (record === undefined) {
+    return undefined;
+  }
+  const binding = bindClaimSubject({
+    subjectName: record.name,
+    valueNames: [valueName],
+    markerText: visibleText,
+    predicate: claim.predicate
+  });
+  if (!binding.ok || binding.negated) {
+    return undefined;
+  }
+  const citedValue = normalizeCitedValue(assertion.valueSpelling).canonical;
+  if (!bindCitedValue(citedValue, { markerText: visibleText, predicate: claim.predicate }).ok) {
+    return undefined;
+  }
+  return { kind: 'cited-value', symbolHash: symbolSourceKeySchema.parse(symbolHash), valueName, citedValue };
+};
+
 // Conservative dependency fallback (kernel-derived, never invented from model output): when a
 // code-dependent claim resolved nothing, subscribe it to the whole-file content of the claim's
 // GROUNDED SUBJECT — the grounding symbol's codemap file (named by a proposed evidence symbol or
@@ -288,7 +400,16 @@ const conservativeFallback = (claim: DraftClaim, ctx: ResolutionContext): Depend
 // unchecked. file/url proposals mint nothing here: they are verifier input (wave 2b-ii).
 // file/span on the minted record come from the CODEMAP record for the symbol, never from the
 // writer: a writer-supplied location that mismatches the codemap is a rejected proposal.
-const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: string): EvidenceRecord[] => {
+//
+// `unbound` carries the symbols the claim's own prose never names (impl-15 finding 1): their
+// proposals are DROPPED here — the kernel will not vouch for a subject the reader never sees — and
+// the claim ships unchecked. The caller has already recorded the rejection, never as an error.
+const mintSymbolEvidence = (
+  claim: DraftClaim,
+  ctx: ResolutionContext,
+  commit: string,
+  unbound: ReadonlySet<string>
+): EvidenceRecord[] => {
   const known = new Set(ctx.fingerprints.symbols.map((symbol) => symbol.symbolHash as string));
   const records: EvidenceRecord[] = [];
   for (const proposal of claim.proposedEvidence) {
@@ -302,6 +423,9 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
         code: 'unknown-symbol',
         reason: `symbol evidence — symbol ${proposal.symbol} is not in the fingerprint snapshot`
       });
+      continue;
+    }
+    if (unbound.has(proposal.symbol as string)) {
       continue;
     }
     const codemapRecord: SymbolRecord | undefined = ctx.codemap.symbols.find(
@@ -347,16 +471,34 @@ const mintSymbolEvidence = (claim: DraftClaim, ctx: ResolutionContext, commit: s
   return records;
 };
 
+// A referenced symbol the claim's own prose never names: its evidence proposal is dropped and the
+// claim degrades to unchecked. Carries the diagnostic text for the journal and the rejection record.
+type UnboundSubject = { symbolHash: string; reason: string };
+
+type SubjectBindingOutcome = {
+  // Repair-eligible errors — polarity mismatches ONLY: the two sides state opposite facts, which
+  // is always a writer mistake, never a naming convention.
+  errors: AnchorIssue[];
+  // Degrade-to-unchecked subjects (impl-15 finding 1) — never errors, never retries.
+  unbound: UnboundSubject[];
+};
+
 // SUBJECT BINDING at anchoring (impl-09 finding 1, tightened by impl-10 findings 1+2): every
 // symbol the claim references that RESOLVES in the codemap must be named — as an identifier token
 // — by the visible marker prose AND the predicate, using the CODEMAP record's display name (the
 // subject's ROOT identifier), never the writer's proposal text. Genuine aliasing keeps passing;
 // "`inventedFunction` exists" can no longer ride an unrelated real symbol, a predicate-only
 // occurrence can no longer launder visibly false prose, and a common cited-value leaf ('config')
-// can no longer substitute for the root. Repair-eligible: the writer fixes the prose or drops the
-// wrong symbol. Verification re-checks the same rule (defense in depth) and refuses to mint
-// evidence on violation.
-const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: Codemap): AnchorIssue[] => {
+// can no longer substitute for the root. Verification re-checks the same rule (defense in depth)
+// and refuses to mint evidence on violation.
+//
+// CONSEQUENCE SPLIT (impl-15 finding 1): an unbound subject DEGRADES the claim to unchecked (the
+// evidence proposal is dropped) instead of failing the page — real documentation routinely spells
+// the public name ("docstube generate") while the implementation is called something else
+// (runGenerateCommand), and burning a writer retry over that taught the writer to drop good
+// claims. A POLARITY MISMATCH stays repair-eligible: there the prose and the predicate assert
+// opposite facts about the SAME bound subject, so one of them is simply wrong.
+const bindClaimSubjects = (draft: DraftClaim, visibleText: string, codemap: Codemap): SubjectBindingOutcome => {
   // Cited-value name paths per symbol: their non-root identifier segments are context for the
   // repair message — they never substitute for the root identifier.
   const valueNamesByHash = new Map<string, string[]>();
@@ -372,7 +514,8 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
       subscription.kind === 'file-content' ? [] : [subscription.symbolHash as string]
     )
   ];
-  const issues: AnchorIssue[] = [];
+  const errors: AnchorIssue[] = [];
+  const unbound: UnboundSubject[] = [];
   const checked = new Set<string>();
   for (const symbolHash of referencedHashes) {
     if (checked.has(symbolHash)) {
@@ -404,7 +547,7 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
         binding.negatedIn === 'marker'
           ? `the predicate ("${draft.predicate}")`
           : `the visible prose ("${visibleText}")`;
-      issues.push({
+      errors.push({
         code: 'polarity-mismatch',
         kernel: false,
         markerId: draft.markerId,
@@ -422,12 +565,10 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
           side === 'marker' ? `the visible prose ("${visibleText}")` : `the predicate ("${draft.predicate}")`
         )
         .join(' and ');
-      issues.push({
-        code: 'subject-unbound',
-        kernel: false,
-        markerId: draft.markerId,
-        message:
-          `claim "${draft.markerId}" is SUBJECT-UNBOUND — its evidence points at the symbol "${record.name}"` +
+      unbound.push({
+        symbolHash,
+        reason:
+          `SUBJECT-UNBOUND — the claim references the symbol "${record.name}"` +
           `${valueNames.length === 0 ? '' : ` (cited value ${valueNames.map((name) => `"${name}"`).join(', ')})`}, ` +
           `but ${missingSides} never name${binding.missingIn.length === 1 ? 's' : ''} "${binding.requiredName}" ` +
           "as an identifier. The subject's root identifier must appear in BOTH the wrapped sentence AND the " +
@@ -439,11 +580,15 @@ const subjectBindingIssues = (draft: DraftClaim, visibleText: string, codemap: C
                   .map((name) => `"${name}"`)
                   .join(', ')}) never substitutes for the root`
           }. ` +
-          'Name the real subject on both sides, or drop/replace the wrong symbol reference'
+          'This is NOT an error and never triggers a retry: documentation legitimately spells the PUBLIC name ' +
+          '(a CLI command, a config key, an HTTP route) while the implementation is called something else, so ' +
+          `the evidence proposal is DROPPED and the claim ships UNCHECKED (no-checker-available). To have it ` +
+          `verified, name "${binding.requiredName}" in BOTH the wrapped sentence and the predicate — never ` +
+          'rename a user-facing name in prose just to satisfy the checker'
       });
     }
   }
-  return issues;
+  return { errors, unbound };
 };
 
 // DESTINED-UNCHECKED HINTS (impl-12, grammar tightened to exact canonical visible match in
@@ -558,6 +703,7 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
     ranges = [];
   }
   const markerByid = new Map(scan.markers.map((marker) => [marker.markerId, marker]));
+  const valuePaths = buildValuePathIndex(input.fingerprints);
 
   // Bijection recheck, kernel-side defense in depth (submit_page proves marker↔ledger cardinality
   // in-session, but replay/scripted writers can bypass it): EXACT cardinality both ways. The
@@ -614,19 +760,46 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
       });
       continue;
     }
-    // Subject binding gates before any evidence mints: an unbound claim contributes no
-    // source-linked records and fails the page with a repair-eligible error.
-    const subjectIssues = subjectBindingIssues(draft, marker.visibleText, input.codemap);
-    if (subjectIssues.length > 0) {
-      errors.push(...subjectIssues);
+    // Subject binding gates before any evidence mints. Opposite-polarity sides still fail the
+    // page repair-eligibly; an UNBINDABLE subject only drops its evidence proposal (impl-15
+    // finding 1) — the claim anchors and ships unchecked, with the drop recorded and journaled.
+    const subjects = bindClaimSubjects(draft, marker.visibleText, input.codemap);
+    if (subjects.errors.length > 0) {
+      errors.push(...subjects.errors);
       continue;
     }
+    const unbound = new Set(subjects.unbound.map((entry) => entry.symbolHash));
+    rejectedProposals.push(
+      ...subjects.unbound.map((entry) => ({
+        markerId: draft.markerId,
+        proposal: 'evidence' as const,
+        code: 'subject-unbound' as const,
+        reason: entry.reason
+      }))
+    );
     // Non-blocking phrasing hint for claims destined to stay unchecked under the checkability
-    // grammar — journaled, never gating (impl-12).
-    warnings.push(...checkabilityHints(draft, marker, input.codemap));
-    const claimEvidence = mintSymbolEvidence(draft, ctx, input.commit);
+    // grammar — journaled, never gating (impl-12). Suppressed for unbound subjects: the
+    // subject-unbound note already says why the claim ships unchecked, and a phrasing hint about
+    // a symbol the page deliberately does not name would only mislead.
+    if (unbound.size === 0) {
+      warnings.push(...checkabilityHints(draft, marker, input.codemap));
+    }
+    const claimEvidence = mintSymbolEvidence(draft, ctx, input.commit, unbound);
     evidence.push(...claimEvidence);
     let subscriptions = resolveSubscriptions(draft, ctx);
+    if (draft.class === 'value' && !subscriptions.some((subscription) => subscription.kind === 'cited-value')) {
+      // Kernel cited-value resolution — fires only when the writer's own proposals produced no
+      // value subscription, and BEFORE the whole-file fallback below.
+      const derived = resolveCitedValueFromClaimText(draft, marker.visibleText, valuePaths, ctx);
+      if (derived !== undefined && derived.kind === 'cited-value') {
+        subscriptions = [...subscriptions, derived];
+        warnings.push(
+          `claim "${draft.markerId}": the kernel resolved the cited value "${derived.valueName}" from the claim's ` +
+            `own assertion and subscribed it to the fingerprint snapshot — the value-predicate verifier decides ` +
+            'this claim instead of the conservative whole-file dependency'
+        );
+      }
+    }
     if (subscriptions.length === 0 && CODE_DEPENDENT_CLASSES.has(draft.class)) {
       subscriptions = conservativeFallback(draft, ctx);
       if (subscriptions.length === 0) {

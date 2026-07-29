@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assessClaimCheckability, canonicalizeAssertionText, renderValuePathSubject } from './checkability-grammar.ts';
+import {
+  assessClaimCheckability,
+  canonicalizeAssertionText,
+  parseValueAssertionText,
+  renderValuePathSubject
+} from './checkability-grammar.ts';
 
 // EXACT CANONICAL VISIBLE MATCH (wave 2b close FINAL, impl-13/impl-14): existence/value evidence
 // may only DECIDE a claim whose VISIBLE marker text, after minimal cosmetic normalization,
@@ -349,5 +354,43 @@ describe('value family — exact canonical visible match', () => {
         predicate: 'MODE is set to exponential-backoff'
       })
     ).toEqual({ checkable: true });
+  });
+});
+
+// THE OPEN PARSER (impl-15 finding 2): reads the value PATH out of a claim's own assertion so the
+// kernel can look it up in the fingerprint snapshot. It only NOMINATES a candidate — subject
+// binding, snapshot agreement, and the closed grammar above still decide everything.
+describe('parseValueAssertionText', () => {
+  it('reads subject, verb, and value spelling from the canonical forms', () => {
+    expect(parseValueAssertionText('configFileNames.config is docstube.yml')).toEqual({
+      subject: 'configFileNames.config',
+      verb: 'is',
+      valueSpelling: 'docstube.yml'
+    });
+    expect(parseValueAssertionText('DEFAULT_RETRIES defaults to 3.')).toEqual({
+      subject: 'DEFAULT_RETRIES',
+      verb: 'defaults to',
+      valueSpelling: '3'
+    });
+    // The call-shaped rendering of a parameter default round-trips renderValuePathSubject.
+    expect(parseValueAssertionText('createClient(retries) equals 3')).toMatchObject({
+      subject: renderValuePathSubject('createClient.param.retries.default'),
+      verb: 'equals'
+    });
+  });
+
+  it("longest-verb-first: 'is set to' is never truncated to a bare 'is'", () => {
+    expect(parseValueAssertionText('MODE is set to linear')).toEqual({
+      subject: 'MODE',
+      verb: 'is set to',
+      valueSpelling: 'linear'
+    });
+  });
+
+  it('refuses anything that is not exactly one canonical value assertion', () => {
+    // Verb outside the family, prose before the subject, and a non-identifier subject.
+    expect(parseValueAssertionText('action.yml uses node24')).toBeUndefined();
+    expect(parseValueAssertionText('the DEFAULT_RETRIES option is 3')).toBeUndefined();
+    expect(parseValueAssertionText('greet exists')).toBeUndefined();
   });
 });
