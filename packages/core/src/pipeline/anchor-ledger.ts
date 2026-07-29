@@ -47,12 +47,16 @@ import { coverageLintHint, lintUncoveredAssertions } from './coverage-lint.ts';
 // every claim starts 'unchecked' with disposition 'no-checker-available' ('maintainer-input-
 // needed' for intent-history) — verification flips correctness in wave 2b-ii, never this stage.
 //
-// Anchoring is FAIL-CLOSED (PRODUCT §3.3/§3.5): a claim that cannot anchor, or a required code
-// dependency that cannot resolve even conservatively, fails the whole page attempt with a typed,
-// repair-eligible error. A passing ledger with fewer claims than the writer asserted would
-// silently shrink the trust denominator, which is exactly what the writer ledger exists to
-// prevent. Resolution never invents: an unknown symbol, value name, or file becomes a
+// Anchoring is FAIL-CLOSED (PRODUCT §3.3/§3.5): a claim that cannot anchor fails the whole page
+// attempt with a typed, repair-eligible error. A passing ledger with fewer claims than the writer
+// asserted would silently shrink the trust denominator, which is exactly what the writer ledger
+// exists to prevent. Resolution never invents: an unknown symbol, value name, or file becomes a
 // rejected-proposal record, and code claims fall back to a kernel-derived whole-file dependency.
+//
+// EXISTENCE VS INVALIDATION. The CODEMAP decides whether a symbol is real; the fingerprint
+// snapshot decides when to re-check it. Only the paths that genuinely need a print — facet
+// subscriptions, cited-value comparison — consult the snapshot, and a codemap symbol whose pack
+// emits no prints is a 'missing-facet', never a missing identifier.
 //
 // FAIL-CLOSED IS ABOUT VOUCHING, NOT PUBLISHING (impl-15 finding 1): an UNBINDABLE SUBJECT — the
 // visible prose documents the PUBLIC name ("docstube generate") while the evidence points at the
@@ -90,7 +94,6 @@ export type AnchorIssueCode =
   | 'marker-duplicate' // the same marker id appears more than once in the accepted MDX
   | 'marker-unclaimed' // marker with no ledger entry — an unclaimed assertion shrinks nothing silently
   | 'polarity-mismatch' // one side negates the bound subject while the other asserts it — opposite facts
-  | 'subscription-unresolvable' // code claim with no resolvable dependency and no derivable fallback
   // Kernel invariant breach: submit_page guaranteed these could not happen, so their appearance
   // post-acceptance means the MDX was altered after acceptance — a kernel bug, never repairable.
   | 'marker-scan-invalid';
@@ -107,11 +110,16 @@ export type AnchorIssue = {
 // or stale symbol reference — which the claim-verification stage escalates to a HARD DEFECT for
 // every claim class (trust-model-v2 decision 3: killing hallucinated references stays).
 export type RejectedProposalCode =
-  | 'unknown-symbol' // symbol hash absent from the fingerprint snapshot
+  | 'unknown-symbol' // symbol hash absent from the CODEMAP and the fingerprint snapshot
   | 'unknown-value' // known symbol, unknown cited-value name
   | 'missing-facet' // known symbol without the subscribed signature/body print
   | 'unknown-file' // file in neither the snapshot nor the page's observed reads
   | 'location-mismatch' // writer-supplied file/span disagrees with the codemap record
+  // A code-dependent claim ended with no resolvable dependency AND no derivable conservative
+  // fallback. Like 'subject-unbound' this is a REFUSAL TO VOUCH, not a defect: the claim anchors
+  // and ships unchecked with no invalidation edge of its own. It is not repair-eligible and never
+  // escalates to a grounding failure — nothing here says the prose is wrong.
+  | 'dependency-underivable'
   // The visible prose and/or the predicate never name the referenced symbol's root identifier.
   // NOT a defect and NOT repair-eligible (impl-15 finding 1): documenting a public name that
   // differs from the implementing identifier is normal. The evidence proposal is dropped and the
@@ -195,10 +203,24 @@ type ResolutionContext = {
   rejectedProposals: RejectedProposal[];
 };
 
-// Kernel-derived content hash for a repo file: the fingerprint snapshot's whole-file fallback or
-// the page's observed reads. Never the writer's value.
+// EXISTENCE IS THE CODEMAP'S JOB (the grounding finding). The codemap is what proves a symbol is
+// real; the fingerprint ladder exists for INVALIDATION — knowing when to re-check — and a pack is
+// free to contribute symbols without contributing fingerprints at all (`extractFingerprints` is an
+// additive capability on top of the public plugin-sdk pack contract, which requires only
+// `extractSymbols`). Testing existence against the SNAPSHOT therefore accused every symbol of a
+// fingerprint-less language pack of not existing. A symbol is known when EITHER source carries it:
+// the codemap for source declarations, the snapshot for the .d.ts twins the codemap skips.
+const symbolIsKnown = (ctx: ResolutionContext, symbolHash: string): boolean =>
+  ctx.codemap.symbols.some((symbol) => symbol.hash === symbolHash) ||
+  ctx.fingerprints.symbols.some((symbol) => (symbol.symbolHash as string) === symbolHash);
+
+// Kernel-derived content hash for a repo file: the fingerprint snapshot's whole-file records
+// (fallback files AND fingerprinted ones — every walked file is hashed) or the page's observed
+// reads. Never the writer's value.
 const authoritativeFileHash = (ctx: ResolutionContext, file: string): ContentHash | undefined => {
-  const snapshot = ctx.fingerprints.unparsedFiles.find((entry) => entry.file === file)?.contentHash;
+  const snapshot =
+    ctx.fingerprints.unparsedFiles.find((entry) => entry.file === file)?.contentHash ??
+    ctx.fingerprints.parsedFiles.find((entry) => entry.file === file)?.contentHash;
   if (snapshot !== undefined) {
     return snapshot;
   }
@@ -228,10 +250,21 @@ const resolveSubscriptions = (claim: DraftClaim, ctx: ResolutionContext): Depend
     }
     const symbol = symbolByHash.get(subscription.symbolHash as string);
     if (symbol === undefined) {
-      reject(
-        'unknown-symbol',
-        `${subscription.kind} subscription — symbol ${subscription.symbolHash} is not in the fingerprint snapshot`
-      );
+      // A symbol the CODEMAP knows is real; it simply has no typed prints to subscribe to (its
+      // pack does not implement the fingerprint capability). That is a missing FACET, never a
+      // missing identifier — the claim keeps its conservative whole-file dependency and must not
+      // be escalated to a grounding failure that tells the writer the name does not exist.
+      if (symbolIsKnown(ctx, subscription.symbolHash as string)) {
+        reject(
+          'missing-facet',
+          `${subscription.kind} subscription — symbol ${subscription.symbolHash} resolves in the codemap but its language pack emits no typed fingerprints, so there is no ${subscription.kind} print to subscribe to`
+        );
+      } else {
+        reject(
+          'unknown-symbol',
+          `${subscription.kind} subscription — symbol ${subscription.symbolHash} is in neither the codemap nor the fingerprint snapshot`
+        );
+      }
       continue;
     }
     if (subscription.kind === 'signature' && symbol.signaturePrint === undefined) {
@@ -465,9 +498,8 @@ const conservativeFallback = (claim: DraftClaim, ctx: ResolutionContext): Depend
       return [{ kind: 'file-content', file, contentHash }];
     }
   }
-  // No grounded subject with a derivable authoritative hash: fail closed (the caller raises
-  // subscription-unresolvable). Over-invalidation would be acceptable; a fabricated or unrelated
-  // dependency is not.
+  // No grounded subject with a derivable authoritative hash: the claim keeps NO dependency.
+  // Over-invalidation would be acceptable; a fabricated or unrelated dependency is not.
   return [];
 };
 
@@ -486,18 +518,20 @@ const mintSymbolEvidence = (
   commit: string,
   unbound: ReadonlySet<string>
 ): EvidenceRecord[] => {
-  const known = new Set(ctx.fingerprints.symbols.map((symbol) => symbol.symbolHash as string));
   const records: EvidenceRecord[] = [];
   for (const proposal of claim.proposedEvidence) {
     if (proposal.kind !== 'symbol') {
       continue;
     }
-    if (!known.has(proposal.symbol as string)) {
+    // Grounding asks ONE question — is this symbol real? — and the codemap answers it. Asking the
+    // fingerprint snapshot instead made "has no typed prints" indistinguishable from "does not
+    // exist", which is the difference between an unchecked claim and a hard defect.
+    if (!symbolIsKnown(ctx, proposal.symbol as string)) {
       ctx.rejectedProposals.push({
         markerId: claim.markerId,
         proposal: 'evidence',
         code: 'unknown-symbol',
-        reason: `symbol evidence — symbol ${proposal.symbol} is not in the fingerprint snapshot`
+        reason: `symbol evidence — symbol ${proposal.symbol} is in neither the codemap nor the fingerprint snapshot`
       });
       continue;
     }
@@ -540,7 +574,7 @@ const mintSymbolEvidence = (
         checkedAt: new Date().toISOString(),
         sourceRevision: gitCommitSchema.parse(commit),
         outcome: 'pass',
-        detail: 'symbol resolved in the fingerprint snapshot; assertion unchecked'
+        detail: 'symbol resolved in the verified codemap; assertion unchecked'
       })
     );
   }
@@ -893,13 +927,30 @@ export const anchorWriterLedger = (input: AnchorLedgerInput): AnchorLedgerResult
     if (subscriptions.length === 0 && CODE_DEPENDENT_CLASSES.has(draft.class)) {
       subscriptions = conservativeFallback(draft, ctx);
       if (subscriptions.length === 0) {
-        errors.push({
-          code: 'subscription-unresolvable',
-          kernel: false,
+        // DEGRADE, DO NOT FAIL (the sibling of impl-15 finding 1). This used to be a
+        // repair-eligible error, and it burned a retry on pages whose prose was perfectly correct:
+        // the kernel simply had no file or symbol it could attach an invalidation edge to. That is
+        // the SAME shape as an unbound subject — the kernel cannot VOUCH, but nothing says the page
+        // is wrong — so it gets the same consequence: the claim anchors, carries no dependency of
+        // its own, and ships unchecked / no-checker-available with the refusal recorded.
+        //
+        // It is safe precisely because grounding now runs off the codemap: a claim that minted any
+        // symbol evidence has a codemap record, whose file always has an authoritative hash, so it
+        // can never reach here. Reaching here means nothing grounded, which means the claim was
+        // destined to stay unchecked anyway — and the PAGE still invalidates through its other
+        // claims' subscriptions and its recorded observed reads.
+        rejectedProposals.push({
           markerId: draft.markerId,
-          message: `claim "${draft.markerId}" (${draft.class}) has no resolvable code dependency, and no conservative fallback could be derived from its grounded subject (no proposed symbol/file resolved to a file with a kernel-derived content hash) — propose { kind: "file-content", file: "<repo-relative source file>" } for the file the fact came from, or a symbol subscription with a real hash from the API surface list`
+          proposal: 'subscription',
+          code: 'dependency-underivable',
+          reason:
+            `DEPENDENCY-UNDERIVABLE — the ${draft.class} claim has no resolvable code dependency and no ` +
+            'conservative fallback could be derived from its grounded subject (no proposed symbol or file ' +
+            'resolved to a file with a kernel-derived content hash). This is NOT an error and never triggers a ' +
+            'retry: the claim anchors and ships UNCHECKED (no-checker-available) with no invalidation edge of ' +
+            'its own. To have it tracked, propose { kind: "file-content", file: "<repo-relative source file>" } ' +
+            'for the file the fact came from, or a symbol subscription with a real hash from the API surface list'
         });
-        continue;
       }
     }
     const claim: LedgerClaim = {

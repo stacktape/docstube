@@ -160,7 +160,11 @@ export const verifyClaims = async (input: VerifyClaimsInput): Promise<VerifyClai
   );
 
   // Grounding failures are hard defects for EVERY class (trust-model-v2 decision 3): a claim that
-  // referenced a symbol absent from the snapshot cited an identifier the code does not have.
+  // referenced a symbol absent from the CODEMAP cited an identifier the code does not have.
+  // Only 'unknown-symbol' escalates — the anchoring codes that mean "real symbol, no print to
+  // subscribe to" ('missing-facet') and "real prose, nothing to hang a dependency on"
+  // ('dependency-underivable') are refusals to vouch, and calling them defects would tell the
+  // writer to delete correct sentences.
   const seenGroundingFailures = new Set<string>();
   for (const rejected of input.rejectedProposals) {
     if (rejected.code !== 'unknown-symbol' || seenGroundingFailures.has(`${rejected.markerId}:${rejected.reason}`)) {

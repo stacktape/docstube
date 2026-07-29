@@ -16,6 +16,7 @@ const UNKNOWN_SYMBOL = symbolSourceKeySchema.parse(`ts:${'2'.repeat(64)}`);
 const PRINT = '3'.repeat(64);
 const FILE_HASH = '4'.repeat(64);
 const READ_HASH = '5'.repeat(64);
+const PARSED_FILE_HASH = '6'.repeat(64);
 
 const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
   schemaVersion: 1,
@@ -31,7 +32,10 @@ const fingerprints: FingerprintSnapshot = fingerprintSnapshotSchema.parse({
       bodyPrint: PRINT
     }
   ],
-  unparsedFiles: [{ file: 'package.json', contentHash: FILE_HASH }]
+  unparsedFiles: [{ file: 'package.json', contentHash: FILE_HASH }],
+  // A cleanly-parsed source file the page did NOT observe: hashed by the snapshot all the same, so
+  // a conservative whole-file dependency on it is always derivable.
+  parsedFiles: [{ file: 'src/retry.py', contentHash: PARSED_FILE_HASH }]
 });
 
 const codemap: Codemap = codemapSchema.parse({
@@ -145,7 +149,7 @@ describe('anchorWriterLedger', () => {
     expect(subscriptions[1]).toMatchObject({ kind: 'file-content', file: 'package.json', contentHash: FILE_HASH });
     expect(result.rejectedProposals).toHaveLength(3);
     expect(result.rejectedProposals[0]?.reason).toContain('no value named "NOT_A_VALUE"');
-    expect(result.rejectedProposals[1]?.reason).toContain('is not in the fingerprint snapshot');
+    expect(result.rejectedProposals[1]?.reason).toContain('is in neither the codemap nor the fingerprint snapshot');
     expect(result.rejectedProposals[2]?.reason).toContain('missing.toml');
     // Rejected proposals surface as warnings too (journaled by the page runner).
     expect(result.warnings).toHaveLength(3);
@@ -180,7 +184,7 @@ describe('anchorWriterLedger', () => {
     expect(result.ledger.claims[0]?.subscriptions).toEqual([
       { kind: 'file-content', file: 'src/retry.ts', contentHash: READ_HASH }
     ]);
-    expect(result.rejectedProposals.some((rejected) => rejected.reason.includes('not in the fingerprint'))).toBe(true);
+    expect(result.rejectedProposals.some((rejected) => rejected.code === 'unknown-symbol')).toBe(true);
   });
 
   it('derives the fallback from a known symbol named by a rejected facet subscription', () => {
@@ -202,10 +206,10 @@ describe('anchorWriterLedger', () => {
     ]);
   });
 
-  it('NEVER substitutes unrelated observed reads: a grounded subject with no derivable hash fails closed', () => {
-    // The review probe: the claim grounds src/retry.ts, but the page only observed README.md.
-    // Subscribing the claim to README.md would let the subject change without invalidation — the
-    // claim must fail closed instead.
+  it('NEVER substitutes unrelated observed reads: a grounded subject with no derivable hash keeps no dependency', () => {
+    // The review probe: the claim grounds src/retry.ts, but the page only observed README.md and
+    // the snapshot carries no hash for it. Subscribing the claim to README.md would let the
+    // subject change without invalidation, so the claim keeps NO dependency at all.
     const input = anchorInput(
       [
         draft('c1', {
@@ -217,27 +221,28 @@ describe('anchorWriterLedger', () => {
       ],
       { observedReads: [{ file: 'README.md', contentHash: READ_HASH }] }
     );
-    const result = anchorWriterLedger(input);
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
-    }
-    expect(result.errors[0]).toMatchObject({ code: 'subscription-unresolvable', kernel: false, markerId: 'c1' });
-    expect(result.errors[0]?.message).toContain('grounded subject');
+    const result = expectOk(anchorWriterLedger(input));
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([]);
+    expect(result.ledger.claims[0]).toMatchObject({ correctness: 'unchecked', disposition: 'no-checker-available' });
+    expect(result.rejectedProposals).toContainEqual(
+      expect.objectContaining({ markerId: 'c1', code: 'dependency-underivable' })
+    );
   });
 
-  it('fails closed when a code claim proposes nothing at all — no grounded subject exists to fall back to', () => {
+  it('DEGRADES to unchecked when a code claim proposes nothing at all — never a repair-eligible error', () => {
+    // Sibling of subject-unbound: the kernel cannot vouch for the claim, but nothing here says the
+    // prose is wrong, so it must not burn a writer retry.
     const input = anchorInput([
       draft('c1', { class: 'behavior', proposedSubscriptions: [] } as Partial<DraftClaim>),
       draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
     ]);
-    const result = anchorWriterLedger(input);
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
-    }
-    expect(result.errors[0]).toMatchObject({ code: 'subscription-unresolvable', kernel: false, markerId: 'c1' });
-    expect(result.errors[0]?.message).toContain('file-content');
+    const result = expectOk(anchorWriterLedger(input));
+    expect(result.ledger.claims).toHaveLength(2);
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([]);
+    expect(result.rejectedProposals).toContainEqual(
+      expect.objectContaining({ markerId: 'c1', proposal: 'subscription', code: 'dependency-underivable' })
+    );
+    expect(result.warnings.some((warning) => warning.includes('DEPENDENCY-UNDERIVABLE'))).toBe(true);
   });
 
   it('mints source-linked evidence with the CODEMAP location, rejecting writer-supplied mismatches', () => {
@@ -287,6 +292,104 @@ describe('anchorWriterLedger', () => {
     expect(ref).toMatchObject({ kind: 'source-linked', symbol: KNOWN_SYMBOL });
     expect(ref?.file).toBeUndefined();
     expect(ref?.span).toBeUndefined();
+  });
+
+  // EXISTENCE IS THE CODEMAP'S JOB. `extractFingerprints` is an ADDITIVE capability — the public
+  // plugin-sdk pack contract requires only `extractSymbols` — so a perfectly good language pack
+  // can put every one of its symbols in the codemap and none in the fingerprint snapshot. Testing
+  // existence against the snapshot accused all of them of not existing, which verification then
+  // escalated to a hard defect ("the identifier does not exist in the source") on correct prose.
+  describe('a codemap symbol its pack never fingerprinted', () => {
+    const CODEMAP_ONLY = symbolSourceKeySchema.parse(`ts:${'7'.repeat(64)}`);
+    const codemapWithUnfingerprinted = codemapSchema.parse({
+      schemaVersion: 1,
+      commit: COMMIT,
+      symbols: [
+        ...codemap.symbols,
+        { hash: CODEMAP_ONLY, lang: 'py', kind: 'function', name: 'retries', file: 'src/retry.py', span: [1, 4] }
+      ]
+    });
+
+    it('GROUNDS: symbol evidence mints from the codemap, never rejected as a missing identifier', () => {
+      const input = anchorInput(
+        [
+          draft('c1', {
+            class: 'code-structure',
+            predicate: 'retries exists',
+            proposedEvidence: [{ kind: 'symbol', symbol: CODEMAP_ONLY }],
+            proposedSubscriptions: [{ kind: 'file-content', file: 'package.json' }]
+          } as Partial<DraftClaim>),
+          draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+        ],
+        { codemap: codemapWithUnfingerprinted }
+      );
+      const result = expectOk(anchorWriterLedger(input));
+      expect(result.evidence).toHaveLength(1);
+      expect(result.evidence[0]?.ref).toMatchObject({ kind: 'source-linked', symbol: CODEMAP_ONLY });
+      expect(result.rejectedProposals.some((rejected) => rejected.code === 'unknown-symbol')).toBe(false);
+    });
+
+    it('classifies a facet subscription as missing-facet, NOT unknown-symbol', () => {
+      const input = anchorInput(
+        [
+          draft('c1', {
+            class: 'code-structure',
+            predicate: 'retries exists',
+            proposedEvidence: [{ kind: 'symbol', symbol: CODEMAP_ONLY }],
+            proposedSubscriptions: [{ kind: 'signature', symbolHash: CODEMAP_ONLY }]
+          } as Partial<DraftClaim>),
+          draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+        ],
+        { codemap: codemapWithUnfingerprinted }
+      );
+      const result = expectOk(anchorWriterLedger(input));
+      expect(result.rejectedProposals).toContainEqual(
+        expect.objectContaining({ markerId: 'c1', code: 'missing-facet' })
+      );
+      expect(result.rejectedProposals.some((rejected) => rejected.code === 'unknown-symbol')).toBe(false);
+      // The claim still gets a real invalidation edge: the grounding symbol's own file.
+      expect(result.ledger.claims[0]?.subscriptions).toEqual([
+        { kind: 'file-content', file: 'src/retry.py', contentHash: PARSED_FILE_HASH }
+      ]);
+    });
+
+    it('still rejects a hash that is in NEITHER source — a hallucinated symbol stays a defect', () => {
+      const input = anchorInput([
+        draft('c1', {
+          class: 'code-structure',
+          predicate: 'retries exists',
+          proposedEvidence: [{ kind: 'symbol', symbol: UNKNOWN_SYMBOL }],
+          proposedSubscriptions: [{ kind: 'file-content', file: 'package.json' }]
+        } as Partial<DraftClaim>),
+        draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+      ]);
+      const result = expectOk(anchorWriterLedger(input));
+      expect(result.evidence).toEqual([]);
+      expect(result.rejectedProposals).toContainEqual(
+        expect.objectContaining({ markerId: 'c1', proposal: 'evidence', code: 'unknown-symbol' })
+      );
+    });
+  });
+
+  // A whole-file dependency on a normal, cleanly-parsed source file used to be rejected as an
+  // unknown file whenever the page had not happened to read it: `unparsedFiles` only lists the
+  // files NO pack fingerprinted. Every such rejection was false — the file was right there.
+  it('derives an authoritative hash for a PARSED source file the page never observed', () => {
+    const input = anchorInput(
+      [
+        draft('c1', {
+          class: 'behavior',
+          proposedSubscriptions: [{ kind: 'file-content', file: 'src/retry.py' }]
+        } as Partial<DraftClaim>),
+        draft('c2', { class: 'intent-history', proposedSubscriptions: [] })
+      ],
+      { observedReads: [] }
+    );
+    const result = expectOk(anchorWriterLedger(input));
+    expect(result.ledger.claims[0]?.subscriptions).toEqual([
+      { kind: 'file-content', file: 'src/retry.py', contentHash: PARSED_FILE_HASH }
+    ]);
+    expect(result.rejectedProposals.some((rejected) => rejected.code === 'unknown-file')).toBe(false);
   });
 
   it('FAILS (never drops) a claim whose marker sits outside every content block', () => {
