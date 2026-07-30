@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { execPath } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { subCommands } from './cli-commands.ts';
 
 // END-TO-END DISPATCH. Every other CLI test calls a command handler directly, which is exactly how
 // `docstube generate` shipped a regression where the whole pipeline succeeded and the process then
@@ -56,8 +57,8 @@ const registeredSubCommands = ((): string[] => {
 // is a string only that command can print, so a silent fallthrough cannot pass.
 const realDispatchCases = [
   { args: ['version'], expect: '0.0.2', exitCode: 0 },
-  { args: ['help'], expect: 'Usage: docstube [command] [options]', exitCode: 0 },
-  { args: ['help', 'generate'], expect: 'Usage: docstube generate', exitCode: 0 },
+  { args: ['help'], expect: 'Run `docstube` with no command to open the local control plane', exitCode: 0 },
+  { args: ['help', 'generate'], expect: 'USAGE docstube generate', exitCode: 0 },
   // Rejected by each command's own argument guard, before it loads or does anything.
   { args: ['wizard', '--port', '99999'], expect: 'Invalid --port value: 99999', exitCode: 1 },
   { args: ['preview', '--port', '99999'], expect: 'Invalid --port value: 99999', exitCode: 1 },
@@ -123,6 +124,34 @@ describe('cli dispatch', () => {
     const missing = registeredSubCommands.filter((name) => !exercised.has(name) && !usageOnlySubCommands.has(name));
     expect(missing).toEqual([]);
   });
+});
+
+// `docstube help`, `docstube --help`, `docstube help <command>` and the unknown-command usage dump
+// all render from the ONE citty registry. These assertions run across the process boundary: the
+// left side is the registry imported in-process, the right side is what a user actually sees.
+describe('cli help: every surface renders the same registry', () => {
+  it('shows the CLI the same commands the registry holds', { timeout }, () => {
+    expect(registeredSubCommands.toSorted()).toEqual(Object.keys(subCommands).toSorted());
+  });
+
+  it('renders `help` and `--help` identically', { timeout }, () => {
+    expect(runCli('help').output.trim()).toBe(runCli('--help').output.trim());
+  });
+
+  it('renders the same overview when rejecting an unknown command', { timeout }, () => {
+    const overview = runCli('help').output.trim();
+    const rejected = runCli('generatee').output;
+    expect(rejected).toContain(overview);
+    expect(rejected).toContain('Unknown command generatee');
+  });
+
+  it.each(registeredSubCommands)(
+    "`docstube help %s` matches that command's own --help",
+    (name) => {
+      expect(runCli('help', name).output.trim()).toBe(runCli(name, '--help').output.trim());
+    },
+    timeout
+  );
 });
 
 describe('cli dispatch: bare invocation and flags', () => {

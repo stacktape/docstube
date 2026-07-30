@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { failureModeCodes } from '@docstube/contracts';
 import type { FailureModeCode } from '@docstube/contracts';
+import { subCommands } from './cli-commands.ts';
 import {
   countRunFailureModes,
   createPostHogRuntimeTelemetryTransport,
@@ -120,6 +121,35 @@ describe('per-user preference and legacy migration', () => {
 });
 
 describe('event payload', () => {
+  // Nothing is sent on the very first run, so the preference has to be established before the names
+  // being asserted are observable at all.
+  const reportedCommandNames = async (command: string): Promise<string[]> => {
+    await runOnce();
+    const captured: RuntimeTelemetryEvent[] = [];
+    await runCliCommandWithTelemetry({
+      command,
+      env: {},
+      workspaceDir,
+      userConfigDir,
+      transport: (event) => {
+        captured.push(event);
+      },
+      run: () => ({ exitCode: 0 })
+    });
+    expect(captured.length).toBeGreaterThan(0);
+    return captured.map((event) => event.command);
+  };
+
+  // The command name is derived from THE citty registry. It used to be a hand-copied allowlist that
+  // had gone stale, so every `docstube preview` run was reported as `unknown`.
+  it.each(Object.keys(subCommands))('reports the registered command %s under its own name', async (command) => {
+    expect(new Set(await reportedCommandNames(command))).toEqual(new Set([command]));
+  });
+
+  it('never lets a name that is not a registered command through as free text', async () => {
+    expect(new Set(await reportedCommandNames('some-internal-name'))).toEqual(new Set(['unknown']));
+  });
+
   it('carries duration, coarse error kind, and failure-mode counts on the final event', async () => {
     await runOnce();
     const events = await runOnce({ exitCode: 1, failureModes: { 'verify.typecheck-failed': 2 } });

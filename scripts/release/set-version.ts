@@ -33,14 +33,13 @@ const updateSourceVersionFile = async (path: string, replacements: readonly [Reg
 };
 
 const updateSourceVersion = async (version: string) => {
-  await updateSourceVersionFile(resolve('packages/core/src/core.ts'), [
+  // Exactly two source constants hold the version: the kernel's and the CLI's. `core.ts` only
+  // re-exports `version.ts`, so the old pattern aimed at `core.ts` silently matched nothing.
+  await updateSourceVersionFile(resolve('packages/core/src/version.ts'), [
     [/export const docstubeVersion = '[^']+';/, `export const docstubeVersion = '${version}';`]
   ]);
-  await updateSourceVersionFile(resolve('apps/cli/src/cli.ts'), [
-    [/const docstubeVersion = '[^']+';/, `const docstubeVersion = '${version}';`]
-  ]);
-  await updateSourceVersionFile(resolve('apps/cli/src/runtime-telemetry.ts'), [
-    [/const docstubeVersion = '[^']+';/, `const docstubeVersion = '${version}';`]
+  await updateSourceVersionFile(resolve('apps/cli/src/cli-version.ts'), [
+    [/export const docstubeVersion = '[^']+';/, `export const docstubeVersion = '${version}';`]
   ]);
   // The Action pins the exact docstube version it runs (never @latest); both the action.yml
   // input default and the TS fallback constant track the release version.

@@ -1,53 +1,53 @@
-export const commandHelp = [
-  'Usage: docstube [command] [options]',
-  '',
+import { renderUsage } from 'citty';
+import type { CommandDef } from 'citty';
+import type { CliOutput } from './cli-output.ts';
+
+// ONE help renderer. citty derives the command list, their descriptions, and every argument and
+// option straight from the registry in cli-commands.ts, so `docstube help`, `docstube --help`,
+// `docstube help <command>` and the unknown-command usage dump are all this file. There is no
+// hand-maintained command list to drift out of the registry — an earlier one already had.
+//
+// The single thing citty cannot derive is that bare `docstube` is itself a command: `default:
+// 'wizard'` renders as nothing at all. That paragraph, and only that paragraph, is written here.
+const bareInvocationNote = [
   'Run `docstube` with no command to open the local control plane: first-run setup when this',
-  'repository has no docstube.yml, the generation dashboard when it does.',
-  '',
-  'Commands:',
-  '  wizard                 Open the local setup wizard and control plane.',
-  '  generate               Generate docs from existing config (idempotent — later runs do only the affected work).',
-  '  refine                 Improve the lowest-quality generated pages first.',
-  '  preview                Build (when stale) and serve the generated docs site locally.',
-  '  audit                  Measure verified defects in any existing docs site.',
-  '  answer                 List and answer open maintainer questions.',
-  '  validate               Validate the docstube config family.',
-  '  check [kind]           Run deterministic checks (kinds come from registered verifier plugins).',
-  '  status                 Show manifest, claim counts, and open flags.',
-  '  doctor                 Check local runtime and project setup (--ci preflights CI auth + permissions).',
-  '  plugin                 Scaffold and manage docstube plugins.',
-  '  upgrade                Upgrade the docstube tool itself.',
-  '  version                Print the docstube version.',
-  '  help [command]         Print command help.'
+  'repository has no docstube.yml, the generation dashboard when it does.'
 ].join('\n');
 
-export const commandHelpByCommand: Record<string, string> = {
-  wizard:
-    'Usage: docstube wizard [--port <n>] [--no-open]\n       docstube            (same thing — bare docstube is the entry point)\n\nOpen the local control plane. With no docstube.yml it lands on first-run setup; with one it lands on the dashboard. Non-interactive shells print the URL instead of opening a browser; --no-open always does.',
-  generate:
-    'Usage: docstube generate [--max-attempts <n>]\n\nGenerate docs from existing config. Idempotent reconciler: the first run generates everything; later runs redo only affected work.',
-  refine:
-    'Usage: docstube refine [page] [--failed] [--max-pages <n>] [--max-rounds-per-page <n>] [--total-rounds <n>]\n\nImprove the lowest-quality generated pages first.',
-  audit:
-    'Usage: docstube audit <docs-dir> [--json]\n\nExtract claims from an existing docs site and verify them against the codebase.',
-  preview:
-    'Usage: docstube preview [--port <n>] [--build]\n\nBuild the generated site when its content changed (npm handled automatically), then serve it on localhost and open the browser. --build forces a rebuild.',
-  validate: 'Usage: docstube validate\n\nValidate the docstube config family.',
-  check:
-    'Usage: docstube check [kind]\n       docstube check --list\n\nRun deterministic checks over the generated docs. Kinds derive from registered verifier plugins.',
-  status: 'Usage: docstube status\n\nShow manifest, claim counts, and open flags.',
-  doctor:
-    'Usage: docstube doctor [--ci] [--json]\n\nCheck local runtime and project setup. --ci also preflights the configured transport credential and every GitHub permission, auto-merge precondition, and branch-state fact a CI run needs — before any model spend — and exits non-zero when a blocking check fails. --json emits the versioned report the GitHub Action consumes. Checks that cannot be performed report `unknown` with their reason, never a pass.',
-  answer:
-    'Usage: docstube answer\n       docstube answer <id> "your answer"\n\nList open maintainer questions (tribal knowledge) and answer them.',
-  plugin: 'Usage: docstube plugin scaffold <name>\n\nScaffold a docstube plugin (uses the plugin-authoring skill).',
-  upgrade: 'Usage: docstube upgrade [--check] [--to <version>]\n\nUpgrade the docstube tool itself.',
-  version: 'Usage: docstube version\n\nPrint the docstube version.'
+// `CommandDef` is invariant in its args, and help rendering does not care which args a command has.
+// citty's own `SubCommandsDef` erases them the same way.
+// oxlint-disable-next-line typescript/no-explicit-any
+type HelpCommandDef = CommandDef<any>;
+
+export type RenderedHelp = {
+  text: string;
+  unknownCommand: boolean;
 };
 
-export const getCommandHelp = (command?: string): string => {
+const subCommandsOf = (main: HelpCommandDef): Record<string, HelpCommandDef> =>
+  (main.subCommands ?? {}) as Record<string, HelpCommandDef>;
+
+export const renderRootHelp = async (main: HelpCommandDef): Promise<string> =>
+  `${await renderUsage(main)}\n\n${bareInvocationNote}`;
+
+export const renderHelp = async (main: HelpCommandDef, command?: string): Promise<RenderedHelp> => {
   if (command === undefined) {
-    return commandHelp;
+    return { text: await renderRootHelp(main), unknownCommand: false };
   }
-  return commandHelpByCommand[command] ?? `Unknown command: ${command}\n\n${commandHelp}`;
+  const subCommands = subCommandsOf(main);
+  const subCommand = command in subCommands ? subCommands[command] : undefined;
+  if (subCommand === undefined) {
+    // Same wording citty uses for a typo'd command, so the two paths read identically.
+    return { text: `Unknown command ${command}\n\n${await renderRootHelp(main)}`, unknownCommand: true };
+  }
+  return { text: await renderUsage(subCommand, main), unknownCommand: false };
 };
+
+// Handed to citty's `runMain` so the usage it prints for `--help` and for an unknown command is the
+// exact same text `docstube help` prints, through the CLI's own output rather than console.log.
+export const createUsageRenderer =
+  (output: CliOutput) =>
+  async (cmd: HelpCommandDef, parent?: HelpCommandDef): Promise<void> => {
+    // citty resolves the deepest matched command; no parent means it fell back to the root.
+    output.info(parent === undefined ? await renderRootHelp(cmd) : await renderUsage(cmd, parent));
+  };

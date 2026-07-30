@@ -3,9 +3,9 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { FailureModeCode } from '@docstube/contracts';
 import { toFailureModeCode } from '@docstube/contracts';
+import { subCommands } from './cli-commands.ts';
+import { docstubeVersion } from './cli-version.ts';
 import { telemetryPath } from './workspace-paths.ts';
-
-const docstubeVersion = '0.0.2';
 
 export type RuntimeTelemetryErrorKind = 'command-failed' | 'exception';
 
@@ -38,27 +38,14 @@ export type RuntimeTelemetryDisclosureResult = {
   disclosed: boolean;
 };
 
-const knownRuntimeTelemetryCommands = new Set([
-  'answer',
-  'audit',
-  'check',
-  'doctor',
-  'generate',
-  'help',
-  'plugin',
-  'refine',
-  'status',
-  'upgrade',
-  'validate',
-  'version',
-  'wizard'
-]);
-
 const falseValues = new Set(['0', 'false', 'no', 'off']);
 const trueValues = new Set(['1', 'true', 'yes', 'on']);
 
-const normalizedCommandName = (command: string): string =>
-  knownRuntimeTelemetryCommands.has(command) ? command : 'unknown';
+// Only registered command names may ever reach telemetry — anything else is free text. Derived from
+// THE registry rather than a copy of it: the copy this replaced had gone stale and was reporting
+// every `docstube preview` run as `unknown`. The registry has a null prototype, so `in` cannot
+// resolve an inherited key. `cli-commands.ts` only imports this module dynamically, at run time.
+const normalizedCommandName = (command: string): string => (command in subCommands ? command : 'unknown');
 
 const envBoolean = (value: string | undefined): boolean | undefined => {
   if (!value) {
