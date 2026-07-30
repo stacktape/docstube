@@ -8,7 +8,7 @@ import {
   detectProject,
   docstubeVersion,
   loadConfigFamily,
-  resolveTransportCredentialRequirement
+  resolveRunCredentialRequirements
 } from '@docstube/core';
 import type { TransportCredentialRequirement } from '@docstube/core';
 
@@ -319,23 +319,105 @@ const localRuntimeChecks = async (input: {
   return checks;
 };
 
-const transportChecks = (input: {
+// THE CHECK-ID REGISTRY IS CLOSED AND SINGLE-INSTANCE (ci-preflight-schema): a report carries at
+// most one `transport-credential` check, so a config that routes roles to several providers is
+// AGGREGATED into it rather than emitting a check per provider. Aggregation is worst-status-wins —
+// one missing key anywhere in the run fails the whole preflight — and every detail names the roles
+// it is about, so "which provider, for which role" survives the collapse.
+type CredentialVerdict = { status: 'pass' | 'fail' | 'unknown'; detail: string; remedy?: string };
+
+// "the writer" / "reviewer, translator" — how a requirement's roles are referred to in prose.
+const rolesLabel = (requirement: TransportCredentialRequirement): string =>
+  requirement.roles.length === 1 ? `the ${requirement.roles[0]}` : `${requirement.roles.join(', ')}`;
+
+const credentialVerdict = (input: {
   requirement: TransportCredentialRequirement;
   env: NodeJS.ProcessEnv;
   binaryPresent: boolean | undefined;
   mode: 'ci' | 'local';
-}): CiPreflightCheck[] => {
+}): CredentialVerdict => {
   const { requirement, env } = input;
+  const roles = rolesLabel(requirement);
+  const present = credentialEnvVarPresent(requirement, env);
+
+  if (requirement.kind === 'vendor-cli') {
+    const binary = requirement.binary ?? requirement.transportId;
+    if (input.binaryPresent === false) {
+      return {
+        status: 'fail',
+        detail: `\`${binary}\` is not on PATH, and ${roles} routes to ${requirement.transportId}`,
+        remedy: `Install the ${binary} CLI in the job before the docstube step, or route ${roles} to an API transport.`
+      };
+    }
+    if (present !== undefined) {
+      return { status: 'pass', detail: `\`${binary}\` is on PATH and ${present} is set (${roles})` };
+    }
+    // A vendor CLI with no token env var: on a developer machine an interactive login may well be
+    // in place (unprovable without a billable call); an unattended runner has no such login.
+    return input.mode === 'ci'
+      ? {
+          status: 'fail',
+          detail:
+            `\`${binary}\` is on PATH but none of ${requirement.credentialEnvVars.join(', ')} is set for ${roles}, ` +
+            'and an unattended runner cannot complete an interactive login',
+          remedy: `Pass ${requirement.credentialEnvVars[0]} to the docstube step via \`env:\` from a repository secret.`
+        }
+      : {
+          status: 'unknown',
+          detail:
+            `\`${binary}\` is on PATH; none of ${requirement.credentialEnvVars.join(', ')} is set for ${roles}, so ` +
+            'this run would rely on an interactive login that cannot be verified without a billable call'
+        };
+  }
+
+  if (requirement.kind === 'keyless') {
+    if (requirement.endpointIsPrivate === true) {
+      return {
+        status: 'pass',
+        detail: `${requirement.transportId} needs no credential for ${roles}${requirement.endpoint ? ` — ${requirement.endpoint} is a local endpoint` : ''}`
+      };
+    }
+    return {
+      status: 'fail',
+      detail:
+        `agents.apiKeyEnv is unset, so no authorization header is sent for ${roles} — but ${requirement.endpoint} ` +
+        'is a hosted endpoint that requires a key',
+      remedy:
+        'Set `agents.apiKeyEnv` in docstube.yml to the env var holding the key, or point `agents.baseUrl` at a ' +
+        'local keyless server.'
+    };
+  }
+
+  const envVar = requirement.credentialEnvVars[0] ?? 'the configured credential';
+  return present !== undefined
+    ? { status: 'pass', detail: `${present} is set (${roles})` }
+    : {
+        status: 'fail',
+        detail: `${roles} routes to ${requirement.transportId} and ${envVar} is not set in this environment`,
+        remedy:
+          `Pass ${envVar} to the docstube step via \`env:\` from a repository secret. Other providers' keys are ` +
+          `irrelevant — this transport reads only ${envVar}.`
+      };
+};
+
+const transportChecks = (input: {
+  // EVERY provider the run could use — one entry per distinct routing, writer first.
+  requirements: readonly TransportCredentialRequirement[];
+  env: NodeJS.ProcessEnv;
+  binaryPresent: (binary: string) => boolean | undefined;
+  mode: 'ci' | 'local';
+}): CiPreflightCheck[] => {
   const checks: CiPreflightCheck[] = [];
 
-  if (requirement.configProblem !== undefined) {
+  const broken = input.requirements.find((requirement) => requirement.configProblem !== undefined);
+  if (broken !== undefined) {
     checks.push(
       check(
         'transport-resolution',
         'transport',
         'fail',
         true,
-        requirement.configProblem,
+        `${broken.configProblem} (${rolesLabel(broken)})`,
         'Set `agents.model` in docstube.yml — this transport has no default model.'
       )
     );
@@ -347,100 +429,41 @@ const transportChecks = (input: {
       'transport',
       'pass',
       true,
-      `${requirement.transportId} · model ${requirement.model}${requirement.endpoint ? ` · ${requirement.endpoint}` : ''}`
+      input.requirements
+        .map(
+          (requirement) =>
+            `${rolesLabel(requirement)}: ${requirement.transportId} · model ${requirement.model}` +
+            `${requirement.endpoint ? ` · ${requirement.endpoint}` : ''}`
+        )
+        .join(' | ')
     )
   );
 
-  const present = credentialEnvVarPresent(requirement, env);
-
-  if (requirement.kind === 'vendor-cli') {
-    const binary = requirement.binary ?? requirement.transportId;
-    if (input.binaryPresent === false) {
-      checks.push(
-        check(
-          'transport-credential',
-          'transport credential',
-          'fail',
-          true,
-          `\`${binary}\` is not on PATH, and agents.transport is ${requirement.transportId}`,
-          `Install the ${binary} CLI in the job before the docstube step, or switch agents.transport to an API transport.`
-        )
-      );
-      return checks;
-    }
-    if (present !== undefined) {
-      checks.push(
-        check(
-          'transport-credential',
-          'transport credential',
-          'pass',
-          true,
-          `\`${binary}\` is on PATH and ${present} is set`
-        )
-      );
-      return checks;
-    }
-    // A vendor CLI with no token env var: on a developer machine an interactive login may well be
-    // in place (unprovable without a billable call); an unattended runner has no such login.
-    checks.push(
-      input.mode === 'ci'
-        ? check(
-            'transport-credential',
-            'transport credential',
-            'fail',
-            true,
-            `\`${binary}\` is on PATH but none of ${requirement.credentialEnvVars.join(', ')} is set, and an unattended runner cannot complete an interactive login`,
-            `Pass ${requirement.credentialEnvVars[0]} to the docstube step via \`env:\` from a repository secret.`
-          )
-        : check(
-            'transport-credential',
-            'transport credential',
-            'unknown',
-            true,
-            `\`${binary}\` is on PATH; none of ${requirement.credentialEnvVars.join(', ')} is set, so this run would rely on an interactive login that cannot be verified without a billable call`
-          )
-    );
-    return checks;
-  }
-
-  if (requirement.kind === 'keyless') {
-    if (requirement.endpointIsPrivate === true) {
-      checks.push(
-        check(
-          'transport-credential',
-          'transport credential',
-          'pass',
-          true,
-          `${requirement.transportId} needs no credential${requirement.endpoint ? ` — ${requirement.endpoint} is a local endpoint` : ''}`
-        )
-      );
-      return checks;
-    }
-    checks.push(
-      check(
-        'transport-credential',
-        'transport credential',
-        'fail',
-        true,
-        `agents.apiKeyEnv is unset, so no authorization header is sent — but ${requirement.endpoint} is a hosted endpoint that requires a key`,
-        'Set `agents.apiKeyEnv` in docstube.yml to the env var holding the key, or point `agents.baseUrl` at a local keyless server.'
-      )
-    );
-    return checks;
-  }
-
-  const envVar = requirement.credentialEnvVars[0] ?? 'the configured credential';
+  const verdicts = input.requirements.map((requirement) =>
+    credentialVerdict({
+      requirement,
+      env: input.env,
+      binaryPresent: requirement.binary === undefined ? undefined : input.binaryPresent(requirement.binary),
+      mode: input.mode
+    })
+  );
+  // Worst status wins: a run whose reviewer cannot authenticate is a run that fails, even when the
+  // writer's key is right there.
+  const failed = verdicts.filter((verdict) => verdict.status === 'fail');
+  const unknown = verdicts.filter((verdict) => verdict.status === 'unknown');
+  const worst = failed.length > 0 ? failed : unknown.length > 0 ? unknown : verdicts;
+  const status = failed.length > 0 ? 'fail' : unknown.length > 0 ? 'unknown' : 'pass';
+  const remedy = worst.find((verdict) => verdict.remedy !== undefined)?.remedy;
   checks.push(
-    present !== undefined
-      ? check('transport-credential', 'transport credential', 'pass', true, `${present} is set`)
-      : check(
-          'transport-credential',
-          'transport credential',
-          'fail',
-          true,
-          `agents.transport is ${requirement.transportId} and ${envVar} is not set in this environment`,
-          `Pass ${envVar} to the docstube step via \`env:\` from a repository secret. Other providers' keys are irrelevant — this transport reads only ${envVar}.`
-        )
+    check(
+      'transport-credential',
+      'transport credential',
+      status,
+      true,
+      // Passing routings ride along in the detail so the report states what it actually checked.
+      verdicts.map((verdict) => verdict.detail).join(' | '),
+      remedy
+    )
   );
   return checks;
 };
@@ -684,9 +707,12 @@ export const runCiPreflight = async (input: CiPreflightInput): Promise<CiPreflig
   try {
     const family = await loadConfigFamily(input.workspaceDir);
     checks.push(check('config-family', 'config family', 'pass', true, 'docstube.yml + ia.yml valid'));
-    let requirement: TransportCredentialRequirement | undefined;
+    // EVERY role's provider, not just the default one (role-routing wave): `agents.roles` can send
+    // reviews or translations to a different transport, and a credential only that role needs is
+    // just as fatal — before the run, never forty minutes in.
+    let requirements: TransportCredentialRequirement[] | undefined;
     try {
-      requirement = resolveTransportCredentialRequirement(family.config, env);
+      requirements = resolveRunCredentialRequirements(family.config, env);
     } catch (error) {
       checks.push(
         check(
@@ -698,9 +724,15 @@ export const runCiPreflight = async (input: CiPreflightInput): Promise<CiPreflig
         )
       );
     }
-    if (requirement !== undefined) {
-      const binaryPresent = requirement.binary === undefined ? undefined : await probe(requirement.binary);
-      checks.push(...transportChecks({ requirement, env, binaryPresent, mode: input.mode }));
+    if (requirements !== undefined) {
+      // Each distinct vendor binary is probed once, however many roles need it.
+      const binaries = [
+        ...new Set(requirements.flatMap((entry) => (entry.binary === undefined ? [] : [entry.binary])))
+      ];
+      const probed = new Map(await Promise.all(binaries.map(async (binary) => [binary, await probe(binary)] as const)));
+      checks.push(
+        ...transportChecks({ requirements, env, binaryPresent: (binary) => probed.get(binary), mode: input.mode })
+      );
     }
   } catch (error) {
     // An unusable docstube.yml means every pipeline command will fail — never start one.

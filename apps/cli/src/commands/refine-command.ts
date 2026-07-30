@@ -5,6 +5,7 @@ import { emitPersistedSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { countRunFailureModes } from '../runtime-telemetry.ts';
 import { reportRunSpend } from './run-spend.ts';
+import { reportRunnerRouting } from './runner-banner.ts';
 
 export type RefineCommandInput = {
   workspaceDir: string;
@@ -23,7 +24,7 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
     const configuredRunner =
       input.taskRunner === undefined ? createTaskRunnerFromConfig(family.config, input.workspaceDir) : undefined;
     if (configuredRunner !== undefined) {
-      output.info(`refining with ${configuredRunner.transportId} (${configuredRunner.model})…`);
+      reportRunnerRouting(output, 'refining', configuredRunner);
     }
     const runner = input.taskRunner ?? configuredRunner;
     if (runner === undefined) {

@@ -125,6 +125,62 @@ describe('CI preflight — transport credentials', () => {
     expect(report.ok).toBe(true);
   });
 
+  // ROLE ROUTING IS PART OF THE CREDENTIAL SURFACE: `agents.roles` can send reviews or translations
+  // to a second provider, and a key only that role needs must fail HERE, not mid-run.
+  it('is fatal when a ROLE-OVERRIDDEN transport has no credential, even though the writer does', async () => {
+    await writeConfig(
+      'agents:\n  transport: claude-cli\n  roles:\n    reviewer:\n      transport: anthropic-api\n      model: claude-haiku-5\n'
+    );
+    const report = await runCiPreflight({
+      workspaceDir,
+      mode: 'ci',
+      // The writer's vendor-CLI token is present; the reviewer's provider key is not.
+      env: ciEnv({ CLAUDE_CODE_OAUTH_TOKEN: 'oauth-fixture' }),
+      probeBinary: async () => true,
+      github: okProbe()
+    });
+    const credential = findCheck(report, 'transport-credential');
+    expect(credential.status).toBe('fail');
+    expect(credential.detail).toContain('reviewer');
+    expect(credential.detail).toContain('ANTHROPIC_API_KEY');
+    expect(report.fatal).toContain('transport-credential');
+    expect(report.ok).toBe(false);
+  });
+
+  it('passes — and reports both routings — when every role that moved has its credential', async () => {
+    await writeConfig(
+      'agents:\n  transport: claude-cli\n  roles:\n    reviewer:\n      transport: anthropic-api\n      model: claude-haiku-5\n'
+    );
+    const report = await runCiPreflight({
+      workspaceDir,
+      mode: 'ci',
+      env: ciEnv({ CLAUDE_CODE_OAUTH_TOKEN: 'oauth-fixture', ANTHROPIC_API_KEY: 'sk-ant-fixture' }),
+      probeBinary: async () => true,
+      github: okProbe()
+    });
+    expect(findCheck(report, 'transport-credential').status).toBe('pass');
+    const resolution = findCheck(report, 'transport-resolution');
+    expect(resolution.detail).toContain('claude-cli');
+    expect(resolution.detail).toContain('anthropic-api');
+    expect(resolution.detail).toContain('reviewer');
+    expect(report.ok).toBe(true);
+  });
+
+  it('is fatal when a role-overridden transport resolves NO model', async () => {
+    await writeConfig('agents:\n  transport: claude-cli\n  roles:\n    translator:\n      transport: codex-cli\n');
+    const report = await runCiPreflight({
+      workspaceDir,
+      mode: 'ci',
+      env: ciEnv({ CLAUDE_CODE_OAUTH_TOKEN: 'oauth-fixture', OPENAI_API_KEY: 'sk-openai' }),
+      probeBinary: async () => true,
+      github: okProbe()
+    });
+    const resolution = findCheck(report, 'transport-resolution');
+    expect(resolution.status).toBe('fail');
+    expect(resolution.detail).toContain('agents.roles.translator.model');
+    expect(report.fatal).toContain('transport-resolution');
+  });
+
   it('is fatal when a vendor CLI transport has no binary on PATH', async () => {
     await writeConfig('agents:\n  transport: codex-cli\n  model: gpt-5\n');
     const report = await runCiPreflight({

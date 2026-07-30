@@ -455,10 +455,17 @@ agent read roots** (the dogfood self-reference incident: a writer read generated
 of the SAME page for diff-edit repair, and neighbor-page summaries in the context pack.
 PROVISIONAL — the prior-docs access policy is a registered eval-queue experiment.
 
-**Roles are routed for real:** writer, reviewer (persona review, fidelity review), risk critic,
-translator (economy-class default), researcher (auto-answer agent; web search only on transports
-that support it). `agents.roles.*` config maps roles to models per transport; a parsed-but-
-unrouted role is a false affordance and a bug.
+**Roles are routed for real:** every model task declares a role (`agentRoleByTaskKind` in
+contracts), and `agents.roles.<role>` overrides that role's transport, model, or both — unset roles
+inherit the top-level `agents.transport`/`agents.model`, so an override moves exactly one role's
+spend. The single implementation of the order lives in `core/src/pipeline/agent-role-routing.ts`;
+the CI preflight resolves the SAME routings so a credential only one role needs is fatal before
+spend, not mid-run. A parsed-but-unrouted role is a false affordance and a bug — the routable set
+is therefore exactly the roles that have tasks today: **writer** (write-page), **reviewer**
+(persona review), **translator** (economy-class default), **architect** (IA proposal), **extractor**
+(theme tokens, audit claim extraction, feedback triage). Planned roles — risk critic, researcher
+(auto-answer agent; web search only on transports that support it), fidelity review — join the
+enum WITH the tasks that issue them, never before.
 
 ### 8.3 Transports
 

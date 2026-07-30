@@ -10,6 +10,7 @@ import {
 } from '@docstube/core';
 import type { AuditReport } from '@docstube/core';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+import { reportRunnerRouting } from './runner-banner.ts';
 
 export type AuditCommandInput = {
   workspaceDir: string;
@@ -57,7 +58,7 @@ export const runAuditCommand = async (input: AuditCommandInput, output: CliOutpu
     const config = await loadAuditConfig(input.workspaceDir, output, json);
     const runner = createTaskRunnerFromConfig(config, input.workspaceDir);
     if (!json) {
-      output.info(`auditing with ${runner.transportId} (${runner.model})…`);
+      reportRunnerRouting(output, 'auditing', runner);
     }
     const docsDir = isAbsolute(input.docsDir) ? input.docsDir : join(input.workspaceDir, input.docsDir);
     const report = await runAudit({ repoRoot: input.workspaceDir, docsDir, runTask: runner.runTask });

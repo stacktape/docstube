@@ -13,6 +13,7 @@ import { createSitePublisher } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { countRunFailureModes } from '../runtime-telemetry.ts';
 import { reportRunSpend } from './run-spend.ts';
+import { reportRunnerRouting } from './runner-banner.ts';
 
 export type GenerateCommandInput = {
   workspaceDir: string;
@@ -30,7 +31,7 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
     const configuredRunner =
       input.taskRunner === undefined ? createTaskRunnerFromConfig(family.config, input.workspaceDir) : undefined;
     if (configuredRunner !== undefined) {
-      output.info(`generating with ${configuredRunner.transportId} (${configuredRunner.model})…`);
+      reportRunnerRouting(output, 'generating', configuredRunner);
     }
     const runner = input.taskRunner ?? configuredRunner;
     if (runner === undefined) {
