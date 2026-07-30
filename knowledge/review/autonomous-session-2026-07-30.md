@@ -146,6 +146,44 @@ surfaced together with which one owns it.
   them. A repository-hygiene spec now fails on any raw NUL in a tracked text file — it caught the
   third and fourth within hours of being written.
 
+## The integration run (all of the above, together)
+
+Run `run_2nat7c788sh8zfbk5n1y`. Every feature above exercised in one live generation:
+
+| | Run 3 (before this session) | Integration run |
+|---|---|---|
+| Checked, excluding `behavior` | 47.6% | **56.8%** (54 / 95) |
+| Checked overall | 17.2% | 18.3% (54 / 295) |
+| Attempts for 6 pages | 9 | **6 — no retries** |
+| Contradictions / false flags | 0 | **0** |
+| Cost | ~$30 | **~$18.66** |
+
+Per-role spend now reports itself: writer ~$17.49, risk-critic ~$0.68, reviewer ~$0.48 — the
+critic costs under 4% of a run. Staged-atomic publish worked ("site published to docs-site/").
+The knowledge system correctly warned about the legacy answer file rather than silently ignoring
+it. The risk critic produced an assessment on all six pages.
+
+**Structural findings: 0 — correct, not broken.** The dogfood IA is six flat pages with no
+navigation group holding ≥4 comparable siblings, so the cohort detector has nothing to compare.
+It needs a repo shaped like Stacktape's docs to fire.
+
+**Two things the run caught that no test had:**
+
+1. **`docstube generate` succeeded and then exited 1.** The root command had both `subCommands`
+   and a `run` handler, and citty runs the parent handler *even when a subcommand matched* — so
+   the pipeline finished perfectly, then printed "Unknown command: generate" and failed. It
+   affected **every** subcommand (`version`, `status`, `doctor`, all of them), which means the
+   GitHub Action was entirely broken, since it gates on exit code. 1763 passing tests missed it
+   because every CLI test called handlers directly and none asserted a process exit code. Fixed,
+   with end-to-end dispatch tests that spawn the real binary and assert exit codes — 15 of 36 of
+   them fail against the old code. A second find in the same area: `docstube constructor`
+   resolved `Object.prototype.constructor` and ran it as a command.
+
+2. **The run marked itself `dirtyWorkingTree: true` — and it was right.** I committed the session
+   summary *while the run was in progress*, so HEAD moved from `0c4e5e3` to `547279b` mid-run. The
+   HEAD-stability check flagged that the recorded evidence cannot be vouched for by the commit it
+   names. The system caught its own operator doing precisely what it is built to catch.
+
 ## Still open
 
 - **Auto-answer researcher** and **GitHub `/answer` ingestion** — seams documented, deliberately
