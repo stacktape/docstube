@@ -1,5 +1,5 @@
-import type { ClaimCorrectness, Flag, ManifestIndex, PageShard } from '@docstube/contracts';
-import { manifestIndexSchema, pageShardSchema } from '@docstube/contracts';
+import type { ClaimCorrectness, Flag, ManifestIndex, PageShard, StructuralFinding } from '@docstube/contracts';
+import { manifestIndexSchema, pageShardSchema, structuralGroupShardSchema } from '@docstube/contracts';
 
 // The verified delta is the honest PR annotation (PRODUCT §3.3): what changed, what proves it.
 // It is computed from the committed manifest (the docs lockfile, ARCHITECTURE §5.1) — since wave
@@ -21,11 +21,22 @@ export type PageDelta = {
   openFlags: readonly Flag[];
 };
 
+// STRUCTURAL QUALITY IS REPORTED SEPARATELY AND NEVER GATES (quality-ci-reader-v2 decision 21).
+// These counts live outside `openFlags` on purpose: `openFlags` is the merge-gate input, and a
+// structural work item is not a merge condition — not even an explicit-ia-rule violation.
+export type StructuralQualityDelta = {
+  openPageFindings: number;
+  openGroupFindings: number;
+  // Enough of each to name in the PR, ordered by the stable finding key.
+  open: readonly StructuralFinding[];
+};
+
 export type VerifiedDelta = {
   changedPages: readonly PageDelta[];
   totals: ClaimCounts;
   // Every open flag across all readable shards plus manifest systemFlags — the merge gate input.
   openFlags: readonly Flag[];
+  structural: StructuralQualityDelta;
 };
 
 export type WorkspaceFileReader = (relativePath: string) => Promise<string | undefined>;
@@ -122,5 +133,33 @@ export const loadVerifiedDelta = async (input: {
     ...index.systemFlags.filter(isOpenFlag)
   ];
 
-  return { changedPages, totals, openFlags };
+  // Structural quality, read from the same committed state and reported entirely separately from
+  // the flags above. Page findings come off the SOURCE-LOCALE shards only (renditions carry none);
+  // group findings come from the shards the index declares.
+  const openPageStructural = shards
+    .filter(({ shard }) => shard.locale === index.sourceLocale)
+    .flatMap(({ shard }) => shard.structuralFindings.filter((finding) => finding.status.state === 'open'));
+  const openGroupStructural: StructuralFinding[] = [];
+  for (const groupId of index.structuralGroups) {
+    const path = `.docstube/manifest/structure/${groupId}.json`;
+    const text = await input.readWorkspaceFile(path);
+    if (text === undefined) {
+      continue;
+    }
+    const groupShard = parseJsonOrThrow({ path, text, parseValue: (raw) => structuralGroupShardSchema.parse(raw) });
+    openGroupStructural.push(...groupShard.findings.filter((finding) => finding.status.state === 'open'));
+  }
+
+  return {
+    changedPages,
+    totals,
+    openFlags,
+    structural: {
+      openPageFindings: openPageStructural.length,
+      openGroupFindings: openGroupStructural.length,
+      open: [...openPageStructural, ...openGroupStructural].toSorted((left, right) =>
+        left.key < right.key ? -1 : left.key > right.key ? 1 : 0
+      )
+    }
+  };
 };

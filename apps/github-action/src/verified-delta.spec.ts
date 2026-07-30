@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFixturePage, buildFixturePageShard } from '@docstube/contracts';
+import { buildFixturePage, buildFixturePageShard, buildFixtureStructuralFinding } from '@docstube/contracts';
 import {
   buildFixtureFlag,
   buildFixtureShardWithFlags,
@@ -7,6 +7,40 @@ import {
   shardRelativePath
 } from './test-support.ts';
 import { countShardClaims, isPageShardPath, loadVerifiedDelta } from './verified-delta.ts';
+
+describe('structural quality in the verified delta', () => {
+  it('reports open structural findings separately, never as flags', async () => {
+    const shard = buildFixtureShardWithFlags([]);
+    const groupFinding = buildFixtureStructuralFinding([shard.page.id, 'pg_00000000000000000009']);
+    const pageFinding = {
+      ...groupFinding,
+      key: 'structure.empty-section:page',
+      code: 'structure.empty-section',
+      scope: { kind: 'entity' as const, pageId: shard.page.id },
+      detector: { kind: 'deterministic' as const, id: 'outline-integrity', version: '1' },
+      authority: { kind: 'builtin-rule' as const, ruleCode: 'outline-integrity.empty-section' }
+    };
+    const workspace = buildFixtureWorkspace({
+      shards: [{ ...shard, structuralFindings: [pageFinding] }],
+      structuralGroups: [
+        {
+          schemaVersion: 1,
+          groupId: 'compute-resources',
+          generatedAt: '2026-07-12T00:00:00.000Z',
+          pageIds: [shard.page.id],
+          findings: [groupFinding, { ...groupFinding, key: 'resolved-one', status: { state: 'resolved' } }]
+        }
+      ]
+    });
+
+    const delta = await loadVerifiedDelta({ changedFiles: [], readWorkspaceFile: workspace.readWorkspaceFile });
+
+    expect(delta?.structural.openPageFindings).toBe(1);
+    expect(delta?.structural.openGroupFindings).toBe(1);
+    // The merge-gate input is untouched by structural work items.
+    expect(delta?.openFlags).toEqual([]);
+  });
+});
 
 describe('verified delta', () => {
   it('recognizes page shard paths including frozen versions and Windows separators', () => {

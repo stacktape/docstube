@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildFixtureStructuralFinding } from '@docstube/contracts';
 import {
   buildDigestIssueBody,
   buildFlagCommentBody,
@@ -83,11 +84,53 @@ describe('PR body (verified delta annotation)', () => {
     expect(body).toContain('- `docs-site/content/en/getting-started/installation.mdx`');
   });
 
+  it('gives structural quality its own section and always labels it nonblocking', () => {
+    const finding = buildFixtureStructuralFinding();
+    const body = buildPullRequestBody({
+      committedPaths: [],
+      decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        structural: { openPageFindings: 2, openGroupFindings: 1, open: [finding] }
+      },
+      mode: 'generate'
+    });
+    expect(body).toContain('### Structural quality');
+    expect(body).toContain('Structural quality: 3 open · nonblocking');
+    expect(body).toContain('`structure.sibling-facet-asymmetry`');
+    expect(body).toContain('AI-assessed');
+    // Never the vocabulary of proof.
+    expect(body).not.toContain('verified defect');
+  });
+
+  it('says so plainly when there is no structural work', () => {
+    const body = buildPullRequestBody({
+      committedPaths: [],
+      decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
+      },
+      mode: 'generate'
+    });
+    expect(body).toContain('Structural quality: 0 open · nonblocking');
+    expect(body).toContain('No open structural findings.');
+  });
+
   it('reports the kernel decision plainly when the candidate is eligible', () => {
     const body = buildPullRequestBody({
       committedPaths: ['docs-site/content/en/index.mdx'],
       decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
-      delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
+      },
       mode: 'generate'
     });
     // The flags section no longer declares eligibility — only the kernel decision does.
@@ -110,7 +153,12 @@ describe('PR body (verified delta annotation)', () => {
           reasonCodes: ['budget.frozen', 'plan.deferred']
         })
       }),
-      delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
+      },
       mode: 'generate'
     });
     expect(body).toContain('Execution: **paused-budget**');
@@ -195,7 +243,12 @@ describe('job summary', () => {
       autoMerge: 'enabled',
       committedPaths: ['docs-site/content/en/index.mdx'],
       decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
-      delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
+      },
       mode: 'generate',
       pullRequestUrl: 'https://github.com/stacktape/docstube/pull/12',
       status: 'pull-request'

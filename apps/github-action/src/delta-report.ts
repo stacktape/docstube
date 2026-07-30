@@ -1,4 +1,4 @@
-import type { Flag } from '@docstube/contracts';
+import type { Flag, StructuralFinding } from '@docstube/contracts';
 import type { AutoMergeDecision } from './merge-decision.ts';
 import type { ClaimCounts, PageDelta, VerifiedDelta } from './verified-delta.ts';
 import { normalizeRepoPath } from './verified-delta.ts';
@@ -65,6 +65,32 @@ const changedPagesSection = (delta: VerifiedDelta): string[] =>
 const flagsSection = (openFlags: readonly Flag[]): string[] =>
   openFlags.length === 0 ? ['No open flags.'] : openFlags.map(formatFlagLine);
 
+// STRUCTURAL QUALITY — ITS OWN SECTION, ALWAYS NONBLOCKING (quality-ci-reader-v2 decision 21).
+// Deliberately not merged into the flags section: flags are the merge-gate input, these are
+// committed work items. The heading line is fixed wording so a reader learns it once, and no
+// finding is ever called a "verified defect" — an inferred-convention finding is an AI-ASSESSED
+// STRUCTURAL INCONSISTENCY, which is a weaker and more honest claim.
+const structuralFindingLine = (finding: StructuralFinding): string => {
+  const label = finding.detector.kind === 'ai-assessed' ? 'AI-assessed' : 'deterministic';
+  const targets = finding.repairTargets.length === 0 ? '' : ` — ${finding.repairTargets.length} page(s) to repair`;
+  return `- **${finding.impact}** · ${label} · \`${finding.code}\` — ${finding.message}${targets}`;
+};
+
+export const structuralSection = (delta: VerifiedDelta | undefined): string[] => {
+  const structural = delta?.structural;
+  const open = (structural?.openPageFindings ?? 0) + (structural?.openGroupFindings ?? 0);
+  const lines = [`Structural quality: ${open} open · nonblocking`, ''];
+  if (open === 0) {
+    return [...lines, 'No open structural findings.'];
+  }
+  return [
+    ...lines,
+    'These never block the merge. They are committed work items — `docstube refine` picks them up first.',
+    '',
+    ...(structural?.open ?? []).map(structuralFindingLine)
+  ];
+};
+
 // The honest report (PRODUCT §3.3): what executed, what was deferred, why the merge was withheld,
 // and which reason codes fired.
 const publicationSection = (decision: AutoMergeDecision | undefined): string[] => {
@@ -121,6 +147,7 @@ export const buildPullRequestBody = (input: {
   } else {
     lines.push('### Verified delta', '', 'No manifest index was found, so no verified delta could be computed.', '');
   }
+  lines.push('### Structural quality', '', ...structuralSection(input.delta), '');
   lines.push('### Publication decision', '', ...publicationSection(input.decision), '');
   lines.push('### Committed files', '', ...input.committedPaths.map((path) => `- \`${path}\``));
   return lines.join('\n');
@@ -214,6 +241,7 @@ export const buildJobSummary = (input: JobSummaryInput): string => {
     lines.push('### Verified delta', '', ...changedPagesSection(input.delta), '');
     lines.push(`### Open flags (${input.delta.openFlags.length})`, '', ...flagsSection(input.delta.openFlags), '');
   }
+  lines.push('### Structural quality', '', ...structuralSection(input.delta), '');
   lines.push('### Publication decision', '', ...publicationSection(input.decision), '');
   lines.push('### Auto-merge', '', ...autoMergeSummaryLine(input), '');
   lines.push('### Committed files', '', ...input.committedPaths.map((path) => `- \`${path}\``));
