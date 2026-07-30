@@ -1,5 +1,5 @@
 name: docstube
-description: Run docstube generate (the idempotent reconciler), open a verified-delta PR, and auto-merge when no flag blocks it.
+description: Run docstube generate --ci (the idempotent reconciler), open a verified-delta PR, and auto-merge only when the kernel's publication decision says the candidate is eligible.
 inputs:
   github-token:
     description: GitHub token used by the gh CLI for the PR, flag comment, digest issue, and auto-merge.
@@ -34,6 +34,10 @@ outputs:
     description: Auto-merge decision for the PR (enabled, blocked, unavailable, skipped).
   open-flag-count:
     description: Number of open flags delivered on the PR.
+  publication-reason-codes:
+    description: JSON array of the kernel publication decision's reason codes, verbatim.
+  undeclared-paths:
+    description: JSON array of paths that changed but were not declared by the run's output inventory. Never committed; always fatal to auto-merge eligibility.
   concurrency-group:
     description: Suggested workflow concurrency group for this run.
 runs:

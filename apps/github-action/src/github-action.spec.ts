@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Flag } from '@docstube/contracts';
+import { sha256Hex } from '@docstube/contracts';
 import { digestIssueTitle, flagCommentMarker } from './delta-report.ts';
 import type { IssueComment } from './delta-report.ts';
 import {
@@ -21,21 +22,28 @@ import type {
   GitHubActionPullRequestClient
 } from './github-action.ts';
 import {
+  attachFixturePublication,
   buildFixtureFlag,
   buildFixtureShardWithFlags,
   buildFixtureWorkspace,
+  fixtureHeadCommit,
   shardRelativePath
 } from './test-support.ts';
 
 type HarnessOptions = {
   changedFiles?: readonly string[];
   cliResult?: DocstubeCliRunResult;
+  declaredPaths?: readonly string[];
+  decision?: Record<string, unknown>;
+  decisionText?: string;
   enableAutoMergeError?: Error;
   env?: NodeJS.ProcessEnv;
   existingComments?: readonly IssueComment[];
   existingDigestIssue?: { number: number };
   existingPullRequest?: GitHubPullRequest;
+  headCommit?: string | undefined;
   latestVersion?: string;
+  omitDecision?: boolean;
   shardFlags?: readonly Flag[];
   systemFlags?: readonly Flag[];
   workspaceFiles?: Record<string, string>;
@@ -66,12 +74,25 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
     shardPath,
     '.docstube/cache/agent-calls/abc.json'
   ];
+  // The declared output inventory: by default exactly the committable paths this run touched.
+  attachFixturePublication({
+    files: workspace.files,
+    declaredPaths: options.declaredPaths ?? [
+      'docs-site/content/en/getting-started/installation.mdx',
+      '.docstube/manifest/manifest.json',
+      shardPath
+    ],
+    decision: options.decision,
+    decisionText: options.decisionText,
+    omitDecision: options.omitDecision
+  });
 
   const git: GitHubActionGitClient = {
     changedFiles: async () => {
       operations.push('changed-files');
       return changedFiles;
     },
+    headCommit: async () => ('headCommit' in options ? options.headCommit : fixtureHeadCommit),
     checkoutBase: async (input) => {
       operations.push(`checkout:${input.baseBranch}`);
     },
@@ -144,6 +165,10 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
       mergeControl,
       pullRequest,
       readWorkspaceFile: workspace.readWorkspaceFile,
+      hashWorkspaceFile: async (relativePath) => {
+        const content = workspace.files.get(relativePath);
+        return content === undefined ? undefined : sha256Hex(content);
+      },
       env: options.env ?? { ANTHROPIC_API_KEY: 'test-anthropic-key-123456' },
       checkLatestDocstubeVersion: async () => options.latestVersion,
       reporter: {
@@ -214,6 +239,8 @@ describe('GitHub Action orchestration', () => {
     expect(harness.outputs['auto-merge']).toBe('enabled');
     expect(harness.summaries.join('\n')).toContain('Auto-merge enabled (squash).');
     expect(harness.summaries.join('\n')).toContain('1 | 1 | 0');
+    // The decision is reported plainly, not implied by the absence of complaints.
+    expect(harness.summaries.join('\n')).toContain('Execution: **completed**');
     expect(JSON.stringify({ operations: harness.operations, summaries: harness.summaries })).not.toContain(
       'ghs_secret_token_123456'
     );
@@ -236,7 +263,7 @@ describe('GitHub Action orchestration', () => {
     expect(harness.operations).toContain(`create-comment:12:${flagCommentMarker}`);
     expect(harness.operations).toContain(`find-issue:${digestIssueTitle}`);
     expect(harness.operations).toContain(`create-issue:${digestIssueTitle}`);
-    expect(harness.summaries.join('\n')).toContain('Auto-merge blocked by 1 open flag(s)');
+    expect(harness.summaries.join('\n')).toContain('1 open blocking flag (coverage).');
   });
 
   it('refreshes the existing marker-tagged comment and digest issue instead of spamming new ones', async () => {
@@ -393,6 +420,131 @@ describe('GitHub Action orchestration', () => {
   });
 });
 
+// The hazard this gate exists to close (PRODUCT §3.3): a run that did not finish, or that cannot
+// prove what it produced, must never merge unattended — regardless of how clean the flags look.
+describe('publication decision enforcement', () => {
+  it('no decision artifact: the PR opens but auto-merge is withheld and says so', async () => {
+    const harness = createHarness({ omitDecision: true });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.autoMerge).toBe('blocked');
+    expect(harness.operations).not.toContain('enable-auto-merge:12');
+    expect(result.withheldReasons.join(' ')).toContain('no publication decision was found');
+    expect(harness.summaries.join('\n')).toContain('No enforceable publication decision');
+  });
+
+  it('unparseable and schema-invalid decisions both fail closed', async () => {
+    const brokenJson = createHarness({ decisionText: '{not json' });
+    const broken = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, brokenJson.deps);
+    expect(broken.autoMerge).toBe('blocked');
+    expect(broken.withheldReasons.join(' ')).toContain('not readable JSON');
+
+    // Arithmetic the contract enforces: planned must split into completed + deferred.
+    const invalid = createHarness({ decision: { plan: { planned: 3, completed: 1, deferred: 0 } } });
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, invalid.deps);
+    expect(result.autoMerge).toBe('blocked');
+    expect(result.withheldReasons.join(' ')).toContain('does not satisfy the contract');
+  });
+
+  it('a decision bound to a different tree or a different commit never merges', async () => {
+    const wrongTree = createHarness({ decision: { candidateArtifactHash: 'f'.repeat(64) } });
+    const treeResult = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, wrongTree.deps);
+    expect(treeResult.autoMerge).toBe('blocked');
+    expect(treeResult.withheldReasons.join(' ')).toContain('describes a different tree');
+
+    const wrongCommit = createHarness({ headCommit: 'b'.repeat(40) });
+    const commitResult = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, wrongCommit.deps);
+    expect(commitResult.autoMerge).toBe('blocked');
+    expect(commitResult.withheldReasons.join(' ')).toContain('describes a different revision');
+  });
+
+  it('a reason code from a newer CLI fails closed with an explicit registry message', async () => {
+    const harness = createHarness({
+      decision: {
+        deterministicGate: 'blocked',
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['gate.blocked', 'policy.future-condition']
+      }
+    });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.autoMerge).toBe('blocked');
+    expect(result.withheldReasons.join(' ')).toContain('cannot interpret');
+    expect(result.withheldReasons.join(' ')).toContain('policy.future-condition');
+  });
+
+  it('a budget-paused run never merges, and the PR says what was deferred', async () => {
+    const harness = createHarness({
+      decision: {
+        execution: 'paused-budget',
+        plan: { planned: 4, completed: 1, deferred: 3 },
+        publishable: false,
+        autoMergeEligible: false,
+        reasonCodes: ['budget.frozen', 'plan.deferred']
+      }
+    });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.autoMerge).toBe('blocked');
+    expect(result.reasonCodes).toEqual(['budget.frozen', 'plan.deferred']);
+    const summary = harness.summaries.join('\n');
+    expect(summary).toContain('The run PAUSED at its budget cap after 1 of 4 planned page(s); 3 were deferred.');
+    expect(summary).toContain('`budget.frozen`');
+  });
+
+  it('a ledger regression against the base blocks the merge and names the regression', async () => {
+    const harness = createHarness({
+      decision: {
+        autoMergeEligible: false,
+        regressions: [
+          { kind: 'badge-loss', pageId: 'pg_00000000000000000000', detail: 'the base page checked all 3 claims' }
+        ],
+        reasonCodes: ['ledger.regression']
+      }
+    });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.autoMerge).toBe('blocked');
+    expect(harness.summaries.join('\n')).toContain('Guarantee downgrade (badge-loss) on page pg_00000000000000000000');
+  });
+
+  it('an undeclared dirty path is reported, excluded from the commit, and blocks the merge', async () => {
+    const harness = createHarness({
+      changedFiles: [
+        'docs-site/content/en/getting-started/installation.mdx',
+        '.docstube/manifest/manifest.json',
+        'src/retry.ts'
+      ],
+      declaredPaths: ['docs-site/content/en/getting-started/installation.mdx', '.docstube/manifest/manifest.json']
+    });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.autoMerge).toBe('blocked');
+    expect(result.undeclaredPaths).toEqual(['src/retry.ts']);
+    expect(result.committedPaths).not.toContain('src/retry.ts');
+    expect(harness.operations.some((op) => op.startsWith('commit:') && op.includes('src/retry.ts'))).toBe(false);
+    expect(harness.summaries.join('\n')).toContain('changed outside the declared output inventory');
+  });
+
+  it('a declared path whose bytes drifted from the recorded hash blocks the merge', async () => {
+    const harness = createHarness();
+    // Simulate a post-run write: the file on disk no longer matches the declared content hash.
+    harness.deps.hashWorkspaceFile = async (path) =>
+      path === '.docstube/manifest/manifest.json' ? sha256Hex('tampered') : undefined;
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.autoMerge).toBe('blocked');
+    expect(result.withheldReasons.join(' ')).toContain('no longer match the hash the run recorded');
+  });
+});
+
 describe('inputs and CLI invocation', () => {
   it('runs the docstube CLI as a subprocess via npx in the workspace', async () => {
     const calls: { args: readonly string[]; command: string; cwd: string }[] = [];
@@ -403,7 +555,7 @@ describe('inputs and CLI invocation', () => {
 
     await expect(runner({ workspaceDir: '/repo' })).resolves.toEqual({ exitCode: 0, output: 'ok' });
     // The one supported command: generate (pipeline-v2 decision 1).
-    expect(calls).toEqual([{ command: 'npx', args: ['--yes', 'docstube@1.0.0', 'generate'], cwd: '/repo' }]);
+    expect(calls).toEqual([{ command: 'npx', args: ['--yes', 'docstube@1.0.0', 'generate', '--ci'], cwd: '/repo' }]);
   });
 
   it('creates deterministic branch names and concurrency groups', () => {

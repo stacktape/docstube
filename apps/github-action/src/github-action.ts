@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,8 +15,8 @@ import {
   selectCommitPaths
 } from './delta-report.ts';
 import type { IssueComment } from './delta-report.ts';
-import { decideAutoMerge } from './merge-decision.ts';
-import type { AutoMergeDecision } from './merge-decision.ts';
+import { decideAutoMerge, loadPublicationArtifacts, verifyOutputInventory } from './merge-decision.ts';
+import type { AutoMergeDecision, InventoryCheck } from './merge-decision.ts';
 import { loadVerifiedDelta } from './verified-delta.ts';
 import type { VerifiedDelta, WorkspaceFileReader } from './verified-delta.ts';
 
@@ -77,6 +78,9 @@ export type GitHubActionGitClient = {
   checkoutBase: (input: GitCheckoutInput) => Promise<void>;
   commitPaths: (input: GitCommitInput) => Promise<void>;
   createBranch: (input: GitBranchInput) => Promise<void>;
+  // The revision the CLI generated against — what the publication decision must be bound to.
+  // Undefined when HEAD cannot be read, which fails the binding check closed.
+  headCommit: (input: { workspaceDir: string }) => Promise<string | undefined>;
   pushBranch: (input: GitBranchInput) => Promise<void>;
 };
 
@@ -117,6 +121,10 @@ export type GitHubActionDeps = {
   mergeControl: GitHubActionMergeControl;
   pullRequest: GitHubActionPullRequestClient;
   readWorkspaceFile: WorkspaceFileReader;
+  // Content hash of a workspace file, over RAW BYTES — the output inventory covers emitted binary
+  // assets too, so a utf8 round-trip would corrupt their hashes into false mismatches. Undefined
+  // when the file does not exist.
+  hashWorkspaceFile: (relativePath: string) => Promise<string | undefined>;
   reporter: GitHubActionReporter;
   runDocstube: (input: { workspaceDir: string }) => Promise<DocstubeCliRunResult>;
   // Ambient environment used for the model-credential precondition and secret redaction;
@@ -140,6 +148,11 @@ export type GitHubActionResult = {
   openFlagCount: number;
   pullRequestNumber?: number;
   pullRequestUrl?: string;
+  // The kernel's reason codes, verbatim, and the human-readable reasons the merge was withheld.
+  reasonCodes: readonly string[];
+  withheldReasons: readonly string[];
+  // Dirty paths the run never declared: reported, never committed, and fatal to eligibility.
+  undeclaredPaths: readonly string[];
   summary: string;
 };
 
@@ -314,6 +327,8 @@ const setActionOutputs = async (reporter: GitHubActionReporter, result: GitHubAc
   await reporter.setOutput('auto-merge', result.autoMerge);
   await reporter.setOutput('open-flag-count', String(result.openFlagCount));
   await reporter.setOutput('committed-paths', JSON.stringify(result.committedPaths));
+  await reporter.setOutput('publication-reason-codes', JSON.stringify(result.reasonCodes));
+  await reporter.setOutput('undeclared-paths', JSON.stringify(result.undeclaredPaths));
   if (result.pullRequestUrl) {
     await reporter.setOutput('pull-request-url', result.pullRequestUrl);
   }
@@ -395,6 +410,9 @@ export const runGitHubAction = async (
     concurrencyGroup,
     exitCode: 0,
     openFlagCount: 0,
+    reasonCodes: [],
+    undeclaredPaths: [],
+    withheldReasons: [],
     summary: '',
     ...overrides
   });
@@ -424,6 +442,9 @@ export const runGitHubAction = async (
 
   await deps.git.checkoutBase({ baseBranch, workspaceDir: inputs.workspaceDir });
   await deps.git.createBranch({ branchName, workspaceDir: inputs.workspaceDir });
+  // Read HEAD BEFORE the CLI runs: this is the revision the kernel generates against and the one
+  // its decision must be bound to.
+  const headCommit = await deps.git.headCommit({ workspaceDir: inputs.workspaceDir });
 
   const cliResult = await deps.runDocstube({ workspaceDir: inputs.workspaceDir });
   if (cliResult.exitCode !== 0) {
@@ -453,7 +474,28 @@ export const runGitHubAction = async (
   });
 
   const changedFiles = (await deps.git.changedFiles({ workspaceDir: inputs.workspaceDir })).toSorted();
-  const committedPaths = selectCommitPaths(changedFiles);
+  const candidatePaths = selectCommitPaths(changedFiles);
+
+  // THE KERNEL'S DECISION IS THE AUTHORITY (PRODUCT §3.3). It is read before anything is staged,
+  // because the inventory it carries is what decides which paths may be staged at all.
+  const publication = await loadPublicationArtifacts({ headCommit, readWorkspaceFile: deps.readWorkspaceFile });
+  let inventoryCheck: InventoryCheck | undefined;
+  if (publication.ok) {
+    inventoryCheck = await verifyOutputInventory({
+      candidatePaths,
+      hashWorkspaceFile: deps.hashWorkspaceFile,
+      inventory: publication.inventory
+    });
+    for (const path of inventoryCheck.undeclaredPaths) {
+      deps.reporter.warn(`\`${path}\` changed but the run never declared it — it will NOT be committed.`);
+    }
+  } else {
+    deps.reporter.warn(`Auto-merge is not available for this run: ${publication.reason}`);
+  }
+  // With no valid inventory there is no allowlist, so nothing is staged beyond what the run itself
+  // declared — an unvalidated candidate is reported, never committed silently under a merge gate it
+  // never passed. The PR still opens (so a human can see the work) with everything the run touched.
+  const committedPaths = inventoryCheck?.stagedPaths ?? candidatePaths;
 
   if (committedPaths.length === 0) {
     return completeAction(
@@ -479,7 +521,17 @@ export const runGitHubAction = async (
   } catch (error) {
     deps.reporter.warn(`Could not compute the verified delta: ${(error as Error).message}`);
   }
-  const decision = delta ? decideAutoMerge(delta.openFlags) : undefined;
+  // The gate always runs, even when the manifest could not be read: an unreadable manifest is
+  // missing evidence, and missing evidence must resolve to "do not auto-merge" rather than to no
+  // decision at all.
+  const decision = decideAutoMerge({
+    flags: delta?.openFlags ?? [],
+    inventory: inventoryCheck,
+    publication:
+      delta === undefined && publication.ok
+        ? { ok: false, reason: 'the committed manifest could not be read, so the verified delta is unknown.' }
+        : publication
+  });
 
   // Docs + manifest shards + criteria/instructions ship atomically in one commit (ARCHITECTURE §5.3).
   await deps.git.commitPaths({
@@ -510,7 +562,7 @@ export const runGitHubAction = async (
       });
 
   let autoMerge: GitHubActionAutoMergeState = 'unavailable';
-  if (decision && pullRequest.number !== undefined) {
+  if (pullRequest.number !== undefined) {
     if (decision.openFlags.length > 0) {
       await deliverFlags({ decision, deps, pullRequestNumber: pullRequest.number });
     }
@@ -527,12 +579,11 @@ export const runGitHubAction = async (
       }
     } else {
       autoMerge = 'blocked';
-      deps.reporter.info(
-        `Auto-merge blocked by ${decision.blockingFlags.length} open flag(s); flags were posted on the PR.`
-      );
+      // Every withheld merge states itself — a blocked PR must never read as a silent no-op.
+      for (const reason of decision.withheldReasons) {
+        deps.reporter.info(`Auto-merge withheld: ${reason}`);
+      }
     }
-  } else if (!decision) {
-    deps.reporter.warn('No verified delta available; leaving the PR open without auto-merge.');
   } else {
     deps.reporter.warn('PR number unknown; cannot post flags or enable auto-merge.');
   }
@@ -543,9 +594,12 @@ export const runGitHubAction = async (
       changed: true,
       changedFiles,
       committedPaths,
-      openFlagCount: decision?.openFlags.length ?? 0,
+      openFlagCount: decision.openFlags.length,
       pullRequestNumber: pullRequest.number,
       pullRequestUrl: pullRequest.url,
+      reasonCodes: decision.reasonCodes,
+      undeclaredPaths: decision.undeclaredPaths,
+      withheldReasons: decision.withheldReasons,
       summary: buildJobSummary({
         autoMerge,
         committedPaths,
@@ -617,6 +671,12 @@ export const createGitClient = (run: GitHubActionProcessRunner = runProcess): Gi
     if (result.exitCode !== 0) {
       throw new Error(result.stderr || `Failed to create ${input.branchName}.`);
     }
+  },
+  headCommit: async (input) => {
+    const result = await run('git', ['rev-parse', 'HEAD'], { cwd: input.workspaceDir });
+    // An unreadable HEAD is never guessed at: undefined means the decision's revision binding
+    // cannot be checked, and the gate is only ever as strong as what it can verify.
+    return result.exitCode === 0 && result.stdout.trim().length > 0 ? result.stdout.trim() : undefined;
   },
   changedFiles: async (input) => {
     const result = await run('git', ['status', '--porcelain'], { cwd: input.workspaceDir });
@@ -829,10 +889,13 @@ const createMergeControl = (input: { token?: string | undefined; workspaceDir: s
   };
 };
 
+// `--ci` is not optional for the Action: it is what makes the run emit the publication decision the
+// merge gate enforces. Without it every run would fail closed.
 export const createDocstubeCliArgs = (input: { docstubePackage: string }): string[] => [
   '--yes',
   input.docstubePackage,
-  'generate'
+  'generate',
+  '--ci'
 ];
 
 export const createDocstubeCliRunner =
@@ -880,6 +943,22 @@ const createWorkspaceFileReader =
     }
   };
 
+// Raw-byte content hash, matching what the kernel recorded in the output inventory.
+const createWorkspaceFileHasher =
+  (workspaceDir: string) =>
+  async (relativePath: string): Promise<string | undefined> => {
+    try {
+      return createHash('sha256')
+        .update(await readFile(join(workspaceDir, relativePath)))
+        .digest('hex');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }
+  };
+
 export const createDefaultGitHubActionDeps = (input: {
   docstubePackage?: string;
   githubToken?: string;
@@ -895,6 +974,7 @@ export const createDefaultGitHubActionDeps = (input: {
   mergeControl: createMergeControl({ token: input.githubToken, workspaceDir: input.workspaceDir }),
   pullRequest: createPullRequestClient({ token: input.githubToken }),
   readWorkspaceFile: createWorkspaceFileReader(input.workspaceDir),
+  hashWorkspaceFile: createWorkspaceFileHasher(input.workspaceDir),
   reporter: createReporter(),
   runDocstube: createDocstubeCliRunner(input.docstubePackage ?? defaultDocstubePackage)
 });

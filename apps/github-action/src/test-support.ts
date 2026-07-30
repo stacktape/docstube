@@ -5,9 +5,14 @@ import {
   buildFixturePageShard,
   buildFixtureProvenanceV2,
   canonicalStateJson,
+  hashValue,
   mintId,
-  idPrefixes
+  idPrefixes,
+  sha256Hex
 } from '@docstube/contracts';
+import { outputInventorySchema, publicationDecisionSchema } from '@docstube/contracts';
+import { outputInventoryRelativePath, publicationDecisionRelativePath } from './merge-decision.ts';
+import type { PublicationValidation } from './merge-decision.ts';
 import { manifestIndexRelativePath } from './verified-delta.ts';
 import type { WorkspaceFileReader } from './verified-delta.ts';
 
@@ -57,6 +62,82 @@ export const buildFixtureWorkspace = (input: {
     files.set(shardRelativePath(shard), canonicalStateJson(shard));
   }
   return { files, readWorkspaceFile: async (relativePath) => files.get(relativePath) };
+};
+
+// The commit the fixture workspace pretends to have generated at.
+export const fixtureHeadCommit = 'a'.repeat(40);
+
+// Writes a valid publication decision + output inventory into a fixture workspace. Declared paths
+// get materialized content so the hash the Action recomputes agrees with the declared one; the
+// decision binds to the inventory exactly as the kernel mints it.
+export const attachFixturePublication = (input: {
+  files: Map<string, string>;
+  declaredPaths: readonly string[];
+  decision?: Record<string, unknown>;
+  // Raw text overrides for the corruption cases (unparseable JSON, schema-invalid, unknown codes).
+  decisionText?: string;
+  inventoryText?: string;
+  omitDecision?: boolean;
+  omitInventory?: boolean;
+}): { candidateArtifactHash: string } => {
+  const entries = [...input.declaredPaths].toSorted().map((path) => {
+    const content = input.files.get(path) ?? `fixture content for ${path}\n`;
+    input.files.set(path, content);
+    return { path, contentHash: sha256Hex(content) };
+  });
+  const inventory = { schemaVersion: 1, entries };
+  const candidateArtifactHash = hashValue(inventory);
+  const decision = {
+    schemaVersion: 1,
+    toolVersion: '0.0.2',
+    baseSha: fixtureHeadCommit,
+    sourceSha: fixtureHeadCommit,
+    candidateArtifactHash,
+    execution: 'completed',
+    plan: { planned: 1, completed: 1, deferred: 0 },
+    deterministicGate: 'clean',
+    regressions: [],
+    newBlockingDispositions: [],
+    coverageDelta: [],
+    publishable: true,
+    autoMergeEligible: true,
+    reasonCodes: [],
+    ...input.decision
+  };
+  if (input.omitInventory !== true) {
+    input.files.set(outputInventoryRelativePath, input.inventoryText ?? JSON.stringify(inventory));
+  }
+  if (input.omitDecision !== true) {
+    input.files.set(publicationDecisionRelativePath, input.decisionText ?? JSON.stringify(decision));
+  }
+  return { candidateArtifactHash };
+};
+
+// An already-validated publication decision, for tests that exercise the gate/reporting rather
+// than the artifact loading.
+export const fixturePublicationValidation = (overrides: Record<string, unknown> = {}): PublicationValidation => {
+  const inventory = outputInventorySchema.parse({ schemaVersion: 1, entries: [] });
+  return {
+    ok: true,
+    inventory,
+    decision: publicationDecisionSchema.parse({
+      schemaVersion: 1,
+      toolVersion: '0.0.2',
+      baseSha: fixtureHeadCommit,
+      sourceSha: fixtureHeadCommit,
+      candidateArtifactHash: hashValue(inventory),
+      execution: 'completed',
+      plan: { planned: 1, completed: 1, deferred: 0 },
+      deterministicGate: 'clean',
+      regressions: [],
+      newBlockingDispositions: [],
+      coverageDelta: [],
+      publishable: true,
+      autoMergeEligible: true,
+      reasonCodes: [],
+      ...overrides
+    })
+  };
 };
 
 // A shard with the v2 trust spine attached: two ClaimEvidence records (one checked, one

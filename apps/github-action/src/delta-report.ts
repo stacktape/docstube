@@ -53,16 +53,47 @@ const changedPagesSection = (delta: VerifiedDelta): string[] =>
         `Totals: ${formatCounts(delta.totals)} claim(s).`
       ];
 
+// Flags no longer announce eligibility: the kernel's PublicationDecision is the only thing entitled
+// to say whether this candidate may merge, and the Action never re-derives it.
 const flagsSection = (openFlags: readonly Flag[]): string[] =>
-  openFlags.length === 0 ? ['No open flags. This PR is eligible for auto-merge.'] : openFlags.map(formatFlagLine);
+  openFlags.length === 0 ? ['No open flags.'] : openFlags.map(formatFlagLine);
 
-const decisionLine = (decision: AutoMergeDecision | undefined): string => {
+// The honest report (PRODUCT §3.3): what executed, what was deferred, why the merge was withheld,
+// and which reason codes fired.
+const publicationSection = (decision: AutoMergeDecision | undefined): string[] => {
   if (!decision) {
-    return 'Auto-merge: not attempted — no verified manifest delta was available for this run.';
+    return ['Auto-merge: not attempted — this run produced no publication decision.'];
   }
-  return decision.autoMerge
-    ? 'Auto-merge: eligible — no open flag blocks this change.'
-    : `Auto-merge: blocked by ${decision.blockingFlags.length} open flag${decision.blockingFlags.length === 1 ? '' : 's'}.`;
+  const lines: string[] = [];
+  if (decision.publication.ok) {
+    const published = decision.publication.decision;
+    lines.push(
+      `- Execution: **${published.execution}** — ${published.plan.completed} of ${published.plan.planned} planned page(s) completed, ${published.plan.deferred} deferred.`,
+      `- Deterministic gate: **${published.deterministicGate}**.`,
+      `- Guarantee downgrades: ${published.regressions.length === 0 ? 'none' : `**${published.regressions.length}**`}.`,
+      `- Publishable: **${published.publishable}** · auto-merge eligible: **${published.autoMergeEligible}**.`,
+      `- Reason codes: ${published.reasonCodes.length === 0 ? 'none' : published.reasonCodes.map((code) => `\`${code}\``).join(', ')}.`
+    );
+  } else {
+    lines.push(`- No enforceable publication decision: ${decision.publication.reason}`);
+  }
+  lines.push('');
+  lines.push(
+    decision.autoMerge
+      ? 'Auto-merge: **enabled** — the kernel declared this candidate auto-merge eligible and no open flag blocks it.'
+      : 'Auto-merge: **withheld**.'
+  );
+  if (!decision.autoMerge) {
+    lines.push('', ...decision.withheldReasons.map((reason) => `- ${reason}`));
+  }
+  if (decision.undeclaredPaths.length > 0) {
+    lines.push(
+      '',
+      "Undeclared writes (changed but outside the run's output inventory — **not committed**):",
+      ...decision.undeclaredPaths.map((path) => `- \`${path}\``)
+    );
+  }
+  return lines;
 };
 
 export const buildPullRequestBody = (input: {
@@ -83,7 +114,7 @@ export const buildPullRequestBody = (input: {
   } else {
     lines.push('### Verified delta', '', 'No manifest index was found, so no verified delta could be computed.', '');
   }
-  lines.push('### Decision', '', decisionLine(input.decision), '');
+  lines.push('### Publication decision', '', ...publicationSection(input.decision), '');
   lines.push('### Committed files', '', ...input.committedPaths.map((path) => `- \`${path}\``));
   return lines.join('\n');
 };
@@ -145,16 +176,16 @@ export type JobSummaryInput = {
   failureOutput?: string | undefined;
 };
 
-const autoMergeSummaryLine = (input: JobSummaryInput): string => {
+const autoMergeSummaryLine = (input: JobSummaryInput): string[] => {
   switch (input.autoMerge) {
     case 'enabled':
-      return 'Auto-merge enabled (squash). The PR merges once required checks pass.';
+      return ['Auto-merge enabled (squash). The PR merges once required checks pass.'];
     case 'blocked':
-      return `Auto-merge blocked by ${input.decision && !input.decision.autoMerge ? input.decision.blockingFlags.length : 0} open flag(s); see the flag comment on the PR.`;
+      return ['Auto-merge withheld:', '', ...(input.decision?.withheldReasons ?? []).map((reason) => `- ${reason}`)];
     case 'unavailable':
-      return 'Auto-merge could not be enabled (repository setting or missing verified delta); the PR was left open.';
+      return ['Auto-merge could not be enabled (repository setting); the PR was left open.'];
     case 'skipped':
-      return 'Auto-merge not applicable for this run.';
+      return ['Auto-merge not applicable for this run.'];
   }
 };
 
@@ -176,7 +207,8 @@ export const buildJobSummary = (input: JobSummaryInput): string => {
     lines.push('### Verified delta', '', ...changedPagesSection(input.delta), '');
     lines.push(`### Open flags (${input.delta.openFlags.length})`, '', ...flagsSection(input.delta.openFlags), '');
   }
-  lines.push('### Decision', '', autoMergeSummaryLine(input), '');
+  lines.push('### Publication decision', '', ...publicationSection(input.decision), '');
+  lines.push('### Auto-merge', '', ...autoMergeSummaryLine(input), '');
   lines.push('### Committed files', '', ...input.committedPaths.map((path) => `- \`${path}\``));
   return lines.join('\n');
 };

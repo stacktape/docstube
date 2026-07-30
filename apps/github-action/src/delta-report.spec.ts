@@ -14,6 +14,7 @@ import {
   buildFixtureFlag,
   buildFixtureShardWithFlags,
   buildFixtureWorkspace,
+  fixturePublicationValidation,
   shardRelativePath
 } from './test-support.ts';
 import { loadVerifiedDelta } from './verified-delta.ts';
@@ -58,7 +59,7 @@ describe('PR body (verified delta annotation)', () => {
       changedFiles: [shardRelativePath(shard)],
       readWorkspaceFile: workspace.readWorkspaceFile
     });
-    const decision = decideAutoMerge(delta?.openFlags ?? []);
+    const decision = decideAutoMerge({ flags: delta?.openFlags ?? [], publication: fixturePublicationValidation() });
 
     const body = buildPullRequestBody({
       committedPaths: [shardRelativePath(shard), 'docs-site/content/en/getting-started/installation.mdx'],
@@ -72,30 +73,56 @@ describe('PR body (verified delta annotation)', () => {
     expect(body).toContain('Totals: 1 checked · 1 unchecked · 0 contradicted claim(s).');
     expect(body).toContain('### Open flags (1)');
     expect(body).toContain('**out-of-domain** — why was legacyInit deprecated?');
-    expect(body).toContain('Auto-merge: blocked by 1 open flag.');
+    expect(body).toContain('Auto-merge: **withheld**.');
+    expect(body).toContain('1 open blocking flag (out-of-domain).');
     expect(body).toContain('- `docs-site/content/en/getting-started/installation.mdx`');
   });
 
-  it('declares auto-merge eligibility when no flag blocks', () => {
+  it('reports the kernel decision plainly when the candidate is eligible', () => {
     const body = buildPullRequestBody({
       committedPaths: ['docs-site/content/en/index.mdx'],
-      decision: decideAutoMerge([]),
+      decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
       delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
       mode: 'generate'
     });
-    expect(body).toContain('No open flags. This PR is eligible for auto-merge.');
-    expect(body).toContain('Auto-merge: eligible — no open flag blocks this change.');
+    // The flags section no longer declares eligibility — only the kernel decision does.
+    expect(body).toContain('No open flags.');
+    expect(body).not.toContain('eligible for auto-merge');
+    expect(body).toContain('Execution: **completed** — 1 of 1 planned page(s) completed, 0 deferred.');
+    expect(body).toContain('Auto-merge: **enabled**');
   });
 
-  it('is honest when no verified delta exists', () => {
+  it('states why a withheld merge was withheld, including the reason codes', () => {
     const body = buildPullRequestBody({
       committedPaths: ['docs-site/content/en/index.mdx'],
-      decision: undefined,
+      decision: decideAutoMerge({
+        flags: [],
+        publication: fixturePublicationValidation({
+          execution: 'paused-budget',
+          plan: { planned: 4, completed: 1, deferred: 3 },
+          publishable: false,
+          autoMergeEligible: false,
+          reasonCodes: ['budget.frozen', 'plan.deferred']
+        })
+      }),
+      delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
+      mode: 'generate'
+    });
+    expect(body).toContain('Execution: **paused-budget**');
+    expect(body).toContain('`budget.frozen`');
+    expect(body).toContain('The run PAUSED at its budget cap');
+  });
+
+  it('is honest when the run produced no enforceable decision', () => {
+    const body = buildPullRequestBody({
+      committedPaths: ['docs-site/content/en/index.mdx'],
+      decision: decideAutoMerge({ flags: [], publication: { ok: false, reason: 'artifact absent.' } }),
       delta: undefined,
       mode: 'generate'
     });
     expect(body).toContain('No manifest index was found, so no verified delta could be computed.');
-    expect(body).toContain('Auto-merge: not attempted');
+    expect(body).toContain('No enforceable publication decision: artifact absent.');
+    expect(body).toContain('Auto-merge: **withheld**.');
   });
 });
 
@@ -162,7 +189,7 @@ describe('job summary', () => {
     const summary = buildJobSummary({
       autoMerge: 'enabled',
       committedPaths: ['docs-site/content/en/index.mdx'],
-      decision: decideAutoMerge([]),
+      decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
       delta: { changedPages: [], totals: { checked: 0, unchecked: 0, contradicted: 0 }, openFlags: [] },
       mode: 'generate',
       pullRequestUrl: 'https://github.com/stacktape/docstube/pull/12',
