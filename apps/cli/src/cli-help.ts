@@ -14,7 +14,7 @@ export const commandHelp = [
   '  validate               Validate the docstube config family.',
   '  check [kind]           Run deterministic checks (kinds come from registered verifier plugins).',
   '  status                 Show manifest, claim counts, and open flags.',
-  '  doctor                 Check local runtime and project setup.',
+  '  doctor                 Check local runtime and project setup (--ci preflights CI auth + permissions).',
   '  plugin                 Scaffold and manage docstube plugins.',
   '  upgrade                Upgrade the docstube tool itself.',
   '  version                Print the docstube version.',
@@ -36,7 +36,8 @@ export const commandHelpByCommand: Record<string, string> = {
   check:
     'Usage: docstube check [kind]\n       docstube check --list\n\nRun deterministic checks over the generated docs. Kinds derive from registered verifier plugins.',
   status: 'Usage: docstube status\n\nShow manifest, claim counts, and open flags.',
-  doctor: 'Usage: docstube doctor\n\nCheck local runtime and project setup.',
+  doctor:
+    'Usage: docstube doctor [--ci] [--json]\n\nCheck local runtime and project setup. --ci also preflights the configured transport credential and every GitHub permission, auto-merge precondition, and branch-state fact a CI run needs — before any model spend — and exits non-zero when a blocking check fails. --json emits the versioned report the GitHub Action consumes. Checks that cannot be performed report `unknown` with their reason, never a pass.',
   answer:
     'Usage: docstube answer\n       docstube answer <id> "your answer"\n\nList open maintainer questions (tribal knowledge) and answer them.',
   plugin: 'Usage: docstube plugin scaffold <name>\n\nScaffold a docstube plugin (uses the plugin-authoring skill).',

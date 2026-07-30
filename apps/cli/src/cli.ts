@@ -268,11 +268,18 @@ const status = defineCommand({
 
 const doctor = defineCommand({
   meta: { description: 'Check local runtime and project setup.', name: 'doctor' },
-  async run() {
+  args: {
+    ci: {
+      type: 'boolean',
+      description: 'Run the CI preflight (transport auth + GitHub permissions) before any model spend.'
+    },
+    json: { type: 'boolean', description: 'Emit the versioned preflight report as JSON.' }
+  },
+  async run({ args }) {
     await runCliCommand('doctor', async () => {
       enableNodeCompileCache();
       const { runDoctorCommand } = await import('./commands/doctor-command.ts');
-      return runDoctorCommand({ workspaceDir: process.cwd() }, output);
+      return runDoctorCommand({ workspaceDir: process.cwd(), ci: args.ci === true, json: args.json === true }, output);
     });
   }
 });

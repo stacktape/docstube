@@ -1,107 +1,41 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { CoreError, detectProject, loadConfigFamily } from '@docstube/core';
+import type { CiPreflightReport } from '@docstube/contracts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+import { renderCiPreflightReport, runCiPreflight } from './ci-preflight.ts';
+import type { GitHubPreflightProbe } from './ci-preflight.ts';
 
-const execFileAsync = promisify(execFile);
+// `doctor` is one report renderer over one check runner (ci-preflight.ts). `--ci` adds the GitHub
+// half and the honest automation label; `--json` emits the versioned report the GitHub Action
+// parses to abort BEFORE any model spend (quality-ci-reader-v2 decision 14).
 
 export type DoctorCommandInput = {
   workspaceDir: string;
-};
-
-type DoctorCheck = { name: string; ok: boolean; detail: string; critical: boolean };
-
-const binaryAvailable = async (binary: string): Promise<boolean> => {
-  try {
-    await execFileAsync(binary, ['--version'], { timeout: 10_000, shell: process.platform === 'win32' });
-    return true;
-  } catch {
-    return false;
-  }
+  ci?: boolean | undefined;
+  json?: boolean | undefined;
+  // Test seams — production passes none of these.
+  env?: NodeJS.ProcessEnv | undefined;
+  probeBinary?: ((binary: string) => Promise<boolean>) | undefined;
+  github?: GitHubPreflightProbe | undefined;
+  now?: (() => Date) | undefined;
 };
 
 export const runDoctorCommand = async (input: DoctorCommandInput, output: CliOutput): Promise<CliCommandResult> => {
-  const checks: DoctorCheck[] = [];
-
-  const [nodeMajor = 0] = process.versions.node.split('.').map(Number);
-  checks.push({
-    name: 'node',
-    ok: nodeMajor >= 24,
-    detail: `v${process.versions.node} (need >= 24)`,
-    critical: true
-  });
-  checks.push({
-    name: 'git',
-    ok: await binaryAvailable('git'),
-    detail: 'required for provenance commits',
-    critical: true
+  const report: CiPreflightReport = await runCiPreflight({
+    workspaceDir: input.workspaceDir,
+    mode: input.ci === true ? 'ci' : 'local',
+    ...(input.env === undefined ? {} : { env: input.env }),
+    ...(input.probeBinary === undefined ? {} : { probeBinary: input.probeBinary }),
+    ...(input.github === undefined ? {} : { github: input.github }),
+    ...(input.now === undefined ? {} : { now: input.now })
   });
 
-  const detection = await detectProject(input.workspaceDir);
-  if (detection.languages.includes('python')) {
-    const { resolvePythonInterpreter } = await import('@docstube/lang-python');
-    const interpreter = await resolvePythonInterpreter();
-    checks.push({
-      name: 'python',
-      ok: interpreter !== undefined,
-      detail: interpreter ?? 'documenting a Python repo requires a python interpreter (3.9+) on PATH',
-      critical: true
-    });
-  }
-  checks.push({
-    name: 'project detection',
-    ok: detection.languages.length > 0,
-    detail:
-      detection.languages.length > 0
-        ? `${detection.languages.join(', ')}${detection.docType ? ` · looks like ${detection.docType}` : ''}${detection.monorepo ? ' · monorepo' : ''}`
-        : 'no supported language detected (TypeScript, Python, Java)',
-    critical: false
-  });
-
-  try {
-    const family = await loadConfigFamily(input.workspaceDir);
-    checks.push({ name: 'config family', ok: true, detail: 'docstube.yml + ia.yml valid', critical: true });
-
-    const transport = family.config.agents.transport;
-    if (transport === 'claude-cli') {
-      checks.push({
-        name: 'claude CLI',
-        ok: await binaryAvailable('claude'),
-        detail: 'agents.transport = claude-cli',
-        critical: true
-      });
-    } else if (transport === 'codex-cli') {
-      checks.push({
-        name: 'codex CLI',
-        ok: await binaryAvailable('codex'),
-        detail: 'agents.transport = codex-cli',
-        critical: true
-      });
-    } else if (transport === 'anthropic-api' || transport === 'openai-compatible') {
-      const envName = family.config.agents.apiKeyEnv;
-      checks.push({
-        name: 'api credential',
-        ok: envName !== undefined && process.env[envName] !== undefined && process.env[envName] !== '',
-        detail: envName === undefined ? 'agents.apiKeyEnv not set' : `env ${envName}`,
-        critical: true
-      });
-    }
-  } catch (error) {
-    // An unusable docstube.yml means every pipeline command will fail — doctor must exit non-zero.
-    checks.push({
-      name: 'config family',
-      ok: false,
-      detail: error instanceof CoreError ? (error.message.split('\n')[0] ?? 'invalid') : 'unreadable',
-      critical: true
-    });
-  }
-
-  let failedCritical = false;
-  for (const check of checks) {
-    output.info(`${check.ok ? 'ok  ' : 'FAIL'}  ${check.name} — ${check.detail}`);
-    if (!check.ok && check.critical) {
-      failedCritical = true;
+  if (input.json === true) {
+    // JSON only on stdout: the Action parses this stream, so nothing else may be written to it.
+    output.info(JSON.stringify(report, null, 2));
+  } else {
+    for (const line of renderCiPreflightReport(report)) {
+      output.info(line);
     }
   }
-  return { exitCode: failedCritical ? 1 : 0 };
+
+  return { exitCode: report.ok ? 0 : 1 };
 };
