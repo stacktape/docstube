@@ -23,6 +23,8 @@ import {
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
+import { resolveRoleRouting } from './agent-role-routing.ts';
+import { createRiskCriticCache } from './risk-critic-cache.ts';
 import type { RoleSpend } from './run-cost.ts';
 
 // `docstube refine`: improve the lowest-quality pages first. Quality is read from the committed
@@ -294,7 +296,11 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       journal,
       options: {
         runTask: options.runTask,
-        toolDescriptors: options.toolDescriptors
+        toolDescriptors: options.toolDescriptors,
+        // `refine` regenerates pages, so it re-assesses them too — and shares the same cache, so a
+        // refine that did not actually change a page's prose or ledger never re-bills the critic.
+        riskCriticModel: resolveRoleRouting(config, 'risk-critic').model,
+        riskCriticCache: createRiskCriticCache(repoRoot)
       },
       config,
       glossary,

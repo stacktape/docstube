@@ -11,6 +11,7 @@ import type {
   IaPageNodeV2,
   PageShard,
   ProvenanceV2,
+  RiskCriticResult,
   ToolDescriptor,
   Transcript
 } from '@docstube/contracts';
@@ -34,6 +35,8 @@ import { anchorWriterLedger } from './anchor-ledger.ts';
 import { matchClaimIds } from './match-claims.ts';
 import { CLAIM_VERIFICATION_CHECK, verifyClaims } from './verify-claims.ts';
 import { createQuestionCollector, flagQuestionDescriptor } from './tribal-knowledge.ts';
+import { RISK_CRITIC_CHECK, riskCriticFindings, runRiskCritic } from './risk-critic.ts';
+import type { RiskCriticCache } from './risk-critic-cache.ts';
 import type { KnowledgeSession } from '../knowledge/knowledge-session.ts';
 import type { RunCostTracker } from './run-cost.ts';
 
@@ -57,6 +60,11 @@ export type PageRunOptions = {
   runTask: TaskRunner;
   toolDescriptors: ToolDescriptor[];
   maxAttemptsPerPage?: number | undefined;
+  // The model the risk-critic role routes to, and its content-addressed verdict cache. Both
+  // optional: a caller that supplies neither still runs the page, and the critic is recorded
+  // `pending` rather than silently skipped (harness-state-v2 decision 3's rule for unrun reviews).
+  riskCriticModel?: string | undefined;
+  riskCriticCache?: RiskCriticCache | undefined;
 };
 
 export type PageRunContext = {
@@ -138,6 +146,7 @@ export const generatePage = async (
     ledger?: ClaimLedger;
     provenance?: ProvenanceV2;
     matching?: ClaimMatching;
+    riskCritic?: RiskCriticResult;
   };
   let candidate: AttemptCandidate | undefined;
   // One collector across attempts: retries re-asking the same question stay a single flag.
@@ -384,6 +393,56 @@ export const generatePage = async (
     ];
     attemptCandidate.findings = findings;
     attemptCandidate.ledger = verified.ledger;
+
+    // THE RISK CRITIC — ONE CALL PER PAGE (harness-state-v2 decision 4). It runs HERE because this
+    // is the first moment the evidence summary exists: the ledger is anchored, matched, and
+    // verified, so the critic can be told what each claim asserts and how strongly it is backed.
+    //
+    // WHEN IT RUNS, AND WHY NOT EVERY ATTEMPT. Only on the attempt that will actually ship — the
+    // one that cleared the gate, or the last one when retries are exhausted. Critiquing a draft the
+    // gate has already rejected buys nothing: that prose is about to be rewritten, so the verdict
+    // would be stale before it was persisted, and the cache key (which is the page's content) would
+    // miss on every attempt. That makes this exactly one billed call per page, and the shipped page
+    // always carries a critic verdict about ITS OWN final prose.
+    //
+    // IT IS NOT PART OF THE GATE. Its findings never join `findings` — that array is what decides
+    // pass/flag and what feeds the bounded retry. A model's editorial opinion must not be able to
+    // fail a page whose claims all check out (see the nonblocking rule in risk-critic.ts).
+    const willShip = findings.length === 0 || attempt === maxAttempts;
+    if (willShip) {
+      const personaDescription = ctx.config.personas.find((persona) => persona.id === node.primaryPersona)?.description;
+      const critic = await runRiskCritic({
+        critic: {
+          mdx,
+          page,
+          ledger: verified.ledger,
+          claimEvidence: verified.claimEvidence,
+          node,
+          ...(personaDescription === undefined ? {} : { personaDescription })
+        },
+        model: ctx.options.riskCriticModel,
+        runTask: ctx.options.runTask,
+        journal: ctx.journal,
+        costTracker: ctx.costTracker,
+        cache: ctx.options.riskCriticCache,
+        pageId: page.id
+      });
+      attemptCandidate.riskCritic = critic.result;
+      // Warnings (a dropped anchor, a pending assessment, a broken payload) and the findings
+      // themselves are journaled at info/warning — never error, which is the gate's severity.
+      const criticJournalFindings: Finding[] = [
+        ...critic.warnings.map((warning) => ({
+          source: 'review' as const,
+          check: RISK_CRITIC_CHECK,
+          severity: 'warning' as const,
+          message: warning
+        })),
+        ...riskCriticFindings(critic.result)
+      ];
+      if (criticJournalFindings.length > 0) {
+        await ctx.journal.append({ type: 'findings', pageId: page.id, findings: criticJournalFindings });
+      }
+    }
     // Provenance v2: lineage / dependencies / claimEvidence / assessments, validated by parse.
     // Assembled on every anchored attempt so the candidate always carries its OWN final state.
     attemptCandidate.provenance = assembleProvenanceV2({
@@ -396,6 +455,7 @@ export const generatePage = async (
       transcript,
       writeTask: task,
       reviews,
+      ...(attemptCandidate.riskCritic === undefined ? {} : { riskCritic: attemptCandidate.riskCritic }),
       instructions: ctx.instructions,
       criteria: ctx.criteria,
       glossary: ctx.glossary,

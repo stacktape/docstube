@@ -44,6 +44,7 @@ import { resolveRoleRouting } from './agent-role-routing.ts';
 import { runStructurePass, structuralSummaryLine } from '../structure/structure-pass.ts';
 import type { StructurePassResult } from '../structure/structure-pass.ts';
 import { createStructuralAssessmentCache } from '../structure/assessment-cache.ts';
+import { createRiskCriticCache } from './risk-critic-cache.ts';
 import type { ToolDescriptor } from '@docstube/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -682,7 +683,12 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       options: {
         runTask: options.runTask,
         toolDescriptors: options.toolDescriptors,
-        maxAttemptsPerPage: options.maxAttemptsPerPage
+        maxAttemptsPerPage: options.maxAttemptsPerPage,
+        // The risk critic's own routing (agents.roles.risk-critic) and its content-addressed
+        // verdict cache: one call per page, and never a second call for a page whose prose and
+        // ledger state did not move.
+        riskCriticModel: resolveRoleRouting(config, 'risk-critic').model,
+        riskCriticCache: createRiskCriticCache(repoRoot)
       },
       config,
       glossary,

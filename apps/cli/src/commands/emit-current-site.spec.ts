@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from '@docstube/core';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -107,6 +108,9 @@ const scriptedRunner =
       stopReason: 'complete' as const,
       turns: []
     };
+    if (spec.kind === 'assess-page-risk') {
+      return cleanRiskCriticTranscript(spec);
+    }
     if (spec.kind === 'review-page') {
       return {
         ...base,
@@ -166,6 +170,9 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
         stopReason: 'complete' as const,
         turns: []
       };
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return {
           ...base,
@@ -301,6 +308,9 @@ describe('generate → JSON shards → emit (trust-spine E2E)', () => {
           stopReason: 'complete' as const,
           turns: []
         };
+        if (spec.kind === 'assess-page-risk') {
+          return cleanRiskCriticTranscript(spec);
+        }
         if (spec.kind === 'review-page') {
           return {
             ...base,

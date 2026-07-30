@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from '@docstube/core';
 import { join } from 'node:path';
 import { hostname, tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -61,6 +62,9 @@ const scriptedRunTask = (pageMdx: string, writer: 'pass' | 'throw-on-first-page'
     };
     if (spec.kind === 'translate-page') {
       return { ...base, result: { type: 'mdx', mdx: pageMdx } };
+    }
+    if (spec.kind === 'assess-page-risk') {
+      return cleanRiskCriticTranscript(spec);
     }
     if (spec.kind === 'review-page') {
       return {

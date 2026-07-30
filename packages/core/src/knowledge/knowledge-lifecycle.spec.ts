@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from '../pipeline/risk-critic-test-support.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -52,6 +53,9 @@ const runWith = async (options: { asks?: Ask[]; onWritePrompt?: (spec: AgentTask
       usage: { inputTokens: 1, outputTokens: 1, cacheHit: false },
       stopReason: 'complete'
     };
+    if (spec.kind === 'assess-page-risk') {
+      return cleanRiskCriticTranscript(spec);
+    }
     if (spec.kind === 'review-page') {
       return {
         ...base,

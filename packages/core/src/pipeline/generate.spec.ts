@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from './risk-critic-test-support.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -115,12 +116,21 @@ const passingReview = (spec: AgentTaskSpec): Transcript => ({
   }
 });
 
-// Dispatches by task kind: write-page consumes the scripted MDX queue; review-page passes.
-const scriptedRunner = (writeResponses: string[]) => {
+// Dispatches by task kind: write-page consumes the scripted MDX queue; review-page passes; the
+// risk critic answers with `critic`, defaulting to the clean-page verdict.
+const scriptedRunner = (
+  writeResponses: string[],
+  critic?: (spec: AgentTaskSpec) => Promise<Transcript> | Transcript
+) => {
   const remaining = [...writeResponses];
   const writeCalls: AgentTaskSpec[] = [];
   const reviewCalls: AgentTaskSpec[] = [];
+  const criticCalls: AgentTaskSpec[] = [];
   const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+    if (spec.kind === 'assess-page-risk') {
+      criticCalls.push(spec);
+      return critic === undefined ? cleanRiskCriticTranscript(spec) : await critic(spec);
+    }
     if (spec.kind === 'review-page') {
       reviewCalls.push(spec);
       return passingReview(spec);
@@ -136,7 +146,7 @@ const scriptedRunner = (writeResponses: string[]) => {
       result: writeResult(mdx)
     };
   };
-  return { runTask, writeCalls, reviewCalls };
+  return { runTask, writeCalls, reviewCalls, criticCalls };
 };
 
 beforeEach(async () => {
@@ -270,6 +280,102 @@ describe('runGenerate', () => {
     expect(reviewCalls[0]?.systemPrompt).toContain('Do NOT judge factual correctness');
   }, 60_000);
 
+  // THE RISK CRITIC END TO END (harness-state-v2 decision 4). What matters at this level is where
+  // its output LANDS: in the editorial assessments and nowhere near the claim spine or the gate.
+  it('runs the critic ONCE per page and lands its findings in assessments — never in the claim ledger', async () => {
+    const { runTask, criticCalls, writeCalls } = scriptedRunner([goodMdx], (spec) => ({
+      ...cleanRiskCriticTranscript(spec),
+      result: {
+        type: 'structured',
+        value: {
+          findings: [
+            {
+              // The anchor id must be a real block on the page; read it back out of the prompt's
+              // page map, which is the same contract the live critic works from.
+              kind: 'misleading-framing',
+              anchorId: /### block (bl_[0-9a-z]{20})/u.exec(spec.userPrompt)?.[1] ?? 'bl_00000000000000000000',
+              severity: 'error',
+              message: 'The example implies greet always succeeds.',
+              rationale: 'The ledger records the behavior claim as unchecked, but the prose reads as a guarantee.'
+            }
+          ]
+        }
+      }
+    }));
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    // ONE call per page, not one per attempt.
+    expect(writeCalls).toHaveLength(1);
+    expect(criticCalls).toHaveLength(1);
+    // The critic is fed the evidence summary and DENIED the repository.
+    expect(criticCalls[0]?.tools).toEqual([]);
+    expect(criticCalls[0]?.workspace.readRoots).toEqual([]);
+    expect(criticCalls[0]?.userPrompt).toContain('PAGE MAP');
+
+    // NONBLOCKING: an error-severity critic finding does not fail the page.
+    expect(summary.outcome).toBe('passed');
+    expect(summary.pages[0]?.status).toBe('passed');
+    expect(summary.pages[0]?.findings).toEqual([]);
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+
+    // It landed on the EDITORIAL axis…
+    const critic = shard?.provenance?.assessments.riskCritic;
+    expect(critic?.completion).toBe('completed');
+    expect(critic?.findings).toHaveLength(1);
+    expect(critic?.findings[0]).toMatchObject({ kind: 'misleading-framing', severity: 'error' });
+    expect(critic?.findings[0]?.anchor.kind).toBe('block');
+
+    // …and NOWHERE on the correctness axis. No claim was invented, no correctness changed, and
+    // the page ships with no open flag from the critic.
+    expect(shard?.ledger?.claims).toHaveLength(1);
+    expect(shard?.ledger?.claims[0]?.correctness).toBe('unchecked');
+    expect(shard?.provenance?.claimEvidence).toHaveLength(1);
+    expect(JSON.stringify(shard?.ledger)).not.toContain('misleading-framing');
+    expect(JSON.stringify(shard?.provenance?.claimEvidence)).not.toContain('misleading-framing');
+    expect(shard?.flags).toEqual([]);
+  }, 60_000);
+
+  it('records pending — never a clean pass — when the critic cannot run, and still publishes the page', async () => {
+    const { runTask, criticCalls } = scriptedRunner([goodMdx], () => {
+      throw new Error('critic transport exploded');
+    });
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    expect(criticCalls).toHaveLength(1);
+    // The page publishes: an unassessed page is not a failed page (decision 3's rule for unrun
+    // reviews, applied to the critic).
+    expect(summary.outcome).toBe('passed');
+    const mdxOnDisk = await readFile(join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx'), 'utf8');
+    expect(mdxOnDisk).toContain('# Getting started');
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    // …and the record says so out loud rather than being absent (which would read as clean).
+    expect(shard?.provenance?.assessments.riskCritic).toMatchObject({ completion: 'pending', findings: [] });
+  }, 60_000);
+
+  it('serves an unchanged page from the critic cache on a second run — no second call', async () => {
+    const first = scriptedRunner([goodMdx]);
+    await runGenerate({ repoRoot, runTask: first.runTask, toolDescriptors: [] });
+    expect(first.criticCalls).toHaveLength(1);
+
+    // Nothing about the page moved, so the same question must not be re-billed.
+    const second = scriptedRunner([goodMdx]);
+    const summary = await runGenerate({ repoRoot, runTask: second.runTask, toolDescriptors: [] });
+    expect(summary.outcome).toBe('passed');
+    expect(second.criticCalls).toHaveLength(0);
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    // A cache hit is still a real, completed verdict on the shipped page.
+    expect(shard?.provenance?.assessments.riskCritic?.completion).toBe('completed');
+  }, 90_000);
+
   it('journals a run-completed failed event when the pipeline escapes with an error', async () => {
     const runId = 'run_00000000000000000009';
     await expect(
@@ -289,6 +395,9 @@ describe('runGenerate', () => {
   it('journals a warning when a persona review is skipped (invalid reviewer output)', async () => {
     const runId = 'run_00000000000000000010';
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return {
           ...baseTranscript(spec),
@@ -319,6 +428,9 @@ describe('runGenerate', () => {
     const remaining = [goodMdx, goodMdx];
     let reviewCount = 0;
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         reviewCount += 1;
         if (reviewCount === 1) {
@@ -373,6 +485,9 @@ describe('runGenerate', () => {
       )
       .replace('## Usage', '## Verwendung');
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -436,6 +551,9 @@ describe('runGenerate', () => {
     // cannot align, so ids cannot be carried.
     const brokenTranslation = goodMdx.replace(/```ts[\s\S]*?```\n/u, '');
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -474,6 +592,9 @@ describe('runGenerate', () => {
     // ITS page-locale and leaves the source page's own verified state completely intact.
     const malformed = `${goodMdx}\n<Broken attr="\n`;
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -505,6 +626,9 @@ describe('runGenerate', () => {
       .replace('# Getting started', '# Erste Schritte')
       .replace("greet({ name: 'Ada' })", "greet({ name: 'Bob' })");
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -538,6 +662,9 @@ describe('runGenerate', () => {
         "The library exposes a single `greet` function.</Claim> {<script>document.title = 'lie'</script>}"
       );
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -580,6 +707,9 @@ describe('runGenerate', () => {
         '<Claim id="c9">Die Bibliothek stellt eine einzige `greet`-Funktion bereit.</Claim>'
       );
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -675,6 +805,9 @@ describe('runGenerate', () => {
     // repair-eligible error that feeds the retry loop and finally flags the page.
     const headingClaimMdx = goodMdx.replace('## Usage', '## <Claim id="h1">Usage claims things</Claim>');
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -750,6 +883,9 @@ describe('runGenerate', () => {
       ]
     });
     return async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -863,6 +999,9 @@ describe('runGenerate', () => {
     });
     let writeCall = 0;
     const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }

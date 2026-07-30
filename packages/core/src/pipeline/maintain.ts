@@ -39,6 +39,8 @@ import {
 } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 import type { RoleSpend } from './run-cost.ts';
+import { resolveRoleRouting } from './agent-role-routing.ts';
+import { createRiskCriticCache } from './risk-critic-cache.ts';
 
 // The maintain stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
 // affected pages regenerate. Bias rule: uncertain provenance ⇒ regenerate, never assume. A
@@ -263,7 +265,9 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       options: {
         runTask: options.runTask,
         toolDescriptors: options.toolDescriptors,
-        maxAttemptsPerPage: options.maxAttemptsPerPage
+        maxAttemptsPerPage: options.maxAttemptsPerPage,
+        riskCriticModel: resolveRoleRouting(config, 'risk-critic').model,
+        riskCriticCache: createRiskCriticCache(repoRoot)
       },
       config,
       glossary,

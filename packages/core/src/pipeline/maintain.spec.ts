@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from './risk-critic-test-support.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -99,6 +100,9 @@ const scriptedRunner = (writeResponses: string[], observedContent: string) => {
   const writeCalls: AgentTaskSpec[] = [];
   const reviewCalls: AgentTaskSpec[] = [];
   const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+    if (spec.kind === 'assess-page-risk') {
+      return cleanRiskCriticTranscript(spec);
+    }
     if (spec.kind === 'review-page') {
       reviewCalls.push(spec);
       return passingReview(spec, observedContent);
@@ -290,6 +294,9 @@ tree:
     // Generate with a persistently failing persona review: the page ships flagged with an OPEN
     // flag while its MDX passes every deterministic verifier.
     const failingReviewTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return {
           ...baseTranscript(spec, fixtureSource),

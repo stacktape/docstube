@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from '@docstube/core';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -49,6 +50,9 @@ const scriptedRunTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
   };
   if (spec.kind === 'preflight') {
     return { ...base, observedReads: [], result: { type: 'text', text: 'ok' } };
+  }
+  if (spec.kind === 'assess-page-risk') {
+    return cleanRiskCriticTranscript(spec);
   }
   if (spec.kind === 'review-page') {
     return {

@@ -79,7 +79,14 @@ describe('resolveRunCredentialRequirements', () => {
   it('collapses to ONE requirement when every role inherits the run default', () => {
     const requirements = resolveRunCredentialRequirements(config({ transport: 'anthropic-api' }), {});
     expect(requirements).toHaveLength(1);
-    expect(requirements[0]?.roles).toEqual(['writer', 'reviewer', 'translator', 'architect', 'extractor']);
+    expect(requirements[0]?.roles).toEqual([
+      'writer',
+      'reviewer',
+      'risk-critic',
+      'translator',
+      'architect',
+      'extractor'
+    ]);
   });
 
   it('reports the role-overridden provider as its own requirement, with its own env var', () => {
@@ -94,7 +101,7 @@ describe('resolveRunCredentialRequirements', () => {
     expect(requirements).toHaveLength(2);
     const [primary, reviewer] = requirements;
     expect(primary).toMatchObject({ transportId: 'anthropic-api', credentialEnvVars: ['MY_ANTHROPIC_KEY'] });
-    expect(primary?.roles).toEqual(['writer', 'translator', 'architect', 'extractor']);
+    expect(primary?.roles).toEqual(['writer', 'risk-critic', 'translator', 'architect', 'extractor']);
     // The reviewer switched providers, so the top-level key is NOT forwarded to it.
     expect(reviewer).toMatchObject({ roles: ['reviewer'], transportId: 'openai-compatible', kind: 'keyless' });
     expect(reviewer?.credentialEnvVars).toEqual([]);

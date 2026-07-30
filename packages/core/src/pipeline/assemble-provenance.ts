@@ -7,6 +7,7 @@ import type {
   IaPageNodeV2,
   PageEntity,
   ProvenanceV2,
+  RiskCriticResult,
   Transcript
 } from '@docstube/contracts';
 import { canonicalJson, contentHash, hashValue, provenanceV2Schema } from '@docstube/contracts';
@@ -40,6 +41,10 @@ export type AssembleProvenanceInput = {
   // The write task the accepted attempt ran — its prompts are the revision refs.
   writeTask: AgentTaskSpec;
   reviews: ScoredReview[];
+  // The page's single evidence-fed risk critic (harness-state-v2 decision 4). Absent only for
+  // callers that do not run it at all; a critic that could not run passes a `pending` record —
+  // never a missing one, and never a silent pass.
+  riskCritic?: RiskCriticResult | undefined;
   // Context the writer consumed (instructions/criteria from .docstube/, glossary, config).
   instructions: string[];
   criteria: string[];
@@ -192,7 +197,8 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
     lineage: {
       models: [
         { role: 'writer', model: input.transcript.model, transport: input.transcript.transport },
-        ...input.reviews.map((review) => ({ role: `reviewer:${review.persona}`, model: review.scoredBy }))
+        ...input.reviews.map((review) => ({ role: `reviewer:${review.persona}`, model: review.scoredBy })),
+        ...(input.riskCritic === undefined ? [] : [{ role: 'risk-critic', model: input.riskCritic.scoredBy }])
       ],
       // Prompt templates by id + content-hash revision, so prompt changes are traceable.
       prompts: [
@@ -200,6 +206,8 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
         { id: 'write-page:user', revision: contentHash(input.writeTask.userPrompt) }
       ],
       transcripts: [input.transcript.taskId, ...input.reviews.map((review) => review.taskId)],
+      // NOTE: a cache-served risk critic contributes no transcript id — it never ran a task this
+      // run. Its verdict is still attributed on assessments.riskCritic (model + promptVersion).
       // Journal-registered ctx_ context packs are a later wave; the page's current seed-context
       // strings are not ctx_ ids, so lineage starts without them rather than faking handles.
       seedContext: [],
@@ -219,9 +227,13 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
         scoredBy: review.scoredBy,
         completion: review.completed ? 'completed' : 'failed',
         criteria: review.criteria.map((criterion) => ({ id: criterion.criterion, outcome: criterion.outcome }))
-      }))
-      // riskCritic is a later wave (harness-state-v2 decision 4); translationFidelity and
-      // structural assessments attach on their own pipelines.
+      })),
+      // THE EDITORIAL AXIS, SECOND HALF (harness-state-v2 decision 4). Critic findings are
+      // ASSESSMENTS: they live here and nowhere else — never in `claimEvidence`, never in the
+      // ledger, never on the correctness axis. Recorded whenever the critic was attempted, including
+      // when it could not run (`pending`), so an unassessed page is a stated fact rather than an
+      // absent record. translationFidelity and structural assessments attach on their own pipelines.
+      ...(input.riskCritic === undefined ? {} : { riskCritic: input.riskCritic })
     }
   });
 };

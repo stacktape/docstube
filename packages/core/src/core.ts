@@ -177,6 +177,33 @@ export type {
 } from './pipeline/anchor-ledger.ts';
 export { lintUncoveredAssertions, coverageLintHint, coverageLintRules } from './pipeline/coverage-lint.ts';
 export type { CoverageLintInput } from './pipeline/coverage-lint.ts';
+export {
+  buildAssessPageRiskTask,
+  buildRiskCriticSystemPrompt,
+  buildRiskCriticUserPrompt,
+  pendingRiskCritic,
+  riskCriticCacheKey,
+  riskCriticFindings,
+  riskCriticFromTranscript,
+  riskCriticPromptVersion,
+  riskCriticSummaryLine,
+  runRiskCritic,
+  RISK_CRITIC_CHECK
+} from './pipeline/risk-critic.ts';
+export type {
+  RiskCriticInput,
+  RiskCriticParse,
+  RiskCriticTaskRunner,
+  RunRiskCriticInput,
+  RunRiskCriticResult
+} from './pipeline/risk-critic.ts';
+export {
+  createMemoryRiskCriticCache,
+  createRiskCriticCache,
+  riskCriticCacheDir
+} from './pipeline/risk-critic-cache.ts';
+export type { RiskCriticCache } from './pipeline/risk-critic-cache.ts';
+export { cleanRiskCriticTranscript } from './pipeline/risk-critic-test-support.ts';
 export { matchClaimIds } from './pipeline/match-claims.ts';
 export type { ClaimMatch, ClaimMatchConfidence, MatchClaimIdsInput, MatchedClaimIds } from './pipeline/match-claims.ts';
 export { translateArtifact, buildTranslatePageTask, alignTranslatedEntities } from './pipeline/translate-page.ts';

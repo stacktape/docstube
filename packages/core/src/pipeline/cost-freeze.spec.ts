@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from './risk-critic-test-support.ts';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -206,6 +207,9 @@ const baseTranscript = (spec: AgentTaskSpec, costUsd: number): Omit<Transcript, 
 const scriptedRunner = () => {
   const writeCalls: AgentTaskSpec[] = [];
   const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+    if (spec.kind === 'assess-page-risk') {
+      return cleanRiskCriticTranscript(spec);
+    }
     if (spec.kind === 'review-page') {
       return {
         ...baseTranscript(spec, REVIEW_COST),

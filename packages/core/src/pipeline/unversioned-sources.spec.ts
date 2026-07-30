@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { cleanRiskCriticTranscript } from './risk-critic-test-support.ts';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,6 +52,9 @@ const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
     usage: { inputTokens: 1, outputTokens: 1, cacheHit: false },
     stopReason: 'complete'
   };
+  if (spec.kind === 'assess-page-risk') {
+    return cleanRiskCriticTranscript(spec);
+  }
   if (spec.kind === 'review-page') {
     return { ...base, result: { type: 'structured', value: { persona: 'dev', criteria: [], findings: [] } } };
   }

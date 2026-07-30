@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cleanRiskCriticTranscript } from '@docstube/core';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -97,6 +98,9 @@ describe('runRefineCommand', () => {
 
     // Run 1: an ordinary generate establishes both pages, their shards, and their routes.
     const generateRunner = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }
@@ -119,6 +123,9 @@ describe('runRefineCommand', () => {
     // the next page, so runRefine throws with one page already committed.
     let writes = 0;
     const refineRunner = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'assess-page-risk') {
+        return cleanRiskCriticTranscript(spec);
+      }
       if (spec.kind === 'review-page') {
         return passingReview(spec);
       }

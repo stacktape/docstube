@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { cleanRiskCriticTranscript } from './risk-critic-test-support.ts';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { hostname, tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
@@ -87,6 +88,9 @@ const baseTranscript = (spec: AgentTaskSpec, costUsd: number): Omit<Transcript, 
 const scriptedRunner = () => {
   const writtenSlugs: string[] = [];
   const runTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+    if (spec.kind === 'assess-page-risk') {
+      return cleanRiskCriticTranscript(spec);
+    }
     if (spec.kind === 'review-page') {
       return {
         ...baseTranscript(spec, REVIEW_COST),
