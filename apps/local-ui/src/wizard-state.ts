@@ -1,6 +1,7 @@
-import type { DocType, DocstubeConfig, Ia, IaNode, Persona } from '@docstube/contracts';
+import type { DocType, DocstubeConfig, Ia, IaNode, Persona, TransportId } from '@docstube/contracts';
 // Type-only imports straight from core source (same rationale as trpc-client.ts): erased at build
 // time, so the core export map pointing at built output never matters here.
+import type { OnboardingDraft, OnboardingDraftPatch } from '../../../packages/core/src/config/onboarding-draft.ts';
 import type { ProjectDetection } from '../../../packages/core/src/detect/detect-project.ts';
 import type { IaProposal, IaProposalId } from '../../../packages/core/src/pipeline/propose-ia.ts';
 
@@ -212,11 +213,19 @@ export const applyIaOp = (tree: WizardIaNode[], op: IaEditOp): WizardIaNode[] =>
 
 export type IaChoice = IaProposalId | 'custom' | undefined;
 
+// Mirrors defaultModels in packages/core/src/pipeline/task-runner.ts: every other transport makes
+// createTransportFromConfig throw without an explicit model, so setup must ask for one rather than
+// let the user reach Generate with a config that cannot build a transport.
+export const transportsWithDefaultModel: readonly TransportId[] = ['claude-cli', 'anthropic-api'];
+
 export const wizardStepIds = [
   'doc-type',
   'context',
   'personas',
   'sources',
+  // The provider comes BEFORE the IA step: proposing an IA is an agent call, and it runs on
+  // whatever the draft says the provider is.
+  'agent',
   'ia',
   'versions',
   'theme',
@@ -231,6 +240,7 @@ export const wizardStepTitles: Record<WizardStepId, string> = {
   context: 'Project context',
   personas: 'Personas',
   sources: 'Sources',
+  agent: 'Agent provider',
   ia: 'Information architecture',
   versions: 'Versions & locales',
   theme: 'Theme',
@@ -239,10 +249,20 @@ export const wizardStepTitles: Record<WizardStepId, string> = {
   start: 'Start'
 };
 
+export type AgentDraftState = {
+  transport: TransportId | undefined;
+  model: string;
+  apiKeyEnv: string;
+  baseUrl: string;
+};
+
 export type WizardState = {
   hydrated: boolean;
   mode: 'scaffold' | 'edit';
   step: number;
+  agent: AgentDraftState;
+  // Last preflight outcome, shown on the Generate step. Never faked: undefined until one ran.
+  preflight: { ok: boolean; detail: string } | undefined;
   docType: DocType | undefined;
   projectContext: string;
   personas: Persona[];
@@ -272,10 +292,19 @@ export type WizardState = {
 
 const emptyTokens = (): Record<string, string> => Object.fromEntries(themeTokenNames.map((name) => [name, '']));
 
+export const emptyAgentDraft = (): AgentDraftState => ({
+  transport: undefined,
+  model: '',
+  apiKeyEnv: '',
+  baseUrl: ''
+});
+
 export const initialWizardState = (): WizardState => ({
   hydrated: false,
   mode: 'scaffold',
   step: 0,
+  agent: emptyAgentDraft(),
+  preflight: undefined,
   docType: undefined,
   projectContext: '',
   personas: [],
@@ -305,11 +334,17 @@ export const initialWizardState = (): WizardState => ({
 export type HydrationInput = {
   family: { config: DocstubeConfig; ia: Ia } | undefined;
   detection: { detection: ProjectDetection; suggestedPersonas: Persona[] } | undefined;
+  // The autosaved onboarding draft. Wins over detection (it IS the user's own in-progress intent)
+  // and loses to committed config (which is the shared truth).
+  draft?: OnboardingDraft | undefined;
 };
 
 export type WizardAction =
   | ({ type: 'hydrate' } & HydrationInput)
   | { type: 'go-to-step'; step: number }
+  | { type: 'set-transport'; transport: TransportId; model?: string | undefined; apiKeyEnv?: string | undefined }
+  | { type: 'set-agent-field'; field: 'model' | 'apiKeyEnv' | 'baseUrl'; value: string }
+  | { type: 'set-preflight'; result: { ok: boolean; detail: string } | undefined }
   | { type: 'set-doc-type'; docType: DocType }
   | { type: 'set-project-context'; value: string }
   | { type: 'set-personas'; personas: Persona[] }
@@ -333,6 +368,15 @@ const filteredTokens = (tokens: Record<string, string>): Record<string, string> 
 
 type ConfigPair = { path: Array<string | number>; value: unknown };
 
+// Intent only: fields the user never touched stay absent so docstube.yml carries the choice, not
+// an expanded default. The credential itself is never here — only the env-var NAME.
+export const agentsValue = (agent: AgentDraftState): Record<string, string> => ({
+  ...(agent.transport === undefined ? {} : { transport: agent.transport }),
+  ...(agent.model.trim().length === 0 ? {} : { model: agent.model.trim() }),
+  ...(agent.apiKeyEnv.trim().length === 0 ? {} : { apiKeyEnv: agent.apiKeyEnv.trim() }),
+  ...(agent.baseUrl.trim().length === 0 ? {} : { baseUrl: agent.baseUrl.trim() })
+});
+
 // The full set of config values the wizard owns, as comment-preserving update paths. Edit mode
 // diffs these against the hydration baseline and sends only what changed.
 export const configPairs = (state: WizardState): ConfigPair[] => [
@@ -342,6 +386,7 @@ export const configPairs = (state: WizardState): ConfigPair[] => [
   { path: ['sources', 'openapi'], value: state.openapi },
   { path: ['sources', 'asyncapi'], value: state.asyncapi },
   { path: ['sources', 'imports'], value: state.imports },
+  ...Object.entries(agentsValue(state.agent)).map(([key, value]) => ({ path: ['agents', key], value })),
   { path: ['versions', 'current'], value: state.currentVersion },
   { path: ['locales', 'source'], value: state.sourceLocale },
   { path: ['locales', 'targets'], value: state.targetLocales },
@@ -372,12 +417,14 @@ export const iaChanged = (state: WizardState): boolean => JSON.stringify(buildIa
 export const buildConfigInput = (state: WizardState): Record<string, unknown> => {
   const tokens = filteredTokens(state.themeTokens);
   const hasSources = state.openapi.length > 0 || state.asyncapi.length > 0 || state.imports.length > 0;
+  const agents = agentsValue(state.agent);
   return {
     schemaVersion: 1,
     docType: state.docType,
     ...(state.projectContext.trim().length === 0 ? {} : { projectContext: state.projectContext }),
     personas: state.personas,
     ...(hasSources ? { sources: { openapi: state.openapi, asyncapi: state.asyncapi, imports: state.imports } } : {}),
+    ...(Object.keys(agents).length === 0 ? {} : { agents }),
     versions: { current: state.currentVersion, frozen: state.frozenVersions },
     locales: { source: state.sourceLocale, targets: state.targetLocales },
     // The theme name is always written explicitly (knowledge/design/theming.md): a later change
@@ -452,6 +499,19 @@ export const stepIssues = (state: WizardState, stepId: WizardStepId): string[] =
       }
       return issues;
     }
+    case 'agent': {
+      if (state.agent.transport === undefined) {
+        return ['Choose the agent provider docstube should run on.'];
+      }
+      const issues: string[] = [];
+      if (!transportsWithDefaultModel.includes(state.agent.transport) && state.agent.model.trim().length === 0) {
+        issues.push(`The ${state.agent.transport} transport has no default model — name the model to use.`);
+      }
+      if (state.agent.apiKeyEnv.trim().length > 0 && !/^[A-Z][A-Z0-9_]*$/.test(state.agent.apiKeyEnv.trim())) {
+        issues.push('The credential env var must be an UPPER_SNAKE_CASE name (the name, never the key itself).');
+      }
+      return issues;
+    }
     case 'ia':
       if (state.iaTree.length === 0) {
         return ['Add at least one page to the information architecture.'];
@@ -487,6 +547,12 @@ const hydrateFromFamily = (state: WizardState, config: DocstubeConfig, ia: Ia): 
     ...state,
     hydrated: true,
     mode: 'edit',
+    agent: {
+      transport: config.agents.transport,
+      model: config.agents.model ?? '',
+      apiKeyEnv: config.agents.apiKeyEnv ?? '',
+      baseUrl: config.agents.baseUrl ?? ''
+    },
     docType: config.docType,
     projectContext: config.projectContext,
     personas: config.personas.map((persona) => ({ ...persona })),
@@ -527,17 +593,104 @@ const hydrateFromDetection = (
   siteTitle: detection?.siteTitle ?? ''
 });
 
+// Resume from the autosaved draft. Detection has already pre-filled `state`, so this only
+// overlays what the user actually decided — a refresh or a crash mid-setup resumes instead of
+// restarting, which is the whole point of the draft.
+const hydrateFromDraft = (state: WizardState, draft: OnboardingDraft): WizardState => {
+  type ConfigIntent = {
+    docType?: DocType;
+    projectContext?: string;
+    personas?: Persona[];
+    sources?: { openapi?: string[]; asyncapi?: string[]; imports?: ImportSource[] };
+    versions?: { current?: string; frozen?: string[] };
+    locales?: { source?: string; targets?: string[] };
+    theme?: { tokens?: Record<string, string> };
+    site?: { title?: string; description?: string; logo?: string; favicon?: string };
+    components?: string[];
+  };
+  const intent = draft.config as ConfigIntent;
+  const ia = draft.ia as { tree?: IaNode[]; pageCountTarget?: number } | undefined;
+  return {
+    ...state,
+    step: draft.step ?? state.step,
+    agent: {
+      transport: draft.agents.transport ?? state.agent.transport,
+      model: draft.agents.model ?? state.agent.model,
+      apiKeyEnv: draft.agents.apiKeyEnv ?? state.agent.apiKeyEnv,
+      baseUrl: draft.agents.baseUrl ?? state.agent.baseUrl
+    },
+    preflight:
+      draft.preflight === undefined ? state.preflight : { ok: draft.preflight.ok, detail: draft.preflight.detail },
+    docType: intent.docType ?? state.docType,
+    projectContext: intent.projectContext ?? state.projectContext,
+    personas: intent.personas ?? state.personas,
+    openapi: intent.sources?.openapi ?? state.openapi,
+    asyncapi: intent.sources?.asyncapi ?? state.asyncapi,
+    imports: intent.sources?.imports ?? state.imports,
+    iaTree: ia?.tree === undefined ? state.iaTree : toEditorTree(ia.tree),
+    iaChoice: ia?.tree === undefined ? state.iaChoice : 'custom',
+    pageCountTarget: ia?.pageCountTarget ?? state.pageCountTarget,
+    currentVersion: intent.versions?.current ?? state.currentVersion,
+    frozenVersions: intent.versions?.frozen ?? state.frozenVersions,
+    sourceLocale: intent.locales?.source ?? state.sourceLocale,
+    targetLocales: intent.locales?.targets ?? state.targetLocales,
+    themeTokens: { ...state.themeTokens, ...intent.theme?.tokens },
+    siteTitle: intent.site?.title ?? state.siteTitle,
+    siteDescription: intent.site?.description ?? state.siteDescription,
+    logo: intent.site?.logo ?? state.logo,
+    favicon: intent.site?.favicon ?? state.favicon,
+    components: intent.components ?? state.components
+  };
+};
+
+// What the setup UI autosaves after every change. `config`/`ia` are the same intent the commit
+// step will write — held machine-locally until the user actually commits.
+export const draftPatch = (state: WizardState): OnboardingDraftPatch => ({
+  step: state.step,
+  agents: {
+    ...(state.agent.transport === undefined ? {} : { transport: state.agent.transport }),
+    ...(state.agent.model.trim().length === 0 ? {} : { model: state.agent.model.trim() }),
+    ...(state.agent.apiKeyEnv.trim().length === 0 ? {} : { apiKeyEnv: state.agent.apiKeyEnv.trim() }),
+    ...(state.agent.baseUrl.trim().length === 0 ? {} : { baseUrl: state.agent.baseUrl.trim() })
+  },
+  config: buildConfigInput(state),
+  ia: buildIa(state) as unknown as Record<string, unknown>
+});
+
 export const wizardReducer = (state: WizardState, action: WizardAction): WizardState => {
   switch (action.type) {
     case 'hydrate': {
       if (state.hydrated) {
         return state;
       }
+      // Committed config is the shared truth: when it exists the wizard is an EDITOR of it, and a
+      // leftover draft must never shadow the file everything else reads.
       if (action.family !== undefined) {
         return hydrateFromFamily(state, action.family.config, action.family.ia);
       }
-      return hydrateFromDetection(state, action.detection?.detection, action.detection?.suggestedPersonas ?? []);
+      const detected = hydrateFromDetection(
+        state,
+        action.detection?.detection,
+        action.detection?.suggestedPersonas ?? []
+      );
+      return action.draft === undefined ? detected : hydrateFromDraft(detected, action.draft);
     }
+    case 'set-transport':
+      return {
+        ...state,
+        agent: {
+          ...state.agent,
+          transport: action.transport,
+          model: action.model ?? state.agent.model,
+          apiKeyEnv: action.apiKeyEnv ?? state.agent.apiKeyEnv
+        },
+        // A different provider invalidates the previous provider's proof.
+        preflight: undefined
+      };
+    case 'set-agent-field':
+      return { ...state, agent: { ...state.agent, [action.field]: action.value }, preflight: undefined };
+    case 'set-preflight':
+      return { ...state, preflight: action.result };
     case 'go-to-step':
       return { ...state, step: Math.min(Math.max(action.step, 0), wizardStepIds.length - 1) };
     case 'set-doc-type':

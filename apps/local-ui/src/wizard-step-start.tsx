@@ -15,9 +15,11 @@ import {
   wizardStepTitles
 } from './wizard-state.ts';
 
-// Step 10 (PRODUCT §3.9.2): summary + start. Scaffold mode writes docstube.yml + ia.yml and kicks
-// off the first generate run; edit mode writes comment-preserving config diffs + the IA, then
-// offers a run. Both paths land on the dashboard — the waiting room is the review room.
+// The final step (PRODUCT §3.9.2 phase 4). First run is ONE atomic action — `setup.commit`
+// preflights the chosen provider, writes docstube.yml + ia.yml, and starts the generate run that
+// publishes the site. Splitting it was the old bug: setup could finish with config written, no
+// site, and an auth failure still undiscovered. Edit mode keeps the editor shape: write the
+// comment-preserving diff, then optionally run.
 
 type StartStepProps = StepProps & { onComplete: () => void };
 
@@ -37,14 +39,15 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
   const [runMode, setRunMode] = useState<RunMode>('generate');
   const issues = allIssues(state);
 
-  // Scaffold mode: write the config family first; starting the run is a separate step so a
-  // missing run launcher leaves the scaffolded files intact and visible.
-  const scaffoldMutation = useMutation({
+  // First run: preflight → write both files → generate → publish, in one call. Any step failing
+  // fails the whole action, so the repo is never left half set up.
+  const commitMutation = useMutation({
     mutationFn: () =>
-      trpc.setup.scaffold.mutate({
+      trpc.setup.commit.mutate({
         config: buildConfigInput(state),
         ia: buildIa(state) as unknown as Record<string, unknown>
-      })
+      }),
+    onSuccess: () => onComplete()
   });
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -63,11 +66,6 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
     onSuccess: () => onComplete()
   });
 
-  const startScaffoldFlow = async () => {
-    await scaffoldMutation.mutateAsync();
-    startRunMutation.mutate('generate');
-  };
-
   const sourcesSummary =
     [
       ...(state.openapi.length > 0 ? [`${state.openapi.length} OpenAPI`] : []),
@@ -76,10 +74,10 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
     ].join(' · ') || 'code only';
   const tokensSet = Object.values(state.themeTokens).filter((value) => value.trim().length > 0).length;
 
-  const errors = [scaffoldMutation.error, saveMutation.error, startRunMutation.error]
+  const errors = [commitMutation.error, saveMutation.error, startRunMutation.error]
     .filter((error) => error !== null)
     .map((error) => describeMutationError(error));
-  const saved = state.mode === 'scaffold' ? scaffoldMutation.isSuccess : saveMutation.isSuccess;
+  const saved = state.mode === 'scaffold' ? commitMutation.isSuccess : saveMutation.isSuccess;
 
   return (
     <div className="space-y-4">
@@ -87,7 +85,7 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
         title="Start"
         hint={
           state.mode === 'scaffold'
-            ? 'Review the intent, write docstube.yml + ia.yml, and start the first generation run.'
+            ? 'One action: check the provider, write docstube.yml + ia.yml, generate, and publish the site.'
             : 'Review the changes, write them back (comments and formatting preserved), and optionally start a run.'
         }
       />
@@ -99,6 +97,14 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
           value={state.projectContext.trim().length > 0 ? state.projectContext : '(empty)'}
         />
         <SummaryRow label="Personas" value={state.personas.map((persona) => persona.id).join(', ') || '(none)'} />
+        <SummaryRow
+          label="Agent provider"
+          value={
+            state.agent.transport === undefined
+              ? '(not chosen)'
+              : `${state.agent.transport}${state.agent.model.trim().length > 0 ? ` · ${state.agent.model.trim()}` : ''}`
+          }
+        />
         <SummaryRow label="Sources" value={sourcesSummary} />
         <SummaryRow label="IA" value={`${countIaNodes(state.iaTree)} node(s) · ${state.iaChoice ?? 'blank'}`} />
         <SummaryRow
@@ -139,12 +145,10 @@ export function StartStep({ state, dispatch, onComplete }: StartStepProps) {
           <button
             type="button"
             className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
-            disabled={issues.length > 0 || scaffoldMutation.isPending || startRunMutation.isPending}
-            onClick={() => void startScaffoldFlow().catch(() => undefined)}
+            disabled={issues.length > 0 || commitMutation.isPending}
+            onClick={() => commitMutation.mutate()}
           >
-            {scaffoldMutation.isPending || startRunMutation.isPending
-              ? 'Starting…'
-              : 'Create config & start generating'}
+            {commitMutation.isPending ? 'Starting…' : 'Create config & start generating'}
           </button>
           {saved && <span className="text-xs text-emerald-300">docstube.yml + ia.yml written.</span>}
         </div>

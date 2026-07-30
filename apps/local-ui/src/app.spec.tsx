@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './app.tsx';
 import { readSessionFromUrl } from './trpc-client.ts';
 
@@ -9,6 +9,7 @@ afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
   window.history.replaceState(null, '', '/');
+  vi.unstubAllGlobals();
 });
 
 const renderApp = () =>
@@ -18,20 +19,45 @@ const renderApp = () =>
     </QueryClientProvider>
   );
 
+// The App builds its own client from the session token, so the control plane is stubbed at the
+// fetch layer — the same seam the real tRPC client uses.
+const stubControlPlane = (status: { hasConfig: boolean; initialSurface: 'setup' | 'dashboard' }) => {
+  window.history.replaceState(null, '', '/#session=abc123');
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const body = url.includes('setup.status')
+      ? [{ result: { data: { ...status, draft: null } } }]
+      : [{ result: { data: [] } }];
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+  });
+};
+
 describe('control plane shell', () => {
-  it('renders all four surfaces as live tabs', () => {
+  // THE FIRST-RUN BUG: the shell opened on the dashboard unconditionally, so a fresh repository
+  // landed on an empty page telling the user to go run a command.
+  it('opens on setup — not the dashboard — when the control plane reports no config', async () => {
+    stubControlPlane({ hasConfig: false, initialSurface: 'setup' });
     renderApp();
+    expect(await screen.findByText('First-run setup')).toBeDefined();
+    // Dashboard/flags/review are not peer tabs during first run: there is nothing behind them yet.
+    expect(screen.queryByRole('button', { name: 'Dashboard' })).toBeNull();
+  });
+
+  it('opens on the dashboard once config exists, with all four surfaces as live tabs', async () => {
+    stubControlPlane({ hasConfig: true, initialSurface: 'dashboard' });
+    renderApp();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Dashboard' })).toBeDefined());
     for (const label of ['Dashboard', 'Flag queue', 'Wizard', 'Review']) {
       const tab = screen.getByRole('button', { name: label }) as HTMLButtonElement;
       expect(tab.disabled).toBe(false);
     }
-    expect(screen.queryByText('next wave')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Dashboard' }).getAttribute('aria-current')).toBe('page');
   });
 
   it('asks for the tokened URL when the session param is missing', () => {
     renderApp();
     expect(screen.getByText('Missing session token')).toBeDefined();
-    expect(screen.getByText(/docstube wizard/)).toBeDefined();
+    expect(screen.getByText(/carries the one-time session token/)).toBeDefined();
   });
 });
 

@@ -1,11 +1,19 @@
-import { useEffect, useReducer } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useReducer, useRef } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useTrpc } from './trpc-client.ts';
+import { AgentStep } from './wizard-step-agent.tsx';
 import { IaStep } from './wizard-step-ia.tsx';
 import { StartStep } from './wizard-step-start.tsx';
 import { ThemeStep } from './wizard-step-theme.tsx';
 import type { WizardStepId } from './wizard-state.ts';
-import { initialWizardState, stepIssues, wizardReducer, wizardStepIds, wizardStepTitles } from './wizard-state.ts';
+import {
+  draftPatch,
+  initialWizardState,
+  stepIssues,
+  wizardReducer,
+  wizardStepIds,
+  wizardStepTitles
+} from './wizard-state.ts';
 import type { StepProps } from './wizard-steps.tsx';
 import {
   ComponentsStep,
@@ -17,16 +25,22 @@ import {
   VersionsStep
 } from './wizard-steps.tsx';
 
-// The ten-step setup wizard (PRODUCT §3.9.2). One reducer store; hydrated once from config.family
-// (edit mode — the wizard is one editor among others) or, when no config exists, pre-filled from
-// the deterministic detection engine (scaffold mode). The progress rail navigates freely; Next
-// and the final Start are gated on per-step validation.
+// The setup wizard (PRODUCT §3.9.2). One reducer store, hydrated once from config.family (edit
+// mode — the wizard is one editor among others) or, when no config exists, from the deterministic
+// detection engine plus the autosaved ONBOARDING DRAFT.
+//
+// The draft is what makes first run work at all: setup's agent-backed steps read their provider
+// from it, so they no longer need a docstube.yml that setup itself has not written yet. It also
+// autosaves, so a reload or a crash mid-setup resumes instead of restarting.
+
+const DRAFT_AUTOSAVE_MS = 600;
 
 const stepComponents: Record<Exclude<WizardStepId, 'start'>, (props: StepProps) => ReturnType<typeof DocTypeStep>> = {
   'doc-type': DocTypeStep,
   context: ContextStep,
   personas: PersonasStep,
   sources: SourcesStep,
+  agent: AgentStep,
   ia: IaStep,
   versions: VersionsStep,
   theme: ThemeStep,
@@ -56,19 +70,52 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
     queryFn: () => trpc.detect.project.query(),
     retry: false
   });
+  const draftQuery = useQuery({
+    queryKey: ['onboarding-draft'],
+    queryFn: async () => {
+      try {
+        return await trpc.setup.draft.query();
+      } catch {
+        return null;
+      }
+    },
+    retry: false
+  });
 
   const familyPending = familyQuery.isPending;
   const detectPending = detectQuery.isPending;
+  const draftPending = draftQuery.isPending;
   useEffect(() => {
-    if (state.hydrated || familyPending || detectPending) {
+    if (state.hydrated || familyPending || detectPending || draftPending) {
       return;
     }
     dispatch({
       type: 'hydrate',
       family: familyQuery.data ?? undefined,
-      detection: detectQuery.data
+      detection: detectQuery.data,
+      draft: draftQuery.data ?? undefined
     });
-  }, [state.hydrated, familyPending, detectPending, familyQuery.data, detectQuery.data]);
+  }, [state.hydrated, familyPending, detectPending, draftPending, familyQuery.data, detectQuery.data, draftQuery.data]);
+
+  const saveDraft = useMutation({
+    mutationFn: (patch: ReturnType<typeof draftPatch>) => trpc.setup.saveDraft.mutate({ patch })
+  });
+
+  // Autosave, debounced. Scaffold mode only: in edit mode the committed files are the truth and a
+  // draft alongside them would be a second, conflicting source.
+  const saveRef = useRef(saveDraft);
+  saveRef.current = saveDraft;
+  const scaffolding = state.hydrated && state.mode === 'scaffold';
+  const patchJson = scaffolding ? JSON.stringify(draftPatch(state)) : undefined;
+  useEffect(() => {
+    if (patchJson === undefined) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      saveRef.current.mutate(JSON.parse(patchJson) as ReturnType<typeof draftPatch>);
+    }, DRAFT_AUTOSAVE_MS);
+    return () => clearTimeout(timer);
+  }, [patchJson]);
 
   if (!state.hydrated) {
     return <p className="p-6 text-sm text-neutral-400">Detecting project…</p>;
@@ -85,7 +132,9 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
         className="w-64 shrink-0 space-y-0.5 overflow-y-auto border-r border-neutral-800 p-3"
       >
         <p className="px-2 pb-2 text-xs text-neutral-500">
-          {state.mode === 'scaffold' ? 'First-run setup — pre-filled by detection.' : 'Editing existing docstube.yml.'}
+          {state.mode === 'scaffold'
+            ? 'First-run setup — pre-filled by detection, autosaved as you go.'
+            : 'Editing existing docstube.yml.'}
         </p>
         {wizardStepIds.map((stepId, index) => {
           const active = index === state.step;
