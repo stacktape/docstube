@@ -18,5 +18,6 @@ export type {
   FingerprintCapablePack,
   PackFingerprints
 } from './build-fingerprints.ts';
+export { materialFingerprint, materialFingerprintIndex } from './material-fingerprint.ts';
 export { diffFingerprints } from './diff-fingerprints.ts';
 export type { FingerprintDiff, FingerprintedCodemap, SymbolFacetChange } from './diff-fingerprints.ts';

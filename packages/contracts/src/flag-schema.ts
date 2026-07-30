@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { entityAddressSchema } from './entity-schema.ts';
-import { flagIdSchema, isoTimestampSchema, runIdSchema, sourceKeySchema } from './primitives.ts';
+import { flagIdSchema, isoTimestampSchema, knowledgeNeedIdSchema, runIdSchema, sourceKeySchema } from './primitives.ts';
 
 // Flags are the ONLY human touchpoint in the L4 posture (PRODUCT §3.3): exceptions, not
 // supervision. They live in the page shard they belong to (travel with branches); cross-page and
@@ -39,6 +39,12 @@ export const flagSchema = z.object({
   entity: entityAddressSchema.optional(),
   // For tribal-knowledge flags: the durable-context key the answer is stored under.
   subjectSymbol: sourceKeySchema.optional(),
+  // The KnowledgeNeed this flag is a QUEUE PROJECTION of (dx-knowledge-v2 decision 6). The need —
+  // not the flag, and never the question text — owns the durable identity: several pages asking
+  // for the same missing fact carry several flags pointing at ONE need, and answering any of them
+  // answers all of them. Optional only so flags raised before the KnowledgeNeed store existed stay
+  // answerable (the answer path mints the need on the fly).
+  needId: knowledgeNeedIdSchema.optional(),
   question: z.string().optional(),
   answer: flagAnswerSchema.optional(),
   runId: runIdSchema.optional(),
