@@ -416,6 +416,22 @@ export type {
   Waiver
 } from './publication-schema.ts';
 
+export {
+  ciPreflightStatusSchema,
+  ciPreflightCheckRegistryVersion,
+  ciPreflightCheckIdSchema,
+  ciAutomationModeSchema,
+  ciPreflightCheckSchema,
+  ciPreflightReportSchema
+} from './ci-preflight-schema.ts';
+export type {
+  CiPreflightStatus,
+  CiPreflightCheckId,
+  CiAutomationMode,
+  CiPreflightCheck,
+  CiPreflightReport
+} from './ci-preflight-schema.ts';
+
 export { supportLevelSchema, supportMatrixSchema, assuranceProfileSchema } from './assurance-schema.ts';
 export type { SupportLevel, SupportMatrix, AssuranceProfile } from './assurance-schema.ts';
 

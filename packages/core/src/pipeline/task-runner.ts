@@ -34,7 +34,7 @@ const resolveMcpServerPath = (): { path: string; nodeArgs: string[] } => {
 // The public config enum stops at four transports; 'google' (experimental, Antigravity CLI drops
 // subprocess stdout) and 'replay' (record/replay test transport) stay reachable only through the
 // DOCSTUBE_TRANSPORT_OVERRIDE env var — internal escape hatch, never a docstube.yml value.
-type InternalTransportId = DocstubeConfig['agents']['transport'] | 'google' | 'replay';
+export type InternalTransportId = DocstubeConfig['agents']['transport'] | 'google' | 'replay';
 
 const internalTransportIds: readonly InternalTransportId[] = [
   'claude-cli',
@@ -61,7 +61,9 @@ export const resolveTransportId = (
   return override as InternalTransportId;
 };
 
-const defaultModels: Partial<Record<InternalTransportId, string>> = {
+// Exported so the CI preflight can answer "will this config even construct a transport?" without
+// constructing one — the two must never drift apart.
+export const transportDefaultModels: Partial<Record<InternalTransportId, string>> = {
   'claude-cli': 'sonnet',
   'anthropic-api': 'claude-sonnet-5',
   replay: 'replay'
@@ -74,7 +76,7 @@ export const createTransportFromConfig = (
 ): { transport: Transport; model: string } => {
   const agents = config.agents;
   const transportId = resolveTransportId(config, env);
-  const model = agents.model ?? defaultModels[transportId];
+  const model = agents.model ?? transportDefaultModels[transportId];
   if (model === undefined) {
     throw configError(`agents.transport "${transportId}" requires an explicit agents.model in docstube.yml`);
   }

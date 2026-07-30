@@ -165,8 +165,14 @@ export {
 export type { FeedbackCategory } from './server/feedback.ts';
 export { preflightSkipReason, preflightTaskSpec, runTransportPreflight } from './pipeline/preflight-transport.ts';
 export type { PreflightInput, PreflightResult } from './pipeline/preflight-transport.ts';
-export { createTransportFromConfig, createTaskRunnerFromConfig } from './pipeline/task-runner.ts';
-export type { ConfiguredTaskRunner } from './pipeline/task-runner.ts';
+export { createTransportFromConfig, createTaskRunnerFromConfig, resolveTransportId } from './pipeline/task-runner.ts';
+export type { ConfiguredTaskRunner, InternalTransportId } from './pipeline/task-runner.ts';
+export {
+  credentialEnvVarPresent,
+  isPrivateEndpoint,
+  resolveTransportCredentialRequirement
+} from './pipeline/transport-credential.ts';
+export type { TransportCredentialKind, TransportCredentialRequirement } from './pipeline/transport-credential.ts';
 
 export { createLocalApp, startLocalServer } from './server/local-server.ts';
 export type { LocalAppOptions, LocalServer, LocalServerOptions } from './server/local-server.ts';
