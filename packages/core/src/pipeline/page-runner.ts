@@ -33,8 +33,8 @@ import { assembleProvenanceV2 } from './assemble-provenance.ts';
 import { anchorWriterLedger } from './anchor-ledger.ts';
 import { matchClaimIds } from './match-claims.ts';
 import { CLAIM_VERIFICATION_CHECK, verifyClaims } from './verify-claims.ts';
-import { createQuestionCollector, flagQuestionDescriptor, questionsToFlags } from './tribal-knowledge.ts';
-import type { KnowledgeEntry, OpenQuestions } from './tribal-knowledge.ts';
+import { createQuestionCollector, flagQuestionDescriptor } from './tribal-knowledge.ts';
+import type { KnowledgeSession } from '../knowledge/knowledge-session.ts';
 import type { RunCostTracker } from './run-cost.ts';
 
 // The per-page generation loop: write ⇄ (review ∥ verify) → gate, bounded retries, flag instead
@@ -71,9 +71,9 @@ export type PageRunContext = {
   glossary: ConfigFamily['glossary'];
   criteria: string[];
   instructions: string[];
-  // Answered tribal knowledge, injected into every writer prompt; keys drive ask-once dedup.
-  knowledge: KnowledgeEntry[];
-  openQuestions: OpenQuestions;
+  // The run's knowledge session: answered facts injected into every writer prompt, and the capture
+  // path that turns writer questions into KnowledgeNeeds (ask-once by subject + missing fact).
+  knowledge: KnowledgeSession;
   // Accumulates every task's reported cost; callers check shouldFreeze() between pages.
   costTracker: RunCostTracker;
   commit: string;
@@ -158,7 +158,7 @@ export const generatePage = async (
       priorDraft,
       enabledComponents: ctx.config.components,
       instructions: ctx.instructions,
-      knowledge: ctx.knowledge,
+      knowledge: ctx.knowledge.contextFacts(),
       toolDescriptors: [...ctx.options.toolDescriptors, submitPageDescriptor, flagQuestionDescriptor]
     });
     const transcript = await runRecordedTask({
@@ -400,7 +400,7 @@ export const generatePage = async (
       criteria: ctx.criteria,
       glossary: ctx.glossary,
       config: ctx.config,
-      knowledge: ctx.knowledge
+      knowledge: ctx.knowledge.contextFacts()
     });
     if (findings.length > 0) {
       await ctx.journal.append({ type: 'findings', pageId: page.id, findings });
@@ -435,15 +435,15 @@ export const generatePage = async (
   // just re-verified, so a stale verification flag is superseded (re-raised below if still true).
   const carriedFlags = (previousShard?.flags ?? []).filter((flag) => flag.kind === 'tribal-knowledge');
 
-  // Tribal knowledge: writer questions become flags — non-blocking (the page still ships),
-  // ask-once (deduped against every open flag and every stored answer).
-  const questionFlags = questionsToFlags({
+  // Tribal knowledge: writer questions become KnowledgeNeeds and, when the need is genuinely open,
+  // one queue flag — non-blocking (the page still ships), ask-once by SUBJECT + missing fact rather
+  // than by question phrasing (dx-knowledge-v2 decision 6).
+  const questionFlags = await ctx.knowledge.capture({
     questions: questionCollector.questions(),
     codemap: ctx.codemap,
-    knowledgeKeys: new Set(ctx.knowledge.map((entry) => entry.key)),
-    openQuestions: ctx.openQuestions,
-    shard: { locale: ctx.locale, version: ctx.version },
     pageId: finalArtifact.page.id,
+    locale: ctx.locale,
+    version: ctx.version,
     runId: ctx.journal.runId
   });
 

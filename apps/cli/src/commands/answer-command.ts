@@ -1,4 +1,12 @@
-import { applyFlagAnswers, CoreError, createManifestStore, loadConfigFamily } from '@docstube/core';
+import {
+  applyFlagAnswers,
+  CoreError,
+  createFingerprintResolver,
+  createManifestStore,
+  loadConfigFamily,
+  loadKnowledgeState,
+  resolveAnswerAuthor
+} from '@docstube/core';
 import type { Flag } from '@docstube/contracts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 
@@ -76,6 +84,9 @@ export const runAnswerCommand = async (input: AnswerCommandInput, output: CliOut
       output.error('shard vanished while answering — retry');
       return { exitCode: 1 };
     }
+    // Real attribution: who answered, when, and (through the fact's subject fingerprint) at what
+    // revision. Re-answering supersedes the previous fact instead of overwriting it.
+    const author = await resolveAnswerAuthor(input.workspaceDir, 'cli');
     await store.writePageShard({
       ...shard,
       flags: shard.flags.map((flag) =>
@@ -83,19 +94,27 @@ export const runAnswerCommand = async (input: AnswerCommandInput, output: CliOut
           ? {
               ...flag,
               status: 'answered' as const,
-              answer: { text: input.text!.trim(), answeredAt: new Date().toISOString(), author: 'cli' }
+              answer: { text: input.text!.trim(), answeredAt: new Date().toISOString(), author }
             }
           : flag
       )
     });
     // Commit to the knowledge store right away (marks the flag resolved).
-    const applied = await applyFlagAnswers({
+    const result = await applyFlagAnswers({
       repoRoot: input.workspaceDir,
       store,
       locales,
-      pageIds: index.pages.map((entry) => entry.id)
+      pageIds: index.pages.map((entry) => entry.id),
+      state: await loadKnowledgeState(input.workspaceDir),
+      fingerprints: createFingerprintResolver(input.workspaceDir)
     });
-    output.info(`answered — ${applied} answer(s) committed to .docstube/knowledge/; future runs will use it.`);
+    const regenerating = new Set(result.answers.flatMap((answer) => answer.pageIds)).size;
+    output.info(
+      `answer saved — ${result.applied} fact(s) committed to .docstube/knowledge/; ` +
+        (regenerating === 0
+          ? 'no generated page consumes it yet.'
+          : `${regenerating} page(s) will regenerate on the next run.`)
+    );
     return { exitCode: 0 };
   } catch (error) {
     if (error instanceof CoreError) {

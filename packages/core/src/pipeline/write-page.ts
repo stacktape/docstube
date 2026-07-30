@@ -18,8 +18,10 @@ export type WritePromptInput = {
   enabledComponents: string[];
   // Durable writing instructions from .docstube/instructions/ (feedback learning).
   instructions: string[];
-  // Answered maintainer questions from .docstube/knowledge/ (tribal-knowledge capture).
-  knowledge: Array<{ question: string; answer: string }>;
+  // Answered maintainer questions from .docstube/knowledge/ (KnowledgeFacts). `stale` marks a fact
+  // whose subject changed materially since it was answered: still the best knowledge available, but
+  // the writer must not present it as current.
+  knowledge: Array<{ question: string; answer: string; stale?: boolean | undefined }>;
 };
 
 const symbolSummary = (codemap: Codemap, cap = 200): string => {
@@ -217,7 +219,14 @@ export const buildWriterSystemPrompt = (input: WritePromptInput): string => {
       ? [
           '',
           'Maintainer-provided knowledge (answers to earlier questions — trustworthy, cite freely, do not re-ask):',
-          ...input.knowledge.map((entry) => `- Q: ${entry.question}\n  A: ${entry.answer}`)
+          ...input.knowledge.map(
+            (entry) =>
+              `- Q: ${entry.question}\n  A: ${entry.answer}${
+                entry.stale === true
+                  ? '\n  NOTE: the code this answer describes has changed since it was given — do not state it as current fact; a re-check is already queued.'
+                  : ''
+              }`
+          )
         ]
       : [])
   ].join('\n');

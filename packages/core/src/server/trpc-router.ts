@@ -44,7 +44,9 @@ import { CoreError } from '../errors.ts';
 import type { PreflightResult } from '../pipeline/preflight-transport.ts';
 import { buildExtractThemeTokensTask, tokensFromTranscript } from '../pipeline/extract-theme-tokens.ts';
 import { buildProposeIaTask, proposalsFromTranscript } from '../pipeline/propose-ia.ts';
-import { applyFlagAnswers } from '../pipeline/tribal-knowledge.ts';
+import { applyFlagAnswers } from '../knowledge/knowledge-answers.ts';
+import { createFingerprintResolver, resolveAnswerAuthor } from '../knowledge/answer-fingerprints.ts';
+import { loadKnowledgeState } from '../knowledge/knowledge-store.ts';
 import type { ManifestStore } from '../state/manifest-store.ts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { runsDir, summarizeRun } from '../state/run-journal.ts';
@@ -298,13 +300,16 @@ const writeFlagUpdate = async (repoRoot: string, located: LocatedFlag, updated: 
     ...located.shard,
     flags: located.shard.flags.map((flag) => (flag.id === updated.id ? updated : flag))
   });
-  // Persist answered tribal-knowledge flags to .docstube/knowledge/ immediately (instead of
-  // waiting for the next run) — the answer becomes durable writer context and the flag resolves.
+  // Commit answered tribal-knowledge flags as KnowledgeFacts immediately (instead of waiting for
+  // the next run) — the answer becomes durable writer context, supersedes any previous answer to
+  // the same need, and the flag resolves.
   await applyFlagAnswers({
     repoRoot,
     store: located.store,
     locales: [located.shard.locale],
-    pageIds: [located.shard.page.id]
+    pageIds: [located.shard.page.id],
+    state: await loadKnowledgeState(repoRoot),
+    fingerprints: createFingerprintResolver(repoRoot)
   });
   const reread = await located.store.readPageShard({ locale: located.shard.locale, pageId: located.shard.page.id });
   return reread?.flags.find((flag) => flag.id === updated.id) ?? updated;
@@ -359,7 +364,12 @@ export const controlPlaneRouter = t.router({
         return writeFlagUpdate(ctx.repoRoot, located, {
           ...located.flag,
           status: 'answered',
-          answer: { text: input.text, answeredAt: new Date().toISOString(), author: 'local-ui' }
+          answer: {
+            text: input.text,
+            answeredAt: new Date().toISOString(),
+            // Real attribution: the answering human's git identity when the repo records one.
+            author: await resolveAnswerAuthor(ctx.repoRoot, 'local-ui')
+          }
         });
       }),
     dismiss: t.procedure.input(z.object({ flagId: flagIdSchema })).mutation(async ({ ctx, input }) => {

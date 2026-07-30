@@ -18,6 +18,8 @@ const CLAIM_B = `cl_${'2'.repeat(20)}`;
 const BLOCK = `bl_${'3'.repeat(20)}`;
 const PAGE = `pg_${'4'.repeat(20)}`;
 const HASH = '5'.repeat(64);
+const KNOWLEDGE_FACT_ID = `kf_${'6'.repeat(20)}`;
+const KNOWLEDGE_NEED_ID = `kn_${'7'.repeat(20)}`;
 
 const subscription = { kind: 'file-content', file: 'src/retry.ts', contentHash: HASH };
 
@@ -144,7 +146,15 @@ const assemble = (
     criteria: ['audience-fit: the page addresses the persona.'],
     glossary,
     config,
-    knowledge: [{ key: 'why-retries', question: 'Why retries?', answer: 'Flaky registries.' }]
+    knowledge: [
+      {
+        factId: KNOWLEDGE_FACT_ID,
+        needId: KNOWLEDGE_NEED_ID,
+        question: 'Why retries?',
+        answer: 'Flaky registries.',
+        stale: false
+      }
+    ]
   });
 
 describe('assembleProvenanceV2', () => {
@@ -268,7 +278,9 @@ describe('assembleProvenanceV2', () => {
     const instruction = dependencies.consumed[0];
     expect(instruction?.hash).toBe(contentHash('Prefer active voice.'));
     expect(instruction?.id).toBe(`instruction-${contentHash('Prefer active voice.').slice(0, 12)}`);
-    expect(dependencies.consumed.find((fragment) => fragment.kind === 'knowledge-fact')?.id).toBe('why-retries');
+    // Keyed by the FACT id: superseding an answer mints a new fact id, so every page that consumed
+    // the old answer becomes dirty (dx-knowledge-v2 decision 8).
+    expect(dependencies.consumed.find((fragment) => fragment.kind === 'knowledge-fact')?.id).toBe(KNOWLEDGE_FACT_ID);
   });
 
   it('records the page-specific IA fragment as a consumed dependency (title/brief/depth/persona)', () => {

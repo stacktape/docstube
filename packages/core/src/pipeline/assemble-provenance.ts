@@ -11,7 +11,8 @@ import type {
 } from '@docstube/contracts';
 import { canonicalJson, contentHash, hashValue, provenanceV2Schema } from '@docstube/contracts';
 import { CoreError } from '../errors.ts';
-import type { KnowledgeEntry } from './tribal-knowledge.ts';
+import { knowledgeFactFragmentHash } from '../knowledge/knowledge-store.ts';
+import type { KnowledgeContextFact } from '../knowledge/knowledge-store.ts';
 import type { ScoredReview } from './review-page.ts';
 
 // Provenance v2 assembly (wave 2b-ii, in-memory — persistence is 2b-iii): the four-way split of
@@ -44,7 +45,7 @@ export type AssembleProvenanceInput = {
   criteria: string[];
   glossary: Glossary;
   config: DocstubeConfig;
-  knowledge: KnowledgeEntry[];
+  knowledge: KnowledgeContextFact[];
 };
 
 // Stable per-fragment ids for id-less context files: the content hash prefix names the fragment
@@ -161,10 +162,13 @@ export const assembleProvenanceV2 = (input: AssembleProvenanceInput): Provenance
   const consumed = [
     ...input.instructions.map((text) => fragmentOf('instruction', text)),
     ...input.criteria.map((text) => fragmentOf('criteria', text)),
+    // Keyed by the FACT id (dx-knowledge-v2 decision 8): superseding an answer mints a new fact id,
+    // so every page that consumed the old one becomes dirty and gets rewritten against the new
+    // answer — the causal edge that makes answering propagate to exactly its pages.
     ...input.knowledge.map((entry) => ({
       kind: 'knowledge-fact',
-      id: entry.key,
-      hash: hashValue({ question: entry.question, answer: entry.answer })
+      id: entry.factId,
+      hash: knowledgeFactFragmentHash(entry)
     })),
     ...(input.glossary.terms.length > 0 ? [{ kind: 'glossary', id: 'glossary', hash: hashValue(input.glossary) }] : []),
     { kind: 'config', id: 'docstube.yml', hash: hashValue(input.config) },

@@ -10,7 +10,7 @@ import { loadConfiguredPlugins, registerBuiltinPlugins } from '../plugins/load-p
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal, journalRunFailure } from '../state/run-journal.ts';
 import { loadContextFiles } from './context-files.ts';
-import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
+import { openKnowledgeForRun } from '../knowledge/knowledge-lifecycle.ts';
 import {
   dirtyTreeEndOfRunSweep,
   dirtyWorkingTreeWarning,
@@ -161,9 +161,14 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
 
     const pageIds = index.pages.map((entry) => entry.id);
     const locales = [locale, ...config.locales.targets];
-    await applyFlagAnswers({ repoRoot, store, locales, pageIds });
-    const knowledge = await loadKnowledge(repoRoot);
-    const openQuestions = await collectOpenQuestions({ store, locales, pageIds, knowledge });
+    const knowledge = await openKnowledgeForRun({
+      repoRoot,
+      store,
+      locales,
+      pageIds,
+      fingerprints,
+      runId: journal.runId
+    });
 
     // Rank every indexed page from committed state.
     const ranked: RankedPage[] = [];
@@ -222,8 +227,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       glossary,
       criteria: contextFiles.criteria,
       instructions: contextFiles.instructions,
-      knowledge,
-      openQuestions,
+      knowledge: knowledge.session,
       costTracker,
       commit,
       dirtyWorkingTree,

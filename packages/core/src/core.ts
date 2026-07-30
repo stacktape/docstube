@@ -108,15 +108,43 @@ export { reviewPage, buildReviewPageTask, defaultReviewCriteria } from './pipeli
 export type { ReviewPageInput } from './pipeline/review-page.ts';
 export { loadContextFiles } from './pipeline/context-files.ts';
 export type { ContextFiles } from './pipeline/context-files.ts';
+export { createQuestionCollector, flagQuestionDescriptor } from './pipeline/tribal-knowledge.ts';
 export {
+  activeFactForNeed,
+  emptyKnowledgeState,
+  factHistoryForNeed,
+  knowledgeContextFacts,
+  knowledgeDir,
+  knowledgeFactFragmentHash,
+  loadKnowledgeState,
+  writeKnowledgeFact,
+  writeKnowledgeNeed
+} from './knowledge/knowledge-store.ts';
+export type { KnowledgeContextFact, KnowledgeState } from './knowledge/knowledge-store.ts';
+export {
+  answerKnowledgeNeed,
   applyFlagAnswers,
-  collectOpenQuestions,
-  flagQuestionDescriptor,
-  loadKnowledge,
-  questionKey,
-  writeKnowledgeAnswer
-} from './pipeline/tribal-knowledge.ts';
-export type { CapturedQuestion, KnowledgeEntry } from './pipeline/tribal-knowledge.ts';
+  knowledgeDirtyPages,
+  mergeKnowledgeNeed,
+  reconcileKnowledgePropagation
+} from './knowledge/knowledge-answers.ts';
+export type { AppliedAnswer, ApplyFlagAnswersResult } from './knowledge/knowledge-answers.ts';
+export {
+  buildKnowledgeSubject,
+  normalizeMissingFact,
+  questionsSimilar,
+  resolveSlot,
+  resolveSubjectSymbol,
+  slotKey,
+  subjectKey,
+  suggestedNeedMerges
+} from './knowledge/knowledge-slots.ts';
+export type { MergeSuggestion, MissingFactSlot } from './knowledge/knowledge-slots.ts';
+export { currentSubjectFingerprint, revalidateKnowledge } from './knowledge/knowledge-revalidation.ts';
+export { createKnowledgeSession } from './knowledge/knowledge-session.ts';
+export type { CapturedQuestion, KnowledgeSession } from './knowledge/knowledge-session.ts';
+export { openKnowledgeForRun } from './knowledge/knowledge-lifecycle.ts';
+export { createFingerprintResolver, resolveAnswerAuthor } from './knowledge/answer-fingerprints.ts';
 export { anchorWriterLedger } from './pipeline/anchor-ledger.ts';
 export type {
   AnchoredClaim,

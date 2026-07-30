@@ -23,7 +23,7 @@ import { createRunJournal, journalRunFailure } from '../state/run-journal.ts';
 import type { RunJournal } from '../state/run-journal.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
 import { loadContextFiles } from './context-files.ts';
-import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
+import { openKnowledgeForRun } from '../knowledge/knowledge-lifecycle.ts';
 import { contentRelativePath, generatePage } from './page-runner.ts';
 import type { PageOutcome, PageRunContext, TaskRunner } from './page-runner.ts';
 import { translateArtifact } from './translate-page.ts';
@@ -641,17 +641,18 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     const baseLedgers =
       options.ci === true ? await readLedgerSnapshot({ store, index: previousIndex, locale }) : undefined;
 
-    // Tribal-knowledge lifecycle: persist any human-answered flags into the knowledge store, then
-    // load answers (writer context) and open-question keys (ask-once dedup) for this run.
+    // Knowledge lifecycle (PRODUCT §3.10): commit human-answered flags as KnowledgeFacts, rebind or
+    // stale facts against this run's fingerprint snapshot, reconcile propagation, and open the
+    // session the page runner reads answers from and captures new needs through.
     const previousPageIds = (previousIndex?.pages ?? []).map((entry) => entry.id);
     const allLocales = [locale, ...config.locales.targets];
-    await applyFlagAnswers({ repoRoot, store, locales: allLocales, pageIds: previousPageIds });
-    const knowledge = await loadKnowledge(repoRoot);
-    const openQuestions = await collectOpenQuestions({
+    const knowledge = await openKnowledgeForRun({
+      repoRoot,
       store,
       locales: allLocales,
       pageIds: previousPageIds,
-      knowledge
+      fingerprints,
+      runId: journal.runId
     });
 
     const maxRunUsd = config.agents.budgets.maxRunUsd;
@@ -672,8 +673,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       glossary,
       criteria: contextFiles.criteria,
       instructions: contextFiles.instructions,
-      knowledge,
-      openQuestions,
+      knowledge: knowledge.session,
       costTracker,
       commit,
       dirtyWorkingTree,
@@ -966,7 +966,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       pages: outcomes,
       translations,
       siteFindings,
-      warnings: host.warnings(),
+      warnings: [...host.warnings(), ...knowledge.warnings],
       openFlagKinds,
       published,
       resumedPages,

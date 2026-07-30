@@ -265,11 +265,16 @@ describe('flag mutations', () => {
     expect(updated.status).toBe('resolved');
     expect(updated.answer?.text).toBe('Three keeps p99 under a second.');
 
-    const knowledgeFiles = await readdir(join(repoRoot, '.docstube', 'knowledge'));
-    expect(knowledgeFiles).toHaveLength(1);
-    const knowledge = await readFile(join(repoRoot, '.docstube', 'knowledge', knowledgeFiles[0]!), 'utf8');
-    expect(knowledge).toContain('Why is the retry cap three?');
-    expect(knowledge).toContain('Three keeps p99 under a second.');
+    // The answer is committed as a KnowledgeNeed + KnowledgeFact pair, not a question-hash file.
+    const needFiles = await readdir(join(repoRoot, '.docstube', 'knowledge', 'needs'));
+    const factFiles = await readdir(join(repoRoot, '.docstube', 'knowledge', 'facts'));
+    expect(needFiles).toHaveLength(1);
+    expect(factFiles).toHaveLength(1);
+    const need = await readFile(join(repoRoot, '.docstube', 'knowledge', 'needs', needFiles[0]!), 'utf8');
+    const fact = await readFile(join(repoRoot, '.docstube', 'knowledge', 'facts', factFiles[0]!), 'utf8');
+    expect(need).toContain('Why is the retry cap three?');
+    expect(fact).toContain('Three keeps p99 under a second.');
+    expect(JSON.parse(fact).author.startsWith('local-ui')).toBe(true);
 
     const shard = await createManifestStore(repoRoot, 'latest').readPageShard({ locale: 'en', pageId: page.id });
     expect(shard?.flags[0]?.status).toBe('resolved');

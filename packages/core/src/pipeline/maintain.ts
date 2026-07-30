@@ -26,7 +26,7 @@ import { errorFindings, runVerifiers } from './verify-page.ts';
 import { loadContextFiles } from './context-files.ts';
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
-import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
+import { openKnowledgeForRun } from '../knowledge/knowledge-lifecycle.ts';
 import {
   attachSiteFindingsToShards,
   dirtyTreeEndOfRunSweep,
@@ -228,17 +228,18 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       });
     }
 
-    // Tribal-knowledge lifecycle (same as generate): persist answered flags, then load answers and
-    // open-question keys for ask-once dedup during regeneration.
+    // Knowledge lifecycle (same as generate): commit answered flags as KnowledgeFacts, revalidate
+    // facts against this run's fingerprints, and learn which pages a new or superseded answer left
+    // stale — those regenerate even when no code changed (dx-knowledge-v2 decision 8).
     const maintainPageIds = previousIndex.pages.map((entry) => entry.id);
     const maintainLocales = [locale, ...config.locales.targets];
-    await applyFlagAnswers({ repoRoot, store, locales: maintainLocales, pageIds: maintainPageIds });
-    const knowledge = await loadKnowledge(repoRoot);
-    const openQuestions = await collectOpenQuestions({
+    const knowledge = await openKnowledgeForRun({
+      repoRoot,
       store,
       locales: maintainLocales,
       pageIds: maintainPageIds,
-      knowledge
+      fingerprints,
+      runId: journal.runId
     });
 
     const headSymbolHashes = new Set(codemap.symbols.map((symbol) => symbol.hash));
@@ -268,8 +269,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       glossary,
       criteria: contextFiles.criteria,
       instructions: contextFiles.instructions,
-      knowledge,
-      openQuestions,
+      knowledge: knowledge.session,
       costTracker,
       commit,
       dirtyWorkingTree,
@@ -341,7 +341,12 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       }
 
       const affected =
-        shard === undefined || mdx === undefined || (await isShardAffected({ repoRoot, shard, headSymbolHashes }));
+        shard === undefined ||
+        mdx === undefined ||
+        // A maintainer's answer is a source change like any other: the pages that consumed the old
+        // answer (or asked the question) are stale until they are rewritten with it.
+        knowledge.dirtyPageIds.has(entry.id) ||
+        (await isShardAffected({ repoRoot, shard, headSymbolHashes }));
       if (!affected && shard !== undefined && mdx !== undefined) {
         // Unaffected: reconstruct the artifact from disk — no agent calls.
         unchangedCount += 1;
@@ -532,7 +537,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       regenerated,
       unchangedCount,
       siteFindings,
-      warnings: [...host.warnings(), ...newNodeWarnings],
+      warnings: [...host.warnings(), ...newNodeWarnings, ...knowledge.warnings],
       openFlagKinds,
       spendByRole: costTracker.spendByRole(),
       ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),

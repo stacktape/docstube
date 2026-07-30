@@ -1,8 +1,8 @@
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildFixturePage, buildFixturePageShard, idPrefixes, mintId } from '@docstube/contracts';
+import { buildFixturePage, buildFixturePageShard, idPrefixes, knowledgeFactSchema, mintId } from '@docstube/contracts';
 import { createManifestStore } from '@docstube/core';
 import type { CliOutput } from '../cli-output.ts';
 import { runAnswerCommand } from './answer-command.ts';
@@ -82,8 +82,18 @@ describe('docstube answer', () => {
     expect(result.exitCode).toBe(0);
     expect(lines.join('\n')).toContain('committed to .docstube/knowledge/');
 
-    const files = await readdir(join(workspaceDir, '.docstube', 'knowledge'));
-    expect(files).toHaveLength(1);
+    // The flag carried no needId (it predates the KnowledgeNeed store) — the answer path mints the
+    // need rather than dropping the answer, so both records land.
+    const needs = await readdir(join(workspaceDir, '.docstube', 'knowledge', 'needs'));
+    const facts = await readdir(join(workspaceDir, '.docstube', 'knowledge', 'facts'));
+    expect(needs).toHaveLength(1);
+    expect(facts).toHaveLength(1);
+    const fact = knowledgeFactSchema.parse(
+      JSON.parse(await readFile(join(workspaceDir, '.docstube', 'knowledge', 'facts', facts[0]!), 'utf8'))
+    );
+    expect(fact.statement).toContain('presentation concern');
+    // Attribution is real: the answering surface plus the repository's git identity when it has one.
+    expect(fact.author.startsWith('cli')).toBe(true);
 
     const store = createManifestStore(workspaceDir, 'latest');
     const index = await store.readIndex();
