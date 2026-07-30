@@ -244,7 +244,9 @@ the Action recomputes evidence rather than trusting committed shards).
     structure/<groupId>.json       # structural findings scoped to a nav group
   criteria/                        # review criteria (YAML — human-owned; feedback writes here)
   instructions/                    # writing instructions (YAML — human-owned)
-  knowledge/                       # KnowledgeNeed / KnowledgeFact records (public data format)
+  knowledge/
+    needs/<needId>.json            # KnowledgeNeed records (public data format)
+    facts/<factId>.json            # KnowledgeFact records, incl. superseded answers (history)
 docstube.yml · ia.yml · glossary.yaml
 docs-site/                         # the generated, self-contained Astro site (ejected)
 ```
