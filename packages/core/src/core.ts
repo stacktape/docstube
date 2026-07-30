@@ -139,7 +139,8 @@ export type { RefineOptions, RefineSummary, RefinedPage } from './pipeline/refin
 export { runAudit, auditFallbackConfig } from './audit/run-audit.ts';
 export type { AuditReport, AuditDefect, RunAuditOptions } from './audit/run-audit.ts';
 export { createRunCostTracker, FREEZE_MARGIN_RATIO } from './pipeline/run-cost.ts';
-export type { RunCostTracker } from './pipeline/run-cost.ts';
+export type { RoleSpend, RunCostTracker } from './pipeline/run-cost.ts';
+export { runRecordedTask } from './pipeline/agent-task-record.ts';
 export {
   buildProposeIaTask,
   proposalsFromTranscript,
@@ -165,11 +166,27 @@ export {
 export type { FeedbackCategory } from './server/feedback.ts';
 export { preflightSkipReason, preflightTaskSpec, runTransportPreflight } from './pipeline/preflight-transport.ts';
 export type { PreflightInput, PreflightResult } from './pipeline/preflight-transport.ts';
-export { createTransportFromConfig, createTaskRunnerFromConfig, resolveTransportId } from './pipeline/task-runner.ts';
-export type { ConfiguredTaskRunner, InternalTransportId } from './pipeline/task-runner.ts';
+export {
+  createTransportFromConfig,
+  createTransportForRouting,
+  createTaskRunnerFromConfig
+} from './pipeline/task-runner.ts';
+export type { ConfiguredTaskRunner } from './pipeline/task-runner.ts';
+export {
+  describeRoleOverrides,
+  describeRoleRouting,
+  resolveRoleRouting,
+  resolveRunRoleRoutings,
+  resolveTransportId,
+  roleRoutingKey,
+  transportDefaultModels
+} from './pipeline/agent-role-routing.ts';
+export type { InternalTransportId, RoleRouting } from './pipeline/agent-role-routing.ts';
 export {
   credentialEnvVarPresent,
+  credentialRequirementForRouting,
   isPrivateEndpoint,
+  resolveRunCredentialRequirements,
   resolveTransportCredentialRequirement
 } from './pipeline/transport-credential.ts';
 export type { TransportCredentialKind, TransportCredentialRequirement } from './pipeline/transport-credential.ts';

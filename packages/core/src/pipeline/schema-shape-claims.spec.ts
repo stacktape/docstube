@@ -21,7 +21,7 @@ const SOURCE = `import { z } from 'zod';
 
 export const agentsConfigSchema = z.strictObject({
   transport: z.enum(['claude-cli', 'codex-cli']).default('claude-cli'),
-  reviewModel: z.string().optional(),
+  apiKeyEnv: z.string().optional(),
   budgets: z.strictObject({ maxRunUsd: z.number().default(20) }).prefault({})
 });
 
@@ -43,7 +43,7 @@ title: "Config"
 
 <Claim id="c2">\`docstubeConfigSchema\` requires \`docType\`.</Claim>
 
-<Claim id="c3">\`agentsConfigSchema\` defines \`reviewModel\`.</Claim>
+<Claim id="c3">\`agentsConfigSchema\` defines \`apiKeyEnv\`.</Claim>
 
 <Claim id="c4">\`docstubeConfigSchema\` requires \`outDir\`.</Claim>
 
@@ -104,7 +104,7 @@ const CLASS_OF: Record<string, string> = {
 const PREDICATES: Record<string, string> = {
   c1: 'loadConfigFamily exists',
   c2: 'docstubeConfigSchema requires docType',
-  c3: 'agentsConfigSchema defines reviewModel',
+  c3: 'agentsConfigSchema defines apiKeyEnv',
   c4: 'docstubeConfigSchema requires outDir',
   c5: 'agentsConfigSchema defaults maxRunUsd to 20',
   c6: 'docstubeConfigSchema.outDir defaults to docs-site',

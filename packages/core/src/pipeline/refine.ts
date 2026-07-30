@@ -23,6 +23,7 @@ import {
 import { generatePage } from './page-runner.ts';
 import type { PageRunContext, TaskRunner } from './page-runner.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
+import type { RoleSpend } from './run-cost.ts';
 
 // `docstube refine`: improve the lowest-quality pages first. Quality is read from the committed
 // state, never an opaque score: pages with open (non-tribal) flags rank worst, then pages with
@@ -64,6 +65,9 @@ export type RefineSummary = {
   // Conservative token-derived spend for tasks that carried no costUsd; present when any task's
   // spend had to be estimated. Display totals as "(partly estimated)" when set.
   estimatedUsd?: number;
+  // Spend attributed to the routing role that incurred it (agents.roles) — the input to "where did
+  // the money go?", and to deciding which role is worth moving to a cheaper model.
+  spendByRole: RoleSpend[];
   // Latest subscription plan usage (0-100) reported by the transport this run, when available.
   planUsedPercent?: number;
 };
@@ -323,6 +327,7 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       outcome,
       refined,
       consideredCount: ranked.length,
+      spendByRole: costTracker.spendByRole(),
       ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
       ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
       ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})

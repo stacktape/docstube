@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { flagSchema } from './flag-schema.ts';
 import { findingSchema } from './findings-schema.ts';
 import { isoTimestampSchema, pageIdSchema, runIdSchema, taskIdSchema } from './primitives.ts';
-import { taskUsageSchema } from './agent-task-schema.ts';
+import { agentRoleSchema, taskUsageSchema } from './agent-task-schema.ts';
 
 // The run journal (.docstube/runs/<runId>/journal.jsonl) is the source of truth for run state.
 // Dashboard timelines are pure renderers over it (+ the sqlite view) — refresh-safe, identical
@@ -51,12 +51,22 @@ export const runEventSchema = z.discriminatedUnion('type', [
     durationMs: z.number().nonnegative()
   }),
   z.object({ ...eventBase, type: z.literal('page-status'), pageId: pageIdSchema, status: pageStatusSchema }),
-  z.object({ ...eventBase, type: z.literal('task-started'), taskId: taskIdSchema, pageId: pageIdSchema.optional() }),
+  // `role` is the ROUTING role the task ran under (agents.roles) — carried on both events so run
+  // spend can be attributed to the role that spent it. Optional so journals written before roles
+  // existed still parse; the pipeline always writes it.
+  z.object({
+    ...eventBase,
+    type: z.literal('task-started'),
+    taskId: taskIdSchema,
+    pageId: pageIdSchema.optional(),
+    role: agentRoleSchema.optional()
+  }),
   z.object({
     ...eventBase,
     type: z.literal('task-completed'),
     taskId: taskIdSchema,
     pageId: pageIdSchema.optional(),
+    role: agentRoleSchema.optional(),
     usage: taskUsageSchema
   }),
   z.object({

@@ -29,6 +29,7 @@ import type { PageOutcome, PageRunContext, TaskRunner } from './page-runner.ts';
 import { translateArtifact } from './translate-page.ts';
 import type { TranslationOutcome } from './translate-page.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
+import type { RoleSpend } from './run-cost.ts';
 import { compareLedgerSnapshots, readLedgerSnapshot, resolveDeterministicGate } from './publication-decision.ts';
 import type { PublicationDecisionInputs } from './publication-decision.ts';
 import {
@@ -79,6 +80,9 @@ export type GenerateSummary = {
   // Conservative token-derived spend for tasks that carried no costUsd; present when any task's
   // spend had to be estimated. Display totals as "(partly estimated)" when set.
   estimatedUsd?: number;
+  // Spend attributed to the routing role that incurred it (agents.roles) — the input to "where did
+  // the money go?", and to deciding which role is worth moving to a cheaper model.
+  spendByRole: RoleSpend[];
   // Kinds of the open flags raised this run — telemetry input (coarse failure modes).
   openFlagKinds: FlagKind[];
   // TRUE only when the whole plan completed and the staged work was published (pipeline-v2
@@ -967,6 +971,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       published,
       resumedPages,
       ...(publicationInputs === undefined ? {} : { publicationInputs }),
+      spendByRole: costTracker.spendByRole(),
       ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
       ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
       ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})

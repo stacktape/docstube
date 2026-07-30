@@ -3,6 +3,7 @@ import { docstubeConfigSchema, fixtureConfigInput } from '@docstube/contracts';
 import {
   credentialEnvVarPresent,
   isPrivateEndpoint,
+  resolveRunCredentialRequirements,
   resolveTransportCredentialRequirement
 } from './transport-credential.ts';
 
@@ -69,6 +70,62 @@ describe('resolveTransportCredentialRequirement', () => {
     const requirement = resolveTransportCredentialRequirement(config({ transport: 'codex-cli' }), {});
     expect(requirement.model).toBeUndefined();
     expect(requirement.configProblem).toContain('agents.model');
+  });
+});
+
+// EVERY provider a run could touch. A role routed elsewhere spends real money on a real account,
+// so its credential is preflight's business exactly as much as the writer's.
+describe('resolveRunCredentialRequirements', () => {
+  it('collapses to ONE requirement when every role inherits the run default', () => {
+    const requirements = resolveRunCredentialRequirements(config({ transport: 'anthropic-api' }), {});
+    expect(requirements).toHaveLength(1);
+    expect(requirements[0]?.roles).toEqual(['writer', 'reviewer', 'translator', 'architect', 'extractor']);
+  });
+
+  it('reports the role-overridden provider as its own requirement, with its own env var', () => {
+    const requirements = resolveRunCredentialRequirements(
+      config({
+        transport: 'anthropic-api',
+        apiKeyEnv: 'MY_ANTHROPIC_KEY',
+        roles: { reviewer: { transport: 'openai-compatible', model: 'gpt-5-mini' } }
+      }),
+      {}
+    );
+    expect(requirements).toHaveLength(2);
+    const [primary, reviewer] = requirements;
+    expect(primary).toMatchObject({ transportId: 'anthropic-api', credentialEnvVars: ['MY_ANTHROPIC_KEY'] });
+    expect(primary?.roles).toEqual(['writer', 'translator', 'architect', 'extractor']);
+    // The reviewer switched providers, so the top-level key is NOT forwarded to it.
+    expect(reviewer).toMatchObject({ roles: ['reviewer'], transportId: 'openai-compatible', kind: 'keyless' });
+    expect(reviewer?.credentialEnvVars).toEqual([]);
+  });
+
+  it('surfaces a MISSING credential that only a non-writer role would have needed', () => {
+    const requirements = resolveRunCredentialRequirements(
+      config({
+        transport: 'claude-cli',
+        roles: { translator: { transport: 'anthropic-api', model: 'claude-haiku-5' } }
+      }),
+      {}
+    );
+    const translator = requirements.find((requirement) => requirement.roles.includes('translator'));
+    expect(translator).toMatchObject({ transportId: 'anthropic-api', credentialEnvVars: ['ANTHROPIC_API_KEY'] });
+    expect(credentialEnvVarPresent(translator!, { CLAUDE_CODE_OAUTH_TOKEN: 'oauth' })).toBeUndefined();
+    expect(credentialEnvVarPresent(translator!, { ANTHROPIC_API_KEY: 'sk-ant' })).toBe('ANTHROPIC_API_KEY');
+  });
+
+  it('collapses roles that resolve to the same provider AND model into one requirement', () => {
+    const requirements = resolveRunCredentialRequirements(
+      config({
+        transport: 'anthropic-api',
+        model: 'claude-sonnet-5',
+        roles: { reviewer: { model: 'claude-haiku-5' }, translator: { model: 'claude-haiku-5' } }
+      }),
+      {}
+    );
+    expect(requirements).toHaveLength(2);
+    expect(requirements[1]?.roles).toEqual(['reviewer', 'translator']);
+    expect(requirements[1]?.model).toBe('claude-haiku-5');
   });
 });
 

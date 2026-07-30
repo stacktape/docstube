@@ -22,6 +22,37 @@ export const knownAgentTaskKinds = [
   // forty minutes into a run. Never cached — a cache hit would prove nothing.
   'preflight'
 ] as const;
+export type KnownAgentTaskKind = (typeof knownAgentTaskKinds)[number];
+
+// THE ROLE A TASK PLAYS. Roles are the ROUTING unit for `agents.roles` in docstube.yml: every
+// model task declares one, and a role can be pointed at a different transport/model than the run
+// default — the lever that puts reviews and translations on a cheaper model without touching the
+// writer. The set is closed and derived from the task kinds that actually exist; a new kind must
+// join an existing role (or add one here) to be routable, so a role can never be configurable
+// without being read.
+export const agentRoleSchema = z.enum(['writer', 'reviewer', 'translator', 'architect', 'extractor']);
+export type AgentRole = z.infer<typeof agentRoleSchema>;
+
+// Every known kind, exhaustively — the Record type makes an unrouted new kind a compile error.
+export const agentRoleByTaskKind: Record<KnownAgentTaskKind, AgentRole> = {
+  'write-page': 'writer',
+  'review-page': 'reviewer',
+  'translate-page': 'translator',
+  // Setup's IA proposal: structural, high-leverage, one call per project.
+  'propose-ia': 'architect',
+  // Cheap read-and-return-structured-data work: theme tokens, audit claim extraction, feedback
+  // triage. Grouped so one override moves all of it onto an economy model.
+  'categorize-feedback': 'extractor',
+  'extract-theme-tokens': 'extractor',
+  'audit-extract-claims': 'extractor',
+  // The connectivity probe proves the run's PRIMARY routing answers, so it rides the writer role.
+  preflight: 'writer'
+};
+
+// An unregistered kind (a plugin's, or one added without a mapping) routes as the WRITER — the run
+// default — never silently onto the cheapest role.
+export const agentRoleForTaskKind = (kind: string): AgentRole =>
+  agentRoleByTaskKind[kind as KnownAgentTaskKind] ?? 'writer';
 
 // Serializable tool descriptor; handlers live in the runtime and are matched by name.
 export const toolDescriptorSchema = z.object({

@@ -192,6 +192,8 @@ export {
   importSourceKindSchema,
   sourcesConfigSchema,
   transportIdSchema,
+  agentRoleConfigSchema,
+  agentRolesConfigSchema,
   agentsConfigSchema,
   versionsConfigSchema,
   localesConfigSchema,
@@ -199,7 +201,14 @@ export {
   siteConfigSchema,
   docstubeConfigSchema
 } from './config-schema.ts';
-export type { DocType, Persona, TransportId, DocstubeConfig, DocstubeConfigInput } from './config-schema.ts';
+export type {
+  DocType,
+  Persona,
+  TransportId,
+  AgentRoleConfig,
+  DocstubeConfig,
+  DocstubeConfigInput
+} from './config-schema.ts';
 
 export { depthBudgetSchema, iaNodeSchema, iaSchema, walkIaNodes } from './ia-schema.ts';
 export type { IaNode, Ia } from './ia-schema.ts';
@@ -210,6 +219,9 @@ export type { GlossaryTerm, Glossary } from './glossary-schema.ts';
 export {
   agentTaskKindSchema,
   knownAgentTaskKinds,
+  agentRoleSchema,
+  agentRoleByTaskKind,
+  agentRoleForTaskKind,
   toolDescriptorSchema,
   taskOutputSpecSchema,
   agentTaskSpecSchema,
@@ -224,6 +236,8 @@ export {
 export type {
   ToolDescriptor,
   TaskOutputSpec,
+  AgentRole,
+  KnownAgentTaskKind,
   AgentTaskSpec,
   TranscriptBlock,
   TaskResult,

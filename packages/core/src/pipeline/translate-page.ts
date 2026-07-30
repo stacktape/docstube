@@ -5,6 +5,7 @@ import type { AgentTaskSpec, Finding, PageEntity, PageShard } from '@docstube/co
 import { agentTaskSpecSchema, contentHash, contentHashSchema, idPrefixes, mintId } from '@docstube/contracts';
 import { blockSourceRanges, extractPageEntity, parseMdx } from '../entities/extract-entities.ts';
 import { CoreError } from '../errors.ts';
+import { runRecordedTask } from './agent-task-record.ts';
 import { configElementPolicy } from './element-policy.ts';
 import type { PageRunContext } from './page-runner.ts';
 import { contentRelativePath, unwrapMdxFence } from './page-runner.ts';
@@ -307,7 +308,6 @@ export const translateArtifact = async (
         mdx: sourceArtifact.mdx,
         slug: sourceArtifact.page.slug
       });
-      await ctx.journal.append({ type: 'task-started', taskId: task.id, pageId: sourceArtifact.page.id });
       // NO TRANSLATION CAN THROW THE RUN (i18n-lifecycle-v2 decision 5; impl-23 finding 4): a
       // transport rejection (provider outage, auth failure, budget refusal, subprocess crash) and
       // a transcript that carries no MDX are the SAME nonblocking class as the hygiene/extraction
@@ -316,14 +316,13 @@ export const translateArtifact = async (
       // abort a whole generate run over one unreachable translator.
       let mdx: string;
       try {
-        const transcript = await ctx.options.runTask(task);
-        await ctx.journal.append({
-          type: 'task-completed',
-          taskId: task.id,
-          pageId: sourceArtifact.page.id,
-          usage: transcript.usage
+        const transcript = await runRecordedTask({
+          runTask: ctx.options.runTask,
+          journal: ctx.journal,
+          task,
+          costTracker: ctx.costTracker,
+          pageId: sourceArtifact.page.id
         });
-        ctx.costTracker.add(transcript.usage);
         if (transcript.result?.type !== 'mdx') {
           throw new CoreError(
             'pipeline-failed',

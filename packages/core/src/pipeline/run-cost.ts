@@ -1,3 +1,5 @@
+import type { AgentRole } from '@docstube/contracts';
+
 // Run-level cost accounting (PRODUCT §3.5): usage caps are approximate, so the run freezes WITH
 // MARGIN — at 85% of agents.budgets.maxRunUsd, not at the cap itself. Cost is only observable
 // after a task finishes, vendor-reported costs are themselves approximations, and the freeze is
@@ -11,13 +13,29 @@ export const FREEZE_MARGIN_RATIO = 0.85;
 export const ESTIMATE_USD_PER_1M_INPUT_TOKENS = 5;
 export const ESTIMATE_USD_PER_1M_OUTPUT_TOKENS = 15;
 
+// WHERE THE MONEY WENT, per routing role (agents.roles). Roles are the unit users can actually
+// act on: seeing that reviews cost more than writing is what makes `roles.reviewer.model` a
+// decision rather than a guess. Attribution is additive to the run totals, never a second
+// accounting of them.
+export type RoleSpend = {
+  role: AgentRole;
+  tasks: number;
+  spentUsd: number;
+  estimatedUsd: number;
+};
+
 export type RunCostTracker = {
-  add: (usage: {
-    costUsd?: number | undefined;
-    inputTokens?: number | undefined;
-    outputTokens?: number | undefined;
-    planUsedPercent?: number | undefined;
-  }) => void;
+  add: (
+    usage: {
+      costUsd?: number | undefined;
+      inputTokens?: number | undefined;
+      outputTokens?: number | undefined;
+      planUsedPercent?: number | undefined;
+    },
+    // The role the task ran under. Omitted only by callers with no task context (tests); such
+    // usage still counts toward the run totals, it simply attributes to no role.
+    role?: AgentRole | undefined
+  ) => void;
   // Vendor-reported spend only; estimates are tracked separately.
   spentUsd: () => number;
   // Conservative token-derived estimate for usage that carried no costUsd.
@@ -32,6 +50,8 @@ export type RunCostTracker = {
   hasEstimates: () => boolean;
   // Latest subscription plan usage (0-100) seen this run; undefined when no transport reported one.
   planUsedPercent: () => number | undefined;
+  // Per-role attribution, highest total spend first; roles that ran no task are absent.
+  spendByRole: () => RoleSpend[];
 };
 
 export const createRunCostTracker = (maxRunUsd?: number, maxPlanUsagePercent?: number): RunCostTracker => {
@@ -40,8 +60,21 @@ export const createRunCostTracker = (maxRunUsd?: number, maxPlanUsagePercent?: n
   let reported = false;
   let hasEstimates = false;
   let planUsedPercent: number | undefined;
+  const byRole = new Map<AgentRole, RoleSpend>();
+  const attribute = (role: AgentRole | undefined, spentDelta: number, estimatedDelta: number): void => {
+    if (role === undefined) {
+      return;
+    }
+    const entry = byRole.get(role) ?? { role, tasks: 0, spentUsd: 0, estimatedUsd: 0 };
+    byRole.set(role, {
+      role,
+      tasks: entry.tasks + 1,
+      spentUsd: entry.spentUsd + spentDelta,
+      estimatedUsd: entry.estimatedUsd + estimatedDelta
+    });
+  };
   return {
-    add: (usage) => {
+    add: (usage, role) => {
       // Plan usage is a level: keep the highest observation this run.
       if (usage.planUsedPercent !== undefined) {
         planUsedPercent = Math.max(planUsedPercent ?? 0, usage.planUsedPercent);
@@ -49,6 +82,7 @@ export const createRunCostTracker = (maxRunUsd?: number, maxPlanUsagePercent?: n
       if (usage.costUsd !== undefined) {
         spent += usage.costUsd;
         reported = true;
+        attribute(role, usage.costUsd, 0);
         return;
       }
       // No reported cost: estimate from tokens so the cap never silently no-ops on transports
@@ -56,11 +90,16 @@ export const createRunCostTracker = (maxRunUsd?: number, maxPlanUsagePercent?: n
       const inputTokens = usage.inputTokens ?? 0;
       const outputTokens = usage.outputTokens ?? 0;
       if (inputTokens > 0 || outputTokens > 0) {
-        estimated +=
+        const taskEstimate =
           (inputTokens / 1_000_000) * ESTIMATE_USD_PER_1M_INPUT_TOKENS +
           (outputTokens / 1_000_000) * ESTIMATE_USD_PER_1M_OUTPUT_TOKENS;
+        estimated += taskEstimate;
         hasEstimates = true;
+        attribute(role, 0, taskEstimate);
+        return;
       }
+      // A task that reported nothing at all still ran under its role — count it, bill it zero.
+      attribute(role, 0, 0);
     },
     spentUsd: () => spent,
     estimatedUsd: () => estimated,
@@ -78,7 +117,11 @@ export const createRunCostTracker = (maxRunUsd?: number, maxPlanUsagePercent?: n
     },
     hasReportedCost: () => reported,
     hasEstimates: () => hasEstimates,
-    planUsedPercent: () => planUsedPercent
+    planUsedPercent: () => planUsedPercent,
+    spendByRole: () =>
+      [...byRole.values()].toSorted(
+        (left, right) => right.spentUsd + right.estimatedUsd - (left.spentUsd + left.estimatedUsd)
+      )
   };
 };
 

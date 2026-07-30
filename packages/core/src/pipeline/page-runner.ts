@@ -24,6 +24,7 @@ import type { BlockMatchConfidence } from '../entities/match-entities.ts';
 import type { PluginHost } from '../plugins/plugin-host.ts';
 import type { RunJournal } from '../state/run-journal.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
+import { runRecordedTask } from './agent-task-record.ts';
 import { configElementPolicy } from './element-policy.ts';
 import { buildWritePageTask } from './write-page.ts';
 import { reviewPage } from './review-page.ts';
@@ -160,10 +161,13 @@ export const generatePage = async (
       knowledge: ctx.knowledge,
       toolDescriptors: [...ctx.options.toolDescriptors, submitPageDescriptor, flagQuestionDescriptor]
     });
-    await ctx.journal.append({ type: 'task-started', taskId: task.id });
-    const transcript = await ctx.options.runTask(task, [submitPage.tool, questionCollector.tool]);
-    await ctx.journal.append({ type: 'task-completed', taskId: task.id, usage: transcript.usage });
-    ctx.costTracker.add(transcript.usage);
+    const transcript = await runRecordedTask({
+      runTask: ctx.options.runTask,
+      journal: ctx.journal,
+      task,
+      costTracker: ctx.costTracker,
+      extraTools: [submitPage.tool, questionCollector.tool]
+    });
     if (transcript.result?.type !== 'mdx-ledger') {
       throw new CoreError(
         'pipeline-failed',

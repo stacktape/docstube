@@ -1,6 +1,7 @@
 import { runAgentTask } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, DocstubeConfig, Transcript } from '@docstube/contracts';
 import { idPrefixes, mintId } from '@docstube/contracts';
+import { resolveRoleRouting } from './agent-role-routing.ts';
 import { createTransportFromConfig } from './task-runner.ts';
 
 // TRANSPORT PREFLIGHT (PRODUCT §3.9.2 phase 2, dx-knowledge-v2 decision 2). One tiny real call
@@ -55,6 +56,9 @@ export type PreflightInput = {
 export const runTransportPreflight = async (input: PreflightInput): Promise<PreflightResult> => {
   const env = input.env ?? process.env;
   const spec = preflightTaskSpec();
+  // The probe rides the WRITER role (agentRoleByTaskKind maps 'preflight' there) — the run's
+  // primary routing — so the labels name what the call would actually use, role overrides included.
+  const routing = resolveRoleRouting(input.config, 'writer', env);
 
   if (input.runTask === undefined) {
     const skip = preflightSkipReason(env);
@@ -62,15 +66,15 @@ export const runTransportPreflight = async (input: PreflightInput): Promise<Pref
       return {
         ok: true,
         skipped: true,
-        transport: input.config.agents.transport,
-        model: input.config.agents.model ?? '(default)',
+        transport: routing.transportId,
+        model: routing.model ?? '(default)',
         detail: `preflight skipped — ${skip}`
       };
     }
   }
 
-  let transportId = input.config.agents.transport as string;
-  let model = input.config.agents.model ?? '(default)';
+  let transportId: string = routing.transportId;
+  let model = routing.model ?? '(default)';
   try {
     let transcript: Transcript;
     if (input.runTask === undefined) {

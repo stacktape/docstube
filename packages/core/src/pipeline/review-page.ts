@@ -4,6 +4,7 @@ import type { AgentTaskSpec, DocstubeConfig, Persona, ReviewResult, Transcript }
 import { agentTaskSpecSchema, idPrefixes, mintId, reviewResultSchema } from '@docstube/contracts';
 import { CoreError } from '../errors.ts';
 import type { RunJournal } from '../state/run-journal.ts';
+import { runRecordedTask } from './agent-task-record.ts';
 import type { RunCostTracker } from './run-cost.ts';
 
 // The review stage (PRODUCT §3.5 stage 4, harness-state-v2 decision 4): one EDITORIAL reviewer
@@ -138,15 +139,13 @@ export const reviewPage = async (input: ReviewPageInput): Promise<ScoredReview[]
       artifact: input.artifact,
       brief: input.brief
     });
-    await input.journal.append({ type: 'task-started', taskId: task.id, pageId: input.artifact.page.id });
-    const transcript = await input.runTask(task);
-    await input.journal.append({
-      type: 'task-completed',
-      taskId: task.id,
-      pageId: input.artifact.page.id,
-      usage: transcript.usage
+    const transcript = await runRecordedTask({
+      runTask: input.runTask,
+      journal: input.journal,
+      task,
+      costTracker: input.costTracker,
+      pageId: input.artifact.page.id
     });
-    input.costTracker?.add(transcript.usage);
     reviews.push({ ...reviewFromTranscript(persona, transcript), scoredBy: transcript.model, taskId: task.id });
   }
   return reviews;

@@ -1,21 +1,29 @@
-import type { DocstubeConfig } from '@docstube/contracts';
-import { resolveTransportId, transportDefaultModels } from './task-runner.ts';
-import type { InternalTransportId } from './task-runner.ts';
+import type { AgentRole, DocstubeConfig } from '@docstube/contracts';
+import type { InternalTransportId, RoleRouting } from './agent-role-routing.ts';
+import { resolveRoleRouting, resolveRunRoleRoutings, roleRoutingKey } from './agent-role-routing.ts';
 
-// WHAT THE CONFIGURED TRANSPORT ACTUALLY NEEDS, resolved from the parsed config — not guessed from
-// the text of docstube.yml. This mirrors createTransportFromConfig exactly (same transport id,
-// same model fallback, same apiKeyEnv/baseUrl defaults), so the CI preflight can answer "will this
-// authenticate?" without constructing a transport and without making a billable call.
+// WHAT THE CONFIGURED TRANSPORTS ACTUALLY NEED, resolved from the parsed config — not guessed from
+// the text of docstube.yml. Every requirement is derived from a RoleRouting, the same object the
+// task runner constructs transports from, so the CI preflight can answer "will this authenticate?"
+// without constructing a transport and without making a billable call.
 //
-// A missing credential for the CONFIGURED transport is fatal. An unrelated provider's key being
-// absent is not — nothing in the run will ever read it.
+// EVERY ROLE, NOT JUST THE DEFAULT (the role-routing wave): once `agents.roles` can send reviews or
+// translations to a different provider, checking only the top-level transport would pass a run that
+// dies on its first review. resolveRunCredentialRequirements walks all five roles and returns one
+// requirement per DISTINCT provider+credential — a missing key for any of them is fatal preflight,
+// never a mid-run surprise.
+//
+// A missing credential for a transport this run WILL use is fatal. An unrelated provider's key
+// being absent is not — nothing in the run will ever read it.
 
 export type TransportCredentialKind = 'vendor-cli' | 'api-key' | 'keyless';
 
 export type TransportCredentialRequirement = {
   transportId: InternalTransportId;
+  // The roles that route here. Reported so a failure names the role whose tasks would break.
+  roles: AgentRole[];
   // Resolved exactly as the task runner resolves it; undefined when the transport requires an
-  // explicit agents.model and the config does not set one (the run would throw before any call).
+  // explicit model and the config does not set one (the run would throw before any call).
   model?: string;
   kind: TransportCredentialKind;
   // Vendor-CLI transports: the executable that must be on PATH.
@@ -51,23 +59,17 @@ export const isPrivateEndpoint = (endpoint: string): boolean => {
   return /^(10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
 };
 
-export const resolveTransportCredentialRequirement = (
-  config: DocstubeConfig,
-  env: NodeJS.ProcessEnv = process.env
-): TransportCredentialRequirement => {
-  const agents = config.agents;
-  const transportId = resolveTransportId(config, env);
-  const model = agents.model ?? transportDefaultModels[transportId];
-  const base: { transportId: InternalTransportId; model?: string; configProblem?: string } = {
-    transportId,
-    ...(model === undefined
-      ? {
-          configProblem: `agents.transport "${transportId}" has no default model, so docstube.yml must set agents.model`
-        }
-      : { model })
+// One routing → one requirement. Every credential fact comes off the routing, so a role that
+// switched providers is checked against ITS provider's env var, never the top-level one.
+export const credentialRequirementForRouting = (routing: RoleRouting): TransportCredentialRequirement => {
+  const base: Pick<TransportCredentialRequirement, 'transportId' | 'roles' | 'model' | 'configProblem'> = {
+    transportId: routing.transportId,
+    roles: [routing.role],
+    ...(routing.model === undefined ? {} : { model: routing.model }),
+    ...(routing.configProblem === undefined ? {} : { configProblem: routing.configProblem })
   };
 
-  switch (transportId) {
+  switch (routing.transportId) {
     case 'claude-cli':
       return {
         ...base,
@@ -86,12 +88,12 @@ export const resolveTransportCredentialRequirement = (
       return {
         ...base,
         kind: 'api-key',
-        credentialEnvVars: [agents.apiKeyEnv ?? 'ANTHROPIC_API_KEY'],
-        endpoint: agents.baseUrl ?? anthropicDefaultBaseUrl
+        credentialEnvVars: [routing.apiKeyEnv ?? 'ANTHROPIC_API_KEY'],
+        endpoint: routing.baseUrl ?? anthropicDefaultBaseUrl
       };
     case 'openai-compatible': {
-      const endpoint = agents.baseUrl ?? openAiDefaultBaseUrl;
-      if (agents.apiKeyEnv === undefined) {
+      const endpoint = routing.baseUrl ?? openAiDefaultBaseUrl;
+      if (routing.apiKeyEnv === undefined) {
         // No apiKeyEnv means the transport sends NO authorization header — correct for a local
         // server, broken against a hosted API.
         return {
@@ -102,11 +104,37 @@ export const resolveTransportCredentialRequirement = (
           endpointIsPrivate: isPrivateEndpoint(endpoint)
         };
       }
-      return { ...base, kind: 'api-key', credentialEnvVars: [agents.apiKeyEnv], endpoint };
+      return { ...base, kind: 'api-key', credentialEnvVars: [routing.apiKeyEnv], endpoint };
     }
     case 'replay':
       return { ...base, kind: 'keyless', credentialEnvVars: [], endpointIsPrivate: true };
   }
+};
+
+// The PRIMARY requirement: what the writer role — and therefore the run banner and the setup
+// preflight probe — will authenticate against.
+export const resolveTransportCredentialRequirement = (
+  config: DocstubeConfig,
+  env: NodeJS.ProcessEnv = process.env
+): TransportCredentialRequirement => credentialRequirementForRouting(resolveRoleRouting(config, 'writer', env));
+
+// EVERY provider this run could touch, deduped, writer first. Roles sharing a provider collapse
+// into one requirement listing all of them.
+export const resolveRunCredentialRequirements = (
+  config: DocstubeConfig,
+  env: NodeJS.ProcessEnv = process.env
+): TransportCredentialRequirement[] => {
+  const byRouting = new Map<string, TransportCredentialRequirement>();
+  for (const routing of resolveRunRoleRoutings(config, env)) {
+    const key = roleRoutingKey(routing);
+    const existing = byRouting.get(key);
+    if (existing === undefined) {
+      byRouting.set(key, credentialRequirementForRouting(routing));
+      continue;
+    }
+    existing.roles.push(routing.role);
+  }
+  return [...byRouting.values()];
 };
 
 export const credentialEnvVarPresent = (

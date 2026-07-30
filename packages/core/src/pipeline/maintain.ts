@@ -38,6 +38,7 @@ import {
   unversionedReadSources
 } from './generate.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
+import type { RoleSpend } from './run-cost.ts';
 
 // The maintain stage (PRODUCT §3.5 stage 8): symbol-hash diff → provenance lookup → only
 // affected pages regenerate. Bias rule: uncertain provenance ⇒ regenerate, never assume. A
@@ -68,6 +69,9 @@ export type MaintainSummary = {
   // Conservative token-derived spend for tasks that carried no costUsd; present when any task's
   // spend had to be estimated. Display totals as "(partly estimated)" when set.
   estimatedUsd?: number;
+  // Spend attributed to the routing role that incurred it (agents.roles) — the input to "where did
+  // the money go?", and to deciding which role is worth moving to a cheaper model.
+  spendByRole: RoleSpend[];
   // Kinds of the open flags raised this run — telemetry input (coarse failure modes).
   openFlagKinds: FlagKind[];
   // Latest subscription plan usage (0-100) reported by the transport this run, when available.
@@ -530,6 +534,7 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       siteFindings,
       warnings: [...host.warnings(), ...newNodeWarnings],
       openFlagKinds,
+      spendByRole: costTracker.spendByRole(),
       ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
       ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
       ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})

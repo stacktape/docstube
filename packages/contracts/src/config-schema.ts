@@ -31,20 +31,33 @@ export const sourcesConfigSchema = z.strictObject({
 export const transportIdSchema = z.enum(['claude-cli', 'codex-cli', 'anthropic-api', 'openai-compatible']);
 export type TransportId = z.infer<typeof transportIdSchema>;
 
+// ONE ROLE OVERRIDE: a transport, a model, or both. Whatever the role does not name is INHERITED
+// from the top-level `agents:` block (see resolveRoleRouting in core — the single implementation of
+// this order). Credentials are deliberately not per-role: a role that switches transport uses that
+// transport's own default credential env var, because agents.apiKeyEnv holds a key issued by the
+// top-level provider and must never be sent to a different one.
 export const agentRoleConfigSchema = z.strictObject({
   transport: transportIdSchema.optional(),
   model: z.string().optional()
+});
+export type AgentRoleConfig = z.infer<typeof agentRoleConfigSchema>;
+
+// PER-ROLE OVERRIDES, ROUTED FOR REAL. Every model task declares a role (agentRoleByTaskKind), and
+// an unset role inherits the top-level transport AND model — so this block is a pure cost/quality
+// lever: point `reviewer` or `translator` at an economy model and only those tasks move.
+// Every key here is one of agentRoleSchema's values; the contracts spec asserts the two stay in
+// sync, so a role can never be configurable without being routed.
+export const agentRolesConfigSchema = z.strictObject({
+  writer: agentRoleConfigSchema.optional(),
+  reviewer: agentRoleConfigSchema.optional(),
+  translator: agentRoleConfigSchema.optional(),
+  architect: agentRoleConfigSchema.optional(),
+  extractor: agentRoleConfigSchema.optional()
 });
 
 export const agentsConfigSchema = z.strictObject({
   transport: transportIdSchema.default('claude-cli'),
   model: z.string().optional(),
-  reviewModel: z
-    .string()
-    .optional()
-    .describe(
-      'Model used for review tasks; defaults to agents.model. Pointing it at a different (cheaper) model breaks self-review correlation.'
-    ),
   // For openai-compatible: preset base URLs cover OpenAI/Ollama/anything compatible (§3.6).
   baseUrl: z.string().url().optional(),
   // Name of the env var holding the credential — never the credential itself.
@@ -52,14 +65,10 @@ export const agentsConfigSchema = z.strictObject({
     .string()
     .regex(/^[A-Z][A-Z0-9_]*$/)
     .optional(),
-  // Per-role overrides; unset roles inherit the top-level transport/model.
-  roles: z
-    .strictObject({
-      writer: agentRoleConfigSchema.optional(),
-      reviewer: agentRoleConfigSchema.optional(),
-      translator: agentRoleConfigSchema.optional()
-    })
-    .optional(),
+  // NOTE: the old `reviewModel` shortcut is gone — `roles.reviewer` says the same thing and can
+  // also move the reviewer to a different PROVIDER, which is what reviewer independence actually
+  // requires. Two spellings of one routing rule is how the two drift apart.
+  roles: agentRolesConfigSchema.prefault({}),
   // Each default is written once at field level; `.prefault({})` parses the empty object through
   // the schema so nested field defaults apply (Zod 4 `.default()` would short-circuit).
   budgets: z

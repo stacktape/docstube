@@ -97,6 +97,31 @@ describe('createRunCostTracker', () => {
     expect(freezeReason({ maxRunUsd: 20, maxPlanUsagePercent: 80, planUsedPercent: 10 })).toContain('$20');
   });
 
+  // WHERE THE MONEY WENT, per routing role — the number that makes `agents.roles.<role>.model`
+  // an informed decision. Attribution rides alongside the run totals, never replacing them.
+  it('attributes reported and estimated spend to the role that incurred it', () => {
+    const tracker = createRunCostTracker();
+    tracker.add({ costUsd: 0.6 }, 'writer');
+    tracker.add({ costUsd: 0.2 }, 'reviewer');
+    tracker.add({ costUsd: 0.1 }, 'reviewer');
+    tracker.add({ inputTokens: 1_000_000 }, 'translator');
+    // Sorted by total spend, so the role worth moving to a cheaper model is the first line.
+    expect(tracker.spendByRole()).toEqual([
+      { role: 'translator', tasks: 1, spentUsd: 0, estimatedUsd: ESTIMATE_USD_PER_1M_INPUT_TOKENS },
+      { role: 'writer', tasks: 1, spentUsd: 0.6, estimatedUsd: 0 },
+      { role: 'reviewer', tasks: 2, spentUsd: 0.30000000000000004, estimatedUsd: 0 }
+    ]);
+    // Totals are unchanged by attribution.
+    expect(tracker.spentUsd()).toBeCloseTo(0.9, 10);
+  });
+
+  it('leaves unattributed usage out of the breakdown while still counting it toward the run total', () => {
+    const tracker = createRunCostTracker();
+    tracker.add({ costUsd: 1 });
+    expect(tracker.spendByRole()).toEqual([]);
+    expect(tracker.spentUsd()).toBe(1);
+  });
+
   it('a reported costUsd is never double-counted as an estimate, even with tokens present', () => {
     const tracker = createRunCostTracker(10);
     tracker.add({ costUsd: 1, inputTokens: 1_000_000, outputTokens: 1_000_000 });

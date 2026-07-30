@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { agentRoleSchema } from './agent-task-schema.ts';
 import { docstubeConfigSchema } from './config-schema.ts';
 import { docstubeConfigJsonSchema } from './config-json-schema.ts';
 import { fixtureConfigInput } from './fixtures.ts';
@@ -46,10 +47,39 @@ describe('docstube.yml schema', () => {
     expect(config.agents.budgets.maxTurnsPerTask).toBe(24);
   });
 
-  it('accepts an optional agents.reviewModel', () => {
-    const config = docstubeConfigSchema.parse({ ...fixtureConfigInput, agents: { reviewModel: 'claude-haiku-5' } });
-    expect(config.agents.reviewModel).toBe('claude-haiku-5');
-    expect(docstubeConfigSchema.parse(fixtureConfigInput).agents.reviewModel).toBeUndefined();
+  // agents.roles is the ONE way to route a role at its own transport/model. The removed
+  // `reviewModel` shortcut said a strict subset of `roles.reviewer` and must not come back as a
+  // second spelling of the same rule.
+  it('rejects the removed agents.reviewModel shortcut', () => {
+    expect(
+      docstubeConfigSchema.safeParse({ ...fixtureConfigInput, agents: { reviewModel: 'claude-haiku-5' } }).success
+    ).toBe(false);
+  });
+
+  it('makes every routable agent role configurable, and defaults roles to empty', () => {
+    for (const role of agentRoleSchema.options) {
+      const config = docstubeConfigSchema.parse({
+        ...fixtureConfigInput,
+        agents: { roles: { [role]: { transport: 'anthropic-api', model: 'claude-haiku-5' } } }
+      });
+      expect(config.agents.roles[role]).toEqual({ transport: 'anthropic-api', model: 'claude-haiku-5' });
+    }
+    expect(docstubeConfigSchema.parse(fixtureConfigInput).agents.roles).toEqual({});
+  });
+
+  it('rejects a role that is not in the routable role set', () => {
+    expect(docstubeConfigSchema.safeParse({ ...fixtureConfigInput, agents: { roles: { judge: {} } } }).success).toBe(
+      false
+    );
+  });
+
+  it('accepts a role override that names only a transport or only a model', () => {
+    const config = docstubeConfigSchema.parse({
+      ...fixtureConfigInput,
+      agents: { roles: { reviewer: { model: 'claude-haiku-5' }, translator: { transport: 'openai-compatible' } } }
+    });
+    expect(config.agents.roles.reviewer).toEqual({ model: 'claude-haiku-5' });
+    expect(config.agents.roles.translator).toEqual({ transport: 'openai-compatible' });
   });
 
   it('exposes only the four public transports — google and replay are internal-only', () => {
