@@ -1,25 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bareCommandAction } from './bare-command.ts';
 import { shouldOpenBrowser } from './open-browser.ts';
-
-// Bare `docstube` opens the control plane (PRODUCT §3.9.1). It used to print help, which meant the
-// first thing a new user saw was a list of commands instead of setup.
-
-describe('bare command dispatch', () => {
-  it('opens the control plane with no arguments', () => {
-    expect(bareCommandAction([])).toBe('control-plane');
-  });
-
-  // Flags parse away before this sees them, so `docstube --port 4242` has no positionals at all.
-  it('opens the control plane when only flags are given', () => {
-    expect(bareCommandAction([])).toBe('control-plane');
-  });
-
-  it('reports a typo instead of silently opening a UI the user did not ask for', () => {
-    expect(bareCommandAction(['generat'])).toEqual({ unknown: 'generat' });
-    expect(bareCommandAction(['refresh'])).toEqual({ unknown: 'refresh' });
-  });
-});
 
 describe('browser opening is TTY-safe', () => {
   it('opens on an interactive terminal', () => {

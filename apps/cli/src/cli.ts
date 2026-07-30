@@ -3,7 +3,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineCommand, runMain } from 'citty';
-import { bareCommandAction } from './bare-command.ts';
+import type { SubCommandsDef } from 'citty';
 import { getCommandHelp } from './cli-help.ts';
 import { defaultOutput } from './cli-output.ts';
 import type { CliCommandResult } from './cli-output.ts';
@@ -325,6 +325,26 @@ const help = defineCommand({
   }
 });
 
+// Null prototype on purpose: citty resolves a subcommand with `name in subCommands`, so with a
+// normal object literal `docstube constructor` would resolve Object.prototype.constructor and run
+// as if it were a command instead of failing as the typo it is.
+const subCommands: SubCommandsDef = Object.assign(Object.create(null), {
+  wizard,
+  generate,
+  refine,
+  preview,
+  audit,
+  answer,
+  plugin,
+  validate,
+  check,
+  status,
+  doctor,
+  upgrade,
+  version,
+  help
+});
+
 const main = defineCommand({
   meta: {
     description: 'Verified docs, generated from your code.',
@@ -332,32 +352,13 @@ const main = defineCommand({
     version: docstubeVersion
   },
   args: controlPlaneArgs,
-  subCommands: {
-    wizard,
-    generate,
-    refine,
-    preview,
-    audit,
-    answer,
-    plugin,
-    validate,
-    check,
-    status,
-    doctor,
-    upgrade,
-    version,
-    help
-  },
-  run: async ({ args }) => {
-    const action = bareCommandAction(Array.isArray(args._) ? (args._ as string[]) : []);
-    if (action !== 'control-plane') {
-      output.error(`Unknown command: ${action.unknown}`);
-      printHelp();
-      process.exitCode = 1;
-      return;
-    }
-    await runCliCommand('wizard', () => runControlPlane(args));
-  }
+  subCommands,
+  // Bare `docstube` IS `docstube wizard` (PRODUCT §3.9.1). This MUST stay a `default` and must
+  // never become a root `run`: citty runs a parent's `run` *in addition to* the matched
+  // subcommand, so a root handler here made every successful `docstube <command>` exit 1
+  // afterwards. citty already rejects a positional that is not a subcommand
+  // (E_UNKNOWN_COMMAND -> usage + exit 1), so a typo still never opens the control plane.
+  default: 'wizard'
 });
 
 runMain(main);
