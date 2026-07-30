@@ -4,6 +4,9 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import type { CiAutomationMode } from '@docstube/contracts';
+import { evaluateCiPreflight, renderCiPreflightSummary } from './ci-preflight-gate.ts';
+import type { PreflightRunResult } from './ci-preflight-gate.ts';
 import {
   buildDigestIssueBody,
   buildFlagCommentBody,
@@ -127,6 +130,10 @@ export type GitHubActionDeps = {
   hashWorkspaceFile: (relativePath: string) => Promise<string | undefined>;
   reporter: GitHubActionReporter;
   runDocstube: (input: { workspaceDir: string }) => Promise<DocstubeCliRunResult>;
+  // `docstube doctor --ci --json` — runs BEFORE generate and costs zero model spend. Optional so
+  // an Action embedded with an older pinned CLI still works: when it is absent (or the pinned CLI
+  // cannot produce a report) the legacy environment credential check runs instead.
+  runPreflight?: ((input: { workspaceDir: string }) => Promise<PreflightRunResult>) | undefined;
   // Ambient environment used for the model-credential precondition and secret redaction;
   // defaults to process.env.
   env?: NodeJS.ProcessEnv;
@@ -139,6 +146,10 @@ export type GitHubActionAutoMergeState = 'enabled' | 'blocked' | 'unavailable' |
 
 export type GitHubActionResult = {
   autoMerge: GitHubActionAutoMergeState;
+  // The honest merge story the preflight established: full-auto only on evidence (decision 14).
+  automationMode: CiAutomationMode;
+  // Whether the CI preflight ran and what it concluded.
+  preflight: 'passed' | 'blocked' | 'unavailable';
   branchName: string;
   changed: boolean;
   changedFiles: readonly string[];
@@ -325,6 +336,8 @@ const setActionOutputs = async (reporter: GitHubActionReporter, result: GitHubAc
   await reporter.setOutput('branch-name', result.branchName);
   await reporter.setOutput('concurrency-group', result.concurrencyGroup);
   await reporter.setOutput('auto-merge', result.autoMerge);
+  await reporter.setOutput('automation-mode', result.automationMode);
+  await reporter.setOutput('preflight', result.preflight);
   await reporter.setOutput('open-flag-count', String(result.openFlagCount));
   await reporter.setOutput('committed-paths', JSON.stringify(result.committedPaths));
   await reporter.setOutput('publication-reason-codes', JSON.stringify(result.reasonCodes));
@@ -401,8 +414,14 @@ export const runGitHubAction = async (
     )
   ];
 
+  // Set by the preflight below; every result the function returns reports them as observed.
+  let automationMode: CiAutomationMode = 'unknown';
+  let preflightState: GitHubActionResult['preflight'] = 'unavailable';
+
   const emptyResult = (overrides: Partial<GitHubActionResult>): GitHubActionResult => ({
     autoMerge: 'skipped',
+    automationMode,
+    preflight: preflightState,
     branchName,
     changed: false,
     changedFiles: [],
@@ -419,25 +438,68 @@ export const runGitHubAction = async (
 
   deps.reporter.info(`Starting docstube ${mode}.`);
 
-  const credential = await checkModelCredential({ env, readWorkspaceFile: deps.readWorkspaceFile });
-  if (!credential.ok) {
-    deps.reporter.error(credential.message);
+  // THE PREFLIGHT RUNS FIRST AND COSTS NOTHING. Everything a CI run needs — the configured
+  // transport's credential, the token's write/PR/issue permissions, the auto-merge preconditions,
+  // the branch state — is checked before a single model call (quality-ci-reader-v2 decision 14).
+  const preflightRun =
+    deps.runPreflight === undefined ? undefined : await deps.runPreflight({ workspaceDir: inputs.workspaceDir });
+  const outcome =
+    preflightRun === undefined
+      ? ({ kind: 'unavailable', reason: 'this Action was not given a preflight runner' } as const)
+      : evaluateCiPreflight(preflightRun);
+
+  if (outcome.kind !== 'unavailable') {
+    automationMode = outcome.report.automationMode;
+    preflightState = outcome.kind === 'blocked' ? 'blocked' : 'passed';
+    for (const check of outcome.report.checks) {
+      if (check.status === 'warn' || check.status === 'unknown') {
+        deps.reporter.warn(`Preflight ${check.status}: ${check.title} — ${check.detail}`);
+      }
+    }
+    if (outcome.report.automationMode !== 'full-auto') {
+      deps.reporter.notice(
+        `docstube automation mode: ${outcome.report.automationMode} — ${outcome.report.automationReason}`
+      );
+    }
+  }
+
+  if (outcome.kind === 'blocked') {
+    deps.reporter.error(
+      `docstube preflight failed (${outcome.report.fatal.join(', ')}). Nothing was generated, so this run spent nothing on models.`
+    );
     return completeAction(
-      emptyResult({
-        exitCode: 1,
-        summary: buildJobSummary({
-          autoMerge: 'skipped',
-          committedPaths: [],
-          decision: undefined,
-          delta: undefined,
-          failureOutput: credential.message,
-          mode,
-          status: 'failed'
-        })
-      }),
+      emptyResult({ exitCode: 1, summary: renderCiPreflightSummary(outcome.report) }),
       deps.reporter,
       secrets
     );
+  }
+
+  if (outcome.kind === 'unavailable') {
+    // A pinned CLI that predates `doctor --ci --json` still gets the cheap credential precondition
+    // it always had — degraded, and said out loud rather than silently skipped.
+    deps.reporter.warn(
+      `CI preflight unavailable — ${outcome.reason} Falling back to the environment credential check.`
+    );
+    const credential = await checkModelCredential({ env, readWorkspaceFile: deps.readWorkspaceFile });
+    if (!credential.ok) {
+      deps.reporter.error(credential.message);
+      return completeAction(
+        emptyResult({
+          exitCode: 1,
+          summary: buildJobSummary({
+            autoMerge: 'skipped',
+            committedPaths: [],
+            decision: undefined,
+            delta: undefined,
+            failureOutput: credential.message,
+            mode,
+            status: 'failed'
+          })
+        }),
+        deps.reporter,
+        secrets
+      );
+    }
   }
 
   await deps.git.checkoutBase({ baseBranch, workspaceDir: inputs.workspaceDir });
@@ -898,6 +960,34 @@ export const createDocstubeCliArgs = (input: { docstubePackage: string }): strin
   '--ci'
 ];
 
+// The free preflight: resolve + inspect only, never a model call.
+export const createDocstubePreflightArgs = (input: { docstubePackage: string }): string[] => [
+  '--yes',
+  input.docstubePackage,
+  'doctor',
+  '--ci',
+  '--json'
+];
+
+export const createDocstubePreflightRunner =
+  (
+    input: { docstubePackage: string; baseBranch: string; branchName: string; githubToken?: string | undefined },
+    processRunner: GitHubActionProcessRunner = runProcess
+  ) =>
+  async (run: { workspaceDir: string }): Promise<PreflightRunResult> => {
+    const result = await processRunner('npx', createDocstubePreflightArgs({ docstubePackage: input.docstubePackage }), {
+      cwd: run.workspaceDir,
+      env: {
+        // The branch the Action will actually push, so the branch-state check is about the real
+        // branch rather than a reconstructed guess.
+        DOCSTUBE_CI_BRANCH: input.branchName,
+        DOCSTUBE_CI_BASE_BRANCH: input.baseBranch,
+        ...(input.githubToken === undefined ? {} : { GITHUB_TOKEN: input.githubToken, GH_TOKEN: input.githubToken })
+      }
+    });
+    return { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
+  };
+
 export const createDocstubeCliRunner =
   (docstubePackage: string, processRunner: GitHubActionProcessRunner = runProcess) =>
   async (input: { workspaceDir: string }): Promise<DocstubeCliRunResult> => {
@@ -960,6 +1050,8 @@ const createWorkspaceFileHasher =
   };
 
 export const createDefaultGitHubActionDeps = (input: {
+  baseBranch?: string;
+  branchPrefix?: string;
   docstubePackage?: string;
   githubToken?: string;
   repository?: string;
@@ -976,7 +1068,16 @@ export const createDefaultGitHubActionDeps = (input: {
   readWorkspaceFile: createWorkspaceFileReader(input.workspaceDir),
   hashWorkspaceFile: createWorkspaceFileHasher(input.workspaceDir),
   reporter: createReporter(),
-  runDocstube: createDocstubeCliRunner(input.docstubePackage ?? defaultDocstubePackage)
+  runDocstube: createDocstubeCliRunner(input.docstubePackage ?? defaultDocstubePackage),
+  runPreflight: createDocstubePreflightRunner({
+    docstubePackage: input.docstubePackage ?? defaultDocstubePackage,
+    baseBranch: input.baseBranch ?? 'main',
+    branchName: createDocstubeActionBranchName({
+      ...(input.baseBranch === undefined ? {} : { baseBranch: input.baseBranch }),
+      ...(input.branchPrefix === undefined ? {} : { branchPrefix: input.branchPrefix })
+    }),
+    ...(input.githubToken === undefined ? {} : { githubToken: input.githubToken })
+  })
 });
 
 const actionInputNames = (name: string): readonly string[] => [
@@ -1019,9 +1120,11 @@ export const readGitHubActionInputsFromEnv = (env: NodeJS.ProcessEnv = process.e
 export const runGitHubActionFromEnv = async (env: NodeJS.ProcessEnv = process.env): Promise<GitHubActionResult> => {
   const inputs = readGitHubActionInputsFromEnv(env);
   const deps = createDefaultGitHubActionDeps({
-    docstubePackage: inputs.docstubePackage,
-    githubToken: inputs.githubToken,
-    repository: inputs.repository,
+    ...(inputs.baseBranch === undefined ? {} : { baseBranch: inputs.baseBranch }),
+    ...(inputs.branchPrefix === undefined ? {} : { branchPrefix: inputs.branchPrefix }),
+    ...(inputs.docstubePackage === undefined ? {} : { docstubePackage: inputs.docstubePackage }),
+    ...(inputs.githubToken === undefined ? {} : { githubToken: inputs.githubToken }),
+    ...(inputs.repository === undefined ? {} : { repository: inputs.repository }),
     workspaceDir: inputs.workspaceDir
   });
   return runGitHubAction(inputs, deps);

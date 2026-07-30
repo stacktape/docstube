@@ -21,9 +21,11 @@ import type {
   GitHubPullRequest,
   GitHubActionPullRequestClient
 } from './github-action.ts';
+import type { PreflightRunResult } from './ci-preflight-gate.ts';
 import {
   attachFixturePublication,
   buildFixtureFlag,
+  buildFixturePreflightReport,
   buildFixtureShardWithFlags,
   buildFixtureWorkspace,
   fixtureHeadCommit,
@@ -44,6 +46,9 @@ type HarnessOptions = {
   headCommit?: string | undefined;
   latestVersion?: string;
   omitDecision?: boolean;
+  // Omitted by default so the legacy credential fallback stays exercised; tests that care about
+  // the preflight supply exactly the stdout the pinned CLI would have printed.
+  preflight?: PreflightRunResult;
   shardFlags?: readonly Flag[];
   systemFlags?: readonly Flag[];
   workspaceFiles?: Record<string, string>;
@@ -194,7 +199,15 @@ const createHarness = (options: HarnessOptions = {}): Harness => {
       runDocstube: async (input) => {
         operations.push(`cli:generate:${input.workspaceDir}`);
         return options.cliResult ?? { exitCode: 0 };
-      }
+      },
+      ...(options.preflight === undefined
+        ? {}
+        : {
+            runPreflight: async (input: { workspaceDir: string }) => {
+              operations.push(`cli:preflight:${input.workspaceDir}`);
+              return options.preflight as PreflightRunResult;
+            }
+          })
     }
   };
 };
@@ -327,6 +340,70 @@ describe('GitHub Action orchestration', () => {
     expect(result.autoMerge).toBe('skipped');
     expect(harness.operations.some((op) => op.startsWith('commit:') || op.startsWith('push:'))).toBe(false);
     expect(harness.summaries.join('\n')).toContain('left no documentation changes');
+  });
+
+  it('aborts BEFORE generation when a blocking preflight check fails, spending nothing on models', async () => {
+    const report = buildFixturePreflightReport({
+      checks: [
+        {
+          id: 'transport-credential',
+          title: 'transport credential',
+          status: 'fail',
+          blocking: true,
+          detail: 'agents.transport is anthropic-api and ANTHROPIC_API_KEY is not set in this environment',
+          remedy: 'Pass ANTHROPIC_API_KEY to the docstube step via `env:` from a repository secret.'
+        }
+      ],
+      automationMode: 'manual',
+      automationReason: 'the repository does not allow auto-merge.'
+    });
+    const harness = createHarness({
+      preflight: { exitCode: 1, stdout: JSON.stringify(report), stderr: '' }
+    });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.preflight).toBe('blocked');
+    expect(result.changed).toBe(false);
+    // The preflight ran; the generate step and every git mutation did not.
+    expect(harness.operations).toContain('cli:preflight:/repo');
+    expect(harness.operations.some((op) => op.startsWith('cli:generate:'))).toBe(false);
+    expect(harness.operations.some((op) => op.startsWith('checkout:') || op.startsWith('branch:'))).toBe(false);
+    const summary = harness.summaries.join('\n');
+    expect(summary).toContain('spent nothing on models');
+    expect(summary).toContain('ANTHROPIC_API_KEY');
+    expect(harness.outputs.preflight).toBe('blocked');
+  });
+
+  it('runs generation when the preflight passes and reports the honest automation mode', async () => {
+    const report = buildFixturePreflightReport({
+      automationMode: 'approval-assisted',
+      automationReason: "PRs opened with the workflow's GITHUB_TOKEN do not trigger workflow runs."
+    });
+    const harness = createHarness({ preflight: { exitCode: 0, stdout: JSON.stringify(report), stderr: '' } });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.preflight).toBe('passed');
+    expect(result.automationMode).toBe('approval-assisted');
+    expect(harness.operations).toContain('cli:preflight:/repo');
+    expect(harness.operations).toContain('cli:generate:/repo');
+    expect(harness.outputs['automation-mode']).toBe('approval-assisted');
+    // The honest label is surfaced on the run page, not buried in the JSON.
+    expect(harness.operations.some((op) => op.startsWith('notice:') && op.includes('approval-assisted'))).toBe(true);
+  });
+
+  it('degrades to the legacy credential check — loudly — when the pinned CLI has no preflight', async () => {
+    const harness = createHarness({ preflight: { exitCode: 1, stdout: 'Unknown command: doctor', stderr: '' } });
+
+    const result = await runGitHubAction({ baseBranch: 'main', workspaceDir: '/repo' }, harness.deps);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.preflight).toBe('unavailable');
+    expect(harness.operations.some((op) => op.startsWith('warn:CI preflight unavailable'))).toBe(true);
+    expect(harness.operations).toContain('cli:generate:/repo');
   });
 
   it('fails fast with a clear message when no model credential is present', async () => {

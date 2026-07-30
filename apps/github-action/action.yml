@@ -1,5 +1,5 @@
 name: docstube
-description: Run docstube generate --ci (the idempotent reconciler), open a verified-delta PR, and auto-merge only when the kernel's publication decision says the candidate is eligible.
+description: Preflight CI auth and GitHub permissions before any model spend, run docstube generate --ci (the idempotent reconciler), open a verified-delta PR, and auto-merge only when the kernel's publication decision says the candidate is eligible.
 inputs:
   github-token:
     description: GitHub token used by the gh CLI for the PR, flag comment, digest issue, and auto-merge.
@@ -32,6 +32,10 @@ outputs:
     description: URL of the opened or updated pull request.
   auto-merge:
     description: Auto-merge decision for the PR (enabled, blocked, unavailable, skipped).
+  preflight:
+    description: Result of `docstube doctor --ci --json`, which runs before any model spend (passed, blocked, unavailable).
+  automation-mode:
+    description: Honest merge story for this repository and token (full-auto, approval-assisted, manual, unknown). A plain GITHUB_TOKEN is approval-assisted, never full-auto.
   open-flag-count:
     description: Number of open flags delivered on the PR.
   publication-reason-codes:

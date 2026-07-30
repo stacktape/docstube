@@ -1,4 +1,12 @@
-import type { Flag, FlagKind, ManifestIndex, PageShard } from '@docstube/contracts';
+import type {
+  CiPreflightCheck,
+  CiPreflightReport,
+  Flag,
+  FlagKind,
+  ManifestIndex,
+  PageShard
+} from '@docstube/contracts';
+import { ciPreflightReportSchema } from '@docstube/contracts';
 import {
   buildFixtureClaimLedger,
   buildFixturePage,
@@ -17,6 +25,33 @@ import { manifestIndexRelativePath } from './verified-delta.ts';
 import type { WorkspaceFileReader } from './verified-delta.ts';
 
 // Pure fixture plumbing for the action tests: no git, no network, no filesystem.
+
+// A CI preflight report as the pinned CLI would print it. `checks` fully replaces the default set,
+// so a test can express exactly the failure it means.
+export const buildFixturePreflightReport = (
+  input: {
+    checks?: readonly CiPreflightCheck[];
+    automationMode?: CiPreflightReport['automationMode'];
+    automationReason?: string;
+  } = {}
+): CiPreflightReport => {
+  const checks = input.checks ?? [
+    { id: 'node-runtime', title: 'node', status: 'pass', blocking: true, detail: 'v24.12.0' },
+    { id: 'transport-credential', title: 'transport credential', status: 'pass', blocking: true, detail: 'KEY is set' }
+  ];
+  const fatal = checks.filter((check) => check.blocking && check.status === 'fail').map((check) => check.id);
+  return ciPreflightReportSchema.parse({
+    schemaVersion: 1,
+    toolVersion: '0.0.2',
+    generatedAt: '2026-07-29T00:00:00.000Z',
+    mode: 'ci',
+    automationMode: input.automationMode ?? 'approval-assisted',
+    automationReason: input.automationReason ?? 'the workflow token is a GitHub App installation token.',
+    checks,
+    ok: fatal.length === 0,
+    fatal
+  });
+};
 
 export const buildFixtureFlag = (overrides: Partial<Flag> & { kind: FlagKind }): Flag => ({
   id: mintId(idPrefixes.flag),
