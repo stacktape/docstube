@@ -177,6 +177,22 @@ describe('control plane router', () => {
     expect(view.open.every((entry) => entry.finding.status.state === 'open')).toBe(true);
   });
 
+  it('keeps risk-critic findings out of the flag queue too, and never reports an unassessed page as clean', async () => {
+    // Same rule as structural findings (harness-state-v2 decision 4): nonblocking committed work
+    // items belong on their own surface, not in the queue that gates human attention.
+    expect(await caller.flags.list()).toHaveLength(2);
+
+    const view = await caller.riskCritic.list();
+    // This fixture shard carries no assessment at all, which must read as PENDING — an absent
+    // record is exactly the silent pass the critic exists to eliminate.
+    expect(view.open).toEqual([]);
+    expect(view.pendingPages).toEqual([page.slug]);
+    // The summary states the deterministic floor and the semantic layer together (PRODUCT §1.2).
+    expect(view.summary).toContain('nonblocking');
+    expect(view.summary).toContain('0 semantic assertion risk(s) on top of 0 detected deterministically');
+    expect(view.summary).toContain('only the deterministic count gates the complete badge');
+  });
+
   it('returns the parsed config family without raw file contents', async () => {
     const family = await caller.config.family();
     expect(family.config.docType).toBe('external-library');
@@ -197,6 +213,7 @@ describe('control plane router on an empty repo', () => {
       open: [],
       summary: 'Structural quality: 0 open · nonblocking'
     });
+    expect(await caller.riskCritic.list()).toMatchObject({ open: [], pendingPages: [] });
     await expect(caller.config.family()).rejects.toThrowError(TRPCError);
   });
 });

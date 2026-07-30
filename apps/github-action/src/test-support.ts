@@ -23,7 +23,7 @@ import { outputInventorySchema, publicationDecisionSchema } from '@docstube/cont
 import { outputInventoryRelativePath, publicationDecisionRelativePath } from './merge-decision.ts';
 import type { PublicationValidation } from './merge-decision.ts';
 import { manifestIndexRelativePath } from './verified-delta.ts';
-import type { WorkspaceFileReader } from './verified-delta.ts';
+import type { RiskCriticDelta, WorkspaceFileReader } from './verified-delta.ts';
 
 // Pure fixture plumbing for the action tests: no git, no network, no filesystem.
 
@@ -187,6 +187,15 @@ export const fixturePublicationValidation = (overrides: Record<string, unknown> 
     })
   };
 };
+
+// A delta whose risk critic found nothing and whose linter flagged nothing — the baseline for
+// tests about OTHER sections of the report.
+export const emptyRiskCriticDelta = (): RiskCriticDelta => ({
+  findings: [],
+  semanticAssertionRisks: 0,
+  uncoveredAssertions: 0,
+  pendingPages: []
+});
 
 // A shard with the v2 trust spine attached: two ClaimEvidence records (one checked, one
 // unchecked) so claim-count assertions have honest non-zero inputs.

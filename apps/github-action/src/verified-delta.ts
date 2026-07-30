@@ -1,4 +1,11 @@
-import type { ClaimCorrectness, Flag, ManifestIndex, PageShard, StructuralFinding } from '@docstube/contracts';
+import type {
+  ClaimCorrectness,
+  Flag,
+  ManifestIndex,
+  PageShard,
+  RiskCriticFinding,
+  StructuralFinding
+} from '@docstube/contracts';
 import { manifestIndexSchema, pageShardSchema, structuralGroupShardSchema } from '@docstube/contracts';
 
 // The verified delta is the honest PR annotation (PRODUCT §3.3): what changed, what proves it.
@@ -31,12 +38,29 @@ export type StructuralQualityDelta = {
   open: readonly StructuralFinding[];
 };
 
+// THE RISK CRITIC'S SIDE OF ASSERTION COVERAGE, REPORTED WITH THE LINTER'S (harness-state-v2
+// decision 4, PRODUCT §1.2). Like structural findings and for the same reason, these are committed
+// work items and NOT merge-gate input: they stay out of `openFlags` so a model's editorial
+// judgement can never withhold an auto-merge.
+//
+// `uncoveredAssertions` is the DETERMINISTIC FLOOR (the linter — it gates the complete badge);
+// `semanticAssertionRisks` is what the critic found on top (advisory). The PR prints them together
+// because either number alone tells a reader the wrong thing about how covered the page is.
+export type RiskCriticDelta = {
+  findings: readonly (RiskCriticFinding & { pageId: string; slug: string })[];
+  semanticAssertionRisks: number;
+  uncoveredAssertions: number;
+  // Source-locale pages whose critic did not produce a verdict this run — never silently "clean".
+  pendingPages: readonly string[];
+};
+
 export type VerifiedDelta = {
   changedPages: readonly PageDelta[];
   totals: ClaimCounts;
   // Every open flag across all readable shards plus manifest systemFlags — the merge gate input.
   openFlags: readonly Flag[];
   structural: StructuralQualityDelta;
+  riskCritic: RiskCriticDelta;
 };
 
 export type WorkspaceFileReader = (relativePath: string) => Promise<string | undefined>;
@@ -150,10 +174,33 @@ export const loadVerifiedDelta = async (input: {
     openGroupStructural.push(...groupShard.findings.filter((finding) => finding.status.state === 'open'));
   }
 
+  // Source-locale shards only: renditions inherit their canonical page's assessment, so counting
+  // them would multiply one page's findings by its locale count.
+  const sourceShards = shards.filter(({ shard }) => shard.locale === index.sourceLocale);
+  const criticFindings = sourceShards.flatMap(({ shard }) =>
+    (shard.provenance?.assessments.riskCritic?.completion === 'completed'
+      ? shard.provenance.assessments.riskCritic.findings
+      : []
+    ).map((finding) => ({ ...finding, pageId: shard.page.id, slug: shard.page.slug }))
+  );
+  const riskCritic: RiskCriticDelta = {
+    findings: criticFindings,
+    semanticAssertionRisks: criticFindings.filter((finding) => finding.kind === 'unmarked-assertion').length,
+    uncoveredAssertions: sourceShards.reduce(
+      (total, { shard }) => total + (shard.ledger?.coverageLint.uncovered.length ?? 0),
+      0
+    ),
+    pendingPages: sourceShards
+      .filter(({ shard }) => (shard.provenance?.assessments.riskCritic?.completion ?? 'not-run') !== 'completed')
+      .map(({ shard }) => shard.page.slug)
+      .toSorted()
+  };
+
   return {
     changedPages,
     totals,
     openFlags,
+    riskCritic,
     structural: {
       openPageFindings: openPageStructural.length,
       openGroupFindings: openGroupStructural.length,

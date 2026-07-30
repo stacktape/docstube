@@ -93,6 +93,49 @@ export const structuralSection = (delta: VerifiedDelta | undefined): string[] =>
   ];
 };
 
+// RISK CRITIC — ITS OWN SECTION, ALWAYS NONBLOCKING (harness-state-v2 decision 4). Kept out of the
+// flags section for the same reason structural findings are: flags gate the merge, these are
+// committed work items an evidence-fed critic raised about framing, omissions, emphasis, semantic
+// assertion coverage, and within-page duplication.
+//
+// THE COVERAGE LINE PRINTS BOTH NUMBERS (PRODUCT §1.2). The deterministic linter is the floor and
+// it is what gates the complete badge; the critic's unmarked-assertion findings are the semantic
+// layer that gates nothing. A reader shown only one of them concludes the wrong thing about how
+// covered these pages are, so neither is ever printed alone.
+export const riskCriticSection = (delta: VerifiedDelta | undefined): string[] => {
+  const critic = delta?.riskCritic;
+  if (critic === undefined) {
+    return ['Risk critic: not run.'];
+  }
+  const lines = [
+    `Risk critic: ${critic.findings.length} finding(s) · nonblocking`,
+    '',
+    `Assertion coverage: ${critic.uncoveredAssertions} detected deterministically by the coverage linter ` +
+      `(these gate the complete badge) · ${critic.semanticAssertionRisks} more the linter structurally cannot see, ` +
+      'found by the critic (advisory — they never change the badge).',
+    ''
+  ];
+  if (critic.pendingPages.length > 0) {
+    lines.push(
+      `No critic verdict this run for ${critic.pendingPages.length} page(s) — recorded pending, not clean: ` +
+        `${critic.pendingPages.map((slug) => `\`${slug}\``).join(', ')}.`,
+      ''
+    );
+  }
+  if (critic.findings.length === 0) {
+    return [...lines, 'No open risk-critic findings.'];
+  }
+  return [
+    ...lines,
+    'These never block the merge. They are committed work items — `docstube refine` picks them up.',
+    '',
+    ...critic.findings.map(
+      (finding) =>
+        `- **${finding.severity}** · \`${finding.kind}\` · \`${finding.slug}\` — ${finding.message} _(${finding.rationale})_`
+    )
+  ];
+};
+
 // The honest report (PRODUCT §3.3): what executed, what was deferred, why the merge was withheld,
 // and which reason codes fired.
 const publicationSection = (decision: AutoMergeDecision | undefined): string[] => {
@@ -150,6 +193,7 @@ export const buildPullRequestBody = (input: {
     lines.push('### Verified delta', '', 'No manifest index was found, so no verified delta could be computed.', '');
   }
   lines.push('### Structural quality', '', ...structuralSection(input.delta), '');
+  lines.push('### Risk critic', '', ...riskCriticSection(input.delta), '');
   lines.push('### Publication decision', '', ...publicationSection(input.decision), '');
   lines.push('### Committed files', '', ...input.committedPaths.map((path) => `- \`${path}\``));
   return lines.join('\n');
@@ -244,6 +288,7 @@ export const buildJobSummary = (input: JobSummaryInput): string => {
     lines.push(`### Open flags (${input.delta.openFlags.length})`, '', ...flagsSection(input.delta.openFlags), '');
   }
   lines.push('### Structural quality', '', ...structuralSection(input.delta), '');
+  lines.push('### Risk critic', '', ...riskCriticSection(input.delta), '');
   lines.push('### Publication decision', '', ...publicationSection(input.decision), '');
   lines.push('### Auto-merge', '', ...autoMergeSummaryLine(input), '');
   lines.push('### Committed files', '', ...input.committedPaths.map((path) => `- \`${path}\``));

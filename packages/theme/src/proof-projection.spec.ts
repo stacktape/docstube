@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { PageShard, PersonaReview } from '@docstube/contracts';
+import type { PageShard, PersonaReview, RiskCriticFinding, RiskCriticResult } from '@docstube/contracts';
+import { riskCriticResultSchema } from '@docstube/contracts';
 import { buildFixtureInput, installMdx } from './emit-site-fixture.ts';
 import { checkShardMdxBinding, projectShardProof, projectUnboundShardProof } from './proof-projection.ts';
 
@@ -180,6 +181,87 @@ describe('projectShardProof — coverage lint gates the complete state', () => {
   it('an unverified shard reports zero uncovered assertions and is never complete', () => {
     const projection = projectUnboundShardProof(withUncovered(allChecked(installShard()), 3));
     expect(projection).toMatchObject({ state: 'unverified', uncoveredAssertions: 0, complete: false });
+  });
+});
+
+// THE CRITIC IS REPORTED WITH THE LINTER AND GATES NOTHING (harness-state-v2 decision 4,
+// PRODUCT §1.2). The deterministic floor decides the badge; the critic's semantic layer is
+// advisory and sits next to it so a reader gets one honest coverage picture.
+const withRiskCritic = (shard: PageShard, critic: RiskCriticResult): PageShard => {
+  if (shard.provenance === undefined) {
+    throw new Error('fixture shard is missing its trust spine');
+  }
+  return {
+    ...shard,
+    provenance: { ...shard.provenance, assessments: { ...shard.provenance.assessments, riskCritic: critic } }
+  };
+};
+
+const criticWith = (kinds: RiskCriticFinding['kind'][], shard: PageShard): RiskCriticResult =>
+  riskCriticResultSchema.parse({
+    scoredBy: 'model',
+    completion: 'completed',
+    promptVersion: '1',
+    findings: kinds.map((kind) => ({
+      kind,
+      anchor: { kind: 'block', blockId: shard.ledger!.claims[0]!.anchor.blockId },
+      severity: 'error',
+      message: `a ${kind} problem`,
+      rationale: 'grounded in the evidence summary'
+    }))
+  });
+
+describe('projectShardProof — the risk critic never moves the complete badge', () => {
+  it('does not WITHHOLD the badge: a clean page stays complete under severe critic findings', () => {
+    const clean = allChecked(installShard());
+    expect(projectShardProof(clean).complete).toBe(true);
+    const critiqued = withRiskCritic(clean, criticWith(['misleading-framing', 'unmarked-assertion'], clean));
+    const projection = projectShardProof(critiqued);
+    // A model's editorial opinion must not be able to fail a page whose claims all check out.
+    expect(projection.complete).toBe(true);
+    expect(projection.riskCriticFindings).toBe(2);
+    expect(projection.semanticAssertionRisks).toBe(1);
+    // …and the deterministic count is still reported, unchanged, right beside it.
+    expect(projection.uncoveredAssertions).toBe(0);
+  });
+
+  it('does not GRANT the badge: an uncovered span still forbids completeness however clean the critic was', () => {
+    const linted = withUncovered(allChecked(installShard()), 2);
+    const projection = projectShardProof(
+      withRiskCritic(
+        linted,
+        riskCriticResultSchema.parse({ scoredBy: 'model', completion: 'completed', promptVersion: '1', findings: [] })
+      )
+    );
+    expect(projection.riskCritic).toBe('completed');
+    expect(projection.riskCriticFindings).toBe(0);
+    expect(projection.uncoveredAssertions).toBe(2);
+    expect(projection.complete).toBe(false);
+  });
+
+  it('says pending rather than clean when no verdict exists, and still lets the page be complete', () => {
+    const clean = allChecked(installShard());
+    // A page nobody assessed reports that fact — never silence, never an implied pass. And, exactly
+    // like an unrun persona review, it does not block publication.
+    expect(projectShardProof(clean).riskCritic).toBe('not-run');
+    const pending = withRiskCritic(
+      clean,
+      riskCriticResultSchema.parse({ scoredBy: 'model', completion: 'pending', promptVersion: '1', findings: [] })
+    );
+    const projection = projectShardProof(pending);
+    expect(projection.riskCritic).toBe('pending');
+    expect(projection.riskCriticFindings).toBe(0);
+    expect(projection.complete).toBe(true);
+  });
+
+  it('drops a stale critic verdict along with the rest of the trust spine on an unbound shard', () => {
+    const clean = allChecked(installShard());
+    const critiqued = withRiskCritic(clean, criticWith(['dangerous-omission'], clean));
+    expect(projectUnboundShardProof(critiqued)).toMatchObject({
+      state: 'unverified',
+      riskCritic: 'not-run',
+      riskCriticFindings: 0
+    });
   });
 });
 

@@ -15,6 +15,7 @@ import {
   buildFixtureFlag,
   buildFixtureShardWithFlags,
   buildFixtureWorkspace,
+  emptyRiskCriticDelta,
   fixturePublicationValidation,
   shardRelativePath
 } from './test-support.ts';
@@ -93,6 +94,7 @@ describe('PR body (verified delta annotation)', () => {
         changedPages: [],
         totals: { checked: 0, unchecked: 0, contradicted: 0 },
         openFlags: [],
+        riskCritic: emptyRiskCriticDelta(),
         structural: { openPageFindings: 2, openGroupFindings: 1, open: [finding] }
       },
       mode: 'generate'
@@ -105,6 +107,74 @@ describe('PR body (verified delta annotation)', () => {
     expect(body).not.toContain('verified defect');
   });
 
+  it('gives the risk critic its own nonblocking section that prints BOTH coverage numbers', () => {
+    // PRODUCT §1.2: the deterministic linter is the floor that gates the complete badge; the
+    // critic's unmarked-assertion findings are the semantic layer that gates nothing. Printing
+    // either number alone tells a reader the wrong thing about how covered these pages are.
+    const body = buildPullRequestBody({
+      committedPaths: [],
+      decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        riskCritic: {
+          findings: [
+            {
+              kind: 'dangerous-omission',
+              anchor: { kind: 'block', blockId: 'bl_00000000000000000000' },
+              severity: 'error',
+              message: 'No warning that `reset` deletes committed state.',
+              rationale: 'The brief names reset as destructive and the page never says it is irreversible.',
+              pageId: 'pg_00000000000000000000',
+              slug: 'cli-reference'
+            },
+            {
+              kind: 'unmarked-assertion',
+              anchor: { kind: 'block', blockId: 'bl_00000000000000000001' },
+              severity: 'warning',
+              message: 'The client gives up after a while.',
+              rationale: 'Asserts a retry limit with no identifier, so the linter cannot see it.',
+              pageId: 'pg_00000000000000000000',
+              slug: 'cli-reference'
+            }
+          ],
+          semanticAssertionRisks: 1,
+          uncoveredAssertions: 3,
+          pendingPages: ['configuration']
+        },
+        structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
+      },
+      mode: 'generate'
+    });
+    expect(body).toContain('### Risk critic');
+    expect(body).toContain('Risk critic: 2 finding(s) · nonblocking');
+    // BOTH numbers, and which one owns the badge.
+    expect(body).toContain('3 detected deterministically by the coverage linter (these gate the complete badge)');
+    expect(body).toContain('1 more the linter structurally cannot see');
+    // An unassessed page is stated, never rolled into "clean".
+    expect(body).toContain('recorded pending, not clean: `configuration`');
+    expect(body).toContain('`dangerous-omission`');
+    expect(body).toContain('These never block the merge.');
+  });
+
+  it('says so plainly when there is no risk-critic work', () => {
+    const body = buildPullRequestBody({
+      committedPaths: [],
+      decision: decideAutoMerge({ flags: [], publication: fixturePublicationValidation() }),
+      delta: {
+        changedPages: [],
+        totals: { checked: 0, unchecked: 0, contradicted: 0 },
+        openFlags: [],
+        riskCritic: emptyRiskCriticDelta(),
+        structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
+      },
+      mode: 'generate'
+    });
+    expect(body).toContain('Risk critic: 0 finding(s) · nonblocking');
+    expect(body).toContain('No open risk-critic findings.');
+  });
+
   it('says so plainly when there is no structural work', () => {
     const body = buildPullRequestBody({
       committedPaths: [],
@@ -113,6 +183,7 @@ describe('PR body (verified delta annotation)', () => {
         changedPages: [],
         totals: { checked: 0, unchecked: 0, contradicted: 0 },
         openFlags: [],
+        riskCritic: emptyRiskCriticDelta(),
         structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
       },
       mode: 'generate'
@@ -129,6 +200,7 @@ describe('PR body (verified delta annotation)', () => {
         changedPages: [],
         totals: { checked: 0, unchecked: 0, contradicted: 0 },
         openFlags: [],
+        riskCritic: emptyRiskCriticDelta(),
         structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
       },
       mode: 'generate'
@@ -157,6 +229,7 @@ describe('PR body (verified delta annotation)', () => {
         changedPages: [],
         totals: { checked: 0, unchecked: 0, contradicted: 0 },
         openFlags: [],
+        riskCritic: emptyRiskCriticDelta(),
         structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
       },
       mode: 'generate'
@@ -247,6 +320,7 @@ describe('job summary', () => {
         changedPages: [],
         totals: { checked: 0, unchecked: 0, contradicted: 0 },
         openFlags: [],
+        riskCritic: emptyRiskCriticDelta(),
         structural: { openPageFindings: 0, openGroupFindings: 0, open: [] }
       },
       mode: 'generate',

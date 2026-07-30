@@ -13,6 +13,7 @@ import type {
   ManifestIndex,
   PageShard,
   PageStatus,
+  RiskCriticFinding,
   RunEvent,
   StructuralFinding,
   ToolDescriptor,
@@ -293,6 +294,88 @@ const listStructuralFindings = async (repoRoot: string): Promise<StructuralQuali
   };
 };
 
+// THE RISK CRITIC'S REVIEW-UI SURFACE (harness-state-v2 decision 4). A separate surface from the
+// flag queue for exactly the reason structural findings are: these are nonblocking committed work
+// items, and a queue that gates human attention must not fill with editorial judgement.
+//
+// `summary` states the deterministic linter count and the critic's semantic count TOGETHER
+// (PRODUCT §1.2): the linter is the floor that gates the complete badge, the critic is the layer on
+// top that gates nothing, and either number alone misleads. Pages whose critic did not produce a
+// verdict are listed as pending — never rolled into "clean".
+export type RiskCriticEntry = {
+  finding: RiskCriticFinding;
+  pageId: string;
+  pageTitle: string;
+  slug: string;
+};
+
+export type RiskCriticView = {
+  open: RiskCriticEntry[];
+  openByPageId: Record<string, number>;
+  // Slugs whose committed assessment is pending/failed/absent.
+  pendingPages: string[];
+  uncoveredAssertions: number;
+  semanticAssertionRisks: number;
+  summary: string;
+};
+
+const riskCriticSummary = (input: { findings: number; semantic: number; uncovered: number }): string =>
+  `Risk critic: ${input.findings} open · nonblocking · ${input.semantic} semantic assertion risk(s) on top of ` +
+  `${input.uncovered} detected deterministically (only the deterministic count gates the complete badge)`;
+
+const listRiskCriticFindings = async (repoRoot: string): Promise<RiskCriticView> => {
+  const empty: RiskCriticView = {
+    open: [],
+    openByPageId: {},
+    pendingPages: [],
+    uncoveredAssertions: 0,
+    semanticAssertionRisks: 0,
+    summary: riskCriticSummary({ findings: 0, semantic: 0, uncovered: 0 })
+  };
+  const index = await readManifestIndex(repoRoot);
+  if (index === undefined) {
+    return empty;
+  }
+  const store = createManifestStore(repoRoot, currentVersionOf(index));
+  const entries: RiskCriticEntry[] = [];
+  const pendingPages: string[] = [];
+  let uncoveredAssertions = 0;
+  // SOURCE LOCALE ONLY: renditions inherit the canonical page's assessment (see the structural
+  // surface above for the same rule and the same double-counting reason).
+  for (const pageId of await store.listShardPageIds(index.sourceLocale)) {
+    const shard = await store.readPageShard({ locale: index.sourceLocale, pageId });
+    if (shard === undefined) {
+      continue;
+    }
+    uncoveredAssertions += shard.ledger?.coverageLint.uncovered.length ?? 0;
+    const critic = shard.provenance?.assessments.riskCritic;
+    if (critic?.completion !== 'completed') {
+      pendingPages.push(shard.page.slug);
+      continue;
+    }
+    for (const finding of critic.findings) {
+      entries.push({ finding, pageId, pageTitle: shard.page.title, slug: shard.page.slug });
+    }
+  }
+  const openByPageId: Record<string, number> = {};
+  for (const entry of entries) {
+    openByPageId[entry.pageId] = (openByPageId[entry.pageId] ?? 0) + 1;
+  }
+  const semanticAssertionRisks = entries.filter((entry) => entry.finding.kind === 'unmarked-assertion').length;
+  return {
+    open: entries,
+    openByPageId,
+    pendingPages: pendingPages.toSorted(),
+    uncoveredAssertions,
+    semanticAssertionRisks,
+    summary: riskCriticSummary({
+      findings: entries.length,
+      semantic: semanticAssertionRisks,
+      uncovered: uncoveredAssertions
+    })
+  };
+};
+
 const fileExists = async (path: string): Promise<boolean> => {
   try {
     await stat(path);
@@ -492,6 +575,9 @@ export const controlPlaneRouter = t.router({
   }),
   structural: t.router({
     list: t.procedure.query(({ ctx }) => listStructuralFindings(ctx.repoRoot))
+  }),
+  riskCritic: t.router({
+    list: t.procedure.query(({ ctx }) => listRiskCriticFindings(ctx.repoRoot))
   }),
   flags: t.router({
     list: t.procedure.query(({ ctx }) => listFlags(ctx.repoRoot)),

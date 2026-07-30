@@ -32,6 +32,24 @@ export type ShardProofProjection = {
   // the writer marked, so without this number a page that simply omitted its markers would present
   // as fully checked. Rendered next to the counts and, decisively, it gates `complete` below.
   uncoveredAssertions: number;
+  // THE RISK CRITIC, ALONGSIDE THE LINTER AND NEVER INSTEAD OF IT (harness-state-v2 decision 4,
+  // PRODUCT §1.2). `uncoveredAssertions` above is the DETERMINISTIC FLOOR and it is what gates
+  // `complete`. These three fields are the SEMANTIC layer on top, and they gate nothing:
+  //
+  //   riskCritic          'completed' | 'pending' | 'failed' | 'not-run'. Never absent-and-silent:
+  //                       a page nobody assessed says so, exactly like an unrun persona review.
+  //   riskCriticFindings  total nonblocking work items the critic raised.
+  //   semanticAssertionRisks  the 'unmarked-assertion' subset — assertions the linter structurally
+  //                       could not see. Rendered NEXT TO uncoveredAssertions so a reader gets one
+  //                       coverage picture: "N detected deterministically (gates the badge), M more
+  //                       the critic found (advisory)". Either number alone misleads.
+  //
+  // A critic finding must never move `complete` in EITHER direction — not withhold it (a model
+  // opinion cannot fail a correct page) and not grant it (the floor still forbids completeness on
+  // its own terms). `complete` below is computed without reading any of these.
+  riskCritic: 'completed' | 'pending' | 'failed' | 'not-run';
+  riskCriticFindings: number;
+  semanticAssertionRisks: number;
   // A DIRTY WORKING TREE CANNOT MINT THE COMPLETE STATE (wave 2b close — the spine finding): this
   // run read working-tree bytes that exist in no commit (uncommitted changes, or no HEAD at all),
   // recorded as provenance.lineage.dirtyWorkingTree. The checks themselves are genuine — they are
@@ -178,6 +196,9 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
   const uncoveredAssertions = shard.ledger?.coverageLint.uncovered.length ?? 0;
   const dirtyWorkingTree = shard.provenance?.lineage.dirtyWorkingTree === true;
 
+  const critic = shard.provenance?.assessments.riskCritic;
+  const criticFindings = critic?.completion === 'completed' ? critic.findings : [];
+
   return {
     state: unverified ? 'unverified' : 'verified',
     checkedClaims,
@@ -185,7 +206,13 @@ export const projectShardProof = (shard: PageShard): ShardProofProjection => {
     contradictedClaims,
     uncheckedClaims: totalClaims - checkedClaims - contradictedClaims,
     uncoveredAssertions,
+    riskCritic: critic?.completion ?? 'not-run',
+    riskCriticFindings: criticFindings.length,
+    semanticAssertionRisks: criticFindings.filter((finding) => finding.kind === 'unmarked-assertion').length,
     dirtyWorkingTree,
+    // DELIBERATELY UNCHANGED (harness-state-v2 decision 4 + decision 5's floor rule): no risk-critic
+    // term appears here. The badge stays a deterministic computation over the ledger, the linter,
+    // and the working tree.
     complete:
       !unverified &&
       !dirtyWorkingTree &&
