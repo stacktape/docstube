@@ -89,7 +89,8 @@ export const buildFixturePageShard = (page: PageEntity): PageShard => ({
   sourceCommit: commit,
   generatedAt: now,
   page,
-  flags: []
+  flags: [],
+  structuralFindings: []
 });
 
 export const fixtureConfigInput: z.input<typeof docstubeConfigSchema> = {

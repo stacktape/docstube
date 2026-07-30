@@ -1,12 +1,15 @@
 import { mkdir, readFile, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { ManifestIndex, PageShard } from '@docstube/contracts';
+import type { ManifestIndex, PageShard, StructuralGroupShard } from '@docstube/contracts';
 import {
   canonicalStateJson,
   manifestIndexSchema,
   pageIdSchema,
   pageShardRelativePath,
-  pageShardSchema
+  pageShardSchema,
+  structuralGroupIdSchema,
+  structuralGroupShardRelativePath,
+  structuralGroupShardSchema
 } from '@docstube/contracts';
 import { CoreError } from '../errors.ts';
 
@@ -19,6 +22,10 @@ import { CoreError } from '../errors.ts';
 export const committedManifestDir = (repoRoot: string): string => join(repoRoot, '.docstube', 'manifest');
 const indexPath = (manifestRoot: string): string => join(manifestRoot, 'manifest.json');
 const currentPagesDir = (manifestRoot: string): string => join(manifestRoot, 'pages');
+// Nav-group structural findings (quality-ci-reader-v2 decision 17): one committed file per group,
+// with no locale dimension — the group is assessed once in the source locale and every rendition
+// inherits the verdict, because renditions are structurally isomorphic to the canonical page.
+const structuralDir = (manifestRoot: string): string => join(manifestRoot, 'structure');
 
 // Every serialization the store has EVER owned at these paths. A `.yml` shard is not a foreign
 // file to be preserved: it is this store's own superseded output, so reconciliation removes it.
@@ -83,6 +90,12 @@ export type ManifestStore = {
   listShardPageIds: (locale: string) => Promise<string[]>;
   // Deletes every frozen shard of one version label (re-cutting replaces the whole snapshot).
   removeVersionShards: (label: string) => Promise<void>;
+  readStructuralShard: (groupId: string) => Promise<StructuralGroupShard | undefined>;
+  writeStructuralShard: (shard: StructuralGroupShard) => Promise<void>;
+  // Group ids with a shard actually on disk. The INDEX is the authority for what should exist;
+  // this is the "what is really there" side, used by reconciliation and by read-only views that
+  // must not fail on an index/disk disagreement.
+  listStructuralGroupIds: () => Promise<string[]>;
 };
 
 export type ManifestStoreOptions = {
@@ -110,6 +123,26 @@ export const createManifestStore = (
   // orphan would pollute the repo AND make the recorded state ambiguous. Scope: the CURRENT
   // page-shard directories plus the superseded root index only — frozen `versions/<label>/` shards
   // are immutable history, and nothing else under `.docstube/` is this store's to delete.
+  const pruneStructuralShards = async (groupIds: readonly string[]): Promise<string[]> => {
+    const keep = new Set(groupIds);
+    const dir = structuralDir(manifestRoot);
+    const pruned: string[] = [];
+    for (const name of await readDirEntries(dir)) {
+      if (!name.endsWith('.json')) {
+        // Only this store's own serialization is ever removed; anything else a human dropped in
+        // this tree is left strictly alone.
+        continue;
+      }
+      const groupId = name.slice(0, -'.json'.length);
+      if (!structuralGroupIdSchema.safeParse(groupId).success || keep.has(groupId)) {
+        continue;
+      }
+      await rm(join(dir, name), { force: true });
+      pruned.push(`structure/${name}`);
+    }
+    return pruned;
+  };
+
   const reconcileShardTree = async (index: ManifestIndex): Promise<string[]> => {
     const keepPageIds = new Set(index.pages.map((entry) => entry.id));
     const keepLocales = new Set([index.sourceLocale, ...index.locales]);
@@ -141,6 +174,10 @@ export const createManifestStore = (
         await rmdir(localeDir).catch(() => {});
       }
     }
+    // Structural group shards follow the SAME rule as page shards: the index says which groups
+    // exist, so a shard for a group the IA no longer has is unreferenced committed state and
+    // leaves with the index write that dropped it.
+    pruned.push(...(await pruneStructuralShards(index.structuralGroups)));
     // The root index has exactly one owner and one current serialization, so a `manifest.yml` next
     // to `manifest.json` is unambiguously this store's superseded output.
     for (const name of ['manifest.yml', 'manifest.yaml']) {
@@ -166,6 +203,26 @@ export const createManifestStore = (
       if (shard === undefined) {
         missing.push({ id: entry.id, slug: entry.slug });
       }
+    }
+    // Same rule for nav-group structural shards: the index says the group owns committed findings,
+    // so a missing shard means work items vanished without anything recording it.
+    const missingGroups: string[] = [];
+    for (const groupId of index.structuralGroups) {
+      const shard = await readJsonFile(join(manifestRoot, structuralGroupShardRelativePath(groupId)), (raw) =>
+        structuralGroupShardSchema.parse(raw)
+      );
+      if (shard === undefined) {
+        missingGroups.push(groupId);
+      }
+    }
+    if (missingGroups.length > 0) {
+      throw new CoreError(
+        'state-corrupt',
+        `the manifest index lists ${missingGroups.length} nav group(s) whose structural findings shard is missing: ` +
+          `${missingGroups.join(', ')} — the recorded manifest outruns the shards on disk. Run \`docstube generate\` ` +
+          'to rebuild the manifest from the codebase.',
+        { repoRoot, groupIds: missingGroups }
+      );
     }
     if (missing.length === 0) {
       return;
@@ -225,6 +282,26 @@ export const createManifestStore = (
     },
     removeVersionShards: async (label) => {
       await rm(join(manifestRoot, 'versions', label, 'pages'), { recursive: true, force: true });
+    },
+    readStructuralShard: (groupId) =>
+      readJsonFile(join(manifestRoot, structuralGroupShardRelativePath(groupId)), (raw) =>
+        structuralGroupShardSchema.parse(raw)
+      ),
+    writeStructuralShard: async (shard) => {
+      const validated = structuralGroupShardSchema.parse(shard);
+      const path = join(manifestRoot, structuralGroupShardRelativePath(validated.groupId));
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, canonicalStateJson(validated), 'utf8');
+    },
+    listStructuralGroupIds: async () => {
+      const entries = await readDirEntries(structuralDir(manifestRoot));
+      return entries.flatMap((name) => {
+        if (!name.endsWith('.json')) {
+          return [];
+        }
+        const groupId = name.slice(0, -'.json'.length);
+        return structuralGroupIdSchema.safeParse(groupId).success ? [groupId] : [];
+      });
     }
   };
 };

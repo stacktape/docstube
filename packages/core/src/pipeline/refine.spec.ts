@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AgentTaskSpec, PageShard, Transcript, WriterClaimLedger } from '@docstube/contracts';
+import type { AgentTaskSpec, PageShard, StructuralFinding, Transcript, WriterClaimLedger } from '@docstube/contracts';
+import { buildFixtureStructuralFinding } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate } from './generate.ts';
-import { rankPagesForRefinement, runRefine } from './refine.ts';
+import { rankPagesForRefinement, runRefine, structuralRepairLoad } from './refine.ts';
 
 // refine picks the worst committed page (open flags first, lowest proven ratio next) and runs it
 // back through the full page loop; a healed page loses its stale system flag.
@@ -209,5 +210,48 @@ describe('rankPagesForRefinement', () => {
     const b = tiedPage('beta');
     expect(rankPagesForRefinement([b, a]).map((entry) => entry.slug)).toEqual(['alpha', 'beta']);
     expect(rankPagesForRefinement([a, b]).map((entry) => entry.slug)).toEqual(['alpha', 'beta']);
+  });
+
+  it('ranks open auto-repairable structural findings first, impact-ordered', () => {
+    const plain = { ...tiedPage('plain'), openFlags: 3 };
+    const lowImpact = { ...tiedPage('low'), structural: { worstImpact: 2, count: 1, findingKeys: ['k1'] } };
+    const highImpact = { ...tiedPage('high'), structural: { worstImpact: 0, count: 1, findingKeys: ['k2'] } };
+    // A page with a high-impact structural target outranks a page with three open flags.
+    expect(rankPagesForRefinement([plain, lowImpact, highImpact]).map((entry) => entry.slug)).toEqual([
+      'high',
+      'low',
+      'plain'
+    ]);
+  });
+});
+
+describe('structuralRepairLoad', () => {
+  const pageA = 'pg_00000000000000000001';
+  const pageB = 'pg_00000000000000000002';
+  const pageC = 'pg_00000000000000000003';
+  const groupFinding = (overrides: Partial<StructuralFinding> = {}): StructuralFinding => ({
+    ...buildFixtureStructuralFinding([pageA, pageB]),
+    ...overrides
+  });
+
+  it('expands a group finding to its MINIMAL repair targets, never the whole cohort', () => {
+    const finding = groupFinding({
+      scope: { kind: 'nav-group', groupId: 'compute-resources', pageIds: [pageA, pageB, pageC] },
+      repairTargets: [pageB]
+    });
+    expect([...structuralRepairLoad([finding]).keys()]).toEqual([pageB]);
+  });
+
+  it('ignores findings that are not open work', () => {
+    expect(structuralRepairLoad([groupFinding({ status: { state: 'resolved' } })]).size).toBe(0);
+    expect(structuralRepairLoad([groupFinding({ repairTargets: [] })]).size).toBe(0);
+  });
+
+  it('keeps the WORST impact and the count when several findings name one page', () => {
+    const load = structuralRepairLoad([
+      groupFinding({ key: 'a', impact: 'low', repairTargets: [pageA] }),
+      groupFinding({ key: 'b', impact: 'high', repairTargets: [pageA] })
+    ]);
+    expect(load.get(pageA)).toEqual({ worstImpact: 0, count: 2, findingKeys: ['a', 'b'] });
   });
 });

@@ -8,6 +8,7 @@ import type { AgentTaskSpec, Codemap, Flag, ManifestIndex, PageEntity, Transcrip
 import {
   buildFixturePage,
   buildFixturePageShard,
+  buildFixtureStructuralFinding,
   contentHash,
   fixtureConfigInput,
   idPrefixes,
@@ -53,7 +54,20 @@ describe('control plane router', () => {
     });
     systemFlag = buildFlag({ kind: 'system', summary: 'Build system looks like Bazel and pnpm at once' });
 
-    const shard = { ...buildFixturePageShard(page), flags: [pageFlag] };
+    const pageStructuralFinding = {
+      ...buildFixtureStructuralFinding(['pg_00000000000000000009', page.id]),
+      key: 'structure.empty-section:page',
+      code: 'structure.empty-section',
+      scope: { kind: 'entity' as const, pageId: page.id },
+      detector: { kind: 'deterministic' as const, id: 'outline-integrity', version: '1' },
+      authority: { kind: 'builtin-rule' as const, ruleCode: 'outline-integrity.empty-section' },
+      repairTargets: [page.id]
+    };
+    const shard = {
+      ...buildFixturePageShard(page),
+      flags: [pageFlag],
+      structuralFindings: [pageStructuralFinding]
+    };
     const index: ManifestIndex = {
       schemaVersion: 1,
       docstubeVersion: '0.0.2',
@@ -63,11 +77,26 @@ describe('control plane router', () => {
       pages: [{ id: page.id, slug: page.slug, title: page.title, path: 'getting-started/installation.mdx' }],
       configHash: contentHash(configText),
       iaHash: contentHash(iaText),
+      structuralGroups: ['compute-resources'],
       systemFlags: [systemFlag]
     };
     const store = createManifestStore(repoRoot, 'latest');
-    await store.writeIndex(index);
     await store.writePageShard(shard);
+    await store.writeStructuralShard({
+      schemaVersion: 1,
+      groupId: 'compute-resources',
+      generatedAt: '2026-07-12T00:00:00.000Z',
+      pageIds: [page.id],
+      findings: [
+        buildFixtureStructuralFinding(['pg_00000000000000000009', page.id]),
+        {
+          ...buildFixtureStructuralFinding(['pg_00000000000000000009', page.id]),
+          key: 'resolved',
+          status: { state: 'resolved' }
+        }
+      ]
+    });
+    await store.writeIndex(index);
 
     runId = mintId(idPrefixes.run);
     const journal = await createRunJournal(repoRoot, runId);
@@ -133,6 +162,21 @@ describe('control plane router', () => {
     expect(systemEntry?.pageId).toBeUndefined();
   });
 
+  it('keeps structural findings out of the flag queue and on their own surface', async () => {
+    const entries = await caller.flags.list();
+    // The queue is unchanged by the structural work items written into the same shard.
+    expect(entries).toHaveLength(2);
+
+    const view = await caller.structural.list();
+    expect(view.summary).toBe('Structural quality: 2 open · nonblocking');
+    expect(view.open.map((entry) => entry.scope).toSorted()).toEqual(['nav-group', 'page']);
+    // A group finding badges the pages it actually names, so the NavTree can point at real work.
+    expect(view.openByPageId[page.id]).toBe(2);
+    expect(view.openByGroupId['compute-resources']).toBe(1);
+    // A resolved finding is committed history, not work.
+    expect(view.open.every((entry) => entry.finding.status.state === 'open')).toBe(true);
+  });
+
   it('returns the parsed config family without raw file contents', async () => {
     const family = await caller.config.family();
     expect(family.config.docType).toBe('external-library');
@@ -149,6 +193,10 @@ describe('control plane router on an empty repo', () => {
     expect(await caller.runs.events({ runId: 'run_00000000000000000000' })).toEqual([]);
     expect(await caller.manifest.index()).toBeNull();
     expect(await caller.flags.list()).toEqual([]);
+    expect(await caller.structural.list()).toMatchObject({
+      open: [],
+      summary: 'Structural quality: 0 open · nonblocking'
+    });
     await expect(caller.config.family()).rejects.toThrowError(TRPCError);
   });
 });
@@ -199,6 +247,7 @@ const setupWriteRepo = async (): Promise<WriteRepo> => {
     pages: [{ id: page.id, slug: page.slug, title: page.title, path: 'getting-started/installation.mdx' }],
     configHash: contentHash(annotatedConfigText),
     iaHash: contentHash('ia'),
+    structuralGroups: [],
     systemFlags: [systemFlag]
   });
   await store.writePageShard({ ...buildFixturePageShard(page), flags: [tribalFlag] });

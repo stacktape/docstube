@@ -162,8 +162,55 @@ export { translateArtifact, buildTranslatePageTask, alignTranslatedEntities } fr
 export type { TranslationOutcome } from './pipeline/translate-page.ts';
 export { runMaintain } from './pipeline/maintain.ts';
 export type { MaintainOptions, MaintainSummary } from './pipeline/maintain.ts';
-export { runRefine, rankPagesForRefinement } from './pipeline/refine.ts';
-export type { RefineOptions, RefineSummary, RefinedPage } from './pipeline/refine.ts';
+export { runRefine, rankPagesForRefinement, structuralRepairLoad } from './pipeline/refine.ts';
+export type { RefineOptions, RefineSummary, RefinedPage, StructuralRepairLoad } from './pipeline/refine.ts';
+export {
+  buildStructuralSnapshot,
+  iaGroups,
+  iaPageMembership,
+  normalizeFacet,
+  outlineHashOf,
+  sectionHasBody
+} from './structure/structural-snapshot.ts';
+export type { BuildStructuralSnapshotInput } from './structure/structural-snapshot.ts';
+export {
+  groupScopeFingerprint,
+  runExplicitConsistencyRules,
+  runOutlineIntegrityDetectors,
+  structuralDetectorVersion,
+  structuralFindingKey
+} from './structure/structure-detectors.ts';
+export {
+  facetPrevalenceThreshold,
+  maximumFacetLevel,
+  minimumCohortSize,
+  siblingFacetCandidates
+} from './structure/facet-matrix.ts';
+export type { FacetCandidate } from './structure/facet-matrix.ts';
+export {
+  assessmentsFromTranscript,
+  buildAssessGroupStructureTask,
+  buildSiblingAsymmetryFinding,
+  groupAssessmentCacheKey,
+  groupAssessmentResultSchema,
+  groupAssessorDetectorId,
+  groupAssessorPromptVersion,
+  structuralAssessmentOutcomes
+} from './structure/group-assessor.ts';
+export type { GroupAssessment, GroupAssessmentResult } from './structure/group-assessor.ts';
+export {
+  compareStructuralImpact,
+  isOpenStructuralFinding,
+  reconcileStructuralFindings
+} from './structure/structural-lifecycle.ts';
+export {
+  createMemoryAssessmentCache,
+  createStructuralAssessmentCache,
+  structureCacheDir
+} from './structure/assessment-cache.ts';
+export type { StructuralAssessmentCache } from './structure/assessment-cache.ts';
+export { runStructurePass, structuralSummaryLine } from './structure/structure-pass.ts';
+export type { StructurePassInput, StructurePassResult, StructurePassTaskRunner } from './structure/structure-pass.ts';
 export { runAudit, auditFallbackConfig } from './audit/run-audit.ts';
 export type { AuditReport, AuditDefect, RunAuditOptions } from './audit/run-audit.ts';
 export { createRunCostTracker, FREEZE_MARGIN_RATIO } from './pipeline/run-cost.ts';
@@ -226,6 +273,8 @@ export type {
   ControlPlaneContext,
   ControlPlaneRouter,
   FlagQueueEntry,
+  StructuralFindingEntry,
+  StructuralQualityView,
   RunListEntry,
   ControlPlaneInjection,
   RunMode

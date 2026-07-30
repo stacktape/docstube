@@ -2,8 +2,8 @@ import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promis
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import type { PageArtifact } from '@docstube/plugin-sdk';
-import type { Finding, ManifestIndex, PageShard } from '@docstube/contracts';
-import { findingSchema, hashValue, manifestIndexSchema } from '@docstube/contracts';
+import type { Finding, ManifestIndex, PageShard, StructuralGroupShard } from '@docstube/contracts';
+import { findingSchema, hashValue, manifestIndexSchema, structuralGroupIdSchema } from '@docstube/contracts';
 import { CoreError } from '../errors.ts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import type { ManifestStore } from '../state/manifest-store.ts';
@@ -72,6 +72,11 @@ export const stagedRunStateSchema = z.object({
   // them exactly as the staging writes did — never re-derive it from the index.
   version: z.string(),
   pages: z.array(stagedPageRecordSchema).default([]),
+  // Nav groups the structure pass staged a findings shard for. Group findings are part of the same
+  // publish unit as the pages they name — a PR that ships the page changes but not the structural
+  // work items they produced would advertise a state nothing recorded. The list doubles as the
+  // reconciliation set: a group NOT in it had its committed shard removed by this publish.
+  structuralGroupIds: z.array(structuralGroupIdSchema).default([]),
   // The index the publish replay commits LAST. Recorded only when phase flips to 'publishing', so
   // its presence is exactly "a publish was started and may not have finished".
   index: manifestIndexSchema.optional()
@@ -168,6 +173,10 @@ export type PublishStaging = {
   // Reads a resumable page's staged MDX bytes back.
   readStagedMdx: (record: StagedPageRecord) => Promise<string | undefined>;
   stagePage: (input: StagedArtifactInput) => Promise<void>;
+  // The structure pass's output, staged as one set: the shards it produced ARE the complete
+  // structural state for this plan, so the publish replay can both write them and prune the groups
+  // that are no longer there.
+  stageStructuralGroups: (shards: readonly StructuralGroupShard[]) => Promise<void>;
   records: () => StagedPageRecord[];
   // THE COMMIT POINT. Flips the staging area to 'publishing' (so an interruption is recoverable),
   // then replays the publish in the fixed order below and clears staging on success.
@@ -223,6 +232,24 @@ const replayPublish = async (input: {
       );
     }
     await input.store.writePageShard(shard);
+  }
+
+  // 2b. Structural group findings — the same publish unit, through the same store. Written before
+  // the index for the same reason the page shards are: everything the published state advertises
+  // must already exist. Groups the IA no longer has are reconciled away by the index write, which
+  // carries the authoritative `structuralGroups` list.
+  for (const groupId of state.structuralGroupIds) {
+    const groupShard = await stagingStore.readStructuralShard(groupId);
+    if (groupShard === undefined) {
+      throw new CoreError(
+        'state-corrupt',
+        `the staged run ${state.runId} lists structural group "${groupId}" but its staged shard is missing — ` +
+          'publishing would record structural state nothing wrote. Delete `.docstube/staging/` and re-run ' +
+          '`docstube generate`.',
+        { repoRoot, groupId }
+      );
+    }
+    await input.store.writeStructuralShard(groupShard);
   }
 
   // 3. Routes, twins, and the rest of the emitted site — rendered against the STAGED index (passed
@@ -305,6 +332,9 @@ export const openPublishStaging = async (input: {
   const records: StagedPageRecord[] = resumed === undefined ? [] : [...resumed.pages];
   const resumable = new Map(records.map((record) => [resumeKey(record), record]));
   const store = createManifestStore(repoRoot, input.version, { manifestDir: stagingManifestDir(repoRoot) });
+  // The structure pass runs once, at the end of the plan, so a resumed staging area's group shards
+  // are simply replaced by the fresh pass — never merged.
+  let structuralGroupIds: string[] = resumed?.structuralGroupIds ?? [];
 
   const persistState = async (state: Partial<StagedRunState> = {}): Promise<StagedRunState> => {
     const next = stagedRunStateSchema.parse({
@@ -314,6 +344,7 @@ export const openPublishStaging = async (input: {
       runId: input.runId,
       version: input.version,
       pages: records,
+      structuralGroupIds,
       ...state
     });
     await writeJsonAtomic(stagingStatePath(repoRoot), next);
@@ -361,6 +392,13 @@ export const openPublishStaging = async (input: {
       } else {
         records[index] = record;
       }
+      await persistState();
+    },
+    stageStructuralGroups: async (shards) => {
+      for (const shard of shards) {
+        await store.writeStructuralShard(shard);
+      }
+      structuralGroupIds = shards.map((shard) => shard.groupId).toSorted((left, right) => left.localeCompare(right));
       await persistState();
     },
     records: () => [...records],

@@ -364,15 +364,20 @@ export type {
 } from './knowledge-schema.ts';
 
 export {
+  structuralGroupIdSchema,
   structuralDetectorSchema,
   structuralScopeSchema,
+  structuralScopeKey,
   structuralAuthoritySchema,
   structuralFindingStatusSchema,
   structuralImpactSchema,
   structuralEvidenceItemSchema,
   structuralFindingSchema,
+  structuralOutlineEntrySchema,
   structuralSnapshotPageSchema,
-  structuralSnapshotSchema
+  structuralSnapshotSchema,
+  structuralGroupShardSchema,
+  structuralGroupShardRelativePath
 } from './structural-finding-schema.ts';
 export type {
   StructuralDetector,
@@ -380,8 +385,10 @@ export type {
   StructuralAuthority,
   StructuralFindingStatus,
   StructuralFinding,
+  StructuralOutlineEntry,
   StructuralSnapshotPage,
-  StructuralSnapshot
+  StructuralSnapshot,
+  StructuralGroupShard
 } from './structural-finding-schema.ts';
 
 export {

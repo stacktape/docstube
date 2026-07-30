@@ -506,6 +506,10 @@ export const runMaintain = async (options: MaintainOptions): Promise<MaintainSum
       configHash: hashValue(family.raw.config),
       iaHash: hashValue(family.raw.ia),
       ...(coverageStats === undefined ? {} : { coverage: coverageStats }),
+      // CARRIED FORWARD VERBATIM: maintain does not run the structure pass, so it has no basis for
+      // declaring which nav groups own findings. Rewriting this list from nothing would make the
+      // index write reconcile away every committed group shard.
+      structuralGroups: previousIndex.structuralGroups,
       systemFlags: [...carriedSystemFlags, ...newSystemFlags]
     };
     const { pruned } = await store.writeIndex(index);

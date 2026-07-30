@@ -9,7 +9,8 @@ import type {
   IaPageNodeV2,
   ManifestIndex,
   PageShard,
-  ProvenanceV2
+  ProvenanceV2,
+  StructuralGroupShard
 } from '@docstube/contracts';
 import { convertIaToV2, hashValue, idPrefixes, mintId, walkIaV2Nodes } from '@docstube/contracts';
 import { buildCodemap, buildFingerprintSnapshot } from '@docstube/codemap';
@@ -39,6 +40,10 @@ import {
   planFingerprint
 } from './publish-staging.ts';
 import type { SitePublisher } from './publish-staging.ts';
+import { resolveRoleRouting } from './agent-role-routing.ts';
+import { runStructurePass, structuralSummaryLine } from '../structure/structure-pass.ts';
+import type { StructurePassResult } from '../structure/structure-pass.ts';
+import { createStructuralAssessmentCache } from '../structure/assessment-cache.ts';
 import type { ToolDescriptor } from '@docstube/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -93,6 +98,16 @@ export type GenerateSummary = {
   resumedPages: number;
   // Latest subscription plan usage (0-100) reported by the transport this run, when available.
   planUsedPercent?: number;
+  // Structural quality (PRODUCT §4.1). Counts only — NONBLOCKING work items that never touch the
+  // run outcome, the flag queue, or the publication decision. Absent when the pass did not run
+  // (a frozen run publishes nothing, so there is no staged site to judge).
+  structural?: {
+    openPageFindings: number;
+    openGroupFindings: number;
+    pendingGroups: number;
+    assessmentsRequested: number;
+    assessmentsFromCache: number;
+  };
   // Present only under `ci: true` — everything the RUN knows about publishability. The decision
   // itself is minted after site emission, when the output inventory it binds to exists.
   publicationInputs?: PublicationDecisionInputs;
@@ -862,6 +877,75 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       durationMs: 0
     });
 
+    // THE STRUCTURE PASS (quality-ci-reader-v2 decisions 18/20/21). It runs HERE — over the staged
+    // canonical site, after every page landed and before anything publishes — because that is the
+    // only moment the whole shape of what the reader is about to get exists in one place. It is
+    // strictly non-blocking: it produces committed WORK ITEMS (page findings on page shards, group
+    // findings on per-group structural shards), never flags, never claims, never a gate input. A
+    // frozen run skips it: nothing is publishing, so judging the shape would only spend money on a
+    // site no reader will see.
+    let structural: StructurePassResult | undefined;
+    if (!frozen) {
+      const stagedShards: PageShard[] = [];
+      for (const artifact of artifacts) {
+        const staged = await staging.store.readPageShard({ locale, pageId: artifact.page.id });
+        if (staged !== undefined) {
+          stagedShards.push(staged);
+        }
+      }
+      const priorShards = new Map<string, PageShard>();
+      for (const entry of previousIndex?.pages ?? []) {
+        const shard = await store.readPageShard({ locale, pageId: entry.id });
+        if (shard !== undefined) {
+          priorShards.set(entry.id, shard);
+        }
+      }
+      const priorGroupShards: StructuralGroupShard[] = [];
+      for (const groupId of await store.listStructuralGroupIds()) {
+        const shard = await store.readStructuralShard(groupId);
+        if (shard !== undefined) {
+          priorGroupShards.push(shard);
+        }
+      }
+      const architectModel = resolveRoleRouting(config, 'architect').model;
+      structural = await runStructurePass({
+        tree: iaV2.tree,
+        stagedShards,
+        priorShards,
+        priorGroupShards,
+        runTask: options.runTask,
+        ...(architectModel === undefined ? {} : { model: architectModel }),
+        cache: createStructuralAssessmentCache(repoRoot),
+        journal,
+        costTracker
+      });
+      // Findings ride the STAGED shards: they publish with the pages they describe, in one commit.
+      for (const shard of stagedShards) {
+        const findings = structural.pageFindings.get(shard.page.id) ?? [];
+        if (findings.length > 0 || shard.structuralFindings.length > 0) {
+          await staging.store.writePageShard({ ...shard, structuralFindings: findings });
+        }
+      }
+      await staging.stageStructuralGroups(structural.groupShards);
+      await journal.append({
+        type: 'findings',
+        findings: [
+          {
+            source: 'verifier',
+            check: 'structural-quality',
+            // INFO, ALWAYS (decision 21): structural findings are nonblocking work items, so this
+            // must never reach the deterministic gate or the flag queue.
+            severity: 'info',
+            message: `${structuralSummaryLine(structural)}${
+              structural.pendingScopes.length === 0
+                ? ''
+                : ` · ${structural.pendingScopes.length} group(s) pending (not assessed this run)`
+            }`
+          }
+        ]
+      });
+    }
+
     // The index this run WOULD publish: exactly the pages the plan produced. It is built even for a
     // frozen run (the journal and the decision reason about the same object) but a frozen run never
     // reaches the publish step, so it never reaches disk. The old carry-forward-on-freeze logic is
@@ -884,6 +968,10 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       })),
       configHash: hashValue(family.raw.config),
       iaHash: hashValue(family.raw.ia),
+      // The groups whose structural shards this publish carries. A frozen run never reaches
+      // publish, so it never records groups it did not evaluate; a run whose structure pass ran
+      // states exactly the set it staged, which is what prunes shards for deleted nav groups.
+      structuralGroups: (structural?.groupShards ?? []).map((shard) => shard.groupId),
       systemFlags: []
     };
 
@@ -966,8 +1054,19 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       pages: outcomes,
       translations,
       siteFindings,
-      warnings: [...host.warnings(), ...knowledge.warnings],
+      warnings: [...host.warnings(), ...knowledge.warnings, ...(structural?.warnings ?? [])],
       openFlagKinds,
+      ...(structural === undefined
+        ? {}
+        : {
+            structural: {
+              openPageFindings: structural.openPageFindings,
+              openGroupFindings: structural.openGroupFindings,
+              pendingGroups: structural.pendingScopes.length,
+              assessmentsRequested: structural.assessmentsRequested,
+              assessmentsFromCache: structural.assessmentsFromCache
+            }
+          }),
       published,
       resumedPages,
       ...(publicationInputs === undefined ? {} : { publicationInputs }),

@@ -14,6 +14,7 @@ import {
   versionLabelSchema
 } from './primitives.ts';
 import { provenanceV2Schema } from './provenance-v2-schema.ts';
+import { structuralFindingSchema, structuralGroupIdSchema } from './structural-finding-schema.ts';
 
 // The committed manifest is the lockfile of the docs (PRODUCT §3.10): derived state committed for
 // determinism and branch-correctness. Sharded one-file-per-page-per-locale so parallel PRs never
@@ -57,6 +58,11 @@ export const manifestIndexSchema = z.object({
   iaHash: sha256HexSchema,
   // Doc-type-conditional (on for libraries/SDKs, off for apps/services).
   coverage: coverageStatsSchema.optional(),
+  // Nav groups that own a structural findings shard (`.docstube/manifest/structure/<id>.json`).
+  // The index is the authority for what exists — exactly as it is for pages — so any reader can
+  // enumerate group findings without listing a directory, and writing the index reconciles away
+  // the shards of groups the IA no longer has.
+  structuralGroups: z.array(structuralGroupIdSchema).default([]),
   // Cross-page and system-level flags; entity-scoped flags live in page shards.
   systemFlags: z.array(flagSchema).default([])
 });
@@ -191,10 +197,34 @@ export const pageShardSchema = z
     provenance: provenanceV2Schema.optional(),
     claimMatching: claimMatchingSchema.optional(),
     flags: z.array(flagSchema).default([]),
+    // COMMITTED STRUCTURAL WORK ITEMS (quality-ci-reader-v2 decisions 17/21) — page-scoped findings
+    // only; nav-group findings live in their own structural shard. These are NOT flags and NOT
+    // claims: they never block publication, never enter the flag queue, and never touch the
+    // correctness axis. They ride the page shard so they travel with the page in one commit.
+    structuralFindings: z.array(structuralFindingSchema).default([]),
     // Reserved for the signed-provenance contract (PRODUCT §4.2); unsigned in v1.
     signature: z.string().optional()
   })
   .superRefine((shard, ctx) => {
+    // A page shard carries THIS page's structural findings. A nav-group finding copied onto a page
+    // shard would be the same fact recorded in two places with no owner.
+    for (const finding of shard.structuralFindings) {
+      if (finding.scope.kind !== 'entity') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['structuralFindings'],
+          message: `structural finding "${finding.key}" is nav-group-scoped — group findings persist in the group's structural shard, never on a page shard`
+        });
+        continue;
+      }
+      if (finding.scope.pageId !== shard.page.id) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['structuralFindings'],
+          message: `structural finding "${finding.key}" is scoped to page "${finding.scope.pageId}", not this shard's "${shard.page.id}"`
+        });
+      }
+    }
     // Matching records make sense only relative to a committed ledger.
     if (shard.claimMatching !== undefined && shard.ledger === undefined) {
       ctx.addIssue({

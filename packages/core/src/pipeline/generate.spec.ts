@@ -1025,6 +1025,61 @@ describe('runGenerate', () => {
   }, 60_000);
 });
 
+// THE STRUCTURE PASS, END TO END (quality-ci-reader-v2 decisions 18/21). It runs over the STAGED
+// site before publish, and its output publishes with the pages — one commit, one state.
+describe('runGenerate structural quality', () => {
+  const groupedIaYaml = `schemaVersion: 1
+tree:
+  - title: Compute resources
+    slug: compute
+    children:
+      - title: Containers
+        slug: containers
+        brief: Long-running container workloads.
+`;
+
+  const emptySectionMdx = `---
+title: Containers
+description: Container workloads.
+---
+
+# Containers
+
+<Claim id="c1">The library exposes a single \`greet\` function.</Claim>
+
+## Pricing
+
+## Usage
+
+Containers are billed per second.
+`;
+
+  it('commits page findings on the page shard and lists the nav group on the index', async () => {
+    await writeFile(join(repoRoot, 'ia.yml'), groupedIaYaml);
+    const { runTask } = scriptedRunner([emptySectionMdx]);
+    const summary = await runGenerate({ repoRoot, runTask, toolDescriptors: [] });
+
+    // NONBLOCKING, ALWAYS: the run outcome and the flag queue are untouched by a structural finding.
+    expect(summary.outcome).toBe('passed');
+    expect(summary.published).toBe(true);
+    expect(summary.structural).toMatchObject({ openPageFindings: 1, openGroupFindings: 0 });
+
+    const store = createManifestStore(repoRoot, 'latest');
+    const index = await store.readIndex();
+    expect(index?.structuralGroups).toEqual(['compute']);
+    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
+    expect(shard?.structuralFindings.map((finding) => finding.code)).toEqual(['structure.empty-section']);
+    expect(shard?.structuralFindings[0]?.status).toEqual({ state: 'open' });
+    // A structural finding is never a flag.
+    expect(shard?.flags).toEqual([]);
+
+    const groupShard = await store.readStructuralShard('compute');
+    expect(groupShard?.pageIds).toEqual([shard?.page.id]);
+    // A cohort of one can never reach the candidate floor, so nothing was inferred.
+    expect(groupShard?.findings).toEqual([]);
+  }, 60_000);
+});
+
 describe('unwrapMdxFence', () => {
   it('unwraps a fenced writer response and leaves clean output alone', () => {
     expect(unwrapMdxFence('```mdx\n# Hi\n```')).toBe('# Hi');

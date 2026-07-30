@@ -14,6 +14,7 @@ import type {
   PageShard,
   PageStatus,
   RunEvent,
+  StructuralFinding,
   ToolDescriptor,
   Transcript
 } from '@docstube/contracts';
@@ -208,6 +209,82 @@ const listFlags = async (repoRoot: string): Promise<FlagQueueEntry[]> => {
   return flagEntries;
 };
 
+// STRUCTURAL QUALITY IS A SEPARATE SURFACE FROM THE FLAG QUEUE (quality-ci-reader-v2 decision 21).
+// It is deliberately NOT folded into `listFlags`: structural findings are nonblocking committed
+// work items, and putting them in the queue that gates human attention (and, historically, merges)
+// would make them read as blockers. The dashboard/NavTree render these counts; the review UI
+// anchors on `entityId` when a finding names a section.
+export type StructuralFindingEntry = {
+  finding: StructuralFinding;
+  scope: 'page' | 'nav-group';
+  pageId?: string;
+  pageTitle?: string;
+  groupId?: string;
+};
+
+export type StructuralQualityView = {
+  // Open findings only — resolved and suppressed records stay committed but are not work.
+  open: StructuralFindingEntry[];
+  openByPageId: Record<string, number>;
+  openByGroupId: Record<string, number>;
+  // The one sentence every surface renders. Always says nonblocking.
+  summary: string;
+};
+
+const listStructuralFindings = async (repoRoot: string): Promise<StructuralQualityView> => {
+  const empty: StructuralQualityView = {
+    open: [],
+    openByPageId: {},
+    openByGroupId: {},
+    summary: 'Structural quality: 0 open · nonblocking'
+  };
+  const index = await readManifestIndex(repoRoot);
+  if (index === undefined) {
+    return empty;
+  }
+  const store = createManifestStore(repoRoot, currentVersionOf(index));
+  const entries: StructuralFindingEntry[] = [];
+  // SOURCE LOCALE ONLY: renditions are structurally isomorphic to the canonical page and carry no
+  // findings of their own, so scanning every locale would only invite double counting.
+  for (const pageId of await store.listShardPageIds(index.sourceLocale)) {
+    const shard = await store.readPageShard({ locale: index.sourceLocale, pageId });
+    for (const finding of shard?.structuralFindings ?? []) {
+      if (finding.status.state === 'open') {
+        entries.push({ finding, scope: 'page', pageId, pageTitle: shard?.page.title ?? pageId });
+      }
+    }
+  }
+  for (const groupId of await store.listStructuralGroupIds()) {
+    const groupShard = await store.readStructuralShard(groupId);
+    for (const finding of groupShard?.findings ?? []) {
+      if (finding.status.state === 'open') {
+        entries.push({ finding, scope: 'nav-group', groupId });
+      }
+    }
+  }
+  const openByPageId: Record<string, number> = {};
+  const openByGroupId: Record<string, number> = {};
+  for (const entry of entries) {
+    if (entry.scope === 'nav-group' && entry.groupId !== undefined) {
+      openByGroupId[entry.groupId] = (openByGroupId[entry.groupId] ?? 0) + 1;
+    }
+    // A group finding also counts against each page it names, so the NavTree can badge the pages a
+    // reader would actually have to open — not just the section header.
+    const targets = entry.scope === 'page' ? [entry.pageId] : entry.finding.repairTargets;
+    for (const pageId of targets) {
+      if (pageId !== undefined) {
+        openByPageId[pageId] = (openByPageId[pageId] ?? 0) + 1;
+      }
+    }
+  }
+  return {
+    open: entries.toSorted((a, b) => (a.finding.key < b.finding.key ? -1 : a.finding.key > b.finding.key ? 1 : 0)),
+    openByPageId,
+    openByGroupId,
+    summary: `Structural quality: ${entries.length} open · nonblocking`
+  };
+};
+
 const fileExists = async (path: string): Promise<boolean> => {
   try {
     await stat(path);
@@ -351,6 +428,9 @@ export const controlPlaneRouter = t.router({
         const store = createManifestStore(ctx.repoRoot, currentVersionOf(index));
         return (await store.readPageShard(input)) ?? null;
       })
+  }),
+  structural: t.router({
+    list: t.procedure.query(({ ctx }) => listStructuralFindings(ctx.repoRoot))
   }),
   flags: t.router({
     list: t.procedure.query(({ ctx }) => listFlags(ctx.repoRoot)),

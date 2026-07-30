@@ -2,7 +2,7 @@ import { appendFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ManifestIndex, PageShard } from '@docstube/contracts';
+import type { ManifestIndex, PageShard, StructuralGroupShard } from '@docstube/contracts';
 import { buildFixturePage, buildFixturePageShard } from '@docstube/contracts';
 import { createManifestStore } from './manifest-store.ts';
 import { createRunJournal, summarizeRun } from './run-journal.ts';
@@ -31,11 +31,58 @@ const indexFor = (shards: PageShard[], overrides: Partial<ManifestIndex> = {}): 
   })),
   configHash: '0'.repeat(64),
   iaHash: '0'.repeat(64),
+  structuralGroups: [],
   systemFlags: [],
   ...overrides
 });
 
 const shardDir = (locale: string): string => join(repoRoot, '.docstube', 'manifest', 'pages', locale);
+
+const groupShardFor = (groupId: string, pageIds: string[]): StructuralGroupShard => ({
+  schemaVersion: 1,
+  groupId,
+  generatedAt: '2026-07-12T00:00:00.000Z',
+  pageIds,
+  findings: []
+});
+
+describe('structural group shards', () => {
+  it('round-trips a group shard with no locale dimension and lists it', async () => {
+    const store = createManifestStore(repoRoot, 'latest');
+    const shard = groupShardFor('compute-resources', ['pg_00000000000000000001']);
+    await store.writeStructuralShard(shard);
+    expect(await store.readStructuralShard('compute-resources')).toEqual(shard);
+    expect(await store.listStructuralGroupIds()).toEqual(['compute-resources']);
+    expect(await stat(join(repoRoot, '.docstube', 'manifest', 'structure', 'compute-resources.json'))).toBeTruthy();
+  });
+
+  it('reconciles away the shard of a group the index no longer declares', async () => {
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePageShard(buildFixturePage());
+    await store.writePageShard(page);
+    await store.writeStructuralShard(groupShardFor('compute-resources', [page.page.id]));
+    await store.writeStructuralShard(groupShardFor('networking', [page.page.id]));
+
+    const { pruned } = await store.writeIndex(indexFor([page], { structuralGroups: ['compute-resources'] }));
+    expect(pruned).toContain('structure/networking.json');
+    expect(await store.listStructuralGroupIds()).toEqual(['compute-resources']);
+  });
+
+  it('refuses an index that lists a group whose shard is missing', async () => {
+    const store = createManifestStore(repoRoot, 'latest');
+    const page = buildFixturePageShard(buildFixturePage());
+    await store.writePageShard(page);
+    // Written straight to disk so the index outruns the shard tree, the exact corruption the
+    // strict read exists to catch.
+    await mkdir(join(repoRoot, '.docstube', 'manifest'), { recursive: true });
+    await writeFile(
+      join(repoRoot, '.docstube', 'manifest', 'manifest.json'),
+      JSON.stringify(indexFor([page], { structuralGroups: ['compute-resources'] })),
+      'utf8'
+    );
+    await expect(store.readIndex()).rejects.toThrow(/structural findings shard is missing/u);
+  });
+});
 
 describe('manifest store', () => {
   it('round-trips page shards and lists them', async () => {

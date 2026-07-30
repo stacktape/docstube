@@ -22,6 +22,7 @@ const indexFor = (shards: PageShard[]) => ({
   })),
   configHash: '0'.repeat(64),
   iaHash: '0'.repeat(64),
+  structuralGroups: [],
   systemFlags: []
 });
 
@@ -51,6 +52,7 @@ describe('cutVersionSnapshot', () => {
       ],
       configHash: '0'.repeat(64),
       iaHash: '0'.repeat(64),
+      structuralGroups: [],
       systemFlags: []
     });
 
@@ -109,6 +111,7 @@ describe('cutVersionSnapshot', () => {
       pages: [],
       configHash: '0'.repeat(64),
       iaHash: '0'.repeat(64),
+      structuralGroups: [],
       systemFlags: []
     });
     await expect(cutVersionSnapshot({ repoRoot, label: 'latest', currentVersion: 'latest' })).rejects.toThrow(

@@ -52,6 +52,7 @@ beforeEach(async () => {
     pages: [{ id: page.id, slug: page.slug, title: page.title, path: `content/en/${page.slug}.mdx` }],
     configHash: '0'.repeat(64),
     iaHash: '0'.repeat(64),
+    structuralGroups: [],
     systemFlags: []
   });
 });

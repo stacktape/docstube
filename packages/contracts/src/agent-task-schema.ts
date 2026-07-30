@@ -17,6 +17,10 @@ export const knownAgentTaskKinds = [
   'categorize-feedback',
   'extract-theme-tokens',
   'audit-extract-claims',
+  // The structural group assessor (quality-ci-reader-v2 decision 20): given a sibling cohort and
+  // one shared facet, decide per missing page whether the facet is expected | not-applicable |
+  // uncertain. At most ONE call per changed group per run, cached on the cohort's structure.
+  'assess-group-structure',
   // Setup's tiny live transport check (PRODUCT §3.9.2 phase 2): proves the chosen provider can
   // actually authenticate and answer, so credential failures surface in setup instead of
   // forty minutes into a run. Never cached — a cache hit would prove nothing.
@@ -40,6 +44,9 @@ export const agentRoleByTaskKind: Record<KnownAgentTaskKind, AgentRole> = {
   'translate-page': 'translator',
   // Setup's IA proposal: structural, high-leverage, one call per project.
   'propose-ia': 'architect',
+  // Cross-page structural judgment is the same kind of work as proposing the IA — it reasons about
+  // the shape of the docs, not about any one page — so it rides the architect role.
+  'assess-group-structure': 'architect',
   // Cheap read-and-return-structured-data work: theme tokens, audit claim extraction, feedback
   // triage. Grouped so one override moves all of it onto an economy model.
   'categorize-feedback': 'extractor',

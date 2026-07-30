@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import type { IaPageNodeV2, PageShard, ToolDescriptor } from '@docstube/contracts';
+import type { IaPageNodeV2, PageShard, StructuralFinding, ToolDescriptor } from '@docstube/contracts';
 import { convertIaToV2, hashValue, idPrefixes, mintId, walkIaV2Nodes } from '@docstube/contracts';
 import { buildCodemap, buildFingerprintSnapshot } from '@docstube/codemap';
 import { loadConfigFamily } from '../config/config-io.ts';
@@ -53,6 +53,11 @@ export type RefinedPage = {
   checkedClaimsBefore: number;
   checkedClaimsAfter: number;
   attempts: number;
+  // Keys of the open structural findings that named this page as a repair target — why refine
+  // picked it. Empty when the page was selected on the older quality signals alone. The findings
+  // themselves are NOT resolved here: auto-resolve requires the structure pass to re-evaluate the
+  // scope (decision 17), which only `generate` does.
+  structuralFindingKeys: string[];
 };
 
 export type RefineSummary = {
@@ -79,15 +84,62 @@ const countClaims = (shard: PageShard): { total: number; checked: number } => {
   return { total: records.length, checked: records.filter((record) => record.correctness === 'checked').length };
 };
 
+// STRUCTURAL REPAIR TARGETS (quality-ci-reader-v2 decision 22). A group finding expands to its
+// MINIMAL targets — the pages the assessor judged 'expected' — and never to the whole cohort:
+// rerolling all eight siblings because three lack a section is precisely the waste the group
+// assessor exists to prevent. "Auto-repairable" means the finding names pages a regeneration could
+// plausibly fix; a finding with no repair targets is a work item for a human, not for refine.
+export type StructuralRepairLoad = {
+  // 0 = high, 1 = medium, 2 = low. The WORST open impact targeting this page.
+  worstImpact: number;
+  count: number;
+  findingKeys: string[];
+};
+
+const impactRank = { high: 0, medium: 1, low: 2 } as const;
+
+export const structuralRepairLoad = (findings: readonly StructuralFinding[]): Map<string, StructuralRepairLoad> => {
+  const load = new Map<string, StructuralRepairLoad>();
+  for (const finding of findings) {
+    if (finding.status.state !== 'open' || finding.repairTargets.length === 0) {
+      continue;
+    }
+    for (const pageId of finding.repairTargets) {
+      const current = load.get(pageId) ?? { worstImpact: Number.MAX_SAFE_INTEGER, count: 0, findingKeys: [] };
+      load.set(pageId, {
+        worstImpact: Math.min(current.worstImpact, impactRank[finding.impact]),
+        count: current.count + 1,
+        findingKeys: [...current.findingKeys, finding.key].toSorted()
+      });
+    }
+  }
+  return load;
+};
+
 type RankedPage = {
   slug: string;
   shard: PageShard;
   openFlags: number;
   checkedRatio: number;
+  // Undefined when no open auto-repairable structural finding names this page.
+  structural?: StructuralRepairLoad | undefined;
 };
 
 export const rankPagesForRefinement = (pages: RankedPage[]): RankedPage[] =>
   pages.toSorted((a, b) => {
+    // OPEN AUTO-REPAIRABLE STRUCTURAL FINDINGS RANK FIRST, impact-ordered (decision 22). They are
+    // the concrete, named, already-adjudicated work — a page with a high-impact structural target
+    // is a better use of a reroll than a page that merely looks stale.
+    const aImpact = a.structural?.worstImpact ?? Number.MAX_SAFE_INTEGER;
+    const bImpact = b.structural?.worstImpact ?? Number.MAX_SAFE_INTEGER;
+    if (aImpact !== bImpact) {
+      return aImpact - bImpact;
+    }
+    const aCount = a.structural?.count ?? 0;
+    const bCount = b.structural?.count ?? 0;
+    if (aCount !== bCount) {
+      return bCount - aCount;
+    }
     if (a.openFlags !== b.openFlags) {
       return b.openFlags - a.openFlags;
     }
@@ -170,17 +222,38 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
       runId: journal.runId
     });
 
+    // Structural work items the refine ranking consumes: page findings live on the page shards,
+    // group findings in the per-group structural shards. Both are read BEFORE ranking so a group
+    // finding can pull its named pages up the queue.
+    const structuralFindings: StructuralFinding[] = [];
+    for (const groupId of await store.listStructuralGroupIds()) {
+      const groupShard = await store.readStructuralShard(groupId);
+      structuralFindings.push(...(groupShard?.findings ?? []));
+    }
+
     // Rank every indexed page from committed state.
     const ranked: RankedPage[] = [];
+    const shardsById = new Map<string, PageShard>();
     for (const entry of index.pages) {
       const shard = await store.readPageShard({ locale, pageId: entry.id });
       if (shard === undefined) {
         continue;
       }
+      shardsById.set(entry.id, shard);
+      structuralFindings.push(...shard.structuralFindings);
+    }
+    const repairLoad = structuralRepairLoad(structuralFindings);
+    for (const entry of index.pages) {
+      const shard = shardsById.get(entry.id);
+      if (shard === undefined) {
+        continue;
+      }
+      const load = repairLoad.get(entry.id);
       const { total, checked } = countClaims(shard);
       ranked.push({
         slug: entry.slug,
         shard,
+        ...(load === undefined ? {} : { structural: load }),
         // Tribal questions are not a quality defect — rewriting the page will not answer them.
         openFlags: shard.flags.filter((flag) => flag.status === 'open' && flag.kind !== 'tribal-knowledge').length,
         // No claims ⇒ ratio 1: refine has no checking work to chase on that page.
@@ -280,7 +353,8 @@ export const runRefine = async (options: RefineOptions): Promise<RefineSummary> 
         status: outcome.status,
         checkedClaimsBefore: before.checked,
         checkedClaimsAfter: countClaims(shard).checked,
-        attempts: outcome.attempts
+        attempts: outcome.attempts,
+        structuralFindingKeys: candidate.structural?.findingKeys ?? []
       });
     }
 

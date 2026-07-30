@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { buildFixtureStructuralFinding } from './fixtures.ts';
+import { pageShardSchema } from './manifest-schema.ts';
 import {
   structuralAuthoritySchema,
   structuralDetectorSchema,
   structuralFindingSchema,
   structuralFindingStatusSchema,
+  structuralGroupShardRelativePath,
+  structuralGroupShardSchema,
+  structuralScopeKey,
   structuralScopeSchema,
   structuralSnapshotSchema
 } from './structural-finding-schema.ts';
+import { buildFixturePage, buildFixturePageShard } from './fixtures.ts';
 
 const fingerprint = 'a'.repeat(64);
 const pageId = 'pg_00000000000000000000';
@@ -166,5 +171,90 @@ describe('structural snapshot', () => {
 
   it('is versioned and rejects unversioned snapshots', () => {
     expect(structuralSnapshotSchema.safeParse({ generatedAt: '2026-07-12T00:00:00.000Z' }).success).toBe(false);
+  });
+});
+
+describe('outline-integrity authority', () => {
+  it('carries its own builtin-rule rung, deterministic only', () => {
+    expect(
+      structuralAuthoritySchema.safeParse({ kind: 'builtin-rule', ruleCode: 'outline-integrity.empty-section' }).success
+    ).toBe(true);
+    const base = buildFixtureStructuralFinding();
+    // The tool asserts the rule, so nothing is left for a model to judge.
+    expect(
+      structuralFindingSchema.safeParse({
+        ...base,
+        authority: { kind: 'builtin-rule', ruleCode: 'outline-integrity.empty-section' }
+      }).success
+    ).toBe(false);
+    expect(
+      structuralFindingSchema.safeParse({
+        ...base,
+        detector: { kind: 'deterministic', id: 'outline-integrity', version: '1' },
+        authority: { kind: 'builtin-rule', ruleCode: 'outline-integrity.empty-section' }
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('structural scope keys', () => {
+  it('keys a nav-group scope on the GROUP, never on the cohort membership it happened to carry', () => {
+    const other = 'pg_00000000000000000001';
+    expect(structuralScopeKey({ kind: 'nav-group', groupId: 'compute', pageIds: [pageId] })).toBe('nav-group:compute');
+    expect(structuralScopeKey({ kind: 'nav-group', groupId: 'compute', pageIds: [pageId, other] })).toBe(
+      'nav-group:compute'
+    );
+    expect(structuralScopeKey({ kind: 'entity', pageId })).toBe(`entity:${pageId}`);
+  });
+});
+
+describe('structural shard placement', () => {
+  it('keeps group findings out of page shards', () => {
+    const shard = buildFixturePageShard(buildFixturePage());
+    const groupFinding = buildFixtureStructuralFinding();
+    expect(pageShardSchema.safeParse({ ...shard, structuralFindings: [groupFinding] }).success).toBe(false);
+  });
+
+  it('rejects a page finding scoped to a different page', () => {
+    const page = buildFixturePage();
+    const shard = buildFixturePageShard(page);
+    const finding = {
+      ...buildFixtureStructuralFinding(),
+      detector: { kind: 'deterministic', id: 'outline-integrity', version: '1' },
+      authority: { kind: 'builtin-rule', ruleCode: 'outline-integrity.empty-section' },
+      scope: { kind: 'entity', pageId: 'pg_00000000000000000009' }
+    };
+    expect(pageShardSchema.safeParse({ ...shard, structuralFindings: [finding] }).success).toBe(false);
+    expect(
+      pageShardSchema.safeParse({
+        ...shard,
+        structuralFindings: [{ ...finding, scope: { kind: 'entity', pageId: page.id } }]
+      }).success
+    ).toBe(true);
+  });
+
+  it('keeps page findings out of group shards and rejects a foreign group', () => {
+    const finding = buildFixtureStructuralFinding();
+    expect(
+      structuralGroupShardSchema.safeParse({
+        schemaVersion: 1,
+        groupId: 'compute-resources',
+        generatedAt: '2026-07-12T00:00:00.000Z',
+        pageIds: finding.scope.kind === 'nav-group' ? finding.scope.pageIds : [],
+        findings: [finding]
+      }).success
+    ).toBe(true);
+    expect(
+      structuralGroupShardSchema.safeParse({
+        schemaVersion: 1,
+        groupId: 'networking',
+        generatedAt: '2026-07-12T00:00:00.000Z',
+        findings: [finding]
+      }).success
+    ).toBe(false);
+  });
+
+  it('addresses a group shard with no locale dimension — renditions inherit canonical structure', () => {
+    expect(structuralGroupShardRelativePath('compute-resources')).toBe('structure/compute-resources.json');
   });
 });

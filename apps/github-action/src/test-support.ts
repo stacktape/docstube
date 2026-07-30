@@ -4,7 +4,8 @@ import type {
   Flag,
   FlagKind,
   ManifestIndex,
-  PageShard
+  PageShard,
+  StructuralGroupShard
 } from '@docstube/contracts';
 import { ciPreflightReportSchema } from '@docstube/contracts';
 import {
@@ -64,6 +65,7 @@ export const buildFixtureFlag = (overrides: Partial<Flag> & { kind: FlagKind }):
 export const buildFixtureManifestIndex = (input: {
   shards: readonly PageShard[];
   systemFlags?: readonly Flag[];
+  structuralGroups?: readonly StructuralGroupShard[];
 }): ManifestIndex => ({
   schemaVersion: 1,
   docstubeVersion: '0.0.2',
@@ -78,6 +80,7 @@ export const buildFixtureManifestIndex = (input: {
   })),
   configHash: '0'.repeat(64),
   iaHash: '1'.repeat(64),
+  structuralGroups: (input.structuralGroups ?? []).map((group) => group.groupId),
   systemFlags: [...(input.systemFlags ?? [])]
 });
 
@@ -87,14 +90,24 @@ export const shardRelativePath = (shard: PageShard): string =>
 export const buildFixtureWorkspace = (input: {
   shards: readonly PageShard[];
   systemFlags?: readonly Flag[];
+  structuralGroups?: readonly StructuralGroupShard[];
 }): { files: Map<string, string>; readWorkspaceFile: WorkspaceFileReader } => {
   const files = new Map<string, string>();
   files.set(
     manifestIndexRelativePath,
-    canonicalStateJson(buildFixtureManifestIndex({ shards: input.shards, systemFlags: input.systemFlags }))
+    canonicalStateJson(
+      buildFixtureManifestIndex({
+        shards: input.shards,
+        systemFlags: input.systemFlags,
+        structuralGroups: input.structuralGroups
+      })
+    )
   );
   for (const shard of input.shards) {
     files.set(shardRelativePath(shard), canonicalStateJson(shard));
+  }
+  for (const group of input.structuralGroups ?? []) {
+    files.set(`.docstube/manifest/structure/${group.groupId}.json`, canonicalStateJson(group));
   }
   return { files, readWorkspaceFile: async (relativePath) => files.get(relativePath) };
 };

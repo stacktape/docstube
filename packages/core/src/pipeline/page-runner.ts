@@ -554,6 +554,13 @@ export const generatePage = async (
     ...(candidate.ledger === undefined || candidate.matching === undefined
       ? {}
       : { claimMatching: candidate.matching }),
+    // The STRUCTURE PASS owns these (quality-ci-reader-v2 decision 18): it runs once over the whole
+    // staged site, after every page has landed, because a page cannot see its own siblings. The
+    // per-page loop CARRIES THE PRIOR RECORDS FORWARD rather than shipping an empty list —
+    // auto-resolve is only allowed after the same scope is re-evaluated (decision 17), and
+    // regenerating a page is not re-evaluating its structure. `refine`, which never runs the pass,
+    // would otherwise silently clear every committed structural work item it touched.
+    structuralFindings: previousShard?.structuralFindings ?? [],
     flags: passed
       ? [...carriedFlags, ...questionFlags]
       : [

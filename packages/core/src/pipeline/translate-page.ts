@@ -428,6 +428,11 @@ export const translateArtifact = async (
       sourceCommit: ctx.commit,
       generatedAt: new Date().toISOString(),
       page: lastArtifact.page,
+      // ALWAYS EMPTY ON A RENDITION (quality-ci-reader-v2 decision 7): structure is assessed once,
+      // in the source locale, because a rendition is structurally isomorphic to the canonical page.
+      // Copying the source page's findings here would double every count and invite a translator
+      // to "fix" a structural defect that only the canonical page can own.
+      structuralFindings: [],
       // MDX↔shard binding for the translated artifact bytes (same rule as source shards) — minted
       // ONLY when the translation passed, because only then does the caller persist the locale
       // MDX. A failed translation writes no locale file, so its shard must stay HASHLESS: any
