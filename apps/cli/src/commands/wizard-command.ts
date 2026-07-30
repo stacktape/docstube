@@ -8,10 +8,13 @@ import {
   createTaskRunnerFromConfig,
   loadConfigFamily,
   loadConfiguredPlugins,
+  readSetupStatus,
   registerBuiltinPlugins,
   resolveCommit,
+  resolveSetupConfig,
   runGenerate,
   runRefine,
+  runTransportPreflight,
   startLocalServer
 } from '@docstube/core';
 import type { ControlPlaneInjection } from '@docstube/core';
@@ -19,16 +22,23 @@ import type { AgentTaskSpec, ManifestIndex, ToolDescriptor, Transcript } from '@
 import { idPrefixes, mintId } from '@docstube/contracts';
 import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
+import { openBrowser, shouldOpenBrowser } from '../open-browser.ts';
 import { pathExists } from '../workspace-paths.ts';
 
-// `docstube wizard` serves the local control plane (dashboard + flag queue now; the full setup
-// wizard UI lands next wave). In dev, scripts/dev.ts runs Vite and passes its URL via
-// DOCSTUBE_UI_DEV_SERVER_URL; in production the built UI is staged next to the CLI dist.
+// `docstube wizard` (and bare `docstube`) serves the local control plane: first-run setup,
+// generation dashboard, review UI, flag queue. In dev, scripts/dev.ts runs Vite and passes its URL
+// via DOCSTUBE_UI_DEV_SERVER_URL; in production the built UI is staged next to the CLI dist.
+//
+// Everything agent-backed resolves its config through resolveSetupConfig, NOT loadConfigFamily:
+// that is what lets the setup steps designed for first run actually work on first run, from the
+// onboarding draft, before docstube.yml exists.
 
 export type WizardCommandInput = {
   workspaceDir: string;
   uiDevServerUrl?: string | undefined;
   port?: number | undefined;
+  // undefined = decide from the environment (TTY + CI); false = never open.
+  open?: boolean | undefined;
   // Tests: return immediately instead of waiting for SIGINT.
   waitForShutdown?: boolean | undefined;
 };
@@ -77,23 +87,31 @@ export type WizardControlPlaneInput = {
 // Exported for the wizard spec: the control-plane wiring IS the behavior under test (launchRun →
 // pipeline → site emission), independent of the HTTP server around it.
 export const createWizardControlPlane = (input: WizardControlPlaneInput, output: CliOutput): ControlPlaneInjection => {
-  // Agent-backed mutations resolve config lazily: the wizard can start pre-scaffold and the
-  // runner only materializes when the UI first needs it.
+  // Agent-backed mutations resolve config lazily, and through resolveSetupConfig: during first-run
+  // setup there IS no docstube.yml, so the transport comes from the onboarding draft's agent
+  // settings. The runner only materializes when the UI first needs it.
   const lazyRunner = async () => {
     if (input.taskRunner !== undefined) {
       return input.taskRunner;
     }
-    const family = await loadConfigFamily(input.workspaceDir);
-    return createTaskRunnerFromConfig(family.config, input.workspaceDir);
+    const { config } = await resolveSetupConfig(input.workspaceDir);
+    return createTaskRunnerFromConfig(config, input.workspaceDir);
   };
   return {
     runTask: async (spec) => (await lazyRunner()).runTask(spec),
     toolDescriptors: standardToolDescriptors(),
+    // An injected task runner means no live call is ever made — the preflight rides the same seam.
+    preflight: (config) =>
+      runTransportPreflight({
+        repoRoot: input.workspaceDir,
+        config,
+        ...(input.taskRunner === undefined ? {} : { runTask: input.taskRunner.runTask })
+      }),
     codemapProvider: async () => {
-      const family = await loadConfigFamily(input.workspaceDir);
+      const { config } = await resolveSetupConfig(input.workspaceDir);
       const host = createPluginHost();
       await registerBuiltinPlugins(host);
-      await loadConfiguredPlugins(host, family.config, input.workspaceDir);
+      await loadConfiguredPlugins(host, config, input.workspaceDir);
       return buildCodemap({
         repoRoot: input.workspaceDir,
         commit: await resolveCommit(input.workspaceDir),
@@ -164,7 +182,28 @@ export const runWizardCommand = async (input: WizardCommandInput, output: CliOut
     ...(uiDistDir === undefined ? {} : { uiDistDir }),
     ...(input.uiDevServerUrl === undefined ? {} : { uiDevServerUrl: input.uiDevServerUrl })
   });
+  // Context-aware entry (PRODUCT §3.9.1): the surface the browser lands on is decided by whether a
+  // config exists — the same decision `setup.status` hands the UI, so the two can never disagree.
+  const status = await readSetupStatus(input.workspaceDir);
+  output.info(
+    status.initialSurface === 'setup'
+      ? 'No docstube.yml here yet — opening first-run setup.'
+      : 'docstube.yml found — opening the dashboard.'
+  );
   output.info(`docstube control plane running at:\n\n  ${server.url}\n`);
+
+  const decision = shouldOpenBrowser({
+    ...(input.open === undefined ? {} : { requested: input.open }),
+    isTty: process.stdout.isTTY === true
+  });
+  if (decision.open) {
+    const opened = await openBrowser(server.url);
+    if (!opened) {
+      output.info('Could not launch a browser automatically — open the URL above.');
+    }
+  } else {
+    output.info(`Not opening a browser (${decision.reason}) — open the URL above.`);
+  }
   output.info('Press Ctrl+C to stop.');
 
   if (input.waitForShutdown === false) {

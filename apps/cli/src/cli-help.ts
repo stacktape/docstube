@@ -1,5 +1,8 @@
 export const commandHelp = [
-  'Usage: docstube <command> [options]',
+  'Usage: docstube [command] [options]',
+  '',
+  'Run `docstube` with no command to open the local control plane: first-run setup when this',
+  'repository has no docstube.yml, the generation dashboard when it does.',
   '',
   'Commands:',
   '  wizard                 Open the local setup wizard and control plane.',
@@ -19,7 +22,8 @@ export const commandHelp = [
 ].join('\n');
 
 export const commandHelpByCommand: Record<string, string> = {
-  wizard: 'Usage: docstube wizard [--port <n>]\n\nOpen the local setup wizard and control plane.',
+  wizard:
+    'Usage: docstube wizard [--port <n>] [--no-open]\n       docstube            (same thing — bare docstube is the entry point)\n\nOpen the local control plane. With no docstube.yml it lands on first-run setup; with one it lands on the dashboard. Non-interactive shells print the URL instead of opening a browser; --no-open always does.',
   generate:
     'Usage: docstube generate [--max-attempts <n>]\n\nGenerate docs from existing config. Idempotent reconciler: the first run generates everything; later runs redo only affected work.',
   refine:

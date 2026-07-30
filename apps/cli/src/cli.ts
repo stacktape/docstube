@@ -3,6 +3,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineCommand, runMain } from 'citty';
+import { bareCommandAction } from './bare-command.ts';
 import { getCommandHelp } from './cli-help.ts';
 import { defaultOutput } from './cli-output.ts';
 import type { CliCommandResult } from './cli-output.ts';
@@ -77,25 +78,37 @@ const preview = defineCommand({
   }
 });
 
+// Shared by `docstube wizard` and bare `docstube` — one context-aware entry point (PRODUCT §3.9.1):
+// no config → first-run setup, config → dashboard, TTY-safe, `--no-open` always available.
+const controlPlaneArgs = {
+  port: { type: 'string', description: 'Port for the local control plane (default: random).' },
+  'no-open': { type: 'boolean', description: 'Print the URL instead of opening a browser.' }
+} as const;
+
+const runControlPlane = async (args: { port?: unknown; 'no-open'?: unknown }): Promise<CliCommandResult> => {
+  enableNodeCompileCache();
+  const port = typeof args.port === 'string' ? Number(args.port) : undefined;
+  if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
+    output.error(`Invalid --port value: ${String(args.port)}`);
+    return { exitCode: 1 };
+  }
+  const { runWizardCommand } = await import('./commands/wizard-command.ts');
+  return runWizardCommand(
+    {
+      workspaceDir: process.cwd(),
+      uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL,
+      port,
+      ...(args['no-open'] === true ? { open: false } : {})
+    },
+    output
+  );
+};
+
 const wizard = defineCommand({
   meta: { description: 'Open the local setup wizard and control plane.', name: 'wizard' },
-  args: {
-    port: { type: 'string', description: 'Port for the local control plane (default: random).' }
-  },
+  args: controlPlaneArgs,
   async run({ args }) {
-    await runCliCommand('wizard', async () => {
-      enableNodeCompileCache();
-      const port = typeof args.port === 'string' ? Number(args.port) : undefined;
-      if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65_535)) {
-        output.error(`Invalid --port value: ${args.port}`);
-        return { exitCode: 1 };
-      }
-      const { runWizardCommand } = await import('./commands/wizard-command.ts');
-      return runWizardCommand(
-        { workspaceDir: process.cwd(), uiDevServerUrl: process.env.DOCSTUBE_UI_DEV_SERVER_URL, port },
-        output
-      );
-    });
+    await runCliCommand('wizard', () => runControlPlane(args));
   }
 });
 
@@ -311,6 +324,7 @@ const main = defineCommand({
     name: 'docstube',
     version: docstubeVersion
   },
+  args: controlPlaneArgs,
   subCommands: {
     wizard,
     generate,
@@ -327,10 +341,15 @@ const main = defineCommand({
     version,
     help
   },
-  run: ({ rawArgs }) => {
-    if (rawArgs.length === 0) {
+  run: async ({ args }) => {
+    const action = bareCommandAction(Array.isArray(args._) ? (args._ as string[]) : []);
+    if (action !== 'control-plane') {
+      output.error(`Unknown command: ${action.unknown}`);
       printHelp();
+      process.exitCode = 1;
+      return;
     }
+    await runCliCommand('wizard', () => runControlPlane(args));
   }
 });
 
