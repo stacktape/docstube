@@ -21,6 +21,10 @@ export const knownAgentTaskKinds = [
   // one shared facet, decide per missing page whether the facet is expected | not-applicable |
   // uncertain. At most ONE call per changed group per run, cached on the cohort's structure.
   'assess-group-structure',
+  // The evidence-fed risk critic (harness-state-v2 decision 4): ONE call per page, fed the
+  // claim/evidence SUMMARY and never the raw repository, hunting what the ledger structurally
+  // cannot catch. Cached on the page's content + ledger state, so an unchanged page never re-bills.
+  'assess-page-risk',
   // Setup's tiny live transport check (PRODUCT §3.9.2 phase 2): proves the chosen provider can
   // actually authenticate and answer, so credential failures surface in setup instead of
   // forty minutes into a run. Never cached — a cache hit would prove nothing.
@@ -34,13 +38,19 @@ export type KnownAgentTaskKind = (typeof knownAgentTaskKinds)[number];
 // writer. The set is closed and derived from the task kinds that actually exist; a new kind must
 // join an existing role (or add one here) to be routable, so a role can never be configurable
 // without being read.
-export const agentRoleSchema = z.enum(['writer', 'reviewer', 'translator', 'architect', 'extractor']);
+// 'risk-critic' joins WITH the task that issues it (ARCHITECTURE §8.2: planned roles "join the enum
+// WITH the tasks that issue them, never before") — assess-page-risk exists now, so the role is no
+// longer a false affordance. It is deliberately NOT folded into 'reviewer': the two judge different
+// things (persona reviews are editorial, the critic is evidence-fed factual risk) and the critic is
+// one call on EVERY page, so it is exactly the kind of spend a project may want to move on its own.
+export const agentRoleSchema = z.enum(['writer', 'reviewer', 'risk-critic', 'translator', 'architect', 'extractor']);
 export type AgentRole = z.infer<typeof agentRoleSchema>;
 
 // Every known kind, exhaustively — the Record type makes an unrouted new kind a compile error.
 export const agentRoleByTaskKind: Record<KnownAgentTaskKind, AgentRole> = {
   'write-page': 'writer',
   'review-page': 'reviewer',
+  'assess-page-risk': 'risk-critic',
   'translate-page': 'translator',
   // Setup's IA proposal: structural, high-leverage, one call per project.
   'propose-ia': 'architect',

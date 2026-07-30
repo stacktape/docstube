@@ -50,6 +50,7 @@ export type AgentRoleConfig = z.infer<typeof agentRoleConfigSchema>;
 export const agentRolesConfigSchema = z.strictObject({
   writer: agentRoleConfigSchema.optional(),
   reviewer: agentRoleConfigSchema.optional(),
+  'risk-critic': agentRoleConfigSchema.optional(),
   translator: agentRoleConfigSchema.optional(),
   architect: agentRoleConfigSchema.optional(),
   extractor: agentRoleConfigSchema.optional()

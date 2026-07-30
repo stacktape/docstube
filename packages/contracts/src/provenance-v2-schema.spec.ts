@@ -80,7 +80,7 @@ describe('provenance v2 split', () => {
             criteria: [{ id: 'audience-fit', version: '2', outcome: 'met' }]
           }
         ],
-        riskCritic: { scoredBy: 'model-x', completion: 'completed', issues: [] },
+        riskCritic: { scoredBy: 'model-x', completion: 'completed', promptVersion: '1', findings: [] },
         translationFidelity: [
           {
             state: 'passed',

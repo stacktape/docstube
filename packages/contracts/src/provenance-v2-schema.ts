@@ -202,13 +202,83 @@ export const personaReviewSchema = z
   });
 export type PersonaReview = z.infer<typeof personaReviewSchema>;
 
-// One evidence-fed risk critic per page (harness-state-v2 decision 4): hunts misleading framing,
-// dangerous omissions, wrong emphasis — what the ledger structurally cannot catch.
-export const riskCriticResultSchema = z.object({
-  scoredBy: z.string().min(1),
-  completion: reviewCompletionSchema,
-  issues: z.array(z.object({ message: z.string().min(1), severity: severitySchema })).default([])
+// ONE EVIDENCE-FED RISK CRITIC PER PAGE (harness-state-v2 decision 4; PRODUCT §3.5 stage 6). It
+// receives the claim/evidence SUMMARY — never the raw repository — and hunts exactly what the
+// ledger structurally cannot catch. Three sources decide the kind list, and nothing beyond them:
+//
+//   misleading-framing / dangerous-omission / wrong-emphasis
+//     named verbatim by harness-state-v2 decision 4 and PRODUCT §3.5 stage 6. This is the residual
+//     factual risk that correctness left persona reviews to own.
+//   unmarked-assertion
+//     the SEMANTIC half of assertion coverage (PRODUCT §1.2, decision 5's linter-floor addendum):
+//     prose that asserts a checkable fact without tripping any deterministic signal ("the client
+//     gives up after a while"), or prose inside page-authored markup the linter cannot attribute.
+//     It COMPLEMENTS the deterministic floor and never replaces it — see the badge note below.
+//   duplicate-coverage / misplaced-example
+//     the within-page structural cases quality-ci-reader-v2 decision 18 deferred here on purpose:
+//     the deterministic detectors ship identical-heading duplication and empty sections only, so
+//     two differently-titled sections covering the same ground, and an example sitting under the
+//     wrong heading, are AI-adjudicated within-page work that rides this single critic.
+//
+// THE BADGE IS NOT WEAKENED AND NOT STRENGTHENED BY THESE. `complete` stays a deterministic
+// computation over the ledger and the coverage linter: an unmarked-assertion finding never
+// withholds the badge (a model's opinion must not be able to fail a correct page), and it never
+// grants it either (the linter's floor still forbids completeness on its own terms). The two are
+// REPORTED TOGETHER so a reader sees floor and semantic layer as one coverage picture.
+export const riskCriticFindingKindSchema = z.enum([
+  'misleading-framing',
+  'dangerous-omission',
+  'wrong-emphasis',
+  'unmarked-assertion',
+  'duplicate-coverage',
+  'misplaced-example'
+]);
+export type RiskCriticFindingKind = z.infer<typeof riskCriticFindingKindSchema>;
+
+// EVERY FINDING IS ANCHORED. A critic finding is a work item `refine` must be able to act on, so it
+// names the block whose prose carries the risk, or the ledger claim it is about. An unanchorable
+// observation ("the page feels thin") is dropped by the parser upstream rather than persisted as
+// unactionable editorial noise — the same fail-quiet direction as the group assessor's 'uncertain'.
+export const riskCriticAnchorSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('block'), blockId: blockIdSchema }),
+  z.strictObject({ kind: z.literal('claim'), claimId: claimIdSchema })
+]);
+export type RiskCriticAnchor = z.infer<typeof riskCriticAnchorSchema>;
+
+export const riskCriticFindingSchema = z.strictObject({
+  kind: riskCriticFindingKindSchema,
+  anchor: riskCriticAnchorSchema,
+  severity: severitySchema,
+  // What is wrong, in the reader's terms.
+  message: z.string().min(1),
+  // WHY it is wrong, grounded in the evidence summary the critic was given. A finding a human
+  // cannot check is a finding a human cannot act on.
+  rationale: z.string().min(1)
 });
+export type RiskCriticFinding = z.infer<typeof riskCriticFindingSchema>;
+
+export const riskCriticResultSchema = z
+  .object({
+    scoredBy: z.string().min(1),
+    completion: reviewCompletionSchema,
+    // Prompt revision this verdict was produced under, so a prompt change is visible in committed
+    // state and a stale cached verdict can never be mistaken for a current one.
+    promptVersion: z.string().min(1),
+    findings: z.array(riskCriticFindingSchema).default([])
+  })
+  .superRefine((record, ctx) => {
+    // NEVER A SILENT PASS, AND NEVER SILENT FINDINGS. A critic that did not complete has no
+    // verdict at all: a pending/failed record carrying findings would present unsourced editorial
+    // judgement as if a run had produced it. Zero findings on a COMPLETED critic is the good case
+    // — a clean page — so there is deliberately no inverse invariant here.
+    if (record.completion !== 'completed' && record.findings.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['findings'],
+        message: `a ${record.completion} risk critic must record no findings — it produced no verdict`
+      });
+    }
+  });
 export type RiskCriticResult = z.infer<typeof riskCriticResultSchema>;
 
 // One correction cycle is representable — exactly one (i18n-lifecycle-v2 decision 2): the failed
