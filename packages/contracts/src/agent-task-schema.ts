@@ -16,7 +16,11 @@ export const knownAgentTaskKinds = [
   'propose-ia',
   'categorize-feedback',
   'extract-theme-tokens',
-  'audit-extract-claims'
+  'audit-extract-claims',
+  // Setup's tiny live transport check (PRODUCT §3.9.2 phase 2): proves the chosen provider can
+  // actually authenticate and answer, so credential failures surface in setup instead of
+  // forty minutes into a run. Never cached — a cache hit would prove nothing.
+  'preflight'
 ] as const;
 
 // Serializable tool descriptor; handlers live in the runtime and are matched by name.

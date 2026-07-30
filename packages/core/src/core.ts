@@ -18,6 +18,28 @@ export {
 } from './config/config-io.ts';
 export type { ConfigFamily, YamlPath } from './config/config-io.ts';
 
+export {
+  clearOnboardingDraft,
+  draftIa,
+  draftSetupConfig,
+  emptyOnboardingDraft,
+  onboardingDraftPatchSchema,
+  onboardingDraftRelativePath,
+  onboardingDraftSchema,
+  readOnboardingDraft,
+  readSetupStatus,
+  resolveSetupConfig,
+  saveOnboardingDraft
+} from './config/onboarding-draft.ts';
+export type {
+  DraftAgentSettings,
+  OnboardingDraft,
+  OnboardingDraftPatch,
+  SetupConfigResolution,
+  SetupConfigSource,
+  SetupStatus
+} from './config/onboarding-draft.ts';
+
 export { createPluginHost } from './plugins/plugin-host.ts';
 export type { PluginHost, PluginSource, RegisteredPlugin } from './plugins/plugin-host.ts';
 export { registerBuiltinPlugins, loadConfiguredPlugins } from './plugins/load-plugins.ts';
@@ -25,6 +47,8 @@ export { registerBuiltinPlugins, loadConfiguredPlugins } from './plugins/load-pl
 export { detectProject } from './detect/detect-project.ts';
 export type { ProjectDetection } from './detect/detect-project.ts';
 export { suggestPersonas } from './detect/personas.ts';
+export { detectProviders, soleViableProvider } from './detect/detect-providers.ts';
+export type { ProviderCandidate } from './detect/detect-providers.ts';
 
 export { createBlockRegistry } from './entities/block-registry.ts';
 export { extractPageEntity, parseMdx, slugifyAnchor } from './entities/extract-entities.ts';
@@ -139,6 +163,8 @@ export {
   feedbackCategories
 } from './server/feedback.ts';
 export type { FeedbackCategory } from './server/feedback.ts';
+export { preflightSkipReason, preflightTaskSpec, runTransportPreflight } from './pipeline/preflight-transport.ts';
+export type { PreflightInput, PreflightResult } from './pipeline/preflight-transport.ts';
 export { createTransportFromConfig, createTaskRunnerFromConfig } from './pipeline/task-runner.ts';
 export type { ConfiguredTaskRunner } from './pipeline/task-runner.ts';
 

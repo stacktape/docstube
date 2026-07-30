@@ -37,6 +37,8 @@ Thumbs.db
 .docstube/runs/
 # Staged-atomic publish (pipeline-v2 decision 3): completed-but-unpublished work.
 .docstube/staging/
+# First-run setup's in-progress intent; committed config is the only shared truth.
+.docstube/onboarding-draft.json
 .docstube-build/
 
 BUSINESS.md

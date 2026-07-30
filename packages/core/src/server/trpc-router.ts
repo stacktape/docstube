@@ -1,11 +1,12 @@
 import type { Dirent } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { TRPCError, initTRPC } from '@trpc/server';
 import { z } from 'zod';
 import type {
   AgentTaskSpec,
   Codemap,
+  DocstubeConfig,
   DocstubeConfigInput,
   Flag,
   Ia,
@@ -17,6 +18,7 @@ import type {
   Transcript
 } from '@docstube/contracts';
 import {
+  docstubeConfigSchema,
   entityAddressSchema,
   flagIdSchema,
   iaSchema,
@@ -25,11 +27,21 @@ import {
   runEventSchema,
   versionLabelSchema
 } from '@docstube/contracts';
-import { loadConfigFamily } from '../config/config-io.ts';
+import { configFileNames, loadConfigFamily } from '../config/config-io.ts';
+import {
+  clearOnboardingDraft,
+  onboardingDraftPatchSchema,
+  readOnboardingDraft,
+  readSetupStatus,
+  resolveSetupConfig,
+  saveOnboardingDraft
+} from '../config/onboarding-draft.ts';
 import { scaffoldConfigFamily, updateConfigValues, writeIaFile } from '../config/write-config.ts';
 import { detectProject } from '../detect/detect-project.ts';
+import { detectProviders, soleViableProvider } from '../detect/detect-providers.ts';
 import { suggestPersonas } from '../detect/personas.ts';
 import { CoreError } from '../errors.ts';
+import type { PreflightResult } from '../pipeline/preflight-transport.ts';
 import { buildExtractThemeTokensTask, tokensFromTranscript } from '../pipeline/extract-theme-tokens.ts';
 import { buildProposeIaTask, proposalsFromTranscript } from '../pipeline/propose-ia.ts';
 import { applyFlagAnswers } from '../pipeline/tribal-knowledge.ts';
@@ -65,6 +77,9 @@ export type ControlPlaneInjection = {
   codemapProvider?: (() => Promise<Codemap>) | undefined;
   // Fire-and-forget run launcher: returns the run id immediately, the run continues in the host.
   launchRun?: ((mode: RunMode) => Promise<{ runId: string }>) | undefined;
+  // Tiny live transport check for setup. Injected by the host so tests and CI substitute it —
+  // the control plane itself never constructs a live transport.
+  preflight?: ((config: DocstubeConfig) => Promise<PreflightResult>) | undefined;
 };
 
 export type ControlPlaneContext = { repoRoot: string } & ControlPlaneInjection;
@@ -190,6 +205,23 @@ const listFlags = async (repoRoot: string): Promise<FlagQueueEntry[]> => {
   flagEntries.sort((a, b) => b.flag.createdAt.localeCompare(a.flag.createdAt));
   return flagEntries;
 };
+
+const fileExists = async (path: string): Promise<boolean> => {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Fallback comment-preserving diff when the caller sends no explicit update list: replace each
+// top-level key setup owns. The file header, hand comments on untouched keys, and unknown-to-setup
+// keys all survive, because the write still goes through the yaml Document API.
+const topLevelUpdates = (config: Record<string, unknown>): Array<{ path: string[]; value: unknown }> =>
+  Object.entries(config)
+    .filter(([key]) => key !== 'schemaVersion')
+    .map(([key, value]) => ({ path: [key], value }));
 
 const notConfigured = (capability: string): TRPCError =>
   new TRPCError({
@@ -404,16 +436,47 @@ export const controlPlaneRouter = t.router({
       .mutation(({ ctx, input }) => mapCoreError(() => writeIaFile(ctx.repoRoot, input.ia))),
     // The three wizard IA proposals (task-oriented / by-module / user-journey). Needs the injected
     // task runner + codemap provider; detection is deterministic and always available.
+    // resolveSetupConfig — NOT loadConfigFamily — is what lets this run during first-run setup:
+    // the prompt context comes from the onboarding draft when no docstube.yml exists yet.
     propose: t.procedure.mutation(async ({ ctx }) => {
       const runTask = requireRunTask(ctx);
       const codemap = await requireCodemap(ctx);
-      const family = await mapCoreError(() => loadConfigFamily(ctx.repoRoot));
+      const { config } = await mapCoreError(() => resolveSetupConfig(ctx.repoRoot));
       const detection = await detectProject(ctx.repoRoot);
-      const transcript = await runTask(buildProposeIaTask({ codemap, config: family.config, detection }));
+      const transcript = await runTask(buildProposeIaTask({ codemap, config, detection }));
       return proposalsFromTranscript(transcript);
     })
   }),
   setup: t.router({
+    // Entry decision (PRODUCT §3.9.1): the UI asks which surface to open on instead of guessing.
+    status: t.procedure.query(({ ctx }) => readSetupStatus(ctx.repoRoot)),
+    // The onboarding draft: machine-local, autosaved, and never mistaken for committed state.
+    draft: t.procedure.query(async ({ ctx }) => (await readOnboardingDraft(ctx.repoRoot)) ?? null),
+    saveDraft: t.procedure
+      .input(z.object({ patch: onboardingDraftPatchSchema }))
+      .mutation(({ ctx, input }) => saveOnboardingDraft(ctx.repoRoot, input.patch)),
+    discardDraft: t.procedure.mutation(async ({ ctx }) => {
+      await clearOnboardingDraft(ctx.repoRoot);
+      return { cleared: true };
+    }),
+    // Deterministic: installed CLIs + credential env-var names. Never reads a credential value.
+    providers: t.procedure.query(async () => {
+      const candidates = await detectProviders();
+      return { candidates, preselected: soleViableProvider(candidates)?.transport ?? null };
+    }),
+    // Live check against the drafted provider. The control plane never builds a transport itself —
+    // the host injects the runner, so no test or CI path can make this call.
+    preflight: t.procedure.mutation(async ({ ctx }) => {
+      if (ctx.preflight === undefined) {
+        throw notConfigured('preflighting the agent transport');
+      }
+      const { config } = await mapCoreError(() => resolveSetupConfig(ctx.repoRoot));
+      const result = await ctx.preflight(config);
+      await saveOnboardingDraft(ctx.repoRoot, {
+        preflight: { ok: result.ok, detail: result.detail, at: new Date().toISOString() }
+      });
+      return result;
+    }),
     // First-run scaffold; validates both files and refuses to overwrite existing ones.
     scaffold: t.procedure
       .input(z.object({ config: z.record(z.string(), z.unknown()), ia: z.record(z.string(), z.unknown()) }))
@@ -424,7 +487,79 @@ export const controlPlaneRouter = t.router({
             ia: input.ia as unknown as Ia
           })
         )
+      ),
+    // THE ONE ATOMIC FINAL ACTION (PRODUCT §3.9.2 phase 4): preflight → write docstube.yml + ia.yml
+    // → run generation. Generation owns its own publish (staged-atomic publish), so there is no
+    // separate emit step here — a second publish path is exactly what that work removed.
+    commit: t.procedure
+      .input(
+        z.object({
+          config: z.record(z.string(), z.unknown()),
+          ia: z.record(z.string(), z.unknown()),
+          // Comment-preserving diff, used when docstube.yml already exists. Omitted on first run.
+          updates: z
+            .array(z.object({ path: z.array(z.union([z.string(), z.number()])).min(1), value: z.unknown() }))
+            .optional(),
+          skipPreflight: z.boolean().optional(),
+          startRun: z.boolean().optional()
+        })
       )
+      .mutation(async ({ ctx, input }) => {
+        const parsed = docstubeConfigSchema.safeParse(input.config);
+        if (!parsed.success) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `refusing to commit an invalid ${configFileNames.config}:\n  ${parsed.error.issues
+              .map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`)
+              .join('\n  ')}`
+          });
+        }
+
+        let preflight: PreflightResult | undefined;
+        if (input.skipPreflight !== true && ctx.preflight !== undefined) {
+          preflight = await ctx.preflight(parsed.data);
+          if (!preflight.ok) {
+            // Fail BEFORE writing: a credential that cannot answer must not leave a half-set-up repo.
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: `agent preflight failed (${preflight.transport}): ${preflight.detail}`
+            });
+          }
+        }
+
+        const configExists = await fileExists(join(ctx.repoRoot, configFileNames.config));
+        const result = await mapCoreError(async () => {
+          if (!configExists) {
+            return scaffoldConfigFamily(ctx.repoRoot, {
+              config: input.config as DocstubeConfigInput,
+              ia: input.ia as unknown as Ia
+            });
+          }
+          // Existing docstube.yml is user-owned: only the comment-preserving Document API touches it.
+          const updates = input.updates ?? topLevelUpdates(input.config);
+          if (updates.length > 0) {
+            await updateConfigValues(ctx.repoRoot, updates);
+          }
+          await writeIaFile(ctx.repoRoot, input.ia as unknown as Ia);
+          return {
+            configPath: join(ctx.repoRoot, configFileNames.config),
+            iaPath: join(ctx.repoRoot, configFileNames.ia)
+          };
+        });
+
+        // Setup is over: the intent now lives in the committed files, so the draft must not linger
+        // and shadow them on the next open.
+        await clearOnboardingDraft(ctx.repoRoot);
+
+        let runId: string | undefined;
+        if (input.startRun !== false) {
+          if (ctx.launchRun === undefined) {
+            throw notConfigured('starting runs');
+          }
+          runId = (await ctx.launchRun('generate')).runId;
+        }
+        return { ...result, runId: runId ?? null, preflight: preflight ?? null };
+      })
   }),
   detect: t.router({
     // Deterministic pre-fill for wizard steps 1-3 (never agent-based; ambiguous fields stay
