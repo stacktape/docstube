@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createManifestStore } from '@docstube/core';
@@ -99,10 +99,13 @@ describe('createWizardControlPlane', () => {
     const { runId } = await (controlPlane.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
     expect(runId).toMatch(/^run_/);
 
-    // launchRun is fire-and-forget (the dashboard follows the journal): wait for the emitted
-    // route the shared assemble step writes.
+    // launchRun is fire-and-forget (the dashboard follows the journal), so wait for THE RUN — not
+    // for a file it writes on the way. The publish replay emits routes BEFORE it commits the index
+    // (publish-staging.ts), so polling for the route can win the race against the index write.
+    await controlPlane.runsSettled();
+
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
-    const route = await vi.waitFor(() => readFile(routePath, 'utf8'), { timeout: 90_000, interval: 500 });
+    const route = await readFile(routePath, 'utf8');
 
     // Rendered counts agree with the shard's trust spine — the exact drift the fix closes.
     const store = createManifestStore(repoRoot, 'latest');
@@ -131,8 +134,10 @@ describe('createWizardControlPlane', () => {
       output
     );
     await (first.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
+    // Run 1 must be fully settled before run 2 starts: two overlapping generates would share one
+    // `.docstube/staging/` area, and the byte-comparison below would be against a mid-publish tree.
+    await first.runsSettled();
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
-    await vi.waitFor(() => readFile(routePath, 'utf8'), { timeout: 90_000, interval: 500 });
     const publishedRoute = await readFile(routePath, 'utf8');
 
     // Run 2: a SECOND page joins the IA, the writer produces an UPDATED first page (two claims),
@@ -168,16 +173,10 @@ describe('createWizardControlPlane', () => {
       output
     );
     await (second.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
+    await second.runsSettled();
 
-    // Once the error line appears the run is over; nothing it produced reached the published tree.
-    await vi.waitFor(
-      () => {
-        if (!lines.some((line) => line.includes('background generate run failed'))) {
-          throw new Error('run not failed yet');
-        }
-      },
-      { timeout: 90_000, interval: 500 }
-    );
+    // The run is over and it reported its failure through the same output channel the UI reads.
+    expect(lines.some((line) => line.includes('background generate run failed'))).toBe(true);
     expect(lines.some((line) => line.includes('writer transport exploded'))).toBe(true);
 
     // The route is byte-identical to run 1's publish, and the committed shard still carries the

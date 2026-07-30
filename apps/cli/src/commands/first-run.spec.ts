@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
 import { createControlPlaneCaller, createManifestStore, readOnboardingDraft } from '@docstube/core';
@@ -116,10 +116,16 @@ describe('first run through the control plane', () => {
     expect(await readFile(join(repoRoot, 'docstube.yml'), 'utf8')).toContain('docType: external-library');
     expect(await readFile(join(repoRoot, 'ia.yml'), 'utf8')).toContain('getting-started');
 
+    // commit launches the run fire-and-forget (the UI follows the journal), so the assertions below
+    // wait for THE RUN. Not for one of its output files: the publish replay writes the manifest
+    // index last, strictly after the routes, so "poll until the route exists" can observe a
+    // half-replayed publish with no index at all.
+    await controlPlane.runsSettled();
+
     // Generation owns its own publish (staged-atomic publish): the route appears without any
     // separate emit step, which is what the wizard used to be missing.
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
-    const route = await vi.waitFor(() => readFile(routePath, 'utf8'), { timeout: 90_000, interval: 500 });
+    const route = await readFile(routePath, 'utf8');
 
     const store = createManifestStore(repoRoot, 'latest');
     const index = await store.readIndex();

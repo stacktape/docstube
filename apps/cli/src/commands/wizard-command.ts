@@ -84,9 +84,25 @@ export type WizardControlPlaneInput = {
   taskRunner?: { runTask: (spec: AgentTaskSpec) => Promise<Transcript>; toolDescriptors: ToolDescriptor[] } | undefined;
 };
 
+export type WizardControlPlane = ControlPlaneInjection & {
+  // Resolves once every run `launchRun` started has finished — the pipeline, its publish step, and
+  // (for refine) the site emission after it. Production never awaits this: `launchRun` is
+  // fire-and-forget because the dashboard follows the run journal, which is the point of returning a
+  // run id instead of a promise.
+  //
+  // Tests await it, and must. The only honest completion signal for a run is the run itself: the
+  // staged-atomic publish writes the manifest index LAST, strictly after the routes it advertises
+  // (publish-staging.ts §THE GUARANTEE), so waiting for an emitted route to appear and then reading
+  // the index is a race the poller sometimes wins — it can observe the published tree mid-replay,
+  // before the index exists at all.
+  runsSettled: () => Promise<void>;
+};
+
 // Exported for the wizard spec: the control-plane wiring IS the behavior under test (launchRun →
 // pipeline → site emission), independent of the HTTP server around it.
-export const createWizardControlPlane = (input: WizardControlPlaneInput, output: CliOutput): ControlPlaneInjection => {
+export const createWizardControlPlane = (input: WizardControlPlaneInput, output: CliOutput): WizardControlPlane => {
+  // Every launched run's settlement (these never reject — failures are reported through `output`).
+  const inFlight = new Set<Promise<void>>();
   // Agent-backed mutations resolve config lazily, and through resolveSetupConfig: during first-run
   // setup there IS no docstube.yml, so the transport comes from the onboarding draft's agent
   // settings. The runner only materializes when the UI first needs it.
@@ -142,7 +158,7 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
             })
           : runRefine(common);
       // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
-      void (async () => {
+      const settled = (async () => {
         let runError: unknown;
         try {
           await run;
@@ -160,7 +176,16 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
           output.error(`background ${mode} run failed: ${(runError as Error).message}`);
         }
       })();
+      inFlight.add(settled);
+      void settled.then(() => inFlight.delete(settled));
       return { runId };
+    },
+    // Loops rather than awaiting once: a run launched WHILE we are waiting must also be waited for,
+    // otherwise this reports settled while work is still landing on disk.
+    runsSettled: async () => {
+      while (inFlight.size > 0) {
+        await Promise.all(inFlight);
+      }
     }
   };
 };
