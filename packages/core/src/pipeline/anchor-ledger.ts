@@ -355,7 +355,7 @@ const resolveCitedValueFromClaimText = (
     return undefined;
   }
   const candidates = index.get(assertion.subject) ?? [];
-  const distinct = [...new Map(candidates.map((entry) => [`${entry.symbolHash} ${entry.valueName}`, entry]))];
+  const distinct = [...new Map(candidates.map((entry) => [`${entry.symbolHash}\u0000${entry.valueName}`, entry]))];
   if (distinct.length !== 1) {
     // Unknown path, or the same rendered path under two symbols — never guess which one the
     // sentence meant; the whole-file fallback stays.
