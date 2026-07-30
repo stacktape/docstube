@@ -17,11 +17,16 @@ site that you own. Fully autonomous within a declared domain: flagged, never sil
 The repository is mid-way through the v1 rewrite described in [PRODUCT.md](PRODUCT.md) and
 [ARCHITECTURE.md](ARCHITECTURE.md) (branch `rewrite-for-v1`):
 
-- Working today: `generate` (codemap → write → per-persona review → deterministic verify → gate →
-  manifest → site), `check` (kinds derive from registered verifier plugins), `status`, `doctor`,
-  `validate`, `upgrade`, verified translations for declared locales, and version snapshot cutting.
-- Being rebuilt on the new entity-model pipeline: `wizard`, `refine`, `audit`,
-  `plugin`, and the local web UI. These commands fail with an honest message until they land.
+- Working today: `generate` (codemap → write → claim ledger → deterministic verify → primary-persona
+  review → risk critic → structural pass → staged-atomic publish), plus `wizard`, `refine`,
+  `preview`, `audit`, `answer`, `check` (kinds derive from registered verifier plugins), `status`,
+  `doctor` (`--ci` preflights CI auth and permissions before any model spend), `validate`,
+  `plugin`, `upgrade`, the local web UI, and verified translations for declared locales.
+  Running `docstube` with no command opens first-run setup, or the dashboard once configured.
+- Still landing before 0.1.0: the auto-answer researcher and GitHub `/answer` ingestion, `refine`'s
+  strictly-better acceptance gate, the reader-facing navigation tree and `/verification` report, the
+  coverage ratchet, and the generated support matrix. Version snapshot cutting is cut from 0.1.0 and
+  ships whole in v1.x.
 - The plugin API ships as `@docstube/plugin-sdk` (experimental until 1.0): verifiers, language
   packs, content sources, importers, deploy targets, search providers, and MDX components are all
   plugins — including the built-in ones.
