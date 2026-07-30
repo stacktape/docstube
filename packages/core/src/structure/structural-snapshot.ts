@@ -28,7 +28,7 @@ export const normalizeFacet = (title: string): string =>
   title
     .toLowerCase()
     .normalize('NFKD')
-    .replaceAll(/[̀-ͯ]/gu, '')
+    .replaceAll(/[\u0300-\u036f]/gu, '')
     .replaceAll(/[^a-z0-9]+/gu, '-')
     .replace(/^-+|-+$/gu, '');
 
