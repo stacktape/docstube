@@ -1,4 +1,12 @@
-import { CoreError, createTaskRunnerFromConfig, loadConfigFamily, runGenerate } from '@docstube/core';
+import {
+  CoreError,
+  createTaskRunnerFromConfig,
+  emitPublicationDecision,
+  failedPublicationInputs,
+  loadConfigFamily,
+  resolveCommit,
+  runGenerate
+} from '@docstube/core';
 import type { GenerateSummary, TaskRunner } from '@docstube/core';
 import type { ToolDescriptor } from '@docstube/contracts';
 import { emitPersistedSite } from './emit-current-site.ts';
@@ -9,6 +17,9 @@ import { reportRunSpend } from './run-spend.ts';
 export type GenerateCommandInput = {
   workspaceDir: string;
   maxAttempts?: number | undefined;
+  // `--ci`: emit the fail-closed PublicationDecision + output inventory the GitHub Action enforces
+  // (PRODUCT §3.3). Off by default — a local run has no merge to gate.
+  ci?: boolean | undefined;
   // Tests: a scripted task runner instead of the configured transport (CI never calls live agents).
   taskRunner?: { runTask: TaskRunner; toolDescriptors: ToolDescriptor[] } | undefined;
 };
@@ -32,7 +43,8 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
         repoRoot: input.workspaceDir,
         runTask: runner.runTask,
         toolDescriptors: runner.toolDescriptors,
-        maxAttemptsPerPage: input.maxAttempts
+        maxAttemptsPerPage: input.maxAttempts,
+        ci: input.ci
       });
     } catch (runError) {
       // EMISSION AFTER PARTIAL FAILURE (wave 2b close): the pipeline can throw AFTER pages were
@@ -48,6 +60,22 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
         }
       } catch (emitError) {
         output.error(`site emission after the failed run also failed: ${(emitError as Error).message}`);
+      }
+      // A CRASHED RUN STILL OWES CI A DECISION: without one the Action cannot distinguish a run
+      // that died from a CLI that never emits decisions, and both fail closed — but only the
+      // recorded decision puts `execution: failed` on the PR instead of a silent withheld merge.
+      if (input.ci === true) {
+        try {
+          await emitPublicationDecision({
+            repoRoot: input.workspaceDir,
+            outDir: family.config.outDir,
+            inputs: failedPublicationInputs({ commit: await resolveCommit(input.workspaceDir) })
+          });
+        } catch (decisionError) {
+          output.error(
+            `could not record the publication decision for the failed run: ${(decisionError as Error).message}`
+          );
+        }
       }
       throw runError;
     }
@@ -70,6 +98,25 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
       return { exitCode: 1 };
     }
     output.info(`site emitted to ${family.config.outDir}/ — build it with: npm install && npm run build`);
+
+    // The decision is minted AFTER emission: the output inventory it binds to must describe the
+    // tree the Action is about to stage, site files included.
+    if (input.ci === true) {
+      if (summary.publicationInputs === undefined) {
+        output.error('run finished without publication inputs — refusing to emit a decision that proves nothing');
+        return { exitCode: 1 };
+      }
+      const { decision } = await emitPublicationDecision({
+        repoRoot: input.workspaceDir,
+        outDir: family.config.outDir,
+        inputs: summary.publicationInputs
+      });
+      output.info(
+        `publication decision: ${decision.execution} · ${decision.plan.completed}/${decision.plan.planned} page(s) · ` +
+          `gate ${decision.deterministicGate} · publishable ${decision.publishable} · auto-merge ${decision.autoMergeEligible}` +
+          (decision.reasonCodes.length > 0 ? ` (${decision.reasonCodes.join(', ')})` : '')
+      );
+    }
 
     if (summary.outcome === 'flagged') {
       output.info('run finished with open flags — review them with `docstube status`');

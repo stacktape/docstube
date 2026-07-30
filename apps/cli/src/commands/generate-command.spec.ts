@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
+import { outputInventorySchema, publicationDecisionSchema } from '@docstube/contracts';
+import { inventoryBindingHash, outputInventoryRelativePath, publicationDecisionRelativePath } from '@docstube/core';
 import { runGenerateCommand } from './generate-command.ts';
 import type { CliOutput } from '../cli-output.ts';
 
@@ -43,7 +45,7 @@ const ledgerFor = (source: string): WriterClaimLedger => ({
   }))
 });
 
-const scriptedRunTask = (pageMdx: string, writer: 'pass' | 'throw-on-second-page') => {
+const scriptedRunTask = (pageMdx: string, writer: 'pass' | 'throw-on-first-page' | 'throw-on-second-page') => {
   let writePageCalls = 0;
   return async (spec: AgentTaskSpec): Promise<Transcript> => {
     const base = {
@@ -75,7 +77,7 @@ const scriptedRunTask = (pageMdx: string, writer: 'pass' | 'throw-on-second-page
       };
     }
     writePageCalls += 1;
-    if (writer === 'throw-on-second-page' && writePageCalls > 1) {
+    if (writer === 'throw-on-first-page' || (writer === 'throw-on-second-page' && writePageCalls > 1)) {
       throw new Error('writer transport exploded');
     }
     return { ...base, result: { type: 'mdx-ledger', mdx: pageMdx, ledger: ledgerFor(pageMdx) } };
@@ -141,5 +143,61 @@ describe('runGenerateCommand', () => {
     const route = await readFile(routePath, 'utf8');
     expect(route).toContain('docstubeClaimsTotal: 2');
     expect(route).toContain('`greet` returns a string.');
+  }, 180_000);
+
+  // PRODUCT §3.3: `--ci` is what makes a run accountable to the merge gate. The artifacts land
+  // under `.docstube/runs/` (machine-local, never committed) and bind to the emitted tree.
+  it('--ci emits a publication decision bound to the output inventory, and fails closed on an untrustworthy tree', async () => {
+    const lines: string[] = [];
+    const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
+
+    const result = await runGenerateCommand(
+      { workspaceDir: repoRoot, ci: true, taskRunner: { runTask: scriptedRunTask(mdx, 'pass'), toolDescriptors: [] } },
+      output
+    );
+    expect(result.exitCode).toBe(0);
+
+    const decision = publicationDecisionSchema.parse(
+      JSON.parse(await readFile(join(repoRoot, publicationDecisionRelativePath), 'utf8'))
+    );
+    const inventory = outputInventorySchema.parse(
+      JSON.parse(await readFile(join(repoRoot, outputInventoryRelativePath), 'utf8'))
+    );
+
+    expect(decision.candidateArtifactHash).toBe(inventoryBindingHash(inventory));
+    expect(decision.execution).toBe('completed');
+    expect(decision.plan).toEqual({ planned: 1, completed: 1, deferred: 0 });
+    // The fixture workspace is not a git repository, so no commit can vouch for the checked bytes:
+    // the gate blocks rather than assuming the evidence is bound to a revision.
+    expect(decision.deterministicGate).toBe('blocked');
+    expect(decision.publishable).toBe(false);
+    expect(decision.reasonCodes).toContain('gate.blocked');
+    // The emitted site and the manifest are declared; machine-local run state never is.
+    expect(inventory.entries.some((entry) => entry.path === '.docstube/manifest/manifest.json')).toBe(true);
+    expect(inventory.entries.some((entry) => entry.path.startsWith('.docstube/runs/'))).toBe(false);
+  }, 180_000);
+
+  it('--ci records a failed decision when the pipeline throws, instead of leaving CI with no artifact', async () => {
+    const lines: string[] = [];
+    const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
+
+    await expect(
+      runGenerateCommand(
+        {
+          workspaceDir: repoRoot,
+          ci: true,
+          taskRunner: { runTask: scriptedRunTask(mdx, 'throw-on-first-page'), toolDescriptors: [] }
+        },
+        output
+      )
+    ).rejects.toThrow('writer transport exploded');
+
+    const decision = publicationDecisionSchema.parse(
+      JSON.parse(await readFile(join(repoRoot, publicationDecisionRelativePath), 'utf8'))
+    );
+    expect(decision.execution).toBe('failed');
+    expect(decision.publishable).toBe(false);
+    expect(decision.autoMergeEligible).toBe(false);
+    expect(decision.reasonCodes).toContain('execution.failed');
   }, 180_000);
 });

@@ -46,6 +46,28 @@ export { buildWriterSystemPrompt, buildWriterUserPrompt, buildWritePageTask } fr
 export type { WritePromptInput } from './pipeline/write-page.ts';
 export { runGenerate, unwrapMdxFence, resolveCommit } from './pipeline/generate.ts';
 export type { GenerateOptions, GenerateSummary } from './pipeline/generate.ts';
+export {
+  buildPublicationDecision,
+  collectOutputInventory,
+  compareLedgerSnapshots,
+  emitPublicationDecision,
+  failedPublicationInputs,
+  inventoryBindingHash,
+  outputInventoryRelativePath,
+  publicationDecisionRelativePath,
+  publicationOutputRoots,
+  readLedgerSnapshot,
+  resolveDeterministicGate,
+  snapshotPageLedger
+} from './pipeline/publication-decision.ts';
+export type {
+  BlockingDisposition,
+  ClaimSnapshot,
+  LedgerSnapshot,
+  PageLedgerSnapshot,
+  PublicationDecisionInputs,
+  PublicationExecution
+} from './pipeline/publication-decision.ts';
 export { generatePage, contentRelativePath } from './pipeline/page-runner.ts';
 export type { PageOutcome, PageRunContext, PageRunOptions, TaskRunner } from './pipeline/page-runner.ts';
 export { reviewPage, buildReviewPageTask, defaultReviewCriteria } from './pipeline/review-page.ts';

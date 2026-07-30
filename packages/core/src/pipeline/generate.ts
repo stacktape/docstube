@@ -31,6 +31,8 @@ import type { PageOutcome, PageRunContext, TaskRunner } from './page-runner.ts';
 import { translateArtifact } from './translate-page.ts';
 import type { TranslationOutcome } from './translate-page.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
+import { compareLedgerSnapshots, readLedgerSnapshot, resolveDeterministicGate } from './publication-decision.ts';
+import type { PublicationDecisionInputs } from './publication-decision.ts';
 import type { ToolDescriptor } from '@docstube/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -49,6 +51,10 @@ export type GenerateOptions = {
   toolDescriptors: ToolDescriptor[];
   runId?: string | undefined;
   maxAttemptsPerPage?: number | undefined;
+  // CI mode (PRODUCT §3.3): the run additionally computes the fail-closed PublicationDecision
+  // inputs — plan reconciliation, deterministic gate, and the base-vs-candidate ledger comparison
+  // against the committed manifest the run started from.
+  ci?: boolean | undefined;
 };
 
 export type GenerateSummary = {
@@ -67,6 +73,9 @@ export type GenerateSummary = {
   openFlagKinds: FlagKind[];
   // Latest subscription plan usage (0-100) reported by the transport this run, when available.
   planUsedPercent?: number;
+  // Present only under `ci: true` — everything the RUN knows about publishability. The decision
+  // itself is minted after site emission, when the output inventory it binds to exists.
+  publicationInputs?: PublicationDecisionInputs;
 };
 
 // Site-scope verify only journals findings and flips the run outcome; without this, the named
@@ -582,6 +591,15 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     const previousIndex = await store.readIndex({ requireShards: false });
     const slugToPageId = new Map((previousIndex?.pages ?? []).map((entry) => [entry.slug, entry.id]));
 
+    // The BASE side of the guarantee-downgrade comparison (quality-ci-reader-v2 decision 12): the
+    // committed manifest this run STARTED from, read before a single shard is rewritten. In the
+    // Action's flow the workspace is checked out at the base-branch tip before `generate` runs, so
+    // this is exactly the manifest at the merge base. No manifest at all is the first-run state —
+    // nothing can have regressed; a manifest that cannot be read back is missing evidence and
+    // blocks the deterministic gate rather than passing as "no regression".
+    const baseLedgers =
+      options.ci === true ? await readLedgerSnapshot({ store, index: previousIndex, locale }) : undefined;
+
     // Tribal-knowledge lifecycle: persist any human-answered flags into the knowledge store, then
     // load answers (writer context) and open-question keys (ask-once dedup) for this run.
     const previousPageIds = (previousIndex?.pages ?? []).map((entry) => entry.id);
@@ -649,7 +667,10 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     // mid-page, because a half-verified page would ship state the gate never approved. Pages that
     // already landed stay shipped; remaining pages are simply not generated.
     let frozen = false;
-    for (const node of pageNodes(iaV2.tree)) {
+    // The PLAN: every page the IA asked this run to produce. `planned` is what the decision must
+    // reconcile against — `completed + deferred` — so a freeze can never read as a finished run.
+    const plannedNodes = pageNodes(iaV2.tree);
+    for (const node of plannedNodes) {
       if (costTracker.shouldFreeze()) {
         frozen = true;
         break;
@@ -779,6 +800,36 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       persistedShards
     });
 
+    // The CANDIDATE side of the comparison, read back from what this run actually committed to the
+    // manifest — never from in-memory optimism.
+    const publicationInputs =
+      baseLedgers === undefined
+        ? undefined
+        : await (async (): Promise<PublicationDecisionInputs> => {
+            const candidateLedgers = await readLedgerSnapshot({ store, index, locale });
+            const { regressions, newBlockingDispositions } = compareLedgerSnapshots(baseLedgers, candidateLedgers);
+            const completed = outcomes.length;
+            return {
+              baseSha: commit,
+              sourceSha: commit,
+              execution: frozen ? 'paused-budget' : 'completed',
+              planned: plannedNodes.length,
+              completed,
+              deferred: plannedNodes.length - completed,
+              deterministicGate: resolveDeterministicGate({
+                findings: [...siteFindings, ...outcomes.flatMap((outcome) => outcome.findings)],
+                dirtyWorkingTree,
+                baseUnreadable: baseLedgers.unreadable || candidateLedgers.unreadable
+              }),
+              regressions,
+              newBlockingDispositions,
+              // COVERAGE RATCHET NOT WIRED (quality-ci-reader-v2 decision 13): explicit coverage
+              // obligations are contracted but the kernel does not yet own an obligation registry
+              // to diff, so this run declares no obligation movement rather than inventing one.
+              coverageDelta: []
+            };
+          })();
+
     const flagged =
       outcomes.some((outcome) => outcome.status === 'flagged') ||
       translations.some((translation) => translation.status === 'flagged') ||
@@ -794,6 +845,7 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       siteFindings,
       warnings: host.warnings(),
       openFlagKinds,
+      ...(publicationInputs === undefined ? {} : { publicationInputs }),
       ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
       ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),
       ...(costTracker.planUsedPercent() !== undefined ? { planUsedPercent: costTracker.planUsedPercent() } : {})

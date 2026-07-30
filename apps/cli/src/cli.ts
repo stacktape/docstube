@@ -41,7 +41,8 @@ const runCliCommand = async (
 const generate = defineCommand({
   meta: { description: 'Generate docs from existing config.', name: 'generate' },
   args: {
-    'max-attempts': { type: 'string', description: 'Max write attempts per page (default 3).' }
+    'max-attempts': { type: 'string', description: 'Max write attempts per page (default 3).' },
+    ci: { type: 'boolean', description: 'Emit the fail-closed publication decision the GitHub Action enforces.' }
   },
   async run({ args }) {
     await runCliCommand('generate', async () => {
@@ -52,7 +53,7 @@ const generate = defineCommand({
         return { exitCode: 1 };
       }
       const { runGenerateCommand } = await import('./commands/generate-command.ts');
-      return runGenerateCommand({ workspaceDir: process.cwd(), maxAttempts }, output);
+      return runGenerateCommand({ workspaceDir: process.cwd(), maxAttempts, ci: args.ci === true }, output);
     });
   }
 });
