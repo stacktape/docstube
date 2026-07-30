@@ -7,7 +7,9 @@ export type CoreErrorCode =
   | 'plugin-load-failed'
   | 'plugin-capability-mismatch'
   | 'state-corrupt'
-  | 'pipeline-failed';
+  | 'pipeline-failed'
+  // A second run was asked for while one is already in flight in this workspace (run-lock.ts).
+  | 'run-in-progress';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

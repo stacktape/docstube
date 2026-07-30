@@ -260,7 +260,9 @@ export const compareLedgerSnapshots = (
 // `staging` is the staged-atomic publish area (publish-staging.ts): completed-but-unpublished work.
 // Declaring it would invite the Action to commit a half-applied plan — the exact failure decision 3
 // exists to prevent — so it is machine-local like runs/ and cache/.
-const machineLocalNames = new Set(['runs', 'cache', 'staging', 'telemetry.json']);
+// `run.lock` is the one-run-at-a-time guard (run-lock.ts): a pid on one machine, meaningless on
+// any other, and gone the moment the run ends.
+const machineLocalNames = new Set(['runs', 'cache', 'staging', 'telemetry.json', 'run.lock']);
 const isMachineLocal = (relativePath: string): boolean => {
   const segments = relativePath.split('/');
   return (

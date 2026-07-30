@@ -15,11 +15,11 @@ import {
   runGenerate,
   runRefine,
   runTransportPreflight,
+  startExclusiveRun,
   startLocalServer
 } from '@docstube/core';
-import type { ControlPlaneInjection } from '@docstube/core';
+import type { ControlPlaneInjection, ExclusiveRunStart, RunLockHandle, RunMode } from '@docstube/core';
 import type { AgentTaskSpec, ManifestIndex, ToolDescriptor, Transcript } from '@docstube/contracts';
-import { idPrefixes, mintId } from '@docstube/contracts';
 import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { openBrowser, shouldOpenBrowser } from '../open-browser.ts';
@@ -84,7 +84,12 @@ export type WizardControlPlaneInput = {
   taskRunner?: { runTask: (spec: AgentTaskSpec) => Promise<Transcript>; toolDescriptors: ToolDescriptor[] } | undefined;
 };
 
-export type WizardControlPlane = ControlPlaneInjection & {
+// `launchRun` is narrowed off ControlPlaneInjection: the control plane only needs "launch it", but
+// a DIRECT caller also needs the answer to "did it actually start, or was one already going?".
+export type WizardControlPlane = Omit<ControlPlaneInjection, 'launchRun'> & {
+  // Acquires the workspace run lock when the caller does not already hold one (see run-lock.ts).
+  // `started: false` means a run was already in flight and `runId` is ITS id — nothing new started.
+  launchRun: (mode: RunMode, handle?: RunLockHandle) => Promise<ExclusiveRunStart>;
   // Resolves once every run `launchRun` started has finished — the pipeline, its publish step, and
   // (for refine) the site emission after it. Production never awaits this: `launchRun` is
   // fire-and-forget because the dashboard follows the run journal, which is the point of returning a
@@ -113,6 +118,64 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
     const { config } = await resolveSetupConfig(input.workspaceDir);
     return createTaskRunnerFromConfig(config, input.workspaceDir);
   };
+  // Starts the pipeline and returns immediately; `settled` carries the rest. The workspace run
+  // lock is ALREADY held by the caller (the control plane, or the self-guard below) under
+  // `handle.runId` — the run is journaled under exactly that id so "which run holds the lock?" and
+  // "which run is in the journal?" can never answer differently — and it is released once the run
+  // AND everything trailing it has landed on disk.
+  const start = async (mode: RunMode, handle: RunLockHandle): Promise<void> => {
+    const runner = await lazyRunner();
+    const common = {
+      repoRoot: input.workspaceDir,
+      runTask: runner.runTask,
+      toolDescriptors: runner.toolDescriptors,
+      runId: handle.runId
+    };
+    // `refresh` is gone (pipeline-v2 decision 1): generate IS the reconciler.
+    // generate owns its own publish step (staged-atomic publish): routes are emitted INSIDE it,
+    // together with shards and the index, so the wizard must not emit a second time — a frozen or
+    // crashed generate publishes nothing, and a stray emission would be exactly the independent
+    // publish path decision 3 removes. `refine` still writes pages directly, so it still emits.
+    const run =
+      mode === 'generate'
+        ? runGenerate({
+            ...common,
+            publishSite: async ({ index }) => {
+              await emitWizardSite(input.workspaceDir, output, index);
+            }
+          })
+        : runRefine(common);
+    // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
+    const settled = (async () => {
+      let runError: unknown;
+      try {
+        await run;
+      } catch (error) {
+        runError = error;
+      }
+      if (mode !== 'generate') {
+        try {
+          await emitWizardSite(input.workspaceDir, output);
+        } catch (error) {
+          output.error(`site emission after the ${mode} run failed: ${(error as Error).message}`);
+        }
+      }
+      if (runError !== undefined) {
+        output.error(`background ${mode} run failed: ${(runError as Error).message}`);
+      }
+      // LAST, and unconditionally: the workspace is free only once nothing of this run is still
+      // writing. Releasing before the trailing site emission would let a second run into the
+      // staging area while this one is still touching the published tree.
+      try {
+        await handle.release();
+      } catch (error) {
+        output.error(`could not release the workspace run lock: ${(error as Error).message}`);
+      }
+    })();
+    inFlight.add(settled);
+    void settled.then(() => inFlight.delete(settled));
+  };
+
   return {
     runTask: async (spec) => (await lazyRunner()).runTask(spec),
     toolDescriptors: standardToolDescriptors(),
@@ -134,51 +197,19 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
         packs: host.languagePacks().map((entry) => entry.definition)
       });
     },
-    launchRun: async (mode) => {
-      const runner = await lazyRunner();
-      const runId = mintId(idPrefixes.run);
-      const common = {
-        repoRoot: input.workspaceDir,
-        runTask: runner.runTask,
-        toolDescriptors: runner.toolDescriptors,
-        runId
-      };
-      // `refresh` is gone (pipeline-v2 decision 1): generate IS the reconciler.
-      // generate owns its own publish step (staged-atomic publish): routes are emitted INSIDE it,
-      // together with shards and the index, so the wizard must not emit a second time — a frozen or
-      // crashed generate publishes nothing, and a stray emission would be exactly the independent
-      // publish path decision 3 removes. `refine` still writes pages directly, so it still emits.
-      const run =
-        mode === 'generate'
-          ? runGenerate({
-              ...common,
-              publishSite: async ({ index }) => {
-                await emitWizardSite(input.workspaceDir, output, index);
-              }
-            })
-          : runRefine(common);
-      // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
-      const settled = (async () => {
-        let runError: unknown;
-        try {
-          await run;
-        } catch (error) {
-          runError = error;
-        }
-        if (mode !== 'generate') {
-          try {
-            await emitWizardSite(input.workspaceDir, output);
-          } catch (error) {
-            output.error(`site emission after the ${mode} run failed: ${(error as Error).message}`);
-          }
-        }
-        if (runError !== undefined) {
-          output.error(`background ${mode} run failed: ${(runError as Error).message}`);
-        }
-      })();
-      inFlight.add(settled);
-      void settled.then(() => inFlight.delete(settled));
-      return { runId };
+    // The control plane holds the workspace run lock and hands the run id + release down (see
+    // ControlPlaneInjection.launchRun). A DIRECT call — tests, or any other host — gets no handle,
+    // so it acquires its own: the one-run-at-a-time guarantee must not depend on who called.
+    launchRun: async (mode: RunMode, handle?: RunLockHandle): Promise<ExclusiveRunStart> => {
+      if (handle === undefined) {
+        return startExclusiveRun({
+          repoRoot: input.workspaceDir,
+          mode,
+          launch: (owned) => start(mode, owned)
+        });
+      }
+      await start(mode, handle);
+      return { runId: handle.runId, mode, started: true };
     },
     // Loops rather than awaiting once: a run launched WHILE we are waiting must also be waited for,
     // otherwise this reports settled while work is still landing on disk.

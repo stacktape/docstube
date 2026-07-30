@@ -107,14 +107,20 @@ const buildShard = (correctness: 'checked' | 'contradicted' | 'unchecked' = 'che
   flags: []
 });
 
-const buildClient = (submit: (input: unknown) => Promise<unknown>, shard: unknown = buildShard()): ControlPlaneClient =>
+const startedRun = { runId: 'run_2', mode: 'refine', started: true, alreadyRunning: null, tookOverStaleLock: null };
+
+const buildClient = (
+  submit: (input: unknown) => Promise<unknown>,
+  shard: unknown = buildShard(),
+  startRun: () => Promise<unknown> = () => Promise.resolve(startedRun)
+): ControlPlaneClient =>
   ({
     manifest: {
       index: { query: () => Promise.resolve(manifestIndex) },
       page: { query: () => Promise.resolve(shard) }
     },
     feedback: { submit: { mutate: submit } },
-    runs: { start: { mutate: () => Promise.resolve({ runId: 'run_2' }) } }
+    runs: { start: { mutate: startRun } }
   }) as unknown as ControlPlaneClient;
 
 const renderReview = (client: ControlPlaneClient) =>
@@ -255,6 +261,37 @@ describe('review UI', () => {
       // The complete/green treatment is withheld at this level too — no chip out-greens the page.
       expect(rendered?.className).not.toContain('emerald');
     }
+  });
+
+  // ONE RUN AT A TIME (run-lock.ts). A second "Regenerate" while a run is in flight starts NOTHING
+  // — the control plane hands back the running run's id with `started: false`. That is a normal
+  // outcome of a double-click, not an error, so the UI must say which of the two happened instead
+  // of claiming a run it did not start.
+  it('says a run STARTED, and says so differently when one was already in flight', async () => {
+    renderReview(buildClient(vi.fn(noopSubmit)));
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Regenerate (refine run)' }));
+    await screen.findByText('Run run_2 started.');
+    cleanup();
+
+    renderReview(
+      buildClient(vi.fn(noopSubmit), buildShard(), () =>
+        Promise.resolve({
+          runId: 'run_1',
+          mode: 'generate',
+          started: false,
+          alreadyRunning: { runId: 'run_1', mode: 'generate', pid: 4242, host: 'workstation' },
+          tookOverStaleLock: null
+        })
+      )
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Installation' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Regenerate (refine run)' }));
+    const notice = await screen.findByText(/already in flight/);
+    expect(notice.textContent).toContain('A generate was already in flight');
+    expect(notice.textContent).toContain('run_1');
+    // Nothing about this reads as a failure.
+    expect(screen.queryByText('Run run_1 started.')).toBeNull();
   });
 
   it('renders a shard WITHOUT a trust spine as explicitly unverified — never a silent 0/0 (impl-08)', async () => {

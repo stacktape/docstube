@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -120,6 +120,51 @@ describe('createWizardControlPlane', () => {
     expect(route).not.toContain('docstubeUnverified');
     expect(lines.filter((line) => line.includes('unverified'))).toEqual([]);
   }, 120_000);
+
+  // ONE RUN AT A TIME PER WORKSPACE (run-lock.ts). `launchRun` is fire-and-forget, so a second
+  // call lands while the first run is still mid-plan — which is exactly what a double-clicked
+  // "start run" does. Two pipelines would then share one `.docstube/staging/` area: they interleave
+  // staged pages under a single `state.json` and both can reach the publish replay. The guard is a
+  // lock FILE, so it holds whether the caller is the control plane, a test, or another process.
+  it('launching a second run while the first is in flight starts nothing and follows the run already going', async () => {
+    const lines: string[] = [];
+    const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
+    let writePageCalls = 0;
+    const countingRunTask = async (spec: AgentTaskSpec): Promise<Transcript> => {
+      if (spec.kind === 'write-page') {
+        writePageCalls += 1;
+      }
+      return scriptedRunTask(spec);
+    };
+    const controlPlane = createWizardControlPlane(
+      { workspaceDir: repoRoot, taskRunner: { runTask: countingRunTask, toolDescriptors: [] } },
+      output
+    );
+
+    // Deliberately NOT awaited between the two: the first run is still going when the second lands.
+    const first = await controlPlane.launchRun('generate');
+    const second = await controlPlane.launchRun('generate');
+
+    expect(first.started).toBe(true);
+    // Not an error — the second caller is simply pointed at the run already in flight.
+    expect(second.started).toBe(false);
+    expect(second.runId).toBe(first.runId);
+    expect(second.alreadyRunning?.runId).toBe(first.runId);
+
+    await controlPlane.runsSettled();
+
+    // ONE pipeline ran: one journal, one page written, and no failure reported to the UI channel.
+    expect(await readdir(join(repoRoot, '.docstube', 'runs'))).toEqual([first.runId]);
+    expect(writePageCalls).toBe(1);
+    expect(lines.filter((line) => line.includes('run failed'))).toEqual([]);
+
+    // The lock is gone once the run settled, so the workspace accepts the next run.
+    await expect(readFile(join(repoRoot, '.docstube', 'run.lock'), 'utf8')).rejects.toThrow(/ENOENT/);
+    const third = await controlPlane.launchRun('generate');
+    expect(third.started).toBe(true);
+    expect(third.runId).not.toBe(first.runId);
+    await controlPlane.runsSettled();
+  }, 180_000);
 
   // STAGED-ATOMIC PUBLISH (pipeline-v2 decision 3): the wizard's background generate publishes in
   // one step at the end of the plan, so a run that throws mid-plan leaves the routes exactly as the

@@ -273,8 +273,16 @@ state for the dashboard timelines. Losing it loses nothing; `docstube` rebuilds 
 (`state doctor` path). `cache/` holds the agent-call cache keyed by input hashes. `runs/` holds
 journaled run logs (uploaded as Actions artifacts in CI). `staging/` holds **staged (not yet
 published) work** — `state.json` (plan fingerprint, phase, per-page records), `manifest/` (staged
-shards), `out/` (staged page MDX keyed by its outDir-relative path). All three are gitignored,
-excluded from the output inventory, and excluded from the Action's commit-path selection.
+shards), `out/` (staged page MDX keyed by its outDir-relative path). `run.lock` is the
+**one-run-at-a-time guard**: a JSON record (`runId`, mode, pid, host, `startedAt`, `heartbeatAt`)
+created with `O_EXCL`, so two starts race on one atomic step. Runs share `staging/` and the
+manifest store, so a second concurrent run — a double-clicked "start run", or a CLI `generate`
+while the local UI has one going — would clobber the first and could publish twice. The lock
+**self-heals**: a holder whose pid is gone on this host is stale immediately, and any holder whose
+heartbeat is older than 60s is stale regardless, so a crashed run never wedges the workspace (its
+interrupted publish is repaired forward by the run that takes the lock over). All of these are
+gitignored, excluded from the output inventory, and excluded from the Action's commit-path
+selection.
 
 ### 5.3 Docset boundary
 

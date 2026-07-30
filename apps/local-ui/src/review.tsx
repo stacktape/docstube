@@ -360,6 +360,10 @@ export function Review() {
   });
   // Not page-scoped: the control plane only exposes whole-run modes, so "Regenerate" starts a full
   // refine run (page-scoped regeneration is a control-plane API gap).
+  //
+  // ONE RUN AT A TIME (run-lock.ts): a second click while a run is in flight does not start
+  // anything — it comes back with `started: false` and the RUNNING run's id. That is not an error
+  // and must not read as one, so the button reports the two cases in different words.
   const regenerateMutation = useMutation({ mutationFn: () => trpc.runs.start.mutate({ mode: 'refine' }) });
 
   if (indexQuery.isError) {
@@ -433,9 +437,15 @@ export function Review() {
                 >
                   {regenerateMutation.isPending ? 'Starting…' : 'Regenerate (refine run)'}
                 </button>
-                {regenerateMutation.isSuccess && (
-                  <p className="text-[11px] text-emerald-300">Run {regenerateMutation.data.runId} started.</p>
-                )}
+                {regenerateMutation.isSuccess &&
+                  (regenerateMutation.data.started ? (
+                    <p className="text-[11px] text-emerald-300">Run {regenerateMutation.data.runId} started.</p>
+                  ) : (
+                    <p className="text-[11px] text-amber-300">
+                      A {regenerateMutation.data.alreadyRunning?.mode ?? 'run'} was already in flight — following run{' '}
+                      {regenerateMutation.data.runId} instead.
+                    </p>
+                  ))}
                 <p className="max-w-52 text-[11px] text-neutral-600">
                   Runs a whole refine pass — page-scoped regeneration needs a page-scoped run API.
                 </p>

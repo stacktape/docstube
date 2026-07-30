@@ -51,6 +51,8 @@ import { loadKnowledgeState } from '../knowledge/knowledge-store.ts';
 import type { ManifestStore } from '../state/manifest-store.ts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { runsDir, summarizeRun } from '../state/run-journal.ts';
+import { readRunLock, startExclusiveRun } from '../state/run-lock.ts';
+import type { RunLockHandle, RunLockRecord } from '../state/run-lock.ts';
 import {
   appendFeedbackEntry,
   buildCategorizeFeedbackTask,
@@ -78,8 +80,14 @@ export type ControlPlaneInjection = {
   // The standard read tools handed to repo-inspecting tasks (theme extraction).
   toolDescriptors?: ToolDescriptor[] | undefined;
   codemapProvider?: (() => Promise<Codemap>) | undefined;
-  // Fire-and-forget run launcher: returns the run id immediately, the run continues in the host.
-  launchRun?: ((mode: RunMode) => Promise<{ runId: string }>) | undefined;
+  // Fire-and-forget run launcher: returns once the run is LAUNCHED, the run continues in the host.
+  //
+  // The control plane holds the workspace run lock across the whole run, so the host does not mint
+  // the run id and does not decide whether a run may start: it is handed `handle.runId` (journal
+  // the run under exactly that id) and `handle.release`, which it MUST call once the run and
+  // everything trailing it — publish, site emission — has settled. Failing to release leaves the
+  // lock to expire on its heartbeat instead of freeing immediately.
+  launchRun?: ((mode: RunMode, handle: RunLockHandle) => Promise<unknown>) | undefined;
   // Tiny live transport check for setup. Injected by the host so tests and CI substitute it —
   // the control plane itself never constructs a live transport.
   preflight?: ((config: DocstubeConfig) => Promise<PreflightResult>) | undefined;
@@ -365,6 +373,56 @@ const locateFlag = async (repoRoot: string, flagId: string): Promise<LocatedFlag
   return undefined;
 };
 
+// ONE RUN AT A TIME, DECIDED HERE (run-lock.ts). Both start paths — `runs.start` and the final
+// `setup.commit` action — funnel through this, so a double-click, a second browser tab, or a
+// setup commit racing a first-run generate can never put two pipelines in `.docstube/staging/`.
+//
+// IT RETURNS THE RUNNING RUN INSTEAD OF THROWING. A second start is a double-click, not a mistake:
+// throwing would make every client special-case an error that means "everything is fine, your run
+// is already going", and a user who clicked twice would be shown a red box. Handing back the id of
+// the run in flight makes the second click a no-op the dashboard follows anyway, and `started`
+// tells the UI which sentence to say. The guard is still authoritative — it is the lock file, not
+// this shape, that decides — so a client that ignores `started` still cannot start a second run.
+export type RunStartResult = {
+  runId: string;
+  mode: string;
+  // TRUE when this call started the pipeline; FALSE when a run was already in flight and `runId`
+  // is that run's id.
+  started: boolean;
+  // What was already running. Null whenever this call started the run.
+  alreadyRunning: RunLockRecord | null;
+  // Set when this start took the workspace lock over from a process that is gone (a crashed run).
+  // Surfaced rather than assumed: a takeover is a real event, and an interrupted publish left by
+  // that process is repaired forward by the run this call just started.
+  tookOverStaleLock: { runId: string; pid: number; reason: string } | null;
+};
+
+const startRun = async (ctx: ControlPlaneContext, mode: RunMode): Promise<RunStartResult> => {
+  const launchRun = ctx.launchRun;
+  if (launchRun === undefined) {
+    throw notConfigured('starting runs');
+  }
+  const outcome = await startExclusiveRun({
+    repoRoot: ctx.repoRoot,
+    mode,
+    launch: (handle) => launchRun(mode, handle)
+  });
+  return {
+    runId: outcome.runId,
+    mode: outcome.mode,
+    started: outcome.started,
+    alreadyRunning: outcome.alreadyRunning ?? null,
+    tookOverStaleLock:
+      outcome.tookOverFrom === undefined
+        ? null
+        : {
+            runId: outcome.tookOverFrom.runId,
+            pid: outcome.tookOverFrom.pid,
+            reason: outcome.staleReason ?? 'heartbeat-expired'
+          }
+  };
+};
+
 const writeFlagUpdate = async (repoRoot: string, located: LocatedFlag, updated: Flag): Promise<Flag> => {
   if (located.scope === 'system') {
     await located.store.writeIndex({
@@ -407,14 +465,17 @@ export const controlPlaneRouter = t.router({
         completedStageInputs: Object.fromEntries(summary.completedStageInputs) as Record<string, string>
       };
     }),
-    // Fire-and-forget: the injected launcher starts the pipeline in the host process and returns
-    // the run id; the dashboard then follows it through runs.events/runs.summary.
-    start: t.procedure.input(z.object({ mode: z.enum(['generate', 'refine']) })).mutation(async ({ ctx, input }) => {
-      if (ctx.launchRun === undefined) {
-        throw notConfigured('starting runs');
-      }
-      return ctx.launchRun(input.mode);
-    })
+    // What is running RIGHT NOW, across processes — the workspace run lock, not this process's
+    // memory. `docstube generate` in a terminal shows up here just as a UI-started run does, which
+    // is the point: the two share `.docstube/staging/` and only one may exist.
+    current: t.procedure.query(async ({ ctx }) => (await readRunLock(ctx.repoRoot)) ?? null),
+    // Fire-and-forget: the injected launcher starts the pipeline in the host process; the dashboard
+    // then follows the run through runs.events/runs.summary. Idempotent under the workspace run
+    // lock — a second start while one is in flight returns the RUNNING run's id with
+    // `started: false` rather than beginning a second pipeline.
+    start: t.procedure
+      .input(z.object({ mode: z.enum(['generate', 'refine']) }))
+      .mutation(({ ctx, input }) => startRun(ctx, input.mode))
   }),
   manifest: t.router({
     index: t.procedure.query(async ({ ctx }) => (await readManifestIndex(ctx.repoRoot)) ?? null),
@@ -641,14 +702,22 @@ export const controlPlaneRouter = t.router({
         // and shadow them on the next open.
         await clearOnboardingDraft(ctx.repoRoot);
 
-        let runId: string | undefined;
+        // The same one-run-at-a-time gate `runs.start` uses. Committing setup while a run is in
+        // flight — a first-run generate still going, or a `docstube generate` in a terminal — must
+        // NOT start a second pipeline against the same staging area; the committed files are
+        // written either way and the caller is handed the run already going.
+        let run: RunStartResult | undefined;
         if (input.startRun !== false) {
-          if (ctx.launchRun === undefined) {
-            throw notConfigured('starting runs');
-          }
-          runId = (await ctx.launchRun('generate')).runId;
+          run = await startRun(ctx, 'generate');
         }
-        return { ...result, runId: runId ?? null, preflight: preflight ?? null };
+        return {
+          ...result,
+          runId: run?.runId ?? null,
+          // Null when no run was requested; otherwise whether THIS commit started the run.
+          runStarted: run === undefined ? null : run.started,
+          alreadyRunning: run?.alreadyRunning ?? null,
+          preflight: preflight ?? null
+        };
       })
   }),
   detect: t.router({

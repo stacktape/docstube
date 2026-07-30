@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentTaskSpec, Codemap, Transcript } from '@docstube/contracts';
 import { readOnboardingDraft, saveOnboardingDraft } from '../config/onboarding-draft.ts';
 import type { PreflightResult } from '../pipeline/preflight-transport.ts';
+import type { RunLockHandle } from '../state/run-lock.ts';
 import { createControlPlaneCaller } from './trpc-router.ts';
 
 // FIRST-RUN CONTROL PLANE (PRODUCT §3.9.1/§3.9.2). Everything here runs with NO committed config,
@@ -163,7 +164,11 @@ describe('setup.preflight', () => {
 
 describe('setup.commit is one atomic action', () => {
   it('preflights, writes both files, and starts the generate run', async () => {
-    const launchRun = vi.fn<() => Promise<{ runId: string }>>(async () => ({ runId: 'run_abc' }));
+    // The control plane holds the workspace run lock and hands the run id down; the host releases
+    // it when the run settles (here: immediately, nothing is really running).
+    const launchRun = vi.fn<(mode: string, handle: RunLockHandle) => Promise<void>>(async (_mode, handle) => {
+      await handle.release();
+    });
     const preflight = vi.fn<() => Promise<PreflightResult>>(async () => ({
       ok: true,
       skipped: false,
@@ -174,9 +179,11 @@ describe('setup.commit is one atomic action', () => {
     const caller = createControlPlaneCaller({ repoRoot, launchRun, preflight });
 
     const result = await caller.setup.commit({ config: configInput, ia: iaInput });
-    expect(result.runId).toBe('run_abc');
+    expect(result.runId).toMatch(/^run_/u);
+    expect(result.runStarted).toBe(true);
+    expect(result.alreadyRunning).toBeNull();
     expect(preflight).toHaveBeenCalledTimes(1);
-    expect(launchRun).toHaveBeenCalledWith('generate');
+    expect(launchRun).toHaveBeenCalledWith('generate', expect.objectContaining({ runId: result.runId }));
     expect(await readFile(join(repoRoot, 'docstube.yml'), 'utf8')).toContain('docType: external-library');
     expect(await readFile(join(repoRoot, 'ia.yml'), 'utf8')).toContain('getting-started');
     // Setup is over: the draft must not linger and shadow the committed files.
@@ -184,7 +191,9 @@ describe('setup.commit is one atomic action', () => {
   });
 
   it('writes NOTHING when the preflight fails — a bad credential must not half-set-up the repo', async () => {
-    const launchRun = vi.fn<() => Promise<{ runId: string }>>(async () => ({ runId: 'run_abc' }));
+    const launchRun = vi.fn<(mode: string, handle: RunLockHandle) => Promise<void>>(async (_mode, handle) => {
+      await handle.release();
+    });
     const caller = createControlPlaneCaller({
       repoRoot,
       launchRun,
@@ -203,7 +212,7 @@ describe('setup.commit is one atomic action', () => {
   });
 
   it('rejects an invalid config before touching disk', async () => {
-    const caller = createControlPlaneCaller({ repoRoot, launchRun: async () => ({ runId: 'run_abc' }) });
+    const caller = createControlPlaneCaller({ repoRoot, launchRun: async (_mode, handle) => handle.release() });
     await expect(caller.setup.commit({ config: { ...configInput, docType: 'nonsense' }, ia: iaInput })).rejects.toThrow(
       /docType/
     );
@@ -229,7 +238,7 @@ describe('setup.commit is one atomic action', () => {
     );
     await writeFile(join(repoRoot, 'ia.yml'), 'schemaVersion: 1\ntree: []\n', 'utf8');
 
-    const caller = createControlPlaneCaller({ repoRoot, launchRun: async () => ({ runId: 'run_abc' }) });
+    const caller = createControlPlaneCaller({ repoRoot, launchRun: async (_mode, handle) => handle.release() });
     await caller.setup.commit({
       config: { ...configInput, site: { title: 'New Title' } },
       ia: iaInput,

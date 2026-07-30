@@ -17,7 +17,9 @@ const machineLocalPatterns = [
   /^\.docstube\/runs\//,
   // Staged-atomic publish (pipeline-v2 decision 3): work a frozen run finished but did not publish.
   // Committing it would put a half-applied plan on the PR under a gate it never passed.
-  /^\.docstube\/staging\//
+  /^\.docstube\/staging\//,
+  // The one-run-at-a-time guard (run-lock.ts): a pid on the runner, meaningless anywhere else.
+  /^\.docstube\/run\.lock$/
 ];
 
 // Everything the run changed ships in ONE commit — docs, manifest shards, criteria, instructions,

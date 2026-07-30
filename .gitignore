@@ -39,6 +39,8 @@ Thumbs.db
 .docstube/staging/
 # First-run setup's in-progress intent; committed config is the only shared truth.
 .docstube/onboarding-draft.json
+# One run at a time per workspace: a pid + heartbeat for THIS machine only.
+.docstube/run.lock
 .docstube-build/
 
 BUSINESS.md

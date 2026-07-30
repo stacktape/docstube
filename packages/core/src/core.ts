@@ -60,6 +60,27 @@ export { createManifestStore } from './state/manifest-store.ts';
 export type { ManifestStore } from './state/manifest-store.ts';
 export { createRunJournal, summarizeRun, runsDir } from './state/run-journal.ts';
 export type { RunJournal, RunStatusSummary } from './state/run-journal.ts';
+export {
+  acquireRunLock,
+  readRunLock,
+  runInProgressError,
+  runLockHeartbeatMs,
+  runLockPath,
+  runLockRecordSchema,
+  runLockRelativePath,
+  runLockStaleMs,
+  runLockStaleness,
+  startExclusiveRun,
+  withRunLock
+} from './state/run-lock.ts';
+export type {
+  AcquireRunLockResult,
+  ExclusiveRunStart,
+  HeldRunLock,
+  RunLockHandle,
+  RunLockRecord,
+  RunLockStaleReason
+} from './state/run-lock.ts';
 export { cutVersionSnapshot } from './state/version-cut.ts';
 export type { VersionCutResult } from './state/version-cut.ts';
 
@@ -277,5 +298,6 @@ export type {
   StructuralQualityView,
   RunListEntry,
   ControlPlaneInjection,
-  RunMode
+  RunMode,
+  RunStartResult
 } from './server/trpc-router.ts';

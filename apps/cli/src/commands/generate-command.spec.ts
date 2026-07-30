@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { scanClaimMarkers } from '@docstube/agent-runtime';
 import type { AgentTaskSpec, Transcript, WriterClaimLedger } from '@docstube/contracts';
@@ -138,6 +138,49 @@ describe('runGenerateCommand', () => {
     // The staging area cleans itself up on a successful publish.
     await expect(readFile(join(repoRoot, '.docstube', 'staging', 'state.json'), 'utf8')).rejects.toThrow(/ENOENT/);
   }, 180_000);
+
+  // ONE RUN AT A TIME PER WORKSPACE (run-lock.ts). The CLI is the OTHER process in the scenario
+  // that motivates the lock: `docstube generate` in a terminal while the local UI has a run going.
+  // It cannot "follow" that run — it has nowhere to report to — so it refuses, names the run in
+  // flight, and touches nothing.
+  it('refuses to start while another run holds the workspace, and publishes nothing', async () => {
+    const lines: string[] = [];
+    const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
+    // A live holder: this process is alive and the heartbeat is fresh, so the lock is not stale.
+    const now = new Date().toISOString();
+    await mkdir(join(repoRoot, '.docstube'), { recursive: true });
+    await writeFile(
+      join(repoRoot, '.docstube', 'run.lock'),
+      JSON.stringify({
+        schemaVersion: 1,
+        runId: 'run_from_the_local_ui',
+        mode: 'generate',
+        pid: process.pid,
+        host: hostname(),
+        startedAt: now,
+        heartbeatAt: now
+      }),
+      'utf8'
+    );
+
+    const result = await runGenerateCommand(
+      { workspaceDir: repoRoot, taskRunner: { runTask: scriptedRunTask(mdx, 'pass'), toolDescriptors: [] } },
+      output
+    );
+    expect(result.exitCode).toBe(1);
+    // The message is actionable on its own: which run, which mode, which process.
+    const refusal = lines.find((line) => line.includes('already in flight'));
+    expect(refusal).toContain('run_from_the_local_ui');
+    expect(refusal).toContain('generate');
+    // A refused start is NOT a failed run: nothing was attempted, so nothing claims to have been
+    // published and no manifest appeared.
+    expect(lines.some((line) => line.includes('run failed'))).toBe(false);
+    await expect(readFile(join(repoRoot, '.docstube', 'manifest', 'manifest.json'), 'utf8')).rejects.toThrow(/ENOENT/);
+    // The holder's lock is untouched — a refusal must never free someone else's lock.
+    expect(JSON.parse(await readFile(join(repoRoot, '.docstube', 'run.lock'), 'utf8')).runId).toBe(
+      'run_from_the_local_ui'
+    );
+  }, 60_000);
 
   // STAGED-ATOMIC PUBLISH (pipeline-v2 decision 3): a run that dies part-way through its plan
   // publishes NOTHING. The previous contract here was the opposite — pages landed one at a time, so

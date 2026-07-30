@@ -34,6 +34,16 @@ export function Dashboard() {
     queryFn: () => trpc.manifest.index.query(),
     refetchInterval: POLL_MS * 5
   });
+  // WHAT HOLDS THE WORKSPACE RUN LOCK, across processes (run-lock.ts). A `docstube generate` in a
+  // terminal appears here exactly like a run started from this UI — which is the point: they share
+  // `.docstube/staging/`, only one may exist, and a start attempt while this is set follows the run
+  // named here instead of beginning a second one.
+  const currentRunQuery = useQuery({
+    queryKey: ['run-current'],
+    queryFn: () => trpc.runs.current.query(),
+    refetchInterval: POLL_MS
+  });
+  const currentRun = currentRunQuery.data ?? undefined;
 
   const events = eventsQuery.data ?? [];
   const view = useMemo(() => foldRunView(events), [events]);
@@ -61,7 +71,7 @@ export function Dashboard() {
   if (runsQuery.isError) {
     return <p className="p-6 text-sm text-rose-400">Failed to reach the control plane: {String(runsQuery.error)}</p>;
   }
-  if (runsQuery.isSuccess && runs.length === 0) {
+  if (runsQuery.isSuccess && runs.length === 0 && currentRun === undefined) {
     return (
       <p className="p-6 text-sm text-neutral-400">
         No runs yet — start one with <code className="text-neutral-200">docstube generate</code>.
@@ -101,6 +111,13 @@ export function Dashboard() {
         )}
       </section>
       <section className="min-w-0 flex-1 overflow-y-auto p-4">
+        {currentRun !== undefined && (
+          <div className="mb-4 rounded border border-sky-900 bg-sky-950/50 px-4 py-2 text-xs text-sky-200">
+            <span className="font-mono">{currentRun.runId}</span> ({currentRun.mode}) is running in this workspace —
+            started by process {currentRun.pid} on {currentRun.host}. Only one run at a time can touch the staging area,
+            so starting another follows this one.
+          </div>
+        )}
         {view.frozen !== undefined && (
           <div
             role="alert"

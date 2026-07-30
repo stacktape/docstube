@@ -1,10 +1,12 @@
+import { spawnSync } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AgentTaskSpec, ManifestIndex, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
+import { readRunLock, runLockPath, withRunLock } from '../state/run-lock.ts';
 import { runGenerate } from './generate.ts';
 import { collectOutputInventory } from './publication-decision.ts';
 import { finishInterruptedPublish, readStagedRun, stagingDir } from './publish-staging.ts';
@@ -115,6 +117,21 @@ const exists = async (path: string): Promise<boolean> =>
     () => true,
     () => false
   );
+
+// A pid that is definitely gone — confirmed dead right before it is used, because pids get reused.
+const deadPid = (): number => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const { pid } = spawnSync(process.execPath, ['-e', '']);
+    if (pid !== undefined && pid > 0) {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        return pid;
+      }
+    }
+  }
+  throw new Error('could not obtain a pid that is definitely gone');
+};
 
 const contentPath = (slug: string): string => join(repoRoot, 'docs-site', 'content', 'en', `${slug}.mdx`);
 const indexPath = (): string => join(repoRoot, '.docstube', 'manifest', 'manifest.json');
@@ -311,6 +328,53 @@ describe('staged-atomic publish', () => {
     expect((await store.readIndex())?.pages).toHaveLength(3);
     expect(await exists(stagingDir(repoRoot))).toBe(false);
   }, 120_000);
+
+  // THE GUARD MUST NOT DEADLOCK AGAINST A CORPSE (run-lock.ts). A process that died mid-publish
+  // leaves BOTH a staging area in the `publishing` phase and a run lock nobody released. The next
+  // run is the only thing that can repair the first — so if the lock outlived its owner, the
+  // workspace would be wedged in exactly the state that most needs a run.
+  it('a crashed run leaves a lock AND a half-published tree — the next run takes the lock and repairs forward', async () => {
+    await writeFile(join(repoRoot, 'docstube.yml'), configYaml());
+    const first = scriptedRunner();
+    await expect(
+      runGenerate({
+        repoRoot,
+        runTask: first.runTask,
+        toolDescriptors: [],
+        publishSite: async () => {
+          throw new Error('the machine lost power mid-publish');
+        }
+      })
+    ).rejects.toThrow('the machine lost power mid-publish');
+    expect((await readStagedRun(repoRoot))?.phase).toBe('publishing');
+
+    // …and the dead process's lock, still on disk, pointing at a pid that no longer exists.
+    const now = new Date().toISOString();
+    await mkdir(join(repoRoot, '.docstube'), { recursive: true });
+    await writeFile(
+      runLockPath(repoRoot),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        runId: 'run_crashed',
+        mode: 'generate',
+        pid: deadPid(),
+        host: hostname(),
+        startedAt: now,
+        heartbeatAt: now
+      })}\n`,
+      'utf8'
+    );
+
+    const second = scriptedRunner();
+    const two = await withRunLock({ repoRoot, mode: 'generate' }, (handle) =>
+      runGenerate({ repoRoot, runTask: second.runTask, toolDescriptors: [], runId: handle.runId })
+    );
+    expect(two.outcome).toBe('passed');
+    expect((await createManifestStore(repoRoot, 'latest').readIndex())?.pages).toHaveLength(3);
+    expect(await exists(stagingDir(repoRoot))).toBe(false);
+    // The run finished, so the workspace is free again — no lock outlives its run.
+    expect(await readRunLock(repoRoot)).toBeUndefined();
+  }, 180_000);
 
   it('a run that finds an interrupted publish repairs it before doing anything else, and journals it', async () => {
     await writeFile(join(repoRoot, 'docstube.yml'), configYaml());

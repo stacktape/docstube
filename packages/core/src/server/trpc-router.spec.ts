@@ -495,15 +495,24 @@ describe('agent-backed wizard mutations', () => {
   it('starts runs through the injected launcher', async () => {
     const { repoRoot } = await setupWriteRepo();
     const launched: string[] = [];
-    const runId = mintId(idPrefixes.run);
+    // The RUN ID IS THE CONTROL PLANE'S: it is what the workspace run lock is held under, so the
+    // host must journal the run under it rather than minting its own.
+    let handedRunId: string | undefined;
     const caller = createControlPlaneCaller({
       repoRoot,
-      launchRun: async (mode) => {
+      launchRun: async (mode, handle) => {
         launched.push(mode);
-        return { runId };
+        handedRunId = handle.runId;
+        await handle.release();
       }
     });
-    expect(await caller.runs.start({ mode: 'refine' })).toEqual({ runId });
+    expect(await caller.runs.start({ mode: 'refine' })).toEqual({
+      runId: handedRunId,
+      mode: 'refine',
+      started: true,
+      alreadyRunning: null,
+      tookOverStaleLock: null
+    });
     expect(launched).toEqual(['refine']);
     // 'refresh' is not a run mode anymore (pipeline-v2 decision 1) — the input schema rejects it.
     await expect(caller.runs.start({ mode: 'refresh' as never })).rejects.toThrow(/invalid|refresh/i);

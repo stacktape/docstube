@@ -1,4 +1,4 @@
-import { CoreError, createTaskRunnerFromConfig, loadConfigFamily, runRefine } from '@docstube/core';
+import { CoreError, createTaskRunnerFromConfig, loadConfigFamily, runRefine, withRunLock } from '@docstube/core';
 import type { RefineSummary, TaskRunner } from '@docstube/core';
 import type { ToolDescriptor } from '@docstube/contracts';
 import { emitPersistedSite } from './emit-current-site.ts';
@@ -33,17 +33,26 @@ export const runRefineCommand = async (input: RefineCommandInput, output: CliOut
 
     let summary: RefineSummary;
     try {
-      summary = await runRefine({
-        repoRoot: input.workspaceDir,
-        runTask: runner.runTask,
-        toolDescriptors: runner.toolDescriptors,
-        target: input.target,
-        failedOnly: input.failedOnly,
-        maxPages: input.maxPages,
-        maxRoundsPerPage: input.maxRoundsPerPage,
-        totalRounds: input.totalRounds
-      });
+      // ONE RUN AT A TIME PER WORKSPACE (run-lock.ts): refine rewrites the same committed shards a
+      // concurrent generate is publishing into, so it takes the same lock generate does.
+      summary = await withRunLock({ repoRoot: input.workspaceDir, mode: 'refine' }, (handle) =>
+        runRefine({
+          repoRoot: input.workspaceDir,
+          runTask: runner.runTask,
+          toolDescriptors: runner.toolDescriptors,
+          runId: handle.runId,
+          target: input.target,
+          failedOnly: input.failedOnly,
+          maxPages: input.maxPages,
+          maxRoundsPerPage: input.maxRoundsPerPage,
+          totalRounds: input.totalRounds
+        })
+      );
     } catch (runError) {
+      // A refused start attempted nothing, so there is no partial state to re-emit from.
+      if (runError instanceof CoreError && runError.code === 'run-in-progress') {
+        throw runError;
+      }
       // EMISSION AFTER PARTIAL FAILURE (wave 2b close final): refine persists page by page, so a
       // later page throwing leaves EARLIER pages committed with fresh shards while the rendered
       // routes still show the pre-refine state — current shards disagreeing with stale routes.

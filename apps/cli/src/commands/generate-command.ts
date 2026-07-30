@@ -5,7 +5,8 @@ import {
   failedPublicationInputs,
   loadConfigFamily,
   resolveCommit,
-  runGenerate
+  runGenerate,
+  withRunLock
 } from '@docstube/core';
 import type { GenerateSummary, TaskRunner } from '@docstube/core';
 import type { ToolDescriptor } from '@docstube/contracts';
@@ -40,15 +41,29 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
 
     let summary: GenerateSummary;
     try {
-      summary = await runGenerate({
-        repoRoot: input.workspaceDir,
-        runTask: runner.runTask,
-        toolDescriptors: runner.toolDescriptors,
-        maxAttemptsPerPage: input.maxAttempts,
-        ci: input.ci,
-        publishSite: createSitePublisher(input.workspaceDir, family, output)
-      });
+      // ONE RUN AT A TIME PER WORKSPACE (run-lock.ts). A CLI generate started while the local UI
+      // has a run going would share `.docstube/staging/` with it — the single mutable area
+      // staged-atomic publish depends on owning — so it refuses instead, naming the run in flight.
+      // A lock left behind by a process that died is taken over here, not waited on: the crashed
+      // run's interrupted publish is repaired forward by THIS run (publish-staging.ts §finish-forward).
+      summary = await withRunLock({ repoRoot: input.workspaceDir, mode: 'generate' }, (handle) =>
+        runGenerate({
+          repoRoot: input.workspaceDir,
+          runTask: runner.runTask,
+          toolDescriptors: runner.toolDescriptors,
+          runId: handle.runId,
+          maxAttemptsPerPage: input.maxAttempts,
+          ci: input.ci,
+          publishSite: createSitePublisher(input.workspaceDir, family, output)
+        })
+      );
     } catch (runError) {
+      // A REFUSED START IS NOT A FAILED RUN. Nothing was attempted, so there is nothing to report
+      // as unpublished and no decision to record — the outer handler prints the typed message
+      // (which names the run already in flight) and exits non-zero.
+      if (runError instanceof CoreError && runError.code === 'run-in-progress') {
+        throw runError;
+      }
       // NOTHING TO RECONCILE AFTER A CRASH (pipeline-v2 decision 3): a run publishes in ONE step
       // after the whole plan completes, so a run that threw published nothing — the site, the
       // manifest, and the routes are exactly as the last successful publish left them. The old

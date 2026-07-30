@@ -44,13 +44,17 @@ describe('session guard', () => {
 describe('control plane context injection', () => {
   it('threads injected capabilities into tRPC procedures', async () => {
     const launched: string[] = [];
+    // The control plane owns the run id now (it holds the workspace run lock under it), so the
+    // host journals the run under `handle.runId` and releases when the run settles.
+    let handedRunId: string | undefined;
     const app = createLocalApp({
       repoRoot: await makeRepoRoot(),
       sessionToken: token,
       controlPlane: {
-        launchRun: async (mode) => {
+        launchRun: async (mode, handle) => {
           launched.push(mode);
-          return { runId: 'run_00000000000000000000' };
+          handedRunId = handle.runId;
+          await handle.release();
         }
       }
     });
@@ -60,8 +64,9 @@ describe('control plane context injection', () => {
       body: JSON.stringify({ mode: 'generate' })
     });
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { result: { data: { runId: string } } };
-    expect(body.result.data.runId).toBe('run_00000000000000000000');
+    const body = (await response.json()) as { result: { data: { runId: string; started: boolean } } };
+    expect(body.result.data.runId).toBe(handedRunId);
+    expect(body.result.data.started).toBe(true);
     expect(launched).toEqual(['generate']);
   });
 
