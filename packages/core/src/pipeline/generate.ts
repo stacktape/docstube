@@ -1,6 +1,4 @@
 import { execFile } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import type { PageArtifact } from '@docstube/plugin-sdk';
 import type {
@@ -26,13 +24,20 @@ import type { RunJournal } from '../state/run-journal.ts';
 import { errorFindings, runVerifiers } from './verify-page.ts';
 import { loadContextFiles } from './context-files.ts';
 import { applyFlagAnswers, collectOpenQuestions, loadKnowledge } from './tribal-knowledge.ts';
-import { generatePage } from './page-runner.ts';
+import { contentRelativePath, generatePage } from './page-runner.ts';
 import type { PageOutcome, PageRunContext, TaskRunner } from './page-runner.ts';
 import { translateArtifact } from './translate-page.ts';
 import type { TranslationOutcome } from './translate-page.ts';
 import { createRunCostTracker, freezeReason } from './run-cost.ts';
 import { compareLedgerSnapshots, readLedgerSnapshot, resolveDeterministicGate } from './publication-decision.ts';
 import type { PublicationDecisionInputs } from './publication-decision.ts';
+import {
+  finishInterruptedPublish,
+  interruptedPublishFinding,
+  openPublishStaging,
+  planFingerprint
+} from './publish-staging.ts';
+import type { SitePublisher } from './publish-staging.ts';
 import type { ToolDescriptor } from '@docstube/contracts';
 
 const execFileAsync = promisify(execFile);
@@ -55,6 +60,11 @@ export type GenerateOptions = {
   // inputs — plan reconciliation, deterministic gate, and the base-vs-candidate ledger comparison
   // against the committed manifest the run started from.
   ci?: boolean | undefined;
+  // THE SITE EMISSION STEP, injected (ARCHITECTURE §2: core must not depend on @docstube/theme).
+  // It runs INSIDE the staged-atomic publish — routes, twins, shards and the index all land in one
+  // ordered step, or none of them do. A run without a publisher still publishes content, shards and
+  // the index; it simply renders no routes (the shape core's own tests use).
+  publishSite?: SitePublisher | undefined;
 };
 
 export type GenerateSummary = {
@@ -71,6 +81,12 @@ export type GenerateSummary = {
   estimatedUsd?: number;
   // Kinds of the open flags raised this run — telemetry input (coarse failure modes).
   openFlagKinds: FlagKind[];
+  // TRUE only when the whole plan completed and the staged work was published (pipeline-v2
+  // decision 3). False means the published tree is byte-identical to what it was before the run:
+  // a freeze, or a plan that produced nothing. A crashed run never reaches this summary at all.
+  published: boolean;
+  // Pages this run reused verbatim from a previous frozen run's staged work — nothing re-billed.
+  resumedPages: number;
   // Latest subscription plan usage (0-100) reported by the transport this run, when available.
   planUsedPercent?: number;
   // Present only under `ci: true` — everything the RUN knows about publishability. The decision
@@ -548,6 +564,28 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       await journal.append({ type: 'findings', findings: [dirtyWorkingTreeWarning(commit, [], treeState)] });
     }
 
+    const store = createManifestStore(repoRoot, version);
+    // FIRST THING, BEFORE ANYTHING READS THE COMMITTED MANIFEST (pipeline-v2 decision 3): a staging
+    // area left in the `publishing` phase means a previous publish replay was interrupted, so the
+    // published tree may hold new pages/routes against an index that still describes the previous
+    // state. The staged work is complete (a publish only starts once a plan completed) and the
+    // replay is idempotent, so it is finished FORWARD — never left mixed, never half-discarded.
+    const recovery = await finishInterruptedPublish({
+      repoRoot,
+      outDir: config.outDir,
+      store,
+      publishSite: options.publishSite
+    });
+    if (recovery.recovered) {
+      await journal.append({
+        type: 'findings',
+        findings: [
+          interruptedPublishFinding(recovery.runId ?? 'unknown'),
+          ...(recovery.pruned.length > 0 ? [prunedShardsFinding(recovery.pruned)] : [])
+        ]
+      });
+    }
+
     await journal.append({ type: 'stage-started', stage: 'codemap' });
     const codemapStarted = Date.now();
     const packs = host.languagePacks().map((entry) => entry.definition);
@@ -584,7 +622,6 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     }
     const dirtyWorkingTree = treeDirtyAtStart || unversionedSources.length > 0;
 
-    const store = createManifestStore(repoRoot, version);
     // generate IS the remedy for an index that outruns its shards, so it must be able to READ one:
     // it rewrites the index and reconciles the shard tree at the end of the run. Every consumer
     // that would publish or reason from the manifest keeps the strict read.
@@ -643,34 +680,101 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
     const translations: TranslationOutcome[] = [];
     const artifacts: PageArtifact[] = [];
 
+    // NOTHING PUBLISHES UNTIL THE PLAN COMPLETES (pipeline-v2 decision 3). Completed pages, their
+    // shards, and the index accumulate under `.docstube/staging/`; the published tree and the
+    // committed manifest are not touched until the single publish step at the end of this run.
+    const staging = await openPublishStaging({
+      repoRoot,
+      outDir: config.outDir,
+      runId: journal.runId,
+      version,
+      sourceLocale: locale,
+      planFingerprint: planFingerprint({
+        // The PARSED config, minus `agents.budgets`. Budgets are execution policy, not content:
+        // raising the cap to finish a frozen run is the canonical resume action, and it must not
+        // throw the staged work away. Everything else about the config — personas, docType, project
+        // context, theme, outDir, locales — does change what a page says, so it invalidates.
+        configHash: hashValue({ ...config, agents: { ...config.agents, budgets: undefined } }),
+        iaHash: hashValue(ia),
+        docstubeVersion,
+        locale,
+        targetLocales: config.locales.targets,
+        version,
+        sourceFingerprint: fingerprints
+      }),
+      publishedStore: store
+    });
+
     const openFlagKinds: FlagKind[] = [];
-    // Every shard persisted this run — the end-of-run dirty-tree sweep re-marks exactly these.
+    // Every shard staged this run — the end-of-run dirty-tree sweep re-marks exactly these.
     const persistedShards: Array<{ locale: string; pageId: string }> = [];
-    const persistShard = async (shard: Parameters<typeof store.writePageShard>[0]) => {
-      await store.writePageShard(shard);
-      persistedShards.push({ locale: shard.locale, pageId: shard.page.id });
-      for (const flag of shard.flags) {
+    const stagePage = async (input: {
+      kind: 'source' | 'translation';
+      shard: PageShard;
+      artifact?: PageArtifact | undefined;
+      status: 'passed' | 'flagged';
+      findings: Finding[];
+      attempts?: number | undefined;
+    }) => {
+      await staging.stagePage(input);
+      persistedShards.push({ locale: input.shard.locale, pageId: input.shard.page.id });
+      for (const flag of input.shard.flags) {
         await journal.append({ type: 'flag-raised', flag });
         if (flag.status === 'open') {
           openFlagKinds.push(flag.kind);
         }
       }
     };
-    const persistArtifact = async (artifact: PageArtifact, shard: Parameters<typeof store.writePageShard>[0]) => {
-      const mdxTarget = join(repoRoot, config.outDir, artifact.mdxPath);
-      await mkdir(dirname(mdxTarget), { recursive: true });
-      await writeFile(mdxTarget, artifact.mdx, 'utf8');
-      await persistShard(shard);
-    };
 
     // Cap-freeze (PRODUCT §3.5): checked only BETWEEN pages (and before translations) — never
-    // mid-page, because a half-verified page would ship state the gate never approved. Pages that
-    // already landed stay shipped; remaining pages are simply not generated.
+    // mid-page, because a half-verified page would ship state the gate never approved. Pages the
+    // run already finished stay STAGED (and are reused, unbilled, by the run that resumes);
+    // remaining pages are simply not generated, and nothing publishes.
     let frozen = false;
+    let resumedPages = 0;
     // The PLAN: every page the IA asked this run to produce. `planned` is what the decision must
     // reconcile against — `completed + deferred` — so a freeze can never read as a finished run.
     const plannedNodes = pageNodes(iaV2.tree);
     for (const node of plannedNodes) {
+      // RESUME WITHOUT RE-BILLING (pipeline-v2 decision 3): a page a previous frozen run of this
+      // same plan already completed is reused verbatim from staging — no writer task, no reviewer
+      // task, no cost. The staging area is only offered for reuse while its plan fingerprint (config
+      // + IA + a content fingerprint of every source file the run read) still matches, so reuse can
+      // never serve prose generated against a source tree that has since changed.
+      const staged = staging.resumableSourcePage(node.slug);
+      const stagedShard =
+        staged === undefined ? undefined : await staging.store.readPageShard({ locale, pageId: staged.pageId });
+      const stagedMdx = staged === undefined ? undefined : await staging.readStagedMdx(staged);
+      if (staged !== undefined && stagedShard !== undefined && stagedMdx !== undefined) {
+        resumedPages += 1;
+        outcomes.push({
+          pageId: staged.pageId,
+          slug: staged.slug,
+          status: staged.status,
+          findings: staged.findings,
+          attempts: staged.attempts ?? 0
+        });
+        artifacts.push({
+          page: stagedShard.page,
+          mdx: stagedMdx,
+          mdxPath: staged.mdxPath ?? contentRelativePath(locale, staged.slug),
+          locale,
+          version
+        });
+        persistedShards.push({ locale, pageId: staged.pageId });
+        await journal.append({ type: 'page-status', pageId: staged.pageId, status: staged.status });
+        for (const translation of staging.resumableTranslations(staged.slug)) {
+          translations.push({
+            locale: translation.locale,
+            slug: translation.slug,
+            status: translation.status,
+            findings: translation.findings
+          });
+          persistedShards.push({ locale: translation.locale, pageId: translation.pageId });
+        }
+        continue;
+      }
+
       if (costTracker.shouldFreeze()) {
         frozen = true;
         break;
@@ -682,11 +786,18 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       outcomes.push(outcome);
       artifacts.push(artifact);
 
-      // Assemble per page as it lands: MDX into the site content dir, shard into the manifest.
-      await persistArtifact(artifact, shard);
+      // Stage per page as it lands: MDX and shard into the staging area, never the published tree.
+      await stagePage({
+        kind: 'source',
+        artifact,
+        shard,
+        status: outcome.status,
+        findings: outcome.findings,
+        attempts: outcome.attempts
+      });
       await journal.append({ type: 'page-status', pageId: outcome.pageId, status: outcome.status });
 
-      // Verified translations stream out right behind their source page (PRODUCT §4.1 i18n).
+      // Verified translations stage right behind their source page (PRODUCT §4.1 i18n).
       if (config.locales.targets.length > 0 && outcome.status === 'passed') {
         if (costTracker.shouldFreeze()) {
           frozen = true;
@@ -695,13 +806,15 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
         for (const translation of await translateArtifact(ctx, artifact)) {
           translations.push(translation.outcome);
           // A failed translation must never emit MDX under a locale path — the fallback artifact
-          // is the untranslated source page. The shard (with its flags) still persists so status
+          // is the untranslated source page. The shard (with its flags) still stages so status
           // and the flag queue see the failure.
-          if (translation.outcome.status === 'passed') {
-            await persistArtifact(translation.artifact, translation.shard);
-          } else {
-            await persistShard(translation.shard);
-          }
+          await stagePage({
+            kind: 'translation',
+            shard: translation.shard,
+            ...(translation.outcome.status === 'passed' ? { artifact: translation.artifact } : {}),
+            status: translation.outcome.status,
+            findings: translation.outcome.findings
+          });
         }
       }
     }
@@ -733,7 +846,8 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       await journal.append({ type: 'findings', findings: siteFindings });
       // Site-scope findings must also land on the named page's shard — otherwise `docstube status`
       // (which reads shards) disagrees with the run summary.
-      for (const flag of await attachSiteFindingsToShards({ store, journal, siteFindings })) {
+      // …on the STAGED shard: a site finding is part of the same publish unit as the page it names.
+      for (const flag of await attachSiteFindingsToShards({ store: staging.store, journal, siteFindings })) {
         openFlagKinds.push(flag.kind);
       }
     }
@@ -744,22 +858,11 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       durationMs: 0
     });
 
-    // A frozen run stopped BEFORE reaching some pages: their previous entries (and shards) must
-    // survive, or the freeze would silently delete finished docs (live-hit: the first cap-freeze
-    // pruned three committed shards). Only pages this run actually regenerated replace their entry.
-    const reachedSlugs = new Set(artifacts.map((artifact) => artifact.page.slug));
-    const carriedCandidates = frozen
-      ? (previousIndex?.pages ?? []).filter((entry) => !reachedSlugs.has(entry.slug))
-      : [];
-    // …but only entries whose shard actually survives: carrying an entry with no shard would
-    // record an index that outruns the shards on disk, which every reader is now entitled to
-    // reject. A dropped entry is regenerated from its IA node on the next unfrozen run.
-    const carriedEntries: typeof carriedCandidates = [];
-    for (const entry of carriedCandidates) {
-      if ((await store.readPageShard({ locale, pageId: entry.id })) !== undefined) {
-        carriedEntries.push(entry);
-      }
-    }
+    // The index this run WOULD publish: exactly the pages the plan produced. It is built even for a
+    // frozen run (the journal and the decision reason about the same object) but a frozen run never
+    // reaches the publish step, so it never reaches disk. The old carry-forward-on-freeze logic is
+    // gone with the freeze-publishes-nothing rule: a truncated index can no longer be written, so
+    // there is nothing to rescue committed pages FROM.
     const index: ManifestIndex = {
       schemaVersion: 1,
       docstubeVersion,
@@ -769,29 +872,23 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
         { label: version, status: 'current', commit },
         ...config.versions.frozen.map((label) => ({ label, status: 'frozen' as const }))
       ],
-      pages: [
-        ...artifacts.map((artifact) => ({
-          id: artifact.page.id,
-          slug: artifact.page.slug,
-          title: artifact.page.title,
-          path: artifact.mdxPath
-        })),
-        ...carriedEntries
-      ],
+      pages: artifacts.map((artifact) => ({
+        id: artifact.page.id,
+        slug: artifact.page.slug,
+        title: artifact.page.title,
+        path: artifact.mdxPath
+      })),
       configHash: hashValue(family.raw.config),
       iaHash: hashValue(family.raw.ia),
       systemFlags: []
     };
-    const { pruned } = await store.writeIndex(index);
-    if (pruned.length > 0) {
-      await journal.append({ type: 'findings', findings: [prunedShardsFinding(pruned)] });
-    }
 
     // Dirty-tree honesty, end-of-run recheck (impl-07 finding 7 interim): a clean-at-start tree
-    // that mutated mid-run still gets the marker + journal warning.
+    // that mutated mid-run still gets the marker + journal warning. It marks the STAGED shards —
+    // the ones this run is about to publish — before the publish step reads them.
     await dirtyTreeEndOfRunSweep({
       repoRoot,
-      store,
+      store: staging.store,
       journal,
       commit,
       dirtyAtStart: dirtyWorkingTree,
@@ -800,13 +897,35 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       persistedShards
     });
 
-    // The CANDIDATE side of the comparison, read back from what this run actually committed to the
-    // manifest — never from in-memory optimism.
+    // THE ONE PUBLISH PATH (pipeline-v2 decision 3). Content MDX → shards → emitted routes/twins →
+    // manifest index, in that order, all from the staging area, all or nothing. A frozen run skips
+    // it entirely: the published tree stays byte-identical and the staged work waits for the run
+    // that finishes the plan.
+    let published = false;
+    if (!frozen) {
+      const result = await staging.publish({
+        index,
+        ...(options.publishSite === undefined ? {} : { publishSite: options.publishSite })
+      });
+      published = true;
+      if (result.pruned.length > 0) {
+        await journal.append({ type: 'findings', findings: [prunedShardsFinding(result.pruned)] });
+      }
+    }
+
+    // The CANDIDATE side of the comparison, read back from what is actually PUBLISHED — never from
+    // in-memory optimism, and never from staged work that no reader can see. A frozen run publishes
+    // nothing, so its candidate is the previous published state: the honest statement that this run
+    // changed nothing readers can observe.
     const publicationInputs =
       baseLedgers === undefined
         ? undefined
         : await (async (): Promise<PublicationDecisionInputs> => {
-            const candidateLedgers = await readLedgerSnapshot({ store, index, locale });
+            const candidateLedgers = await readLedgerSnapshot({
+              store,
+              index: published ? index : previousIndex,
+              locale
+            });
             const { regressions, newBlockingDispositions } = compareLedgerSnapshots(baseLedgers, candidateLedgers);
             const completed = outcomes.length;
             return {
@@ -845,6 +964,8 @@ export const runGenerate = async (options: GenerateOptions): Promise<GenerateSum
       siteFindings,
       warnings: host.warnings(),
       openFlagKinds,
+      published,
+      resumedPages,
       ...(publicationInputs === undefined ? {} : { publicationInputs }),
       ...(costTracker.hasReportedCost() ? { spentUsd: costTracker.spentUsd() } : {}),
       ...(costTracker.hasEstimates() ? { estimatedUsd: costTracker.estimatedUsd() } : {}),

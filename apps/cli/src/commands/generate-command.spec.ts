@@ -9,10 +9,10 @@ import { inventoryBindingHash, outputInventoryRelativePath, publicationDecisionR
 import { runGenerateCommand } from './generate-command.ts';
 import type { CliOutput } from '../cli-output.ts';
 
-// EMISSION AFTER PARTIAL FAILURE (wave 2b close): the pipeline can throw AFTER pages were
-// persisted (a writer transport failing on a later page). The generate command must still run the
-// shared assemble step over the consistent persisted state before surfacing the run error —
-// otherwise an old rendered route keeps disagreeing with the new shard.
+// STAGED-ATOMIC PUBLISH at the command boundary (pipeline-v2 decision 3): `generate` publishes its
+// whole plan in one step or publishes nothing. What used to be tested here — re-emitting routes over
+// whatever a crashed run had already persisted — no longer has a subject: a crashed run persists
+// nothing readers can see.
 //
 // The throw vehicle is deliberately a WRITER transport failure on the second page: a TRANSLATOR
 // transport failure is nonblocking by design (impl-23 finding 4) and no longer fails a run.
@@ -107,7 +107,43 @@ afterEach(async () => {
 });
 
 describe('runGenerateCommand', () => {
-  it('emits the persisted state even when the pipeline throws after pages landed, then surfaces the run error', async () => {
+  // ONE PUBLISH PATH (pipeline-v2 decision 3): shard persistence and site emission are no longer
+  // independent writes racing each other — routes, twins, canonical MDX, shards and the manifest
+  // index are all produced by the single publish step at the end of the plan.
+  it('publishes routes, twins, canonical MDX, shards and the index together', async () => {
+    const lines: string[] = [];
+    const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
+
+    const result = await runGenerateCommand(
+      { workspaceDir: repoRoot, taskRunner: { runTask: scriptedRunTask(mdx, 'pass'), toolDescriptors: [] } },
+      output
+    );
+    expect(result.exitCode).toBe(0);
+    expect(lines.some((line) => line.includes('site published to'))).toBe(true);
+
+    const index = JSON.parse(await readFile(join(repoRoot, '.docstube', 'manifest', 'manifest.json'), 'utf8'));
+    expect(index.pages).toHaveLength(1);
+    const entry = index.pages[0];
+    // Everything the index advertises exists: canonical MDX, shard, rendered route, raw twin.
+    expect(await readFile(join(repoRoot, 'docs-site', entry.path), 'utf8')).toContain('# Getting started');
+    expect(
+      await readFile(join(repoRoot, '.docstube', 'manifest', 'pages', 'en', `${entry.id}.json`), 'utf8')
+    ).toContain(entry.id);
+    expect(await readFile(join(repoRoot, 'docs-site', 'src', 'pages', `${entry.slug}.mdx`), 'utf8')).toContain(
+      `docstubePageId: "${entry.id}"`
+    );
+    expect(await readFile(join(repoRoot, 'docs-site', 'public', `${entry.slug}.md`), 'utf8')).toContain(
+      '# Getting started'
+    );
+    // The staging area cleans itself up on a successful publish.
+    await expect(readFile(join(repoRoot, '.docstube', 'staging', 'state.json'), 'utf8')).rejects.toThrow(/ENOENT/);
+  }, 180_000);
+
+  // STAGED-ATOMIC PUBLISH (pipeline-v2 decision 3): a run that dies part-way through its plan
+  // publishes NOTHING. The previous contract here was the opposite — pages landed one at a time, so
+  // a crash had to re-emit the routes to match whatever had already been persisted. Now the
+  // published tree is simply untouched, which is what makes `publishable: false` a fact.
+  it('publishes nothing when the pipeline throws mid-plan — the previous site and manifest are untouched', async () => {
     const lines: string[] = [];
     const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
 
@@ -118,7 +154,10 @@ describe('runGenerateCommand', () => {
     );
     expect(first.exitCode).toBe(0);
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
-    expect(await readFile(routePath, 'utf8')).toContain('docstubeClaimsTotal: 1');
+    const publishedRoute = await readFile(routePath, 'utf8');
+    expect(publishedRoute).toContain('docstubeClaimsTotal: 1');
+    const publishedIndex = await readFile(join(repoRoot, '.docstube', 'manifest', 'manifest.json'), 'utf8');
+    const publishedMdx = await readFile(join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx'), 'utf8');
 
     // Run 2: a SECOND page joins the IA, the writer produces an UPDATED first page (two claims),
     // and the writer transport explodes on the second page — AFTER page one was persisted.
@@ -137,12 +176,18 @@ describe('runGenerateCommand', () => {
       )
     ).rejects.toThrow('writer transport exploded');
 
-    // The finally-shaped emission ran before the error escaped: the route matches the NEW shard
-    // (two claims), never the stale pre-run rendering.
-    expect(lines.some((line) => line.includes('re-emitted'))).toBe(true);
-    const route = await readFile(routePath, 'utf8');
-    expect(route).toContain('docstubeClaimsTotal: 2');
-    expect(route).toContain('`greet` returns a string.');
+    // BYTE-IDENTICAL: the crashed run rewrote page one into STAGING, never into the published tree,
+    // so the route, the canonical MDX, and the manifest index are exactly what run 1 published.
+    expect(lines.some((line) => line.includes('nothing was published'))).toBe(true);
+    expect(await readFile(routePath, 'utf8')).toBe(publishedRoute);
+    expect(await readFile(join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx'), 'utf8')).toBe(
+      publishedMdx
+    );
+    expect(await readFile(join(repoRoot, '.docstube', 'manifest', 'manifest.json'), 'utf8')).toBe(publishedIndex);
+    // …and the second page the crashed run never finished has no route at all.
+    await expect(readFile(join(repoRoot, 'docs-site', 'src', 'pages', 'advanced.mdx'), 'utf8')).rejects.toThrow(
+      /ENOENT/
+    );
   }, 180_000);
 
   // PRODUCT §3.3: `--ci` is what makes a run accountable to the merge gate. The artifacts land

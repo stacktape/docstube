@@ -921,6 +921,10 @@ describe('runGenerate', () => {
     });
     expect(second.outcome).toBe('flagged');
     expect(second.pages[0]?.status).toBe('flagged');
+    // STAGED-ATOMIC PUBLISH (pipeline-v2 decision 3): retention is not an exception to the publish
+    // rule — the retained PRIOR bytes and the retained PRIOR trust state travel through staging as
+    // one unit and land together with the rest of the plan. The plan completed, so it published.
+    expect(second.published).toBe(true);
 
     const mdxAfter = await readFile(mdxPath, 'utf8');
     expect(mdxAfter).toBe(publishedMdx);

@@ -9,7 +9,7 @@ import {
 } from '@docstube/core';
 import type { GenerateSummary, TaskRunner } from '@docstube/core';
 import type { ToolDescriptor } from '@docstube/contracts';
-import { emitPersistedSite } from './emit-current-site.ts';
+import { createSitePublisher } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
 import { countRunFailureModes } from '../runtime-telemetry.ts';
 import { reportRunSpend } from './run-spend.ts';
@@ -44,23 +44,16 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
         runTask: runner.runTask,
         toolDescriptors: runner.toolDescriptors,
         maxAttemptsPerPage: input.maxAttempts,
-        ci: input.ci
+        ci: input.ci,
+        publishSite: createSitePublisher(input.workspaceDir, family, output)
       });
     } catch (runError) {
-      // EMISSION AFTER PARTIAL FAILURE (wave 2b close): the pipeline can throw AFTER pages were
-      // persisted (translation/transport errors) — the rendered routes must still be reconciled
-      // with the persisted shards, or an old route keeps rendering against a new shard. Emission
-      // consumes only committed state, so what it emits is consistent; it no-ops when no manifest
-      // was ever persisted. The run error is surfaced AFTER emission, and an emission failure
-      // must never mask it.
-      try {
-        const emitted = await emitPersistedSite(input.workspaceDir, family, output);
-        if (emitted.emitted) {
-          output.info(`run failed — site re-emitted to ${family.config.outDir}/ from the persisted state`);
-        }
-      } catch (emitError) {
-        output.error(`site emission after the failed run also failed: ${(emitError as Error).message}`);
-      }
+      // NOTHING TO RECONCILE AFTER A CRASH (pipeline-v2 decision 3): a run publishes in ONE step
+      // after the whole plan completes, so a run that threw published nothing — the site, the
+      // manifest, and the routes are exactly as the last successful publish left them. The old
+      // re-emit-from-persisted-state path existed because pages used to land one at a time; under
+      // staged publish it would be a second, competing publish path over state nothing changed.
+      output.info('run failed — nothing was published; the site and manifest are unchanged');
       // A CRASHED RUN STILL OWES CI A DECISION: without one the Action cannot distinguish a run
       // that died from a CLI that never emits decisions, and both fail closed — but only the
       // recorded decision puts `execution: failed` on the PR instead of a silent withheld merge.
@@ -91,13 +84,13 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
       output.info(`  warn  ${warning}`);
     }
 
-    // Assemble the self-contained site from what the pipeline shipped.
-    const emitResult = await emitPersistedSite(input.workspaceDir, family, output);
-    if (!emitResult.emitted) {
-      output.error('pipeline finished but wrote no manifest — this is a bug');
-      return { exitCode: 1 };
+    // Assembly already happened INSIDE the publish step (staged-atomic publish): routes, twins,
+    // shards and the manifest index landed together, or none of them did.
+    if (summary.published) {
+      output.info(`site published to ${family.config.outDir}/ — build it with: npm install && npm run build`);
+    } else {
+      output.info('nothing was published this run — the site and manifest are exactly as they were');
     }
-    output.info(`site emitted to ${family.config.outDir}/ — build it with: npm install && npm run build`);
 
     // The decision is minted AFTER emission: the output inventory it binds to must describe the
     // tree the Action is about to stage, site files included.
@@ -123,8 +116,13 @@ export const runGenerateCommand = async (input: GenerateCommandInput, output: Cl
     }
     if (summary.outcome === 'frozen') {
       output.info(
-        'run FROZE at the configured budget cap (agents.budgets.maxRunUsd) — rerun to continue; finished pages are cached'
+        'run FROZE at the configured budget cap (agents.budgets.maxRunUsd) — NOTHING was published, so the site ' +
+          'never shows a half-applied change. Finished pages are staged under .docstube/staging/; rerun `docstube ' +
+          'generate` to finish the plan and publish it all at once (staged pages are not re-billed)'
       );
+    }
+    if (summary.resumedPages > 0) {
+      output.info(`  resumed ${summary.resumedPages} page(s) from staged work — not regenerated, not re-billed`);
     }
     reportRunSpend(output, summary);
     output.info(`run ${summary.runId}: ${summary.outcome}`);

@@ -269,7 +269,10 @@ docs-site/                         # the generated, self-contained Astro site (e
 symbol→entity reverse map, flag queue, knowledge queue, structural-finding index, run/job/step
 state for the dashboard timelines. Losing it loses nothing; `docstube` rebuilds it on demand
 (`state doctor` path). `cache/` holds the agent-call cache keyed by input hashes. `runs/` holds
-journaled run logs and **staged (not yet published) work** (uploaded as Actions artifacts in CI).
+journaled run logs (uploaded as Actions artifacts in CI). `staging/` holds **staged (not yet
+published) work** — `state.json` (plan fingerprint, phase, per-page records), `manifest/` (staged
+shards), `out/` (staged page MDX keyed by its outDir-relative path). All three are gitignored,
+excluded from the output inventory, and excluded from the Action's commit-path selection.
 
 ### 5.3 Docset boundary
 
@@ -533,8 +536,28 @@ exactly the dependent pages (PRODUCT §3.10).
 
 Pass → stage. Deterministic fail → bounded retry loop with findings. Unresolvable → flag +
 proceed (non-blocking kinds) or block (PRODUCT §3.3 list). On budget freeze, staged work persists
-in the journal/cache and **nothing publishes until the whole plan completes**; the next
-`generate` resumes and publishes atomically. `refine` regenerates into the same staged state and
+in `.docstube/staging/` (plus the journal/cache) and **nothing publishes until the whole plan
+completes**; the next `generate` resumes and publishes atomically.
+
+**The publish step, exactly.** There is ONE code path that writes the published tree
+(`core/src/pipeline/publish-staging.ts`), driven by `runGenerate`; site emission is a step inside
+it, not an independent write. When (and only when) the plan completes, the staging area replays in
+a fixed order: page MDX → shards (through the manifest store, so integrity and shard pruning are
+unchanged) → routes/twins/theme (the injected `SitePublisher`, rendered against the staged index
+in memory) → **the manifest index, last**, written temp-file + rename. Staging is deleted only
+after that rename succeeds.
+
+**The guarantee, and its failure window.** No partial PLAN ever publishes: a freeze, a crash, or a
+failed page leaves the published tree byte-identical. Publishing itself is *not* filesystem-atomic
+across files — no platform offers that — so the guarantee is ordering plus recovery: the index is
+the last write and every file it advertises already exists, and the staging area carries a
+`publishing` phase marker for the duration. An interruption inside the replay leaves new page
+bytes and routes on disk against the previous index; everything that reads THROUGH the manifest
+(status, the local UI, the CI decision, the next run) still sees the previous state, and the next
+`generate` detects the marker and finishes the same replay forward, byte-for-byte, before doing
+anything else. Resume never re-bills: a staged page whose plan fingerprint (config minus budgets,
+IA, and a content fingerprint of every source file the run read) still matches is reused verbatim
+with no agent call at all. `refine` regenerates into the same staged state and
 accepts only under the Pareto gate (PRODUCT §3.5): re-run affected obligations/checks/criteria +
 a virtual group check; accept iff ≥1 target finding resolves or a criterion flips to met and
 nothing regresses; otherwise discard byte-for-byte and journal why. Persona-fit comparison is

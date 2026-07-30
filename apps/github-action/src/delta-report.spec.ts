@@ -31,7 +31,12 @@ describe('atomic commit path selection', () => {
       '.docstube/db.sqlite',
       '.docstube/db.sqlite-wal',
       '.docstube/cache/agent-calls/abc.json',
-      '.docstube/runs/run_1/journal.jsonl'
+      '.docstube/runs/run_1/journal.jsonl',
+      // Staged-atomic publish (pipeline-v2 decision 3): completed-but-UNPUBLISHED work. Committing
+      // it would put a half-applied plan on the PR under a gate it never passed.
+      '.docstube/staging/state.json',
+      '.docstube/staging/out/content/en/installation.mdx',
+      '.docstube\\staging\\manifest\\pages\\en\\pg_00000000000000000000.json'
     ]);
 
     expect(paths).toEqual([

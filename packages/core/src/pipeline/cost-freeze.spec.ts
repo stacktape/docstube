@@ -6,6 +6,8 @@ import type { AgentTaskSpec, Transcript } from '@docstube/contracts';
 import { createManifestStore } from '../state/manifest-store.ts';
 import { createRunJournal } from '../state/run-journal.ts';
 import { runGenerate } from './generate.ts';
+import { readStagedRun } from './publish-staging.ts';
+import { snapshotPublishedTree } from './publish-staging-test-support.ts';
 import {
   createRunCostTracker,
   ESTIMATE_USD_PER_1M_INPUT_TOKENS,
@@ -242,31 +244,45 @@ describe('runGenerate under a run cost cap', () => {
     const runCompleted = events.at(-1);
     expect(runCompleted).toMatchObject({ type: 'run-completed', outcome: 'frozen' });
 
-    // The already-shipped page stays shipped: shard + MDX intact; unstarted pages left nothing.
+    // STAGED-ATOMIC PUBLISH (pipeline-v2 decision 3): the finished page is STAGED, not published.
+    // Nothing reached the manifest or the site — the freeze cannot leave a half-applied source
+    // change behind, which is what makes the decision's `publishable: false` a fact and not advice.
+    expect(summary.published).toBe(false);
     const store = createManifestStore(repoRoot, 'latest');
-    const index = await store.readIndex();
-    expect(index?.pages.map((entry) => entry.slug)).toEqual(['getting-started']);
-    const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
-    expect(shard?.page.slug).toBe('getting-started');
-    const mdxOnDisk = await readFile(join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx'), 'utf8');
-    expect(mdxOnDisk).toContain('# Getting started');
+    expect(await store.readIndex()).toBeUndefined();
+    await expect(readFile(join(repoRoot, 'docs-site', 'content', 'en', 'getting-started.mdx'), 'utf8')).rejects.toThrow(
+      /ENOENT/
+    );
     await expect(readFile(join(repoRoot, 'docs-site', 'content', 'en', 'configuration.mdx'), 'utf8')).rejects.toThrow(
       /ENOENT/
     );
+
+    // …and the completed work IS staged, ready for the run that finishes the plan.
+    const staged = await readStagedRun(repoRoot);
+    expect(staged?.phase).toBe('staging');
+    expect(staged?.pages.map((page) => page.slug)).toEqual(['getting-started']);
+    expect(
+      await readFile(join(repoRoot, '.docstube', 'staging', 'out', 'content', 'en', 'getting-started.mdx'), 'utf8')
+    ).toContain('# Getting started');
   }, 60_000);
 
-  it('a freeze never deletes pages a previous run finished — their index entries and shards survive', async () => {
-    // Live regression: the first real cap-freeze wrote an index with only the reached pages, and
-    // orphan pruning then deleted three committed shards.
+  it('a freeze over an already-published site leaves the published tree byte-identical', async () => {
+    // Live regression, now enforced at the strongest level available: the first real cap-freeze
+    // wrote an index with only the reached pages and orphan pruning deleted three committed shards.
+    // A freeze no longer writes the published tree AT ALL, so there is nothing left to rescue.
     await writeFile(join(repoRoot, 'docstube.yml'), configYaml());
     const full = scriptedRunner();
     await runGenerate({ repoRoot, runTask: full.runTask, toolDescriptors: [] });
+    const before = await snapshotPublishedTree(repoRoot);
 
     await writeFile(join(repoRoot, 'docstube.yml'), configYaml(0.9));
     const frozen = scriptedRunner();
     const summary = await runGenerate({ repoRoot, runTask: frozen.runTask, toolDescriptors: [] });
     expect(summary.outcome).toBe('frozen');
+    expect(summary.published).toBe(false);
 
+    // Byte-for-byte: every manifest file and every emitted content file is what it was.
+    expect(await snapshotPublishedTree(repoRoot)).toEqual(before);
     const store = createManifestStore(repoRoot, 'latest');
     const index = await store.readIndex();
     expect(index?.pages.map((entry) => entry.slug).toSorted()).toEqual([
@@ -274,9 +290,6 @@ describe('runGenerate under a run cost cap', () => {
       'getting-started',
       'troubleshooting'
     ]);
-    for (const entry of index?.pages ?? []) {
-      expect(await store.readPageShard({ locale: 'en', pageId: entry.id })).toBeDefined();
-    }
   }, 60_000);
 
   // budgets.maxRunUsd defaults to 20, so an unconfigured run has real headroom but never runs uncapped.

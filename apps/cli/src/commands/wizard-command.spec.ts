@@ -118,7 +118,10 @@ describe('createWizardControlPlane', () => {
     expect(lines.filter((line) => line.includes('unverified'))).toEqual([]);
   }, 120_000);
 
-  it('still emits the site when the pipeline throws AFTER pages were persisted — routes match the new shards', async () => {
+  // STAGED-ATOMIC PUBLISH (pipeline-v2 decision 3): the wizard's background generate publishes in
+  // one step at the end of the plan, so a run that throws mid-plan leaves the routes exactly as the
+  // last successful publish left them — and the wizard no longer emits a second time of its own.
+  it('publishes nothing when the background generate throws mid-plan — the rendered routes are untouched', async () => {
     const lines: string[] = [];
     const output: CliOutput = { info: (message) => lines.push(message), error: (message) => lines.push(message) };
 
@@ -130,6 +133,7 @@ describe('createWizardControlPlane', () => {
     await (first.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
     const routePath = join(repoRoot, 'docs-site', 'src', 'pages', 'getting-started.mdx');
     await vi.waitFor(() => readFile(routePath, 'utf8'), { timeout: 90_000, interval: 500 });
+    const publishedRoute = await readFile(routePath, 'utf8');
 
     // Run 2: a SECOND page joins the IA, the writer produces an UPDATED first page (two claims),
     // and the WRITER transport explodes on the second page — the pipeline throws AFTER page one
@@ -165,7 +169,7 @@ describe('createWizardControlPlane', () => {
     );
     await (second.launchRun?.('generate') ?? Promise.reject(new Error('no launchRun')));
 
-    // The failure is surfaced AFTER emission — once the error line appears, the routes are final.
+    // Once the error line appears the run is over; nothing it produced reached the published tree.
     await vi.waitFor(
       () => {
         if (!lines.some((line) => line.includes('background generate run failed'))) {
@@ -176,14 +180,13 @@ describe('createWizardControlPlane', () => {
     );
     expect(lines.some((line) => line.includes('writer transport exploded'))).toBe(true);
 
-    // The re-emitted route matches the NEW shard persisted before the throw (two claims), not the
-    // pre-run rendering (one claim) — the exact drift the finally-shaped emission closes.
-    const route = await readFile(routePath, 'utf8');
-    expect(route).toContain('docstubeClaimsTotal: 2');
-    expect(route).toContain('`greet` returns a string.');
+    // The route is byte-identical to run 1's publish, and the committed shard still carries the
+    // ONE-claim ledger: the two-claim rewrite the crashed run produced is staged, never published.
+    expect(await readFile(routePath, 'utf8')).toBe(publishedRoute);
     const store = createManifestStore(repoRoot, 'latest');
     const index = await store.readIndex();
+    expect(index?.pages).toHaveLength(1);
     const shard = await store.readPageShard({ locale: 'en', pageId: index?.pages[0]?.id ?? '' });
-    expect(shard?.ledger?.claims).toHaveLength(2);
+    expect(shard?.ledger?.claims).toHaveLength(1);
   }, 180_000);
 });

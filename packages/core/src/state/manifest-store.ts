@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, rmdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, rm, rmdir, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { ManifestIndex, PageShard } from '@docstube/contracts';
 import {
@@ -16,9 +16,9 @@ import { CoreError } from '../errors.ts';
 // always materialized identically. Human-owned files (docstube.yml, ia.yml, …) stay YAML. There is
 // no YAML→JSON migration: manifests are pre-release state — regenerate.
 
-const manifestDir = (repoRoot: string): string => join(repoRoot, '.docstube', 'manifest');
-const indexPath = (repoRoot: string): string => join(manifestDir(repoRoot), 'manifest.json');
-const currentPagesDir = (repoRoot: string): string => join(manifestDir(repoRoot), 'pages');
+export const committedManifestDir = (repoRoot: string): string => join(repoRoot, '.docstube', 'manifest');
+const indexPath = (manifestRoot: string): string => join(manifestRoot, 'manifest.json');
+const currentPagesDir = (manifestRoot: string): string => join(manifestRoot, 'pages');
 
 // Every serialization the store has EVER owned at these paths. A `.yml` shard is not a foreign
 // file to be preserved: it is this store's own superseded output, so reconciliation removes it.
@@ -85,9 +85,22 @@ export type ManifestStore = {
   removeVersionShards: (label: string) => Promise<void>;
 };
 
-export const createManifestStore = (repoRoot: string, currentVersion: string): ManifestStore => {
+export type ManifestStoreOptions = {
+  // Absolute path of the manifest root. Defaults to the COMMITTED manifest (`.docstube/manifest/`).
+  // The staged-publish area (publish-staging.ts) opens a second store on its own root so a run can
+  // accumulate shards with identical semantics — validation, canonical serialization, index
+  // reconciliation — without touching published state.
+  manifestDir?: string | undefined;
+};
+
+export const createManifestStore = (
+  repoRoot: string,
+  currentVersion: string,
+  options: ManifestStoreOptions = {}
+): ManifestStore => {
+  const manifestRoot = options.manifestDir ?? committedManifestDir(repoRoot);
   const shardPath = (input: { locale: string; pageId: string; version?: string | undefined }): string =>
-    join(manifestDir(repoRoot), pageShardRelativePath({ ...input, currentVersion }));
+    join(manifestRoot, pageShardRelativePath({ ...input, currentVersion }));
 
   const readPageShard = (input: { locale: string; pageId: string; version?: string }): Promise<PageShard | undefined> =>
     readJsonFile(shardPath(input), (raw) => pageShardSchema.parse(raw));
@@ -101,7 +114,7 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
     const keepPageIds = new Set(index.pages.map((entry) => entry.id));
     const keepLocales = new Set([index.sourceLocale, ...index.locales]);
     const pruned: string[] = [];
-    const pagesDir = currentPagesDir(repoRoot);
+    const pagesDir = currentPagesDir(manifestRoot);
     for (const locale of await readDirEntries(pagesDir)) {
       const localeDir = join(pagesDir, locale);
       const entries = await readDirEntries(localeDir);
@@ -131,7 +144,7 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
     // The root index has exactly one owner and one current serialization, so a `manifest.yml` next
     // to `manifest.json` is unambiguously this store's superseded output.
     for (const name of ['manifest.yml', 'manifest.yaml']) {
-      const candidate = join(manifestDir(repoRoot), name);
+      const candidate = join(manifestRoot, name);
       const isFile = await stat(candidate).then(
         (stats) => stats.isFile(),
         () => false
@@ -168,22 +181,28 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
   };
 
   return {
-    readIndex: async (options) => {
-      const index = await readJsonFile(indexPath(repoRoot), (raw) => manifestIndexSchema.parse(raw));
+    readIndex: async (readOptions) => {
+      const index = await readJsonFile(indexPath(manifestRoot), (raw) => manifestIndexSchema.parse(raw));
       // No manifest at all is the FIRST-RUN state, not a contradiction — only an index that claims
       // pages is held to its shards.
       if (index === undefined) {
         return undefined;
       }
-      if (options?.requireShards !== false) {
+      if (readOptions?.requireShards !== false) {
         await assertShardsPresent(index);
       }
       return index;
     },
     writeIndex: async (index) => {
       const validated = manifestIndexSchema.parse(index);
-      await mkdir(manifestDir(repoRoot), { recursive: true });
-      await writeFile(indexPath(repoRoot), canonicalStateJson(validated), 'utf8');
+      await mkdir(manifestRoot, { recursive: true });
+      // THE COMMIT POINT of a staged publish (publish-staging.ts) is this one write: it is the last
+      // thing a publish does, and every page it names is already on disk. Written to a temp file and
+      // RENAMED so the index itself is never observable half-written — a reader either sees the
+      // previous index or the new one, never a truncated JSON document.
+      const temporary = join(manifestRoot, 'manifest.json.tmp');
+      await writeFile(temporary, canonicalStateJson(validated), 'utf8');
+      await rename(temporary, indexPath(manifestRoot));
       // Reconcile AFTER the index is on disk: an interrupted write never leaves shards deleted for
       // an index that was never recorded.
       return { pruned: await reconcileShardTree(validated) };
@@ -198,14 +217,14 @@ export const createManifestStore = (repoRoot: string, currentVersion: string): M
       await writeFile(path, canonicalStateJson(validated), 'utf8');
     },
     listShardPageIds: async (locale) => {
-      const entries = await readDirEntries(join(currentPagesDir(repoRoot), locale));
+      const entries = await readDirEntries(join(currentPagesDir(manifestRoot), locale));
       return entries.flatMap((name) => {
         const shardFile = parseShardFileName(name);
         return shardFile?.extension === '.json' ? [shardFile.pageId] : [];
       });
     },
     removeVersionShards: async (label) => {
-      await rm(join(manifestDir(repoRoot), 'versions', label, 'pages'), { recursive: true, force: true });
+      await rm(join(manifestRoot, 'versions', label, 'pages'), { recursive: true, force: true });
     }
   };
 };

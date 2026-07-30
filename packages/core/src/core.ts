@@ -47,6 +47,16 @@ export type { WritePromptInput } from './pipeline/write-page.ts';
 export { runGenerate, unwrapMdxFence, resolveCommit } from './pipeline/generate.ts';
 export type { GenerateOptions, GenerateSummary } from './pipeline/generate.ts';
 export {
+  discardStaging,
+  finishInterruptedPublish,
+  openPublishStaging,
+  planFingerprint,
+  readStagedRun,
+  stagingDir,
+  stagingRelativeDir
+} from './pipeline/publish-staging.ts';
+export type { PublishStaging, SitePublisher, StagedPageRecord, StagedRunState } from './pipeline/publish-staging.ts';
+export {
   buildPublicationDecision,
   collectOutputInventory,
   compareLedgerSnapshots,

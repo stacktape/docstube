@@ -257,7 +257,10 @@ export const compareLedgerSnapshots = (
 
 // Machine-local state under `.docstube/` (ARCHITECTURE §5.2): rebuildable, never committed, and
 // therefore never part of the commit-boundary allowlist.
-const machineLocalNames = new Set(['runs', 'cache', 'telemetry.json']);
+// `staging` is the staged-atomic publish area (publish-staging.ts): completed-but-unpublished work.
+// Declaring it would invite the Action to commit a half-applied plan — the exact failure decision 3
+// exists to prevent — so it is machine-local like runs/ and cache/.
+const machineLocalNames = new Set(['runs', 'cache', 'staging', 'telemetry.json']);
 const isMachineLocal = (relativePath: string): boolean => {
   const segments = relativePath.split('/');
   return (

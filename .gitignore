@@ -35,6 +35,8 @@ Thumbs.db
 .docstube/db.sqlite*
 .docstube/cache/
 .docstube/runs/
+# Staged-atomic publish (pipeline-v2 decision 3): completed-but-unpublished work.
+.docstube/staging/
 .docstube-build/
 
 BUSINESS.md

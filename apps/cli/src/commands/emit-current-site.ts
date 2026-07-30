@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { ConfigFamily, ManifestStore } from '@docstube/core';
+import type { ConfigFamily, ManifestStore, SitePublisher } from '@docstube/core';
+import type { ManifestIndex } from '@docstube/contracts';
 import { configError, createManifestStore } from '@docstube/core';
 import type { CliOutput } from '../cli-output.ts';
 import { builtinThemes, emitSite } from '@docstube/theme';
@@ -62,9 +63,14 @@ export const emitCurrentSite = async (input: {
   workspaceDir: string;
   family: ConfigFamily;
   store: ManifestStore;
+  // The index to render against, when the caller already holds it. THE STAGED-ATOMIC PUBLISH passes
+  // it (core's publish-staging.ts): emission runs BETWEEN the shard writes and the index write, so
+  // the committed index does not describe this state yet — and must not, until every route it would
+  // advertise exists on disk. Every other caller omits it and renders the published index.
+  index?: ManifestIndex | undefined;
 }): Promise<EmitCurrentSiteResult> => {
   const { workspaceDir, family, store } = input;
-  const index = await store.readIndex();
+  const index = input.index ?? (await store.readIndex());
   if (index === undefined) {
     return { emitted: false, themeConflicts: [], warnings: [], pruned: [] };
   }
@@ -207,16 +213,17 @@ export const emitCurrentSite = async (input: {
   };
 };
 
-// The shared assemble step WITH its reporting, used by every command that mutates docs state
-// (generate, refine, wizard) on BOTH the success path and the partial-failure path — so a run
-// that throws mid-way still reconciles the rendered routes with whatever was persisted.
+// The shared assemble step WITH its reporting. `generate` reaches it only THROUGH its publish step
+// (createSitePublisher below) — routes are never emitted independently of the shards and index they
+// describe. `refine` and the wizard's refine run still write pages directly and call it themselves.
 export const emitPersistedSite = async (
   workspaceDir: string,
   family: ConfigFamily,
-  output: CliOutput
+  output: CliOutput,
+  index?: ManifestIndex
 ): Promise<EmitCurrentSiteResult> => {
   const store = createManifestStore(workspaceDir, family.config.versions.current);
-  const result = await emitCurrentSite({ workspaceDir, family, store });
+  const result = await emitCurrentSite({ workspaceDir, family, store, ...(index === undefined ? {} : { index }) });
   for (const conflict of result.themeConflicts) {
     output.info(`  theme-conflict  ${conflict}`);
   }
@@ -235,3 +242,13 @@ export const emitPersistedSite = async (
   }
   return result;
 };
+
+// THE SITE HALF OF THE ONE PUBLISH PATH (pipeline-v2 decision 3). `runGenerate` owns the publish
+// step — content, shards, routes, twins, index, in one ordered replay from the staging area — and
+// calls this to render the routes with the index it is about to commit. Generate never emits the
+// site a second time: emission is not an independent write any more, it is a step inside publish.
+export const createSitePublisher =
+  (workspaceDir: string, family: ConfigFamily, output: CliOutput): SitePublisher =>
+  async ({ index }) => {
+    await emitPersistedSite(workspaceDir, family, output, index);
+  };

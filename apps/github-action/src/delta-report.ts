@@ -11,7 +11,14 @@ export const flagCommentMarker = '<!-- docstube:flag-report -->';
 export const digestIssueMarker = '<!-- docstube:open-questions -->';
 export const digestIssueTitle = 'docstube: open questions';
 
-const machineLocalPatterns = [/^\.docstube\/db\.sqlite/, /^\.docstube\/cache\//, /^\.docstube\/runs\//];
+const machineLocalPatterns = [
+  /^\.docstube\/db\.sqlite/,
+  /^\.docstube\/cache\//,
+  /^\.docstube\/runs\//,
+  // Staged-atomic publish (pipeline-v2 decision 3): work a frozen run finished but did not publish.
+  // Committing it would put a half-applied plan on the PR under a gate it never passed.
+  /^\.docstube\/staging\//
+];
 
 // Everything the run changed ships in ONE commit — docs, manifest shards, criteria, instructions,
 // knowledge — so the PR carries docs + provenance + flags atomically (ARCHITECTURE §5.3). Only

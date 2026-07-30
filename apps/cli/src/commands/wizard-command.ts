@@ -15,7 +15,7 @@ import {
   startLocalServer
 } from '@docstube/core';
 import type { ControlPlaneInjection } from '@docstube/core';
-import type { AgentTaskSpec, ToolDescriptor, Transcript } from '@docstube/contracts';
+import type { AgentTaskSpec, ManifestIndex, ToolDescriptor, Transcript } from '@docstube/contracts';
 import { idPrefixes, mintId } from '@docstube/contracts';
 import { emitCurrentSite } from './emit-current-site.ts';
 import type { CliCommandResult, CliOutput } from '../cli-output.ts';
@@ -47,10 +47,16 @@ const stagedUiDir = async (): Promise<string | undefined> => {
 // commands run (emit-current-site.ts): updating content and shards without re-emitting routes
 // would leave rendered counts stale against the shard. Warnings surface the same way the CLI
 // commands surface them.
-export const emitWizardSite = async (workspaceDir: string, output: CliOutput): Promise<void> => {
+export const emitWizardSite = async (
+  workspaceDir: string,
+  output: CliOutput,
+  // Passed by generate's staged-atomic publish: the index the publish is about to commit (see
+  // emit-current-site.ts). Omitted everywhere else — then the published index is rendered.
+  index?: ManifestIndex
+): Promise<void> => {
   const family = await loadConfigFamily(workspaceDir);
   const store = createManifestStore(workspaceDir, family.config.versions.current);
-  const result = await emitCurrentSite({ workspaceDir, family, store });
+  const result = await emitCurrentSite({ workspaceDir, family, store, ...(index === undefined ? {} : { index }) });
   for (const conflict of result.themeConflicts) {
     output.info(`  theme-conflict  ${conflict}`);
   }
@@ -104,14 +110,20 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
         runId
       };
       // `refresh` is gone (pipeline-v2 decision 1): generate IS the reconciler.
-      const run = mode === 'generate' ? runGenerate(common) : runRefine(common);
+      // generate owns its own publish step (staged-atomic publish): routes are emitted INSIDE it,
+      // together with shards and the index, so the wizard must not emit a second time — a frozen or
+      // crashed generate publishes nothing, and a stray emission would be exactly the independent
+      // publish path decision 3 removes. `refine` still writes pages directly, so it still emits.
+      const run =
+        mode === 'generate'
+          ? runGenerate({
+              ...common,
+              publishSite: async ({ index }) => {
+                await emitWizardSite(input.workspaceDir, output, index);
+              }
+            })
+          : runRefine(common);
       // Fire-and-forget: the dashboard follows the journal; failures land there as run events.
-      // EMISSION AFTER PARTIAL FAILURE (wave 2b close): the site is re-emitted whether the run
-      // resolved OR threw — a pipeline can fail on a translation/transport error AFTER pages were
-      // persisted, and the rendered routes must still be reconciled with those shards.
-      // emitCurrentSite consumes only committed state (and no-ops when no manifest was ever
-      // persisted), so the emitted site is consistent; the run error is surfaced afterwards and
-      // an emission failure never masks it.
       void (async () => {
         let runError: unknown;
         try {
@@ -119,10 +131,12 @@ export const createWizardControlPlane = (input: WizardControlPlaneInput, output:
         } catch (error) {
           runError = error;
         }
-        try {
-          await emitWizardSite(input.workspaceDir, output);
-        } catch (error) {
-          output.error(`site emission after the ${mode} run failed: ${(error as Error).message}`);
+        if (mode !== 'generate') {
+          try {
+            await emitWizardSite(input.workspaceDir, output);
+          } catch (error) {
+            output.error(`site emission after the ${mode} run failed: ${(error as Error).message}`);
+          }
         }
         if (runError !== undefined) {
           output.error(`background ${mode} run failed: ${(runError as Error).message}`);
