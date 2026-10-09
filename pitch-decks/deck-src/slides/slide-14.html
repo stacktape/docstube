@@ -1,67 +1,153 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
-<style>
-  .ms { flex:1; display:flex; flex-direction:column; align-items:center; text-align:center; }
-  .ms .q { font-family:var(--mono); font-size:12.5px; font-weight:700; letter-spacing:.06em; color:var(--brand-700); margin-bottom:12px; }
-  .ms .node { width:16px; height:16px; border-radius:999px; background:var(--brand-500); border:3px solid #fff; box-shadow:0 0 0 1px var(--brand-300); }
-  .ms .node.open { background:#fff; border:2px solid var(--brand-400); box-shadow:0 0 0 1px var(--brand-200); }
-  .ms h3 { font-family:var(--display); font-weight:600; font-size:16.5px; color:var(--ink); margin-top:16px; }
-  .ms p { font-size:12.5px; color:var(--muted); margin-top:6px; max-width:230px; line-height:1.45; }
-</style>
-</head>
-<body>
-<div class="slide bg-dot bg-glow">
-  <div class="hz">
-    <h1 class="head">Shipping in <span class="accent">Q3.</span></h1>
-  </div>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+    <style>
+      .ms {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .ms .q {
+        font-family: var(--mono);
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--brand-700);
+        margin-bottom: 12px;
+      }
+      .ms .node {
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        background: var(--brand-500);
+        border: 3px solid #fff;
+        box-shadow: 0 0 0 1px var(--brand-300);
+      }
+      .ms .node.open {
+        background: #fff;
+        border: 2px solid var(--brand-400);
+        box-shadow: 0 0 0 1px var(--brand-200);
+      }
+      .ms h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 16.5px;
+        color: var(--ink);
+        margin-top: 16px;
+      }
+      .ms p {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin-top: 6px;
+        max-width: 230px;
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide bg-dot bg-glow">
+      <div class="hz">
+        <h1 class="head">Shipping in <span class="accent">Q3.</span></h1>
+      </div>
 
-  <div class="body center">
-    <!-- roadmap: adoption first, revenue later -->
-    <div style="position:relative;padding-top:6px">
-      <div style="position:absolute;left:16%;right:16%;top:25px;height:2px;background:linear-gradient(90deg,var(--brand-300),var(--brand-400) 60%,var(--brand-200))"></div>
-      <div class="row" style="gap:20px;align-items:flex-start">
-        <div class="ms">
-          <div class="q">Q3 2026</div>
-          <div class="node"></div>
-          <h3>Open-source release</h3>
-          <p>And the public drift-report campaign.</p>
+      <div class="body center">
+        <!-- roadmap: adoption first, revenue later -->
+        <div style="position: relative; padding-top: 6px">
+          <div
+            style="
+              position: absolute;
+              left: 16%;
+              right: 16%;
+              top: 25px;
+              height: 2px;
+              background: linear-gradient(90deg, var(--brand-300), var(--brand-400) 60%, var(--brand-200));
+            "
+          ></div>
+          <div class="row" style="gap: 20px; align-items: flex-start">
+            <div class="ms">
+              <div class="q">Q3 2026</div>
+              <div class="node"></div>
+              <h3>Open-source release</h3>
+              <p>And the public drift-report campaign.</p>
+            </div>
+            <div class="ms">
+              <div class="q">Q4 2026</div>
+              <div class="node"></div>
+              <h3>Adopted by real teams</h3>
+              <p>And open-source projects, on the free version.</p>
+            </div>
+            <div class="ms">
+              <div class="q">Q1 2027</div>
+              <div class="node open"></div>
+              <h3>Cloud launch</h3>
+              <p>And our first paying customers.</p>
+            </div>
+          </div>
         </div>
-        <div class="ms">
-          <div class="q">Q4 2026</div>
-          <div class="node"></div>
-          <h3>Adopted by real teams</h3>
-          <p>And open-source projects, on the free version.</p>
+
+        <!-- the vision -->
+        <div class="col items-c" style="margin-top: 46px; gap: 24px">
+          <div
+            style="
+              font-family: var(--display);
+              font-weight: 800;
+              font-size: 35px;
+              letter-spacing: -0.02em;
+              line-height: 1.18;
+              text-align: center;
+              color: var(--ink);
+              max-width: 20ch;
+            "
+          >
+            One day, every new repo starts with a
+            <span class="mono" style="font-weight: 600; font-size: 30px; color: var(--brand-700)">.docstube</span>
+            folder.<br /><span class="grad">Verified docs, by default.</span>
+          </div>
+          <div class="row items-c gap-4">
+            <span
+              class="btn btn-primary"
+              style="
+                height: 50px;
+                padding: 0 26px;
+                border-radius: 12px;
+                color: #fff;
+                background: linear-gradient(135deg, #0a8b95, #0a6f78);
+                box-shadow: var(--shadow-brand);
+                font-weight: 600;
+                font-size: 15.5px;
+                display: inline-flex;
+                align-items: center;
+                gap: 9px;
+              "
+            >
+              Join the waitlist
+              <svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </span>
+            <span class="mono" style="font-size: 15px; color: var(--ink-soft)">docstube.dev</span>
+          </div>
         </div>
-        <div class="ms">
-          <div class="q">Q1 2027</div>
-          <div class="node open"></div>
-          <h3>Cloud launch</h3>
-          <p>And our first paying customers.</p>
-        </div>
+      </div>
+
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">16 / 16</span>
       </div>
     </div>
-
-    <!-- the vision -->
-    <div class="col items-c" style="margin-top:46px;gap:24px">
-      <div style="font-family:var(--display);font-weight:800;font-size:35px;letter-spacing:-.02em;line-height:1.18;text-align:center;color:var(--ink);max-width:20ch">
-        One day, every new repo starts with a <span class="mono" style="font-weight:600;font-size:30px;color:var(--brand-700)">.docstube</span> folder.<br><span class="grad">Verified docs, by default.</span>
-      </div>
-      <div class="row items-c gap-4">
-        <span class="btn btn-primary" style="height:50px;padding:0 26px;border-radius:12px;color:#fff;background:linear-gradient(135deg,#0a8b95,#0a6f78);box-shadow:var(--shadow-brand);font-weight:600;font-size:15.5px;display:inline-flex;align-items:center;gap:9px">
-          Join the waitlist
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </span>
-        <span class="mono" style="font-size:15px;color:var(--ink-soft)">docstube.dev</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">16 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

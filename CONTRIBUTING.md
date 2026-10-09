@@ -5,6 +5,7 @@ Thanks for your interest - docstube is being built in the open, and early input 
 ## Right now (pre-release)
 
 There's no code to run yet. The most valuable contributions today are:
+
 - Ideas, use cases, and feedback in [Discussions](../../discussions).
 - Issues for problems with this repo's docs/setup, or well-scoped feature proposals.
 

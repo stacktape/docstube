@@ -76,7 +76,7 @@ adjudicated by the founder. Binding for 0.1.0 alongside the other *-v2 design do
    immediate-targeted-regeneration): every generation unit records IDs+hashes of consumed
    knowledge facts, instructions, criteria, glossary entries, and config/IA fragments; changing
    any marks exactly the dependent units dirty. Answers move `answered → propagation-pending →
-   applied` with visible status ("answer saved; 2 pages regenerating"). Broad-scope changes
+applied` with visible status ("answer saved; 2 pages regenerating"). Broad-scope changes
    produce an explicit budgeted backlog, never silent waiting.
 
 9. **Feedback storage is governed.** Immutable FeedbackEvent records first; categorization emits

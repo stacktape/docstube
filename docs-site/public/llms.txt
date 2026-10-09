@@ -3,9 +3,9 @@
 > Verified docs, generated from your code.
 
 ## Docs
-- [CLI reference](/cli-reference/): Command reference for the docstube CLI.
-- [Configuration](/configuration/): Configure the docstube config family, agents, versions, locales, components, plugins, and comment-preserving edits.
-- [Getting started](/getting-started/): Install docstube, open the setup wizard, and generate the first documentation site.
-- [CI and the GitHub Action](/github-action/): Run docstube in GitHub Actions, open verified documentation PRs, deliver flags, and gate auto-merge from the committed manifest.
-- [How verification works](/how-verification-works/): How docstube assigns proof levels, runs built-in verifiers, grounds claims, and ships visible flags instead of silent errors.
-- [Writing plugins](/writing-plugins/): Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold.
+- [CLI reference](/cli-reference/): Command syntax and flags for the docstube CLI.
+- [Configuration](/configuration/): Configure docstube.yml, ia.yml, glossary.yaml, agents, locales, components, and plugins.
+- [Getting started](/getting-started/): Install docstube, open the setup wizard, and generate the first verified docs site.
+- [CI and the GitHub Action](/github-action/): How the docstube GitHub Action runs generation, reports verified changes, and gates auto-merge.
+- [How verification works](/how-verification-works/): How docstube turns writer claims into anchored, checked, unchecked, or contradicted documentation states.
+- [Writing plugins](/writing-plugins/): Create and load docstube plugins with @docstube/plugin-sdk.

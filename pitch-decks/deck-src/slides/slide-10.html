@@ -1,49 +1,129 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
-<style>
-  .win { flex:1; display:flex; flex-direction:column; padding:28px 26px; }
-  .win .ic2 { width:44px;height:44px;border-radius:12px;background:var(--brand-50);border:1px solid var(--brand-100);color:var(--brand-600);display:flex;align-items:center;justify-content:center }
-  .win h3 { font-family:var(--display); font-weight:700; font-size:20px; color:var(--ink); line-height:1.2; margin-top:20px; }
-  .win p { font-size:14.5px; color:var(--ink-soft); line-height:1.55; margin-top:13px; }
-  .win .em { color:var(--ink); font-weight:600; }
-</style>
-</head>
-<body>
-<div class="slide bg-grid">
-  <div class="hz">
-    <h1 class="head">Why we <span class="accent">win.</span></h1>
-  </div>
-
-  <div class="body center">
-    <div class="row gap-5" style="align-items:stretch">
-
-      <div class="card win">
-        <span class="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M6 8.5v7M18 8.5c0 4-6 2.5-6 7"/></svg></span>
-        <h3>Open-source wins developer tools</h3>
-        <p>The tools out there today are paid and closed. In developer tools the free open one usually wins, and to beat it you have to be far better, not a little better. <span class="em">We are the open one.</span></p>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+    <style>
+      .win {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 28px 26px;
+      }
+      .win .ic2 {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: var(--brand-50);
+        border: 1px solid var(--brand-100);
+        color: var(--brand-600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .win h3 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 20px;
+        color: var(--ink);
+        line-height: 1.2;
+        margin-top: 20px;
+      }
+      .win p {
+        font-size: 14.5px;
+        color: var(--ink-soft);
+        line-height: 1.55;
+        margin-top: 13px;
+      }
+      .win .em {
+        color: var(--ink);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide bg-grid">
+      <div class="hz">
+        <h1 class="head">Why we <span class="accent">win.</span></h1>
       </div>
 
-      <div class="card win">
-        <span class="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z"/><path d="M9 11.5l2 2 4-4.5"/></svg></span>
-        <h3>Verification is new, and nobody else does it</h3>
-        <p>It is the one thing no shipping tool has. By the time someone copies it, <span class="em">our open-source product will already own the space.</span></p>
+      <div class="body center">
+        <div class="row gap-5" style="align-items: stretch">
+          <div class="card win">
+            <span class="ic2"
+              ><svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="6" cy="6" r="2.5" />
+                <circle cx="6" cy="18" r="2.5" />
+                <circle cx="18" cy="6" r="2.5" />
+                <path d="M6 8.5v7M18 8.5c0 4-6 2.5-6 7" /></svg
+            ></span>
+            <h3>Open-source wins developer tools</h3>
+            <p>
+              The tools out there today are paid and closed. In developer tools the free open one usually wins, and to
+              beat it you have to be far better, not a little better. <span class="em">We are the open one.</span>
+            </p>
+          </div>
+
+          <div class="card win">
+            <span class="ic2"
+              ><svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6l7-3z" />
+                <path d="M9 11.5l2 2 4-4.5" /></svg
+            ></span>
+            <h3>Verification is new, and nobody else does it</h3>
+            <p>
+              It is the one thing no shipping tool has. By the time someone copies it,
+              <span class="em">our open-source product will already own the space.</span>
+            </p>
+          </div>
+
+          <div class="card win">
+            <span class="ic2"
+              ><svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.7-.7-.7-2.7z" /></svg
+            ></span>
+            <h3>It's what we're good at, and we've started</h3>
+            <p>
+              We've built developer tools before and we're good at developer experience. We also spent
+              <span class="em">five weeks</span> solving this exact problem while building Stacktape's docs. This is not
+              a whiteboard idea.
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div class="card win">
-        <span class="ic2"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.7-.7-.7-2.7z"/></svg></span>
-        <h3>It's what we're good at, and we've started</h3>
-        <p>We've built developer tools before and we're good at developer experience. We also spent <span class="em">five weeks</span> solving this exact problem while building Stacktape's docs. This is not a whiteboard idea.</p>
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">11 / 16</span>
       </div>
-
     </div>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">11 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

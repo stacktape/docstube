@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Wave 2b close. ROUTE FRONTMATTER is now built through the YAML Document API end to end: the authored

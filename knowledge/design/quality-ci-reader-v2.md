@@ -25,9 +25,9 @@ design-review adjudication. Binding for 0.1.0 with the other *-v2 docs.
    checked, missing/renamed; behavioral claims excluded from the denominator). Not marketed as
    overall accuracy until claim predicates exist.
 5. **Trust vocabulary: three orthogonal axes** — correctness (checked | unchecked | contradicted
-   + evidence kind), editorial (reviewed | not | issues), workflow (publishable | attention |
-   blocked). `proven`/`scored`/`out-of-domain` leave public surfaces. The factual claim class
-   `structural` is renamed `code-structure` (page-structure quality is never a claim).
+   - evidence kind), editorial (reviewed | not | issues), workflow (publishable | attention |
+     blocked). `proven`/`scored`/`out-of-domain` leave public surfaces. The factual claim class
+     `structural` is renamed `code-structure` (page-structure quality is never a claim).
 6. **Source-of-truth consolidation before implementation:** every *-v2 decision folds into
    PRODUCT.md and ARCHITECTURE.md; the v2 files remain as decision records, not parallel specs.
 7. Reserved-but-ignored config (`autonomy`, `screenshots`) is removed — no fake affordances.

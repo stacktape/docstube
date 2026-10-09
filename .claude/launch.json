@@ -4,15 +4,7 @@
     {
       "name": "docs-site-preview",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "preview",
-        "--prefix",
-        "docs-site",
-        "--",
-        "--port",
-        "4399"
-      ],
+      "runtimeArgs": ["run", "preview", "--prefix", "docs-site", "--", "--port", "4399"],
       "port": 4399
     }
   ]

@@ -1,134 +1,182 @@
 ---
-title: "CLI reference"
-description: "Command reference for the docstube CLI."
+title: 'CLI reference'
+description: 'Command syntax and flags for the docstube CLI.'
 ---
 
 # CLI reference
 
-Use `docstube help [command]` to print command usage.
+<Claim id="c1">The `docstube` CLI registers subcommands through `main.subCommands`.</Claim> Run `docstube help` when you want the same command list printed by the executable.
+
+## `docstube`
+
+Purpose: <Claim id="c2">Bare `docstube` opens the local control plane.</Claim> <Claim id="c3">Bare `docstube` treats a positional command name as an unknown command.</Claim>
+
+Flags: <Claim id="c4">Bare `docstube --port` sets the local control-plane port.</Claim> <Claim id="c5">Bare `docstube --no-open` disables browser opening.</Claim>
+
+Usage example:
 
 ```bash
-docstube help generate
+docstube --no-open
 ```
 
-## `wizard`
+## `docstube wizard`
 
-Opens the local setup wizard and control plane. The `--port <n>` flag sets the local control-plane port; without it, the server chooses a port.
+Purpose: <Claim id="c6">`docstube wizard` opens the local setup wizard and control plane.</Claim>
+
+Flags: <Claim id="c7">`docstube wizard --port` sets the local control-plane port.</Claim> <Claim id="c8">`docstube wizard --no-open` disables browser opening.</Claim>
+
+Usage example:
 
 ```bash
-docstube wizard --port 3001
+docstube wizard --port 4242 --no-open
 ```
 
-## `generate`
+## `docstube generate`
 
-Generates docs from the existing config. `generate` is an idempotent reconciler: the first run generates everything; later runs redo only the affected work. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
+Purpose: <Claim id="c9">`docstube generate` generates docs from existing config.</Claim> <Claim id="c10">`docstube generate` is the idempotent reconciler for later runs.</Claim>
+
+Flags: <Claim id="c11">`docstube generate --max-attempts` sets the max write attempts per page.</Claim> <Claim id="c12">`docstube generate --ci` emits the fail-closed publication decision used by the GitHub Action.</Claim> <Claim id="c13">`docstube generate --max-attempts` requires an integer of at least 1.</Claim>
+
+Usage example:
 
 ```bash
-docstube generate --max-attempts 3
+docstube generate --max-attempts 4
 ```
 
-## `refine`
+## `docstube refine`
 
-Improves generated pages. Pass a page slug to target one page, or use `--failed` to consider only pages with open flags.
+Purpose: <Claim id="c14">`docstube refine` improves the lowest-quality generated pages first.</Claim>
 
-Budget flags:
+Flags and arguments: <Claim id="c15">`docstube refine target` sets the page slug to refine.</Claim> <Claim id="c16">`docstube refine --failed` considers only pages with open flags.</Claim> <Claim id="c17">`docstube refine --max-pages` sets the max pages refined in one run.</Claim> <Claim id="c18">`docstube refine --max-rounds-per-page` sets the max rewrite rounds per page.</Claim> <Claim id="c19">`docstube refine --total-rounds` sets the global rewrite-round budget for the whole run.</Claim> <Claim id="c20">`docstube refine` numeric budget flags require integers of at least 1.</Claim>
 
-- `--max-pages <n>` limits how many pages are refined.
-- `--max-rounds-per-page <n>` limits rewrite rounds for each page.
-- `--total-rounds <n>` sets a global rewrite-round budget for the run.
+Usage example:
 
 ```bash
-docstube refine cli-reference --failed --max-pages 1 --max-rounds-per-page 2 --total-rounds 2
+docstube refine cli-reference --failed --max-pages 1
 ```
 
-## `audit`
+## `docstube preview`
 
-Measures verified defects in an existing docs directory. The required `<docs-dir>` argument points at Markdown or MDX docs. The `--json` flag emits the report as JSON.
+Purpose: <Claim id="c21">`docstube preview` builds and serves the generated docs site locally.</Claim>
+
+Flags: <Claim id="c22">`docstube preview --port` sets the local preview server port.</Claim> <Claim id="c23">`docstube preview --build` forces a rebuild.</Claim> <Claim id="c24">`docstube preview --port` requires an integer from 0 through 65535.</Claim>
+
+Usage example:
+
+```bash
+docstube preview --build --port 4173
+```
+
+## `docstube audit`
+
+Purpose: <Claim id="c25">`docstube audit` extracts claims from an existing docs site and verifies them against the codebase.</Claim>
+
+Flags and arguments: <Claim id="c26">`docstube audit docs-dir` is required.</Claim> <Claim id="c27">`docstube audit --json` emits the audit report as JSON.</Claim>
+
+Usage example:
 
 ```bash
 docstube audit docs --json
 ```
 
-## `answer`
+## `docstube answer`
 
-Lists open maintainer questions, or records an answer for one question id. When answering, pass the id and the answer text.
+Purpose: <Claim id="c28">`docstube answer` lists and answers open maintainer questions.</Claim>
 
-```bash
-docstube answer
-```
+Arguments: <Claim id="c29">`docstube answer id` selects a question id.</Claim> <Claim id="c30">`docstube answer text` supplies the answer text.</Claim>
 
-```bash
-docstube answer abc12345 "This behavior is intentional because the parser owns command shape."
-```
-
-## `check`
-
-Runs deterministic checks over generated docs. Check kinds come from registered verifier plugins, so use `--list` to see the checks available in the current project. Passing `[kind]` runs only that verifier.
+Usage example:
 
 ```bash
-docstube check --list
+docstube answer fl_12345678 "The retry limit mirrors the upstream API limit."
 ```
 
-```bash
-docstube check claim-grounding
-```
+## `docstube validate`
 
-## `status`
+Purpose: <Claim id="c31">`docstube validate` validates the docstube config family.</Claim>
 
-Shows the generated manifest state, page guarantee levels, provable-block distribution, and open flag count.
-
-```bash
-docstube status
-```
-
-## `doctor`
-
-Checks local runtime and project setup. It checks Node, Git, project detection, config loading, and the configured agent runtime for the project.
-
-```bash
-docstube doctor
-```
-
-## `plugin scaffold`
-
-Scaffolds a docstube plugin under `plugins/`, writes a matching spec file, and materializes the plugin-authoring skill under `.docstube/skills/plugin-authoring/SKILL.md`.
-
-```bash
-docstube plugin scaffold wordcount
-```
-
-## `validate`
-
-Validates the docstube config family and reports the loaded doc type, persona count, IA top-level node count, and glossary term count.
+Usage example:
 
 ```bash
 docstube validate
 ```
 
-## `upgrade`
+## `docstube check`
 
-Upgrades the docstube tool itself. Use `--check` to compare the current version with the target version without installing. Use `--to <version>` to target a specific version; otherwise the command targets the latest version it resolves.
+Purpose: <Claim id="c32">`docstube check` runs deterministic checks over the generated docs.</Claim>
+
+Flags and arguments: <Claim id="c33">`docstube check kind` selects a verifier id.</Claim> <Claim id="c34">`docstube check --list` lists registered checks.</Claim>
+
+Usage example:
+
+```bash
+docstube check --list
+```
+
+## `docstube status`
+
+Purpose: <Claim id="c35">`docstube status` shows manifest, claim counts, and open flags.</Claim>
+
+Usage example:
+
+```bash
+docstube status
+```
+
+## `docstube doctor`
+
+Purpose: <Claim id="c36">`docstube doctor` checks local runtime and project setup.</Claim>
+
+Flags: <Claim id="c37">`docstube doctor --ci` runs the CI preflight.</Claim> <Claim id="c38">`docstube doctor --json` emits the versioned preflight report as JSON.</Claim>
+
+Usage example:
+
+```bash
+docstube doctor --ci --json
+```
+
+## `docstube plugin`
+
+Purpose: <Claim id="c39">`docstube plugin` scaffolds and manages docstube plugins.</Claim>
+
+Arguments: <Claim id="c40">`docstube plugin action` is required.</Claim> <Claim id="c41">`docstube plugin name` supplies the plugin name.</Claim>
+
+Usage example:
+
+```bash
+docstube plugin scaffold wordcount
+```
+
+## `docstube upgrade`
+
+Purpose: <Claim id="c42">`docstube upgrade` upgrades the docstube tool itself.</Claim>
+
+Flags: <Claim id="c43">`docstube upgrade --check` only checks the current version.</Claim> <Claim id="c44">`docstube upgrade --to` sets the target version.</Claim>
+
+Usage example:
 
 ```bash
 docstube upgrade --check
 ```
 
-```bash
-docstube upgrade --to 0.0.3
-```
+## `docstube version`
 
-## `version`
+Purpose: <Claim id="c45">`docstube version` prints the docstube version.</Claim>
 
-Prints the docstube version.
+Usage example:
 
 ```bash
 docstube version
 ```
 
-## `help`
+## `docstube help`
 
-Prints the command overview or command-specific help.
+Purpose: <Claim id="c46">`docstube help` prints command help.</Claim>
+
+Arguments: <Claim id="c47">`docstube help command` selects a command to describe.</Claim>
+
+Usage example:
 
 ```bash
-docstube help refine
+docstube help generate
 ```

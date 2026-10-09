@@ -10,7 +10,7 @@ nothing else — a budget freeze or a partially-executed plan with no blocking f
 Sol's CI review refused to ship auto-merge in that state.
 
 The kernel now emits a fail-closed `PublicationDecision` bound to the candidate tree, and the
-Action *enforces* it rather than re-deriving publishability. Twelve refusal conditions, including:
+Action _enforces_ it rather than re-deriving publishability. Twelve refusal conditions, including:
 artifact absent / unparseable / schema-invalid, a decision bound to a different tree, a
 `sourceSha` that disagrees with the HEAD read before the CLI ran, deferred work, a blocked gate,
 any ledger regression, undeclared dirty paths, hash drift. The Action validates against
@@ -20,7 +20,7 @@ user pinned — and an **unknown reason code from a newer CLI fails closed** rat
 
 The regression comparison is real: base manifest at the merge base vs candidate, per page —
 badge loss, a checked claim going unchecked/contradicted, a checked-count drop beyond deleted
-claims, evidence-authority weakening, attestation loss. An unreadable base blocks; a *missing*
+claims, evidence-authority weakening, attestation loss. An unreadable base blocks; a _missing_
 base is first-run and legitimately yields nothing.
 
 **2. Partial runs published half-applied sites.** `generate` wrote each page as it finished, so a
@@ -47,7 +47,7 @@ ones that could not work on first run.
 Now: bare `docstube` routes by context (no config → setup, config → dashboard, TTY-safe, `--no-open`
 honoured), an onboarding draft at `.docstube/onboarding-draft.json` carries in-progress intent so
 agent-backed steps resolve config from it, and the final action writes both config files, runs
-generation and publishes in one step. An *invalid* committed config still throws — that is the
+generation and publishes in one step. An _invalid_ committed config still throws — that is the
 user's to fix, not something to route around silently.
 
 The end-to-end test starts from a workspace with no `docstube.yml` and asserts a config family, an
@@ -61,7 +61,7 @@ auto-merge preconditions, branch state, tooling — and the Action runs it **fir
 checkout with the report rendered into the job summary and "this run spent nothing on models".
 
 Honesty rules throughout: `unknown` is never fatal and never rounds up to a pass (the schema
-enforces it); a keyless endpoint pointing at a *hosted* API fails rather than passing, because it
+enforces it); a keyless endpoint pointing at a _hosted_ API fails rather than passing, because it
 would 401 mid-run; and `full-auto` is only claimed when token identity, repository setting and
 branch policy are all proven — a workflow's own `GITHUB_TOKEN` reports **approval-assisted**,
 since GitHub will not run workflows for those PRs without approval.
@@ -71,7 +71,7 @@ since GitHub will not run workflows for those PRs without approval.
 `agents.roles` was documented in the schema, validated, and read by nothing — a user could
 configure a cheaper model for reviews and it silently did nothing. It now routes for real, across
 five roles (writer, reviewer, translator, architect, extractor, plus the new risk-critic), with
-one shared resolution path so the CI preflight checks the credential for *every* provider a run
+one shared resolution path so the CI preflight checks the credential for _every_ provider a run
 could use. Spend is now attributed per role.
 
 `agents.reviewModel` was **deleted** — a strict subset of `roles.reviewer`, and two spellings of
@@ -79,12 +79,12 @@ one routing rule is how they drift apart.
 
 ## The knowledge system is the adjudicated one
 
-The *old* store was live: question-text hashing, global paraphrase dedup that could suppress a
+The _old_ store was live: question-text hashing, global paraphrase dedup that could suppress a
 genuinely new question indefinitely, answers overwritten with no history, and nothing marking an
 answer stale when its code changed.
 
 Now: dedup by **slot** (subject + kind-of-missing-fact), never by phrasing; similarity only
-*suggests* a merge and never discards; answers are additive with supersession, author and
+_suggests_ a merge and never discards; answers are additive with supersession, author and
 timestamp; and staleness is wired to the fingerprint ladder via a `materialFingerprint` that
 covers signature, values and schema shape but **not** body — so a cosmetic refactor rebinds
 quietly and only a material change re-asks you.
@@ -131,7 +131,7 @@ surfaced together with which one owns it.
   **the complete badge was unreachable in any repo with a `dist/`**. Git's own allowlist now decides
   what counts as source.
 - **Existence was tested against the fingerprint snapshot rather than the codemap.** Since
-  fingerprint extraction is an *additive* pack capability, every symbol from `lang-python`,
+  fingerprint extraction is an _additive_ pack capability, every symbol from `lang-python`,
   `lang-java` or any third-party pack would have been falsely reported as not existing in source.
 - **Whole-file dependencies resolved only by luck** — 209 of 250 committed subscriptions.
 - **Two concurrent runs shared one staging area.** Two clicks of "start run" clobbered each other
@@ -139,7 +139,7 @@ surfaced together with which one owns it.
   taken over instantly, a live-but-silent holder after 60s, so a crash never wedges a workspace and
   a long run keeps its lock.
 - **A flaky first-run test** turned out to be the test asserting inside a window the design
-  deliberately creates (it polled for the route, which is written *before* the index by contract).
+  deliberately creates (it polled for the route, which is written _before_ the index by contract).
   Proven by tightening the poll to 1ms.
 - **Four raw NUL bytes**, written by four different agents reaching for a delimiter. Two had
   reached main and made git render entire files as "Binary files differ", hiding every diff in
@@ -150,13 +150,13 @@ surfaced together with which one owns it.
 
 Run `run_2nat7c788sh8zfbk5n1y`. Every feature above exercised in one live generation:
 
-| | Run 3 (before this session) | Integration run |
-|---|---|---|
-| Checked, excluding `behavior` | 47.6% | **56.8%** (54 / 95) |
-| Checked overall | 17.2% | 18.3% (54 / 295) |
-| Attempts for 6 pages | 9 | **6 — no retries** |
-| Contradictions / false flags | 0 | **0** |
-| Cost | ~$30 | **~$18.66** |
+|                               | Run 3 (before this session) | Integration run     |
+| ----------------------------- | --------------------------- | ------------------- |
+| Checked, excluding `behavior` | 47.6%                       | **56.8%** (54 / 95) |
+| Checked overall               | 17.2%                       | 18.3% (54 / 295)    |
+| Attempts for 6 pages          | 9                           | **6 — no retries**  |
+| Contradictions / false flags  | 0                           | **0**               |
+| Cost                          | ~$30                        | **~$18.66**         |
 
 Per-role spend now reports itself: writer ~$17.49, risk-critic ~$0.68, reviewer ~$0.48 — the
 critic costs under 4% of a run. Staged-atomic publish worked ("site published to docs-site/").
@@ -170,7 +170,7 @@ It needs a repo shaped like Stacktape's docs to fire.
 **Two things the run caught that no test had:**
 
 1. **`docstube generate` succeeded and then exited 1.** The root command had both `subCommands`
-   and a `run` handler, and citty runs the parent handler *even when a subcommand matched* — so
+   and a `run` handler, and citty runs the parent handler _even when a subcommand matched_ — so
    the pipeline finished perfectly, then printed "Unknown command: generate" and failed. It
    affected **every** subcommand (`version`, `status`, `doctor`, all of them), which means the
    GitHub Action was entirely broken, since it gates on exit code. 1763 passing tests missed it
@@ -180,7 +180,7 @@ It needs a repo shaped like Stacktape's docs to fire.
    resolved `Object.prototype.constructor` and ran it as a command.
 
 2. **The run marked itself `dirtyWorkingTree: true` — and it was right.** I committed the session
-   summary *while the run was in progress*, so HEAD moved from `0c4e5e3` to `547279b` mid-run. The
+   summary _while the run was in progress_, so HEAD moved from `0c4e5e3` to `547279b` mid-run. The
    HEAD-stability check flagged that the recorded evidence cannot be vouched for by the commit it
    names. The system caught its own operator doing precisely what it is built to catch.
 
@@ -206,6 +206,6 @@ design until v1.x predicate verifiers. No engineering changes that. The measured
 that the green 100% badge essentially never appears at 0.1.0 — pages read "18 of 68 checked".
 
 Three options, all defensible: change what the badge threshold means; pull behavior verification
-into 0.1.0; or lead the launch story with *"every claim checked or visibly marked"* rather than
+into 0.1.0; or lead the launch story with _"every claim checked or visibly marked"_ rather than
 green badges. I have deliberately not chosen — it is a positioning decision, and picking one to
 make a number look better is exactly the move this product exists to refuse.

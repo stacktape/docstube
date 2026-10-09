@@ -1,16 +1,1262 @@
 ---
-title: "Writing plugins"
-description: "Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold."
-layout: "../layouts/DocLayout.astro"
-docstubeLocale: "en"
-docstubePageId: "pg_7rhvg4r9f5vc3q877dzf"
-docstubeGuarantee: "scored"
-docstubeBlocksProven: 14
-docstubeBlocksTotal: 25
-docstubeSources: [{"file":"apps/cli/src/commands/plugin-command.ts","line":11,"endLine":15,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/plugin-command.ts","line":26,"endLine":67,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":8,"endLine":8,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":10,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":17,"endLine":17,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":19,"endLine":27,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":28,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":30,"endLine":34,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":36,"endLine":44,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/plugin-manifest-schema.ts","line":45,"endLine":45,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/load-plugins.ts","line":12,"endLine":21,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/load-plugins.ts","line":35,"endLine":57,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":20,"endLine":20,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":22,"endLine":26,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":30,"endLine":41,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/plugins/plugin-host.ts","line":50,"endLine":157,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":6,"endLine":6,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":8,"endLine":12,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":14,"endLine":17,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":21,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/define-plugin.ts","line":30,"endLine":31,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":17,"endLine":23,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":25,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":30,"endLine":33,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":37,"endLine":41,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":46,"endLine":50,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":52,"endLine":61,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":63,"endLine":68,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":70,"endLine":84,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":86,"endLine":95,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":97,"endLine":102,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":104,"endLine":117,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":119,"endLine":124,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":128,"endLine":132,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":134,"endLine":136,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":140,"endLine":144,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":146,"endLine":150,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":152,"endLine":156,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":161,"endLine":167,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/plugin-sdk/src/hook-types.ts","line":169,"endLine":177,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":9,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":21,"endLine":34,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":40,"endLine":105,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":107,"endLine":170,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/plugin-authoring-example.ts","line":172,"endLine":194,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/skills/src/skill-plugin-authoring.ts","line":9,"endLine":334,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"}]
-docstubeSections: [{"anchor":"manifest-validation","title":"Manifest validation","guarantee":"proven"},{"anchor":"registration-hooks","title":"Registration hooks","guarantee":"scored"},{"anchor":"verifier-shape","title":"Verifier shape","guarantee":"proven"},{"anchor":"permissions","title":"Permissions","guarantee":"scored"},{"anchor":"loading-plugins","title":"Loading plugins","guarantee":"proven"},{"anchor":"scaffolding","title":"Scaffolding","guarantee":"proven"}]
+title: 'Writing plugins'
+description: 'Create and load docstube plugins with @docstube/plugin-sdk.'
+layout: '../layouts/DocLayout.astro'
+docstubeLocale: 'en'
+docstubePageId: 'pg_2r95q1wsw79fbxx6v5yq'
+docstubeClaimsChecked: 6
+docstubeClaimsTotal: 39
+docstubeClaimsContradicted: 0
+docstubeUncoveredAssertions: 1
+docstubeDirtyWorkingTree: true
+docstubeUncheckedClaims:
+  [
+    'c4',
+    'c5',
+    'c6',
+    'c8',
+    'c9',
+    'c11',
+    'c12',
+    'c13',
+    'c14',
+    'c15',
+    'c16',
+    'c17',
+    'c18',
+    'c19',
+    'c20',
+    'c21',
+    'c22',
+    'c23',
+    'c24',
+    'c25',
+    'c26',
+    'c27',
+    'c28',
+    'c29',
+    'c30',
+    'c31',
+    'c32',
+    'c33',
+    'c34',
+    'c36',
+    'c37',
+    'c38',
+    'c39'
+  ]
+docstubeReviewedFor: 'oss-maintainer'
+docstubeSources:
+  [
+    { file: 'apps/cli/src/cli-help.ts', line: 1, endLine: 22, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'apps/cli/src/cli-help.ts', line: 24, endLine: 46, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'apps/cli/src/cli-help.ts', line: 48, endLine: 53, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    {
+      file: 'apps/cli/src/commands/plugin-command.ts',
+      line: 11,
+      endLine: 15,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/plugin-command.ts',
+      line: 26,
+      endLine: 67,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 10,
+      endLine: 19,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 20,
+      endLine: 20,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 24,
+      endLine: 24,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 25,
+      endLine: 25,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 27,
+      endLine: 27,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 28,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 31,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 32,
+      endLine: 32,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 34,
+      endLine: 39,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 40,
+      endLine: 40,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/archetype-schema.ts',
+      line: 101,
+      endLine: 101,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 8,
+      endLine: 8,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 9,
+      endLine: 9,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 11,
+      endLine: 14,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 15,
+      endLine: 15,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 18,
+      endLine: 18,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 20,
+      endLine: 26,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 31,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 32,
+      endLine: 32,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 39,
+      endLine: 42,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 43,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 50,
+      endLine: 57,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 59,
+      endLine: 98,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 100,
+      endLine: 103,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 111,
+      endLine: 142,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 144,
+      endLine: 159,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 163,
+      endLine: 171,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 175,
+      endLine: 201,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 202,
+      endLine: 202,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 203,
+      endLine: 203,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 8,
+      endLine: 8,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 10,
+      endLine: 17,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 18,
+      endLine: 18,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 20,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 29,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 31,
+      endLine: 35,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 37,
+      endLine: 45,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/plugin-manifest-schema.ts',
+      line: 46,
+      endLine: 46,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/audit/run-audit.ts',
+      line: 16,
+      endLine: 21,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/audit/run-audit.ts',
+      line: 23,
+      endLine: 36,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/audit/run-audit.ts',
+      line: 38,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/audit/run-audit.ts',
+      line: 48,
+      endLine: 55,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/audit/run-audit.ts',
+      line: 57,
+      endLine: 124,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/knowledge/answer-fingerprints.ts',
+      line: 14,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/knowledge/answer-fingerprints.ts',
+      line: 35,
+      endLine: 48,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 15,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 29,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 31,
+      endLine: 37,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 99,
+      endLine: 104,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 106,
+      endLine: 119,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 121,
+      endLine: 125,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/extract-theme-tokens.ts',
+      line: 132,
+      endLine: 158,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 60,
+      endLine: 75,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 77,
+      endLine: 115,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 122,
+      endLine: 161,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 163,
+      endLine: 170,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 178,
+      endLine: 178,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 180,
+      endLine: 191,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 199,
+      endLine: 202,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 228,
+      endLine: 241,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 245,
+      endLine: 246,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 274,
+      endLine: 284,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 289,
+      endLine: 304,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 310,
+      endLine: 322,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 334,
+      endLine: 367,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 372,
+      endLine: 380,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 413,
+      endLine: 452,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 461,
+      endLine: 554,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/generate.ts',
+      line: 559,
+      endLine: 1087,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/maintain.ts',
+      line: 53,
+      endLine: 59,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/maintain.ts',
+      line: 61,
+      endLine: 81,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/maintain.ts',
+      line: 169,
+      endLine: 558,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 35,
+      endLine: 50,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 52,
+      endLine: 63,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 65,
+      endLine: 80,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 94,
+      endLine: 99,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 103,
+      endLine: 119,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 130,
+      endLine: 157,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/refine.ts',
+      line: 159,
+      endLine: 422,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/verify-page.ts',
+      line: 85,
+      endLine: 94,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/verify-page.ts',
+      line: 113,
+      endLine: 163,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/verify-page.ts',
+      line: 165,
+      endLine: 166,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/write-page.ts',
+      line: 8,
+      endLine: 25,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/write-page.ts',
+      line: 149,
+      endLine: 233,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/write-page.ts',
+      line: 235,
+      endLine: 270,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/pipeline/write-page.ts',
+      line: 272,
+      endLine: 287,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/plugins/load-plugins.ts',
+      line: 12,
+      endLine: 21,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/plugins/load-plugins.ts',
+      line: 36,
+      endLine: 58,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/plugins/plugin-host.ts',
+      line: 20,
+      endLine: 20,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/plugins/plugin-host.ts',
+      line: 22,
+      endLine: 26,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/plugins/plugin-host.ts',
+      line: 30,
+      endLine: 41,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/plugins/plugin-host.ts',
+      line: 50,
+      endLine: 157,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 13,
+      endLine: 13,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 14,
+      endLine: 14,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 31,
+      endLine: 34,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 36,
+      endLine: 40,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 42,
+      endLine: 66,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 68,
+      endLine: 72,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 97,
+      endLine: 110,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 112,
+      endLine: 116,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 120,
+      endLine: 133,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 22,
+      endLine: 22,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 76,
+      endLine: 78,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 80,
+      endLine: 99,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 101,
+      endLine: 107,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 109,
+      endLine: 307,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 13,
+      endLine: 17,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 19,
+      endLine: 19,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 42,
+      endLine: 90,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 94,
+      endLine: 101,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 103,
+      endLine: 107,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 110,
+      endLine: 124,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 31,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 33,
+      endLine: 33,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 36,
+      endLine: 36,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 43,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 45,
+      endLine: 55,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 57,
+      endLine: 57,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 60,
+      endLine: 60,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 81,
+      endLine: 90,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 92,
+      endLine: 109,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 124,
+      endLine: 132,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 134,
+      endLine: 134,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 182,
+      endLine: 227,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 229,
+      endLine: 237,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 239,
+      endLine: 244,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 246,
+      endLine: 258,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 267,
+      endLine: 294,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 300,
+      endLine: 314,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 34,
+      endLine: 37,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 39,
+      endLine: 39,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 41,
+      endLine: 63,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 66,
+      endLine: 74,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 28,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 29,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 31,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 33,
+      endLine: 44,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 45,
+      endLine: 45,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 58,
+      endLine: 103,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 105,
+      endLine: 109,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 114,
+      endLine: 153,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 160,
+      endLine: 167,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 172,
+      endLine: 212,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/group-assessor.ts',
+      line: 218,
+      endLine: 240,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/lang-python/src/lang-python.ts',
+      line: 20,
+      endLine: 33,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/lang-typescript/src/lang-typescript.ts',
+      line: 29,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/define-plugin.ts',
+      line: 6,
+      endLine: 6,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/define-plugin.ts',
+      line: 8,
+      endLine: 12,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/define-plugin.ts',
+      line: 14,
+      endLine: 17,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/define-plugin.ts',
+      line: 21,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/define-plugin.ts',
+      line: 30,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 17,
+      endLine: 23,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 25,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 30,
+      endLine: 33,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 37,
+      endLine: 41,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 46,
+      endLine: 50,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 52,
+      endLine: 61,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 63,
+      endLine: 68,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 70,
+      endLine: 86,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 88,
+      endLine: 97,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 99,
+      endLine: 104,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 106,
+      endLine: 119,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 121,
+      endLine: 126,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 130,
+      endLine: 134,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 136,
+      endLine: 138,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 142,
+      endLine: 146,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 148,
+      endLine: 152,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 154,
+      endLine: 158,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 163,
+      endLine: 169,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/plugin-sdk/src/hook-types.ts',
+      line: 171,
+      endLine: 179,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/skills/src/plugin-authoring-example.ts',
+      line: 9,
+      endLine: 16,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/skills/src/plugin-authoring-example.ts',
+      line: 21,
+      endLine: 34,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/skills/src/plugin-authoring-example.ts',
+      line: 40,
+      endLine: 105,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/skills/src/plugin-authoring-example.ts',
+      line: 107,
+      endLine: 169,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/skills/src/plugin-authoring-example.ts',
+      line: 171,
+      endLine: 193,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/skills/src/skill-plugin-authoring.ts',
+      line: 9,
+      endLine: 332,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/theme/src/theme-plugin.ts',
+      line: 8,
+      endLine: 20,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/code-typecheck-ts.ts',
+      line: 16,
+      endLine: 16,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/code-typecheck-ts.ts',
+      line: 20,
+      endLine: 48,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/code-typecheck-ts.ts',
+      line: 52,
+      endLine: 62,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/code-typecheck-ts.ts',
+      line: 129,
+      endLine: 180,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/mdx-compile.ts',
+      line: 149,
+      endLine: 177,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/prose-lints.ts',
+      line: 43,
+      endLine: 71,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/prose-lints.ts',
+      line: 79,
+      endLine: 118,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/prose-lints.ts',
+      line: 202,
+      endLine: 215,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/sample-parses.ts',
+      line: 13,
+      endLine: 13,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/sample-parses.ts',
+      line: 173,
+      endLine: 185,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/sample-parses.ts',
+      line: 187,
+      endLine: 193,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/sample-parses.ts',
+      line: 215,
+      endLine: 252,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/shellcheck.ts',
+      line: 53,
+      endLine: 116,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/verifiers/src/verifiers.ts',
+      line: 41,
+      endLine: 41,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'scripts/dogfood/build-dogfood.ts',
+      line: 37,
+      endLine: 122,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'scripts/dogfood/build-dogfood.ts',
+      line: 124,
+      endLine: 127,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'scripts/dogfood/build-dogfood.ts',
+      line: 129,
+      endLine: 156,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    { file: 'scripts/evals/run-evals.ts', line: 5, endLine: 5, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 7, endLine: 10, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 12, endLine: 18, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 20, endLine: 24, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 26, endLine: 31, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 33, endLine: 33, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 35, endLine: 42, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 44, endLine: 49, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 51, endLine: 58, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 60, endLine: 67, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 69, endLine: 73, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 75, endLine: 75, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 162, endLine: 189, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 193, endLine: 206, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 243, endLine: 265, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 374, endLine: 400, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 489, endLine: 512, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'scripts/evals/run-evals.ts', line: 514, endLine: 528, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' }
+  ]
+docstubeSections:
+  [
+    { anchor: 'manifest', title: 'Manifest', checked: 2, total: 6, contradicted: 0 },
+    { anchor: 'hooks', title: 'Hooks', checked: 0, total: 12, contradicted: 0 },
+    { anchor: 'runtime-handles', title: 'Runtime Handles', checked: 0, total: 6, contradicted: 0 },
+    { anchor: 'loading', title: 'Loading', checked: 0, total: 4, contradicted: 0 },
+    { anchor: 'scaffold', title: 'Scaffold', checked: 1, total: 5, contradicted: 0 }
+  ]
 ---
 
+import Claim from '../docstube/DocstubeClaim.astro';
 import { default as Callout } from '../components/Callout.astro';
 import { default as CodeBlock } from '../components/CodeBlock.astro';
 import { default as CodeGroup } from '../components/CodeGroup.astro';
@@ -24,117 +1270,121 @@ import { default as Badge } from '../components/Badge.astro';
 import { default as ParamTable } from '../components/ParamTable.astro';
 import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
-
 # Writing plugins
 
-`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. It also re-exports plugin contract schemas and types, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
+Start with the SDK entry point, then decide which hook your repository needs. <Claim id="c1">`definePlugin` is exported.</Claim> <Claim id="c2">`PluginRegistrationHost` is exported.</Claim> <Claim id="c3">`PluginManifest` is exported.</Claim>
 
-A plugin module must default-export the value returned by `definePlugin`. The loader rejects a module whose default export was not created with `definePlugin`.
+A plugin file should default-export a `definePlugin` call. <Claim id="c4">`definePlugin` parses manifest input with `pluginManifestSchema`.</Claim> <Claim id="c5">`definePlugin` throws a `TypeError` when `register` is not a function.</Claim> <Claim id="c6">`definePlugin` returns a frozen branded plugin object.</Claim>
 
-```ts
+```ts no-exec
 import { definePlugin } from '@docstube/plugin-sdk';
+import type {
+  Finding,
+  PageArtifact,
+  VerifierContext,
+  VerifierDefinition,
+  VerifierRunResult
+} from '@docstube/plugin-sdk';
+
+const verifierId = 'frontmatter-title';
+
+const verify = async (_ctx: VerifierContext, pages: PageArtifact[]): Promise<VerifierRunResult> => {
+  const findings: Finding[] = [];
+
+  for (const artifact of pages) {
+    const hasTitle = /^title:\s*\S/mu.test(artifact.mdx);
+    if (!hasTitle) {
+      findings.push({
+        source: 'verifier',
+        check: verifierId,
+        severity: 'error',
+        message: `page "${artifact.page.slug}" is missing a frontmatter title`,
+        entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
+        file: artifact.mdxPath
+      });
+    }
+  }
+
+  return {
+    verifier: verifierId,
+    plugin: 'docstube-plugin-frontmatter-title',
+    status: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass',
+    findings,
+    coveredEntityIds: pages.map((artifact) => artifact.page.id)
+  };
+};
+
+export const frontmatterTitleVerifier: VerifierDefinition = {
+  id: verifierId,
+  title: 'Frontmatter title',
+  scope: 'page',
+  localeScope: 'per-locale',
+  proves: true,
+  verify
+};
 
 export default definePlugin({
   apiVersion: 1,
-  name: 'docstube-plugin-wordcount',
+  name: 'docstube-plugin-frontmatter-title',
   version: '0.1.0',
+  description: 'Fails pages that omit a frontmatter title.',
   permissions: { network: false, exec: [], writableRoots: [] },
-  capabilities: [{ kind: 'verifier', ids: ['wordcount'] }],
+  capabilities: [{ kind: 'verifier', ids: [verifierId] }],
   register: (host) => {
-    host.verifier({
-      id: 'wordcount',
-      title: 'Page word budget',
-      scope: 'page',
-      localeScope: 'per-locale',
-      proves: false,
-      verify: async (_ctx, pages) => ({
-        verifier: 'wordcount',
-        plugin: 'docstube-plugin-wordcount',
-        status: 'pass',
-        findings: [],
-        coveredEntityIds: pages.map((artifact) => artifact.page.id)
-      })
-    });
+    host.verifier(frontmatterTitleVerifier);
   }
 });
 ```
 
-## Manifest validation
+## Manifest
 
-`definePlugin` accepts the manifest fields plus `register`, parses the manifest fields with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
+Keep the manifest honest because the host compares declarations with registrations. <Claim id="c7">`pluginApiVersion` is 1.</Claim> <Claim id="c8">`pluginManifestSchema` requires `apiVersion` to equal `pluginApiVersion`.</Claim> <Claim id="c9">`pluginManifestSchema` requires at least one capability declaration.</Claim>
 
-`pluginManifestSchema` requires `apiVersion: 1`, a valid plugin package name, a semver `version`, and at least one capability declaration. `description` is optional.
+Permissions are declared in the manifest. <Claim id="c10">`pluginPermissionsSchema.network` defaults to false.</Claim> <Claim id="c11">`pluginPermissionsSchema.exec` defaults to an empty array.</Claim> <Claim id="c12">`pluginPermissionsSchema.writableRoots` defaults to an empty array.</Claim>
 
-`pluginPermissionsSchema` has three fields: `network`, `exec`, and `writableRoots`. The schema defaults are `network: false`, `exec: []`, and `writableRoots: []`.
+For maintainers, the practical review is simple: use `network: false` unless the plugin contacts a service, list only the executables the plugin calls through `ctx.exec`, and list only repo-relative roots the plugin writes through `ctx.fs.writeFile`.
 
-```ts
-import { pluginPermissionsSchema } from '@docstube/plugin-sdk';
+## Hooks
 
-const permissions = pluginPermissionsSchema.parse({
-  network: false,
-  exec: [],
-  writableRoots: []
-});
+The registration host is the plugin's connection to docstube. <Claim id="c13">`PluginRegistrationHost.verifier` exists.</Claim> <Claim id="c14">`PluginRegistrationHost.languagePack` exists.</Claim> <Claim id="c15">`PluginRegistrationHost.contentSource` exists.</Claim> <Claim id="c16">`PluginRegistrationHost.importer` exists.</Claim> <Claim id="c17">`PluginRegistrationHost.deployTarget` exists.</Claim> <Claim id="c18">`PluginRegistrationHost.searchProvider` exists.</Claim> <Claim id="c19">`PluginRegistrationHost.component` exists.</Claim>
 
-console.log(permissions);
-```
+A verifier is the usual first plugin because it can add a repository-specific check without changing docstube itself. <Claim id="c20">`VerifierDefinition.scope` accepts `block`, `page`, or `site`.</Claim> <Claim id="c21">`VerifierDefinition.localeScope` accepts `source-only` or `per-locale`.</Claim> <Claim id="c22">`VerifierDefinition.verify` receives a `VerifierContext` and an array of `PageArtifact` values.</Claim>
 
-## Registration hooks
+The verifier example above returns a `VerifierRunResult`. <Claim id="c23">`VerifierRunResult.status` accepts `pass`, `fail`, `error`, or `skipped`.</Claim> <Claim id="c24">`Finding.severity` accepts `info`, `warning`, or `error`.</Claim>
 
-`register(host)` receives a `PluginRegistrationHost`. The host has seven registration methods:
+## Runtime Handles
 
-| Method | Definition type |
-| --- | --- |
-| `host.verifier(...)` | `VerifierDefinition` |
-| `host.languagePack(...)` | `LanguagePackDefinition` |
-| `host.contentSource(...)` | `ContentSourceDefinition` |
-| `host.importer(...)` | `ImporterDefinition` |
-| `host.deployTarget(...)` | `DeployTargetDefinition` |
-| `host.searchProvider(...)` | `SearchProviderDefinition` |
-| `host.component(...)` | `ComponentDefinition` |
+Verifier code receives controlled helpers through `VerifierContext`. <Claim id="c25">`PluginFs.readFile` exists.</Claim> <Claim id="c26">`PluginFs.exists` exists.</Claim> <Claim id="c27">`PluginFs.writeFile` exists.</Claim> <Claim id="c28">`PluginExec` accepts `cwd`, `input`, `timeoutMs`, and `env` options.</Claim>
 
-The matching capability kinds are `verifier`, `language-pack`, `content-source`, `importer`, `deploy-target`, `search-provider`, and `component`.
+The core verifier runner wires those helpers from the plugin manifest. <Claim id="c29">`createPluginExec` rejects a command that is not listed in `permissions.exec`.</Claim> <Claim id="c30">`createPluginFs.writeFile` throws when a write target is outside `writableRoots`.</Claim>
 
-During registration, docstube checks each registered id or component name against the plugin manifest capabilities. Registering an undeclared capability is an error. Declaring a capability without registering it is recorded as a warning.
+## Loading
 
-## Verifier shape
-
-A verifier definition contains `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
-
-`scope` is typed as `'block' | 'page' | 'site'`. `localeScope` is typed as `'source-only' | 'per-locale'`. `verify` receives a `VerifierContext` and an array of `PageArtifact` values, then returns a `VerifierRunResult`.
-
-A verifier context includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, `timeoutMs`, and `env`.
-
-## Permissions
-
-`permissions.network` declares whether the plugin intends to make network calls.
-
-`permissions.exec` lists executables the plugin may spawn through the host-provided `ctx.exec` helper. The `PluginExec` type takes a command, argument list, and optional execution options.
-
-`permissions.writableRoots` lists repo-relative roots the plugin may write through `ctx.fs.writeFile`. An empty list means the plugin declares no writable roots.
-
-## Loading plugins
-
-`loadConfiguredPlugins` loads every specifier in `config.plugins`.
-
-Local plugin specifiers start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
-
-After import, the loader reads the module default export and rejects it unless `isDocstubePlugin` returns true. Loaded plugins are registered with source `"local"` or `"npm"`.
+Enable plugins in `docstube.yml`.
 
 ```yaml
 plugins:
-  - docstube-plugin-wordcount
-  - ./plugins/wordcount.ts
+  - docstube-plugin-frontmatter-title
+  - ./plugins/frontmatter-title.ts
 ```
 
-## Scaffolding
+The loader treats the two forms differently. <Claim id="c31">`loadConfiguredPlugins` reads plugin specifiers from `config.plugins`.</Claim> <Claim id="c32">`loadConfiguredPlugins` treats relative and absolute plugin specifiers as local plugins.</Claim> <Claim id="c33">`loadConfiguredPlugins` resolves npm plugin specifiers from the documented repository.</Claim> <Claim id="c34">`loadConfiguredPlugins` rejects a plugin module whose default export was not created with `definePlugin`.</Claim>
 
-The CLI `plugin` command supports the `scaffold` action.
+Use a local path while developing a private verifier. Use an npm package when multiple repositories should share the same plugin.
 
-`docstube plugin scaffold <name>` writes `plugins/<name>.ts` and `plugins/<name>.spec.ts` from the plugin-authoring example source, then materializes `.docstube/skills/plugin-authoring/SKILL.md`.
+## Scaffold
+
+The CLI has a starter path for plugin authors. <Claim id="c35">`runPluginCommand` is exported.</Claim> <Claim id="c36">`runPluginCommand` accepts only the `scaffold` action.</Claim> <Claim id="c37">`runPluginCommand` writes `plugins/<name>.ts`.</Claim> <Claim id="c38">`runPluginCommand` writes `plugins/<name>.spec.ts`.</Claim> <Claim id="c39">`runPluginCommand` materializes the `plugin-authoring` skill.</Claim>
 
 ```bash
-docstube plugin scaffold wordcount
+pnpm docstube plugin scaffold frontmatter-title
 ```
 
-The scaffold command prints the local plugin entry to add to `docstube.yml`, points the authoring agent at `.docstube/skills/plugin-authoring/SKILL.md`, and notes that `docstube check --list` shows the check after the plugin registers a verifier.
+After scaffolding, register the generated local plugin in `docstube.yml`.
+
+```yaml
+plugins:
+  - ./plugins/frontmatter-title.ts
+```
+
+Then point your coding agent at `.docstube/skills/plugin-authoring/SKILL.md` when the starter needs custom verifier logic, a language pack, a deploy target, or another hook kind.

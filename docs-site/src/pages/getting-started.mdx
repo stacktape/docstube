@@ -1,16 +1,929 @@
 ---
-title: "Getting started"
-description: "Install docstube, open the setup wizard, and generate the first documentation site."
-layout: "../layouts/DocLayout.astro"
-docstubeLocale: "en"
-docstubePageId: "pg_tbbjg36mmhe9ncc1xaxg"
-docstubeGuarantee: "scored"
-docstubeBlocksProven: 0
-docstubeBlocksTotal: 22
-docstubeSources: [{"file":"apps/cli/src/cli-help.ts","line":1,"endLine":19,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/cli-help.ts","line":21,"endLine":40,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/cli-help.ts","line":42,"endLine":47,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/emit-current-site.ts","line":15,"endLine":30,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/emit-current-site.ts","line":32,"endLine":78,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/generate-command.ts","line":13,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/generate-command.ts","line":18,"endLine":79,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/status-command.ts","line":14,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/status-command.ts","line":18,"endLine":59,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/wizard-command.ts","line":26,"endLine":32,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/cli/src/commands/wizard-command.ts","line":44,"endLine":111,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":26,"endLine":26,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":28,"endLine":39,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":41,"endLine":44,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":46,"endLine":49,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":51,"endLine":54,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":56,"endLine":59,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":61,"endLine":65,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":67,"endLine":73,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":75,"endLine":81,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":83,"endLine":87,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":89,"endLine":96,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":98,"endLine":102,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":104,"endLine":112,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":114,"endLine":128,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":130,"endLine":130,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":132,"endLine":144,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":152,"endLine":156,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":158,"endLine":158,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":215,"endLine":215,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":219,"endLine":241,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":298,"endLine":302,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":304,"endLine":308,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":367,"endLine":560,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":824,"endLine":828,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":830,"endLine":839,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":875,"endLine":892,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":917,"endLine":933,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":935,"endLine":944,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/app.tsx","line":20,"endLine":69,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":14,"endLine":27,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":28,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":31,"endLine":44,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":47,"endLine":47,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":48,"endLine":48,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":49,"endLine":49,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":51,"endLine":51,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":52,"endLine":52,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":56,"endLine":64,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":67,"endLine":70,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":72,"endLine":78,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":80,"endLine":89,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":91,"endLine":99,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":101,"endLine":112,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":114,"endLine":115,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":117,"endLine":127,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":174,"endLine":211,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":213,"endLine":213,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":215,"endLine":226,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":227,"endLine":227,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":229,"endLine":240,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":242,"endLine":271,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":275,"endLine":303,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":305,"endLine":308,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":310,"endLine":329,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":338,"endLine":354,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":359,"endLine":360,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":362,"endLine":366,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":368,"endLine":368,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":372,"endLine":399,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":425,"endLine":483,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":485,"endLine":486,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-state.ts","line":533,"endLine":597,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard-step-start.tsx","line":33,"endLine":197,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/local-ui/src/wizard.tsx","line":37,"endLine":155,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":8,"endLine":8,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":9,"endLine":9,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":11,"endLine":14,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":15,"endLine":15,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":18,"endLine":18,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":20,"endLine":26,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":31,"endLine":31,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":32,"endLine":32,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":34,"endLine":37,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":39,"endLine":79,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":81,"endLine":84,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":86,"endLine":89,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":91,"endLine":96,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":98,"endLine":104,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":108,"endLine":124,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":126,"endLine":151,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":152,"endLine":152,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/config-schema.ts","line":153,"endLine":153,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/state/manifest-store.ts","line":33,"endLine":40,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/core/src/state/manifest-store.ts","line":42,"endLine":100,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"}]
-docstubeSections: [{"anchor":"open-the-wizard","title":"Open the wizard","guarantee":"scored"},{"anchor":"generate-the-site","title":"Generate the site","guarantee":"scored"},{"anchor":"check-the-result","title":"Check the result","guarantee":"scored"}]
+title: 'Getting started'
+description: 'Install docstube, open the setup wizard, and generate the first verified docs site.'
+layout: '../layouts/DocLayout.astro'
+docstubeLocale: 'en'
+docstubePageId: 'pg_ybzjtnm9wqnebwx2bgyn'
+docstubeClaimsChecked: 0
+docstubeClaimsTotal: 13
+docstubeClaimsContradicted: 0
+docstubeUncoveredAssertions: 0
+docstubeDirtyWorkingTree: true
+docstubeUncheckedClaims: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10', 'c11', 'c12', 'c13']
+docstubeReviewedFor: 'oss-maintainer'
+docstubeSources:
+  [
+    { file: 'apps/cli/src/bare-command.ts', line: 8, endLine: 8, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'apps/cli/src/bare-command.ts', line: 11, endLine: 14, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'apps/cli/src/cli-help.ts', line: 1, endLine: 22, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'apps/cli/src/cli-help.ts', line: 24, endLine: 46, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    { file: 'apps/cli/src/cli-help.ts', line: 48, endLine: 53, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    {
+      file: 'apps/cli/src/commands/emit-current-site.ts',
+      line: 18,
+      endLine: 33,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/emit-current-site.ts',
+      line: 37,
+      endLine: 46,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/emit-current-site.ts',
+      line: 48,
+      endLine: 60,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/emit-current-site.ts',
+      line: 62,
+      endLine: 214,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/emit-current-site.ts',
+      line: 219,
+      endLine: 244,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/emit-current-site.ts',
+      line: 250,
+      endLine: 254,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/generate-command.ts',
+      line: 19,
+      endLine: 27,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/generate-command.ts',
+      line: 29,
+      endLine: 163,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/wizard-command.ts',
+      line: 36,
+      endLine: 44,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/wizard-command.ts',
+      line: 60,
+      endLine: 79,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/wizard-command.ts',
+      line: 81,
+      endLine: 85,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/wizard-command.ts',
+      line: 89,
+      endLine: 104,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/wizard-command.ts',
+      line: 108,
+      endLine: 222,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/wizard-command.ts',
+      line: 224,
+      endLine: 277,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    { file: 'apps/local-ui/src/app.tsx', line: 104, endLine: 132, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    {
+      file: 'apps/local-ui/src/dashboard.tsx',
+      line: 13,
+      endLine: 143,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    { file: 'apps/local-ui/src/nav-tree.tsx', line: 8, endLine: 8, commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c' },
+    {
+      file: 'apps/local-ui/src/nav-tree.tsx',
+      line: 10,
+      endLine: 21,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/nav-tree.tsx',
+      line: 83,
+      endLine: 91,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/review.tsx',
+      line: 344,
+      endLine: 522,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 7,
+      endLine: 12,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 14,
+      endLine: 18,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 20,
+      endLine: 35,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 37,
+      endLine: 78,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 80,
+      endLine: 86,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 100,
+      endLine: 213,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/run-timeline.tsx',
+      line: 223,
+      endLine: 256,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 15,
+      endLine: 28,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 29,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 32,
+      endLine: 45,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 48,
+      endLine: 48,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 49,
+      endLine: 49,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 50,
+      endLine: 50,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 52,
+      endLine: 52,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 53,
+      endLine: 53,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 57,
+      endLine: 65,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 68,
+      endLine: 71,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 73,
+      endLine: 79,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 81,
+      endLine: 90,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 92,
+      endLine: 100,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 102,
+      endLine: 113,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 115,
+      endLine: 116,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 118,
+      endLine: 128,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 175,
+      endLine: 212,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 214,
+      endLine: 214,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 219,
+      endLine: 219,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 221,
+      endLine: 235,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 236,
+      endLine: 236,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 238,
+      endLine: 250,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 252,
+      endLine: 257,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 259,
+      endLine: 291,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 295,
+      endLine: 300,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 302,
+      endLine: 332,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 334,
+      endLine: 340,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 342,
+      endLine: 364,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 373,
+      endLine: 378,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 382,
+      endLine: 399,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 404,
+      endLine: 405,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 407,
+      endLine: 411,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 413,
+      endLine: 413,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 417,
+      endLine: 443,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 469,
+      endLine: 540,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 542,
+      endLine: 543,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 648,
+      endLine: 658,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-state.ts',
+      line: 660,
+      endLine: 747,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-step-agent.tsx',
+      line: 13,
+      endLine: 166,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-step-start.tsx',
+      line: 35,
+      endLine: 202,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 8,
+      endLine: 11,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 13,
+      endLine: 14,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 16,
+      endLine: 17,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 19,
+      endLine: 26,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 46,
+      endLine: 73,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 75,
+      endLine: 90,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 92,
+      endLine: 141,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 179,
+      endLine: 249,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 269,
+      endLine: 327,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 351,
+      endLine: 379,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard-steps.tsx',
+      line: 381,
+      endLine: 409,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/local-ui/src/wizard.tsx',
+      line: 51,
+      endLine: 204,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 8,
+      endLine: 8,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 9,
+      endLine: 9,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 11,
+      endLine: 14,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 15,
+      endLine: 15,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 18,
+      endLine: 18,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 20,
+      endLine: 26,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 31,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 32,
+      endLine: 32,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 39,
+      endLine: 42,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 43,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 50,
+      endLine: 57,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 59,
+      endLine: 98,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 100,
+      endLine: 103,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 111,
+      endLine: 142,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 144,
+      endLine: 159,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 163,
+      endLine: 171,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 175,
+      endLine: 201,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 202,
+      endLine: 202,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/contracts/src/config-schema.ts',
+      line: 203,
+      endLine: 203,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 20,
+      endLine: 24,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 41,
+      endLine: 42,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 44,
+      endLine: 44,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 46,
+      endLine: 46,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 82,
+      endLine: 87,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 89,
+      endLine: 116,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 120,
+      endLine: 124,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 126,
+      endLine: 126,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 128,
+      endLine: 131,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/config/config-io.ts',
+      line: 139,
+      endLine: 151,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 13,
+      endLine: 13,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 14,
+      endLine: 14,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 31,
+      endLine: 34,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 36,
+      endLine: 40,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 42,
+      endLine: 66,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 68,
+      endLine: 72,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 97,
+      endLine: 110,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 112,
+      endLine: 116,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/server/feedback.ts',
+      line: 120,
+      endLine: 133,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 22,
+      endLine: 22,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 76,
+      endLine: 78,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 80,
+      endLine: 99,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 101,
+      endLine: 107,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/manifest-store.ts',
+      line: 109,
+      endLine: 307,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 13,
+      endLine: 17,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 19,
+      endLine: 19,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 42,
+      endLine: 90,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 94,
+      endLine: 101,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 103,
+      endLine: 107,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-journal.ts',
+      line: 110,
+      endLine: 124,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 31,
+      endLine: 31,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 33,
+      endLine: 33,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 36,
+      endLine: 36,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 43,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 45,
+      endLine: 55,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 57,
+      endLine: 57,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 60,
+      endLine: 60,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 81,
+      endLine: 90,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 92,
+      endLine: 109,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 124,
+      endLine: 132,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 134,
+      endLine: 134,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 182,
+      endLine: 227,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 229,
+      endLine: 237,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 239,
+      endLine: 244,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 246,
+      endLine: 258,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 267,
+      endLine: 294,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/run-lock.ts',
+      line: 300,
+      endLine: 314,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/version-cut.ts',
+      line: 10,
+      endLine: 14,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/state/version-cut.ts',
+      line: 16,
+      endLine: 53,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 34,
+      endLine: 37,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 39,
+      endLine: 39,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 41,
+      endLine: 63,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'packages/core/src/structure/assessment-cache.ts',
+      line: 66,
+      endLine: 74,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    }
+  ]
+docstubeSections:
+  [
+    { anchor: 'open-the-wizard', title: 'Open The Wizard', checked: 0, total: 3, contradicted: 0 },
+    { anchor: 'start-generation', title: 'Start Generation', checked: 0, total: 4, contradicted: 0 },
+    { anchor: 'after-the-first-run', title: 'After The First Run', checked: 0, total: 3, contradicted: 0 }
+  ]
 ---
 
+import Claim from '../docstube/DocstubeClaim.astro';
 import { default as Callout } from '../components/Callout.astro';
 import { default as CodeBlock } from '../components/CodeBlock.astro';
 import { default as CodeGroup } from '../components/CodeGroup.astro';
@@ -24,79 +937,74 @@ import { default as Badge } from '../components/Badge.astro';
 import { default as ParamTable } from '../components/ParamTable.astro';
 import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
-
 # Getting started
 
-The npm package is named `docstube` and exposes a `docstube` binary. For projects that already use Node tooling, the first-run path can be run through `npx`:
+Install docstube in the repository you want documented. <Claim id="c1">`docstube` is the npm package name.</Claim> <Claim id="c2">`docstube` is the CLI binary name.</Claim>
 
-```text
+```bash
+npm install --save-dev docstube
+npx docstube --version
+```
+
+For a standalone install, use the hosted installer scripts instead of adding the npm package. <Claim id="c3">`installs.docstube.dev` is the production install-scripts domain.</Claim>
+
+```bash
+curl -fsSL https://installs.docstube.dev/linux.sh | sh
+```
+
+```powershell
+iwr https://installs.docstube.dev/windows.ps1 -UseB | iex
+```
+
+## Open The Wizard
+
+Run docstube from the repository root.
+
+```bash
+npx docstube
+```
+
+You can also name the wizard command directly. <Claim id="c4">`docstube wizard` opens the local setup wizard and control plane.</Claim> <Claim id="c5">Bare `docstube` opens the local control plane.</Claim>
+
+```bash
 npx docstube wizard
-npx docstube generate
-npx docstube status
 ```
 
-For a standalone binary, use the install scripts hosted at `installs.docstube.dev`. The project README names `https://installs.docstube.dev/linux.sh` for Linux and `https://installs.docstube.dev/windows.ps1` for Windows. After installing the standalone binary, use the same commands without the `npx` prefix.
+On a new repository, the control plane starts in setup. <Claim id="c6">A repository without `docstube.yml` opens first-run setup.</Claim> During setup, choose the project type, personas, agent provider, information architecture, site settings, theme, and components.
 
-## Open the wizard
+## Start Generation
 
-`docstube wizard` starts the local control plane. The command accepts an optional port:
+The last setup screen has one happy-path action: <Claim id="c7">First-run setup writes `docstube.yml` and `ia.yml`.</Claim> <Claim id="c8">First-run setup starts a generate run.</Claim>
 
-```text
-npx docstube wizard --port 4317
-```
+After setup, you can run generation again from the terminal. <Claim id="c9">`docstube generate` generates docs from existing config.</Claim>
 
-When the server starts, the CLI prints:
-
-```text
-docstube control plane running at:
-
-  <local URL>
-
-Press Ctrl+C to stop.
-```
-
-Open the printed URL. The local UI includes a Wizard tab. On a first run, the wizard uses scaffold mode; its final step writes the config family and starts a `generate` run.
-
-## Generate the site
-
-If you start generation from the terminal, run:
-
-```text
+```bash
 npx docstube generate
 ```
 
-The `generate` command loads the config, creates the task runner from that config, and runs the documentation pipeline. During the run, it prints one line per generated page or translation, using `ok` for passed output and `FLAG` for output with open flags.
-
-The generated site is emitted to the configured `outDir`. The config schema defaults that directory to:
+The CLI reports each generated page, then prints where the site was published. <Claim id="c10">The config schema sets `outDir` to `docs-site` when `outDir` is omitted.</Claim>
 
 ```text
-docs-site/
+site published to docs-site/ -- build it with: npm install && npm run build
 ```
 
-After emission, the CLI prints the site directory and the build hint:
+## After The First Run
 
-```text
-site emitted to docs-site/ — build it with: npm install && npm run build
+The first successful publish leaves two important directories in the repository:
+
+- `docs-site/` contains the generated site. <Claim id="c11">`docstube generate` publishes the site to `outDir` when the run summary is published.</Claim>
+- `.docstube/manifest/` contains the committed manifest store. <Claim id="c12">`committedManifestDir` returns `.docstube/manifest` under the repository root.</Claim>
+
+Build the generated site when you are ready to inspect or deploy it.
+
+```bash
+cd docs-site
+npm install
+npm run build
 ```
 
-docstube also writes verified run state under:
+To serve the generated site locally through docstube, use preview. <Claim id="c13">`docstube preview` builds the generated docs site when it is stale and serves it locally.</Claim>
 
-```text
-.docstube/manifest/
-```
-
-That manifest directory contains `manifest.yml` and page shard files under `pages/<locale>/`.
-
-## Check the result
-
-Run status after the first generation:
-
-```text
-npx docstube status
-```
-
-When a manifest exists, `status` reports the docs version, locales, page count, each page guarantee state, and the open flag count. If no manifest exists yet, it prints:
-
-```text
-No manifest yet — run `docstube generate` first.
+```bash
+npx docstube preview
 ```

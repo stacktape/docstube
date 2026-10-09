@@ -1,25 +1,25 @@
-> *Historical research artifact (2026-07). Evidence base for PRODUCT.md. Where any recommendation here conflicts with PRODUCT.md, PRODUCT.md wins (e.g. dry-run, rollback, and flag-rate telemetry were later dropped; the review-UI reframing and several tier placements were adjusted).*
+> _Historical research artifact (2026-07). Evidence base for PRODUCT.md. Where any recommendation here conflicts with PRODUCT.md, PRODUCT.md wins (e.g. dry-run, rollback, and flag-rate telemetry were later dropped; the review-UI reframing and several tier placements were adjusted)._
 
 # Revised, Research-Backed Feature Plan for docstube (L4 Lens)
 
 ## (1) TL;DR — Highest-Conviction Changes under the L4 Lens
 
 1. **Incremental regeneration is the #1 L4 requirement, not a nice-to-have.** DeepWiki's single biggest gap (deepwiki-open issues #402 and #371; the hosted DeepWiki re-indexes on a schedule; guides warn "the wiki lags the source") is exactly what docstube's symbol-level provenance regeneration solves. V1-core; lead marketing with "freshness proven, not scheduled."
-2. **Reframe the Review UI as an Exception-Triage UI.** Under the L4 definition, a page-approval queue is an admission of L3. *(PRODUCT.md resolution: review UI stays the feedback surface; a separate flag queue is the exception-triage surface.)*
+2. **Reframe the Review UI as an Exception-Triage UI.** Under the L4 definition, a page-approval queue is an admission of L3. _(PRODUCT.md resolution: review UI stays the feedback surface; a separate flag queue is the exception-triage surface.)_
 3. **`docstube audit` is the wedge — ship it first, standalone, free.** Operationalizes "verified defects per 100 claims" against the human baseline (Tan, Wagner & Treude, arXiv:2212.01479: 28.9% of the top-1000 most-popular GitHub projects contain at least one outdated reference to source code that no longer exists, outdated 4.7 years on average in that dataset).
 4. **Ship a local-model (Ollama / OpenAI-compatible) adapter in V1.** deepwiki-open's largest issue volume is local-model friction (#358, #175, #248, #152, #355 "No valid XML found in response" with qwen3/llama3). BYO-AI already implies this; make it explicit and first-class for internal-wiki data residency.
 5. **Private-wiki access control is a paid internal-wiki signal.** deepwiki-open's auth is admittedly weak; internal wikis need SSO/ACLs. Architect the contract now; ship in Cloud.
-6. **Adopt the automation-trust playbook: dry-run diffs, blast-radius scopes, one-command rollback, signed provenance, audit log.** *(PRODUCT.md resolution: dry-run and rollback dropped; signed provenance = architect-only; scopes = v2 policy engine.)*
-7. **Diagrams: default to ELK, dagre fallback, TALA opt-in/Cloud-only.** TALA is proprietary — free only for evaluation (watermark unlicensed), paid Terrastruct Enterprise license required for CI/server — cannot be a default in an MIT tool (D2 core is MPL-2.0). Diagram *correctness* (verified against the codemap) matters more than layout beauty; that's the real DeepWiki trust-breaker.
+6. **Adopt the automation-trust playbook: dry-run diffs, blast-radius scopes, one-command rollback, signed provenance, audit log.** _(PRODUCT.md resolution: dry-run and rollback dropped; signed provenance = architect-only; scopes = v2 policy engine.)_
+7. **Diagrams: default to ELK, dagre fallback, TALA opt-in/Cloud-only.** TALA is proprietary — free only for evaluation (watermark unlicensed), paid Terrastruct Enterprise license required for CI/server — cannot be a default in an MIT tool (D2 core is MPL-2.0). Diagram _correctness_ (verified against the codemap) matters more than layout beauty; that's the real DeepWiki trust-breaker.
 8. **Extended deterministic verifiers should include runtime execution in sandboxes.** Doctest-style execution, shellcheck, JSON/YAML schema validation, config-sample validation against Zod/JSON-schema. Every claim promoted from "scored" to "proven" widens the L4 domain. Answers documented distrust (Sonar 2026, n=1,149: 96% don't fully trust AI-generated code is functionally correct).
-9. **Publish the Autonomy Ladder + Failure-Mode Registry as living, versioned spec artifacts.** *(PRODUCT.md resolution: ladder public, registry private.)* The SAE-for-docs frame is not yet claimed for documentation specifically (only adjacent domains — coding agents, QA). The "12-factor / SemVer" success pattern requires a canonical, versioned, vendor-neutral spec page.
+9. **Publish the Autonomy Ladder + Failure-Mode Registry as living, versioned spec artifacts.** _(PRODUCT.md resolution: ladder public, registry private.)_ The SAE-for-docs frame is not yet claimed for documentation specifically (only adjacent domains — coding agents, QA). The "12-factor / SemVer" success pattern requires a canonical, versioned, vendor-neutral spec page.
 10. **De-emphasize llms.txt as a headline; keep as cheap hygiene.** Ahrefs (137,210 domains, June 2026): 97% of valid llms.txt files received zero requests in May 2026; of ~1,100 files with any traffic, AI retrieval bots ~1%, coding agents (Claude-Code, GPTBot) led. Market the MCP server and per-page provenance instead.
 11. **Coverage metric vs. codemap is a required L4 proof.** Omission is a declared failure class; you cannot claim autonomous docs without measuring documented fraction of public symbols.
 12. **Confidence/guarantee-level per claim must be visible in output.** DeepWiki's line-level citations are its most-praised trust feature; per-claim provenance + guarantee labels are the superior L4-native version.
 
 ## (2) DeepWiki-Ecosystem Findings
 
-*Sourcing caveat: GitHub reaction-sorted lists were not fully accessible; ranking inferred from recurrence, not confirmed engagement counts. Only #66 (≈9), #41 (≈3), #45 (≈2) showed visible indicators. Issue existence and verbatim text are reliable.*
+_Sourcing caveat: GitHub reaction-sorted lists were not fully accessible; ranking inferred from recurrence, not confirmed engagement counts. Only #66 (≈9), #41 (≈3), #45 (≈2) showed visible indicators. Issue existence and verbatim text are reliable._
 
 ### Ranked demand list (what L4-docs users want most)
 
@@ -49,65 +49,69 @@
 
 ## (3) Automation-Trust Mechanisms Table
 
-| Mechanism | Evidence from adjacent tools | docstube feature it maps to |
-|---|---|---|
-| Deterministic checks gate the action | Dependabot/Renovate auto-merge only on green CI | Publish only when all verifiers pass; else flag |
-| Scope / blast-radius limits | Semver-patch-only, lockfile-only, CODEOWNERS | Per-path autonomy scopes (→ v2 policy engine) |
-| Observation window before auto-action | 24h soak for security updates; `minimumReleaseAge` | (→ dropped; recorded for reference) |
-| Dry-run / plan-vs-apply | Terraform plan/apply; ArgoCD diff | (→ dropped per founder) |
-| Self-heal / continuous reconciliation | ArgoCD `selfHeal`/`prune` | Provenance-driven auto-regeneration |
-| Easy rollback | Immutable versioned releases | (→ dropped; git revert covers it) |
-| Audit log + signed provenance | Regulated auto-merge requirements | Signed provenance manifest (architect-only) + `.docstube/runs` |
-| Instrumented success-rate metric | Auto-merge success dashboards | Defects-per-100-claims; coverage |
-| Advisory → gating promotion path | "Start non-blocking, promote once dismissal rate <20%" | (informing v2 policy engine) |
-| Explainability as trust interface | "Explainability is becoming the new observability" (CodeRabbit, vendor) | Explainable scores + per-claim guarantee levels |
+| Mechanism                             | Evidence from adjacent tools                                            | docstube feature it maps to                                    |
+| ------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Deterministic checks gate the action  | Dependabot/Renovate auto-merge only on green CI                         | Publish only when all verifiers pass; else flag                |
+| Scope / blast-radius limits           | Semver-patch-only, lockfile-only, CODEOWNERS                            | Per-path autonomy scopes (→ v2 policy engine)                  |
+| Observation window before auto-action | 24h soak for security updates; `minimumReleaseAge`                      | (→ dropped; recorded for reference)                            |
+| Dry-run / plan-vs-apply               | Terraform plan/apply; ArgoCD diff                                       | (→ dropped per founder)                                        |
+| Self-heal / continuous reconciliation | ArgoCD `selfHeal`/`prune`                                               | Provenance-driven auto-regeneration                            |
+| Easy rollback                         | Immutable versioned releases                                            | (→ dropped; git revert covers it)                              |
+| Audit log + signed provenance         | Regulated auto-merge requirements                                       | Signed provenance manifest (architect-only) + `.docstube/runs` |
+| Instrumented success-rate metric      | Auto-merge success dashboards                                           | Defects-per-100-claims; coverage                               |
+| Advisory → gating promotion path      | "Start non-blocking, promote once dismissal rate <20%"                  | (informing v2 policy engine)                                   |
+| Explainability as trust interface     | "Explainability is becoming the new observability" (CodeRabbit, vendor) | Explainable scores + per-claim guarantee levels                |
 
-**Positioning precedent + backlash to avoid:** Oracle's "Autonomous Database" drew on-record skepticism — "we need to see proof that it works" (Marty Puranik, Atlantic.Net); "hyperbolic marketing" (Mike Lloyd, RedSeal). The L4 claim must be falsifiable and demonstrated (defect metrics, audit, registry), never asserted. Corroborating: METR RCT (arXiv:2507.09089, July 2025, n=16) — experienced OSS devs were 19% *slower* with AI while believing they were 20% faster; measured evidence must lead.
+**Positioning precedent + backlash to avoid:** Oracle's "Autonomous Database" drew on-record skepticism — "we need to see proof that it works" (Marty Puranik, Atlantic.Net); "hyperbolic marketing" (Mike Lloyd, RedSeal). The L4 claim must be falsifiable and demonstrated (defect metrics, audit, registry), never asserted. Corroborating: METR RCT (arXiv:2507.09089, July 2025, n=16) — experienced OSS devs were 19% _slower_ with AI while believing they were 20% faster; measured evidence must lead.
 
 ## (4) The Revised Feature Plan (as proposed by this report)
 
 ### V1-CORE
 
-| Feature | Evidence | L4-fit | Effort |
-|---|---|---|---|
-| Symbol-level incremental regeneration | #402, #371; DeepWiki lags source | Core | L |
-| `docstube audit` (standalone, free) | 28.9% baseline; drift GTM | Proves the metric | M |
-| Extended deterministic verifiers (incl. runtime exec, shellcheck, JSON/YAML, config-vs-schema) | Sonar 96%; #230 broken links | Widens "proven" domain | L |
-| Source-grounded, codemap-verified diagrams (ELK default, dagre fallback) | HN "handwavy"; TALA proprietary | Proven diagram claims | M |
-| Local-model / OpenAI-compatible adapter | #358/#175/#248/#152/#355 | Data-residency autonomy | M |
-| Exception-triage surface | Flags ≠ supervision | Core | M |
-| Provenance links + per-claim guarantee level | DeepWiki citations most-praised | Core trust surface | M |
-| Coverage metric vs codemap | Omission failure class | Required proof | S |
-| MCP docs server (DeepWiki-convention names) | `ask_question`/`read_wiki_structure`/`read_wiki_contents` | Agent-ecosystem fit | S |
-| GitHub Action opening PRs | No first-class Action in deepwiki-open | Auto-merge-safe autonomy | M |
-| Explainable quality scores | Trust interface | Required | M |
+| Feature                                                                                        | Evidence                                                  | L4-fit                   | Effort |
+| ---------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------ | ------ |
+| Symbol-level incremental regeneration                                                          | #402, #371; DeepWiki lags source                          | Core                     | L      |
+| `docstube audit` (standalone, free)                                                            | 28.9% baseline; drift GTM                                 | Proves the metric        | M      |
+| Extended deterministic verifiers (incl. runtime exec, shellcheck, JSON/YAML, config-vs-schema) | Sonar 96%; #230 broken links                              | Widens "proven" domain   | L      |
+| Source-grounded, codemap-verified diagrams (ELK default, dagre fallback)                       | HN "handwavy"; TALA proprietary                           | Proven diagram claims    | M      |
+| Local-model / OpenAI-compatible adapter                                                        | #358/#175/#248/#152/#355                                  | Data-residency autonomy  | M      |
+| Exception-triage surface                                                                       | Flags ≠ supervision                                       | Core                     | M      |
+| Provenance links + per-claim guarantee level                                                   | DeepWiki citations most-praised                           | Core trust surface       | M      |
+| Coverage metric vs codemap                                                                     | Omission failure class                                    | Required proof           | S      |
+| MCP docs server (DeepWiki-convention names)                                                    | `ask_question`/`read_wiki_structure`/`read_wiki_contents` | Agent-ecosystem fit      | S      |
+| GitHub Action opening PRs                                                                      | No first-class Action in deepwiki-open                    | Auto-merge-safe autonomy | M      |
+| Explainable quality scores                                                                     | Trust interface                                           | Required                 | M      |
 
 ### V1-ARCHITECT-ONLY (contracts to define)
 
-| Feature | Contract |
-|---|---|
-| Per-path autonomy scopes / policy | `autonomy:` block — per-glob {mode, guarantee_floor, flag_budget} |
-| Flag telemetry schema | (→ dropped as feature; schema noted for reference) |
-| Signed provenance manifest | per-claim {source_path, commit_sha, verifier, guarantee_level, signature} |
-| Verification badge endpoint | {defects_per_100, coverage_percent, last_verified_at} |
-| Tribal-knowledge capture | instructions keyed by symbol hash; declared ODD boundary |
-| Private-wiki access control | SSO/OIDC + per-path ACL contract; enforce in Cloud |
-| Migration importers | importer → normalized IA + content as *context*; imported claims "unverified" until re-grounded |
-| Versioned docs & i18n | version/locale dimensions in manifest, IDs, provenance *(→ ship v1 per PRODUCT.md)* |
+| Feature                           | Contract                                                                                        |
+| --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Per-path autonomy scopes / policy | `autonomy:` block — per-glob {mode, guarantee_floor, flag_budget}                               |
+| Flag telemetry schema             | (→ dropped as feature; schema noted for reference)                                              |
+| Signed provenance manifest        | per-claim {source_path, commit_sha, verifier, guarantee_level, signature}                       |
+| Verification badge endpoint       | {defects_per_100, coverage_percent, last_verified_at}                                           |
+| Tribal-knowledge capture          | instructions keyed by symbol hash; declared ODD boundary                                        |
+| Private-wiki access control       | SSO/OIDC + per-path ACL contract; enforce in Cloud                                              |
+| Migration importers               | importer → normalized IA + content as _context_; imported claims "unverified" until re-grounded |
+| Versioned docs & i18n             | version/locale dimensions in manifest, IDs, provenance _(→ ship v1 per PRODUCT.md)_             |
 
 ### V2 / FAST-FOLLOW
-Language expansion Java → Go → Rust → C# → PHP *(→ Java moved to v1)*; feedback → autonomous refinement; docs-gaps-from-MCP-queries *(→ Cloud)*; changelog generation *(→ v1)*; curl-vs-OpenAPI + CLI-output freshness verifiers *(→ v1 umbrella)*.
+
+Language expansion Java → Go → Rust → C# → PHP _(→ Java moved to v1)_; feedback → autonomous refinement; docs-gaps-from-MCP-queries _(→ Cloud)_; changelog generation _(→ v1)_; curl-vs-OpenAPI + CLI-output freshness verifiers _(→ v1 umbrella)_.
 
 ### CLOUD
+
 Cross-repo Ask agent (#66); fleet docs-health dashboard; governance/SSO; S3/fleet storage (#367); TALA opt-in with license pass-through.
 
 ### REDESIGNED-FOR-L4 (before → after)
-- Review UI: page approval → exception triage *(final: feedback surface + separate flag queue)*.
-- Feedback widget: human backlog → autonomous refinement input *(final: widget dropped; Ask-AI mining instead)*.
+
+- Review UI: page approval → exception triage _(final: feedback surface + separate flag queue)_.
+- Feedback widget: human backlog → autonomous refinement input _(final: widget dropped; Ask-AI mining instead)_.
 - Autonomy default: L3-with-dial recommendation → **founder override: L4 default within declared ODD**.
 - llms.txt: headline → hygiene.
 
 ### DROPPED / DOWNGRADED
+
 TALA as default (licensing) · llms.txt as centerpiece (97% zero requests) · page-approval review UI (L3 gate) · generic star-rating widget (low signal).
 
 ## (5) Failure-Mode Registry Delta (new classes from this research)
@@ -123,7 +127,7 @@ TALA as default (licensing) · llms.txt as centerpiece (97% zero requests) · pa
 
 ## (6) Ladder / Registry Publishing Recommendation
 
-The SAE-style autonomy-ladder frame exists for coding agents (Tessl's "5 levels of AI agent autonomy"; SmartBear's "levels of autonomy in software development") and QA/testing — but **no documentation-specific canonical ladder exists**. docstube can claim "the autonomy ladder *for documentation*," explicitly framed as extending the SAE analogy to a new domain. What made 12-factor/SemVer/DORA succeed: a single canonical, versioned, vendor-neutral spec with a stable URL — not a product-marketing blog post. Recommendation: standalone versioned spec (vendor-neutral tone, docstube positioned as *an implementation targeting L4*), competitors mapped honestly; failure-mode registry as a living versioned document (security-advisory-database model) — *(final: ladder public, registry private)*; manifesto post that links to the spec; every claim anchored to the falsifiable metric (defects per 100 claims vs the 28.9% / 4.7-year human baseline).
+The SAE-style autonomy-ladder frame exists for coding agents (Tessl's "5 levels of AI agent autonomy"; SmartBear's "levels of autonomy in software development") and QA/testing — but **no documentation-specific canonical ladder exists**. docstube can claim "the autonomy ladder _for documentation_," explicitly framed as extending the SAE analogy to a new domain. What made 12-factor/SemVer/DORA succeed: a single canonical, versioned, vendor-neutral spec with a stable URL — not a product-marketing blog post. Recommendation: standalone versioned spec (vendor-neutral tone, docstube positioned as _an implementation targeting L4_), competitors mapped honestly; failure-mode registry as a living versioned document (security-advisory-database model) — _(final: ladder public, registry private)_; manifesto post that links to the spec; every claim anchored to the falsifiable metric (defects per 100 claims vs the 28.9% / 4.7-year human baseline).
 
 ## (7) Caveats on Evidence Quality
 

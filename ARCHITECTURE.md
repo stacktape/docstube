@@ -1,7 +1,7 @@
 # docstube — ARCHITECTURE.md
 
-> How the system described in [PRODUCT.md](PRODUCT.md) is built. PRODUCT.md owns *what and why*;
-> this document owns *how*. If they disagree, PRODUCT.md wins on product semantics and this
+> How the system described in [PRODUCT.md](PRODUCT.md) is built. PRODUCT.md owns _what and why_;
+> this document owns _how_. If they disagree, PRODUCT.md wins on product semantics and this
 > document wins on code structure.
 
 **Status:** authoritative as of 2026-07-21. Written for the v1 rewrite (branch `rewrite-for-v1`);
@@ -23,7 +23,7 @@ Three properties dominate every choice below, in priority order:
    primitives, status/UI surfaces, and the audit metric — it ships as one coherent migration
    while manifests are still private, never piecemeal.
 2. **The kernel is small and boring.** Trusted core = pipeline orchestration, entity model,
-   claim ledger + evidence, state, verification *gating* (not the verifiers themselves),
+   claim ledger + evidence, state, verification _gating_ (not the verifiers themselves),
    publication decision, plugin host, agent harness. Everything else — verifiers, language packs,
    content sources, importers, search, theme components, deterministic structural checks — is a
    plugin behind the same API third parties get.
@@ -36,21 +36,21 @@ Three properties dominate every choice below, in priority order:
 
 pnpm workspaces, `apps/*` + `packages/*`. Entry files named by responsibility, never `index.ts`.
 
-| Workspace | npm name | Published | Role |
-|---|---|---|---|
-| `packages/contracts` | `@docstube/contracts` | no (private) | Zod schemas + types only: entity model, claim ledger, evidence, manifest, config, findings (incl. structural), knowledge records, run events, agent-task schema, publication decision. Zero heavy deps (`zod` only). Everything depends on it; it depends on nothing. |
-| `packages/plugin-sdk` | `@docstube/plugin-sdk` | **yes** (experimental until 1.0) | The public plugin API: `definePlugin`, hook interfaces, plugin manifest schema, capability/permission declarations. Re-exports the contract types plugins need. Second published package after `docstube`. |
-| `packages/agent-runtime` | `@docstube/agent-runtime` | no | The unified BYO-AI harness: task spec, tool surface (generic + evidence tools), loop, transcripts/observed reads, cache, record/replay, transports (API + vendor CLIs). Depends only on `contracts`. |
-| `packages/codemap` | `@docstube/codemap` | no | Codemap host: tree-sitter runtime, symbol table, normalized symbol hashing, typed fingerprints, symbol diff. Language packs plug in; the host is language-agnostic. |
-| `packages/core` | `@docstube/core` | no | The kernel: config load/round-trip, state (manifest shards + sqlite view), plugin host, pipeline orchestrator (the generate reconciler), entity extraction/matching, ledger validation/anchoring, localization scheduler, knowledge store, run journal, local control-plane server (Hono + tRPC). |
-| `packages/lang-typescript` | `@docstube/lang-typescript` | no | First language pack (plugin): tree-sitter-typescript grammar wiring, symbol extraction rules, typed fingerprints, TypeDoc API extraction, snippet typecheck/run toolchain. `lang-python`, `lang-java` follow the same shape. |
-| `packages/verifiers` | `@docstube/verifiers` | no | First-party verifier plugins (each verifier a plugin, named exports from concrete files). |
-| `packages/theme` | `@docstube/theme` | no | Astro + React theme, component registry (each registry component contributes a block type with a Zod metadata schema and **both `renderToHTML` and `renderToMarkdown`**). Generated sites vendor it — user sites never depend on the package at runtime. |
-| `packages/skills` | `@docstube/skills` | no | Shipped `SKILL.md` sources (incl. `plugin-authoring`) + materialization helpers. |
-| `apps/cli` | `docstube` | **yes** | The binary. citty, lazy command loading, no heavy deps at startup. |
-| `apps/local-ui` | — | no | Vite + React wizard/dashboard/review/flag-queue SPA served by the context-aware `docstube` entry. |
-| `apps/github-action` | — | no | Action wrapper around the CLI (runs `generate --ci`, enforces the PublicationDecision). |
-| `apps/install-events`, `apps/web` | — | no | Installer telemetry backend; marketing site (separate workstream). |
+| Workspace                         | npm name                    | Published                        | Role                                                                                                                                                                                                                                                                                              |
+| --------------------------------- | --------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/contracts`              | `@docstube/contracts`       | no (private)                     | Zod schemas + types only: entity model, claim ledger, evidence, manifest, config, findings (incl. structural), knowledge records, run events, agent-task schema, publication decision. Zero heavy deps (`zod` only). Everything depends on it; it depends on nothing.                             |
+| `packages/plugin-sdk`             | `@docstube/plugin-sdk`      | **yes** (experimental until 1.0) | The public plugin API: `definePlugin`, hook interfaces, plugin manifest schema, capability/permission declarations. Re-exports the contract types plugins need. Second published package after `docstube`.                                                                                        |
+| `packages/agent-runtime`          | `@docstube/agent-runtime`   | no                               | The unified BYO-AI harness: task spec, tool surface (generic + evidence tools), loop, transcripts/observed reads, cache, record/replay, transports (API + vendor CLIs). Depends only on `contracts`.                                                                                              |
+| `packages/codemap`                | `@docstube/codemap`         | no                               | Codemap host: tree-sitter runtime, symbol table, normalized symbol hashing, typed fingerprints, symbol diff. Language packs plug in; the host is language-agnostic.                                                                                                                               |
+| `packages/core`                   | `@docstube/core`            | no                               | The kernel: config load/round-trip, state (manifest shards + sqlite view), plugin host, pipeline orchestrator (the generate reconciler), entity extraction/matching, ledger validation/anchoring, localization scheduler, knowledge store, run journal, local control-plane server (Hono + tRPC). |
+| `packages/lang-typescript`        | `@docstube/lang-typescript` | no                               | First language pack (plugin): tree-sitter-typescript grammar wiring, symbol extraction rules, typed fingerprints, TypeDoc API extraction, snippet typecheck/run toolchain. `lang-python`, `lang-java` follow the same shape.                                                                      |
+| `packages/verifiers`              | `@docstube/verifiers`       | no                               | First-party verifier plugins (each verifier a plugin, named exports from concrete files).                                                                                                                                                                                                         |
+| `packages/theme`                  | `@docstube/theme`           | no                               | Astro + React theme, component registry (each registry component contributes a block type with a Zod metadata schema and **both `renderToHTML` and `renderToMarkdown`**). Generated sites vendor it — user sites never depend on the package at runtime.                                          |
+| `packages/skills`                 | `@docstube/skills`          | no                               | Shipped `SKILL.md` sources (incl. `plugin-authoring`) + materialization helpers.                                                                                                                                                                                                                  |
+| `apps/cli`                        | `docstube`                  | **yes**                          | The binary. citty, lazy command loading, no heavy deps at startup.                                                                                                                                                                                                                                |
+| `apps/local-ui`                   | —                           | no                               | Vite + React wizard/dashboard/review/flag-queue SPA served by the context-aware `docstube` entry.                                                                                                                                                                                                 |
+| `apps/github-action`              | —                           | no                               | Action wrapper around the CLI (runs `generate --ci`, enforces the PublicationDecision).                                                                                                                                                                                                           |
+| `apps/install-events`, `apps/web` | —                           | no                               | Installer telemetry backend; marketing site (separate workstream).                                                                                                                                                                                                                                |
 
 Dependency direction (arrows = "depends on"):
 
@@ -322,15 +322,15 @@ export default definePlugin({
 
 `register(host)` receives a typed registration surface — the only door into the kernel:
 
-| Hook | Registers | 0.1.0 status |
-|---|---|---|
-| `host.verifier(…)` | deterministic check: `appliesTo` selector + capability declaration (which claim classes/predicates it can check — this replaces a bare `proves` boolean and feeds the class-appropriate-evidence rule, §4.2) + `verify(ctx, entities) → VerifierResult[]` | shipped, several built-ins |
-| `host.languagePack(…)` | grammar, symbol extraction, typed fingerprints, API extractor, snippet toolchain | shipped (TS; Python/Java follow) |
-| `host.contentSource(…)` | non-code truth sources (OpenAPI/AsyncAPI ingestion) | shipped |
-| `host.importer(…)` | foreign-docs → reference context (Mintlify/GitBook/ReadMe/Confluence) | contract shipped, adapters incremental |
-| `host.searchProvider(…)` | search indexing at assemble (Pagefind built-in, emitter-owned contract) | contract shipped |
-| `host.component(…)` | theme registry component + Zod metadata schema + renderToHTML/renderToMarkdown → block type (§3.2) | shipped |
-| `host.structuralCheck(…)` | deterministic structural detector emitting candidate findings (§12); AI structural assessment stays kernel-owned | contract shipped |
+| Hook                      | Registers                                                                                                                                                                                                                                                 | 0.1.0 status                           |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `host.verifier(…)`        | deterministic check: `appliesTo` selector + capability declaration (which claim classes/predicates it can check — this replaces a bare `proves` boolean and feeds the class-appropriate-evidence rule, §4.2) + `verify(ctx, entities) → VerifierResult[]` | shipped, several built-ins             |
+| `host.languagePack(…)`    | grammar, symbol extraction, typed fingerprints, API extractor, snippet toolchain                                                                                                                                                                          | shipped (TS; Python/Java follow)       |
+| `host.contentSource(…)`   | non-code truth sources (OpenAPI/AsyncAPI ingestion)                                                                                                                                                                                                       | shipped                                |
+| `host.importer(…)`        | foreign-docs → reference context (Mintlify/GitBook/ReadMe/Confluence)                                                                                                                                                                                     | contract shipped, adapters incremental |
+| `host.searchProvider(…)`  | search indexing at assemble (Pagefind built-in, emitter-owned contract)                                                                                                                                                                                   | contract shipped                       |
+| `host.component(…)`       | theme registry component + Zod metadata schema + renderToHTML/renderToMarkdown → block type (§3.2)                                                                                                                                                        | shipped                                |
+| `host.structuralCheck(…)` | deterministic structural detector emitting candidate findings (§12); AI structural assessment stays kernel-owned                                                                                                                                          | contract shipped                       |
 
 There is **no deployment hook in 0.1.0**: deployment is out of product scope (local artifact +
 "Deploying" docs page, PRODUCT §4.1); a deploy adapter surface returns with the v1.x public-MCP/
@@ -344,8 +344,8 @@ verifiers — the kernel has no hardcoded list. Non-built-in verifier evidence i
 
 ```yaml
 plugins:
-  - docstube-plugin-shellcheck        # npm package (user's own dependency)
-  - ./plugins/company-style.ts        # local path, relative to repo root
+  - docstube-plugin-shellcheck # npm package (user's own dependency)
+  - ./plugins/company-style.ts # local path, relative to repo root
 ```
 
 - Built-in plugins (`verifiers`, `lang-typescript`, theme components, Pagefind) are registered
@@ -479,21 +479,21 @@ enum WITH the tasks that issue them, never before.
 
 ### 8.3 Transports
 
-| Transport | Mechanism | Billing |
-|---|---|---|
-| `anthropic-api` | Messages API, native tool use; we run the loop | API key |
-| `openai-compatible` | Chat Completions/Responses tool calling against any base URL (presets: OpenAI, Ollama, …) | API key / local |
-| `claude-cli` | vendor CLI in non-interactive mode, built-in tools disabled, our ToolSurface exposed via MCP (stdio), structured output stream parsed | Claude subscription |
-| `codex-cli` | same pattern via `codex exec --json` + MCP (read-only sandbox; `apply_patch` can't be disabled — scratch-dir + discard) | ChatGPT subscription |
-| `google` (internal/experimental) | Antigravity CLI `agy` (gemini-cli's replacement) — NOT a public transport: an upstream bug drops subprocess stdout, so it is reachable only via `DOCSTUBE_TRANSPORT_OVERRIDE`. Public v1 transports are the four rows above | API key |
-| `replay` | plays recorded transcripts; the only transport CI may use | free |
+| Transport                        | Mechanism                                                                                                                                                                                                                   | Billing              |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `anthropic-api`                  | Messages API, native tool use; we run the loop                                                                                                                                                                              | API key              |
+| `openai-compatible`              | Chat Completions/Responses tool calling against any base URL (presets: OpenAI, Ollama, …)                                                                                                                                   | API key / local      |
+| `claude-cli`                     | vendor CLI in non-interactive mode, built-in tools disabled, our ToolSurface exposed via MCP (stdio), structured output stream parsed                                                                                       | Claude subscription  |
+| `codex-cli`                      | same pattern via `codex exec --json` + MCP (read-only sandbox; `apply_patch` can't be disabled — scratch-dir + discard)                                                                                                     | ChatGPT subscription |
+| `google` (internal/experimental) | Antigravity CLI `agy` (gemini-cli's replacement) — NOT a public transport: an upstream bug drops subprocess stdout, so it is reachable only via `DOCSTUBE_TRANSPORT_OVERRIDE`. Public v1 transports are the four rows above | API key              |
+| `replay`                         | plays recorded transcripts; the only transport CI may use                                                                                                                                                                   | free                 |
 
 Transports declare capabilities (`toolInjection: native | mcp | none`, `structuredOutput`,
 `parallelism`, `webSearch`, billing signal kind: dollars | plan-window | tokens) so the harness
 can degrade explicitly, never silently — the billing signal drives the transport-appropriate
 spend copy (PRODUCT §3.9.2), and the transport data-flow table in the docs is generated from this
 registry. Exact vendor flags are re-verified from primary sources at implementation time.
-*(Vendor capability matrix: `knowledge/design/agent-transports.md`.)*
+_(Vendor capability matrix: `knowledge/design/agent-transports.md`.)_
 
 ### 8.4 Record/replay & evals
 
@@ -509,7 +509,7 @@ evidence.
 `docstube generate` is the single idempotent reconciler (PRODUCT §3.5). The orchestrator (core)
 computes desired vs published state and runs the minimal plan as journaled, resumable steps.
 Stage I/O contracts live in `contracts` (`pipeline-stages.ts`); stages are kernel code that
-*calls* plugins and the agent runtime. There is no separate maintenance command: first run,
+_calls_ plugins and the agent runtime. There is no separate maintenance command: first run,
 incremental run, and continuation after interrupt/freeze are the same code path.
 
 ```
@@ -565,7 +565,7 @@ in memory) → **the manifest index, last**, written temp-file + rename. Staging
 after that rename succeeds.
 
 **The guarantee, and its failure window.** No partial PLAN ever publishes: a freeze, a crash, or a
-failed page leaves the published tree byte-identical. Publishing itself is *not* filesystem-atomic
+failed page leaves the published tree byte-identical. Publishing itself is _not_ filesystem-atomic
 across files — no platform offers that — so the guarantee is ordering plus recovery: the index is
 the last write and every file it advertises already exists, and the staging area carries a
 `publishing` phase marker for the duration. An interruption inside the replay leaves new page
@@ -628,12 +628,13 @@ excerpt embedding is a policy opt-in read from config.
 ### 10.3 Canonical machine corpus
 
 One corpus, everything else a projection: resolved IA/routes, page/entity IDs + revision, locale
-+ publication state, normalized Markdown (per-component `renderToMarkdown`), claim ledger with
-dispositions, optional evidence detail. Projections: `llms.txt` (discovery map), per-page `.md`
-twin, `llms-full.txt` (only under a documented size threshold, else split by IA section), and the
-**local MCP server** — `search_docs`, `read_page`, `read_structure` over a precomputed index,
-with `includeEvidence: summary | full`; ready-to-paste client config emitted. No public MCP
-endpoint in 0.1.0.
+
+- publication state, normalized Markdown (per-component `renderToMarkdown`), claim ledger with
+  dispositions, optional evidence detail. Projections: `llms.txt` (discovery map), per-page `.md`
+  twin, `llms-full.txt` (only under a documented size threshold, else split by IA section), and the
+  **local MCP server** — `search_docs`, `read_page`, `read_structure` over a precomputed index,
+  with `includeEvidence: summary | full`; ready-to-paste client config emitted. No public MCP
+  endpoint in 0.1.0.
 
 ### 10.4 Search
 
@@ -771,32 +772,32 @@ TTY-safe (`--no-open`, URL printing).
 The pre-rewrite implementation (~27k lines) was built against the old plan without the entity
 model, plugin kernel, or unified harness. Verdicts:
 
-| Area | Verdict |
-|---|---|
-| `apps/cli` citty entry, lazy command loading, telemetry wrapper | **adapt** (command set changes: reconciler-only `generate`, no maintenance alias) |
-| Release/binary/install-script/telemetry infra (`scripts/`, `stacktape.ts`, CI workflows) | **keep** |
-| `apps/web`, `apps/install-events` | **keep** (separate workstream / done) |
-| `packages/theme` tokens + MDX component set | **adapt** (registry contract + renderToMarkdown are new; visual layer salvageable) |
-| `packages/contracts`, `core`, `agent`, `codemap`, `extractors`, `verifiers` | **rewrite** against §3–§13 |
-| `apps/local-ui` | **rewrite** later (contracts-first; UI is a pure client of core's tRPC surface) |
-| `apps/github-action` | **adapt** (thin wrapper survives; it becomes a PublicationDecision enforcer) |
-| Version-cut/state code | **parked**, not deleted (v1.x versioning ships the lifecycle whole) |
+| Area                                                                                     | Verdict                                                                            |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `apps/cli` citty entry, lazy command loading, telemetry wrapper                          | **adapt** (command set changes: reconciler-only `generate`, no maintenance alias)  |
+| Release/binary/install-script/telemetry infra (`scripts/`, `stacktape.ts`, CI workflows) | **keep**                                                                           |
+| `apps/web`, `apps/install-events`                                                        | **keep** (separate workstream / done)                                              |
+| `packages/theme` tokens + MDX component set                                              | **adapt** (registry contract + renderToMarkdown are new; visual layer salvageable) |
+| `packages/contracts`, `core`, `agent`, `codemap`, `extractors`, `verifiers`              | **rewrite** against §3–§13                                                         |
+| `apps/local-ui`                                                                          | **rewrite** later (contracts-first; UI is a pure client of core's tRPC surface)    |
+| `apps/github-action`                                                                     | **adapt** (thin wrapper survives; it becomes a PublicationDecision enforcer)       |
+| Version-cut/state code                                                                   | **parked**, not deleted (v1.x versioning ships the lifecycle whole)                |
 
-*(Refined per-file notes: `knowledge/design/salvage-inventory.md`.)*
+_(Refined per-file notes: `knowledge/design/salvage-inventory.md`.)_
 
 ## 16 · Design-record index
 
 Where the binding decisions live (all folded into PRODUCT.md and this document on 2026-07-21):
 
-| Domain | Record | Landed here |
-|---|---|---|
-| Claim ledger, evidence, identity threading | `knowledge/design/trust-model-v2.md` | §3–§4 |
-| i18n lifecycle & translation architecture | `knowledge/design/i18n-lifecycle-v2.md` | §11 |
-| Reconciler, fingerprints, repair, staged publish | `knowledge/design/pipeline-v2.md` | §7.2, §9 |
-| Versioning cut, primary personas, deployment posture | `knowledge/design/release-scope-v2.md` | §9.3, §10, PRODUCT §4 |
-| Harness tools, context pack, state/JSON shards, docsets | `knowledge/design/harness-state-v2.md` | §5, §8 |
-| First-run/config DX, knowledge & feedback contracts | `knowledge/design/dx-knowledge-v2.md` | §13 |
-| Structural quality, CI decision, reader UX, release posture | `knowledge/design/quality-ci-reader-v2.md` | §9.5, §10, §12 |
-| Agent transport capability matrix | `knowledge/design/agent-transports.md` | §8.3 |
-| Salvage inventory | `knowledge/design/salvage-inventory.md` | §15 |
-| Depth policy (pending full spec) | `knowledge/design/depth-policy.md` | §9.6 |
+| Domain                                                      | Record                                     | Landed here           |
+| ----------------------------------------------------------- | ------------------------------------------ | --------------------- |
+| Claim ledger, evidence, identity threading                  | `knowledge/design/trust-model-v2.md`       | §3–§4                 |
+| i18n lifecycle & translation architecture                   | `knowledge/design/i18n-lifecycle-v2.md`    | §11                   |
+| Reconciler, fingerprints, repair, staged publish            | `knowledge/design/pipeline-v2.md`          | §7.2, §9              |
+| Versioning cut, primary personas, deployment posture        | `knowledge/design/release-scope-v2.md`     | §9.3, §10, PRODUCT §4 |
+| Harness tools, context pack, state/JSON shards, docsets     | `knowledge/design/harness-state-v2.md`     | §5, §8                |
+| First-run/config DX, knowledge & feedback contracts         | `knowledge/design/dx-knowledge-v2.md`      | §13                   |
+| Structural quality, CI decision, reader UX, release posture | `knowledge/design/quality-ci-reader-v2.md` | §9.5, §10, §12        |
+| Agent transport capability matrix                           | `knowledge/design/agent-transports.md`     | §8.3                  |
+| Salvage inventory                                           | `knowledge/design/salvage-inventory.md`    | §15                   |
+| Depth policy (pending full spec)                            | `knowledge/design/depth-policy.md`         | §9.6                  |

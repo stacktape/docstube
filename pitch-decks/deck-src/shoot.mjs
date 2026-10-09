@@ -20,7 +20,10 @@ const page = await ctx.newPage();
 
 const files = inArg.endsWith('.html')
   ? [inArg]
-  : readdirSync(inArg).filter((f) => f.endsWith('.html')).sort().map((f) => resolve(inArg, f));
+  : readdirSync(inArg)
+      .filter((f) => f.endsWith('.html'))
+      .sort()
+      .map((f) => resolve(inArg, f));
 
 for (const f of files) {
   await page.goto(toUrl(f), { waitUntil: 'load' });
@@ -28,7 +31,10 @@ for (const f of files) {
     await document.fonts.ready;
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   });
-  const base = f.split(/[\\/]/).pop().replace(/\.html$/, '');
+  const base = f
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.html$/, '');
   const out = resolve(outDir, base + '.png');
   await page.screenshot({ path: out, clip: { x: 0, y: 0, width, height } });
   console.log('shot', out);

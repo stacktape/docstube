@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Wave 2b close. GENERATED PAGES CARRY NO `{…}` EXPRESSIONS. The authored-element whitelist walks

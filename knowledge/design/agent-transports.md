@@ -8,8 +8,8 @@ A vendor breaking its raw mode degrades one transport, never the product.
 ## Design-relevant conclusions
 
 1. **Claude Code is the reference CLI transport.** `claude -p --output-format stream-json
-   --input-format stream-json --tools "" --mcp-config <ours> --strict-mcp-config --max-turns N
-   --system-prompt …` gives: all built-ins off, only our MCP tools visible, full transcript as
+--input-format stream-json --tools "" --mcp-config <ours> --strict-mcp-config --max-turns N
+--system-prompt …` gives: all built-ins off, only our MCP tools visible, full transcript as
    JSONL, multi-turn driving over stdin. Subscription billing through `claude setup-token`
    (`CLAUDE_CODE_OAUTH_TOKEN`) is officially sanctioned for exactly this use (Agent SDK /
    `claude -p` draw from plan limits; per-plan Agent SDK credit program announced 2026-06,
@@ -41,15 +41,15 @@ A vendor breaking its raw mode degrades one transport, never the product.
 
 ## Matrix
 
-| | Claude Code | Codex | gemini-cli (OSS) | Antigravity `agy` |
-|---|---|---|---|---|
-| Headless invoke | `claude -p` | `codex exec` | `gemini -p` | `agy -p` / `--headless --approve` |
-| Kill built-in tools | `--tools ""` (full) | shell/web-search off; `apply_patch` stuck on | tools config in settings.json | unverified |
-| Custom tools | `--mcp-config` + `--strict-mcp-config` (exclusive) | `mcp_servers.*` + allow/deny lists | MCP in settings.json | `.agents/mcp_config.json` (`serverUrl`) |
-| Transcript | `stream-json` in/out | `--json` JSONL + `--output-schema` | `--output-format json/stream-json` | unverified |
-| Subscription billing | OAuth token, officially supported | ChatGPT login, official | dead since 2026-06-18 | Google account; throttled free tier |
-| SDK | `@anthropic-ai/claude-agent-sdk` (in-process MCP tools) | `@openai/codex-sdk` | none | none |
-| Risk | Low | Low-medium | Medium | High |
+|                      | Claude Code                                             | Codex                                        | gemini-cli (OSS)                   | Antigravity `agy`                       |
+| -------------------- | ------------------------------------------------------- | -------------------------------------------- | ---------------------------------- | --------------------------------------- |
+| Headless invoke      | `claude -p`                                             | `codex exec`                                 | `gemini -p`                        | `agy -p` / `--headless --approve`       |
+| Kill built-in tools  | `--tools ""` (full)                                     | shell/web-search off; `apply_patch` stuck on | tools config in settings.json      | unverified                              |
+| Custom tools         | `--mcp-config` + `--strict-mcp-config` (exclusive)      | `mcp_servers.*` + allow/deny lists           | MCP in settings.json               | `.agents/mcp_config.json` (`serverUrl`) |
+| Transcript           | `stream-json` in/out                                    | `--json` JSONL + `--output-schema`           | `--output-format json/stream-json` | unverified                              |
+| Subscription billing | OAuth token, officially supported                       | ChatGPT login, official                      | dead since 2026-06-18              | Google account; throttled free tier     |
+| SDK                  | `@anthropic-ai/claude-agent-sdk` (in-process MCP tools) | `@openai/codex-sdk`                          | none                               | none                                    |
+| Risk                 | Low                                                     | Low-medium                                   | Medium                             | High                                    |
 
 Unverified (recheck before implementing): `agy` JSON/tool/system-prompt flags; Codex
 `-c mcp_servers.*` per-invocation combo (mechanism documented, exact combo not shown);

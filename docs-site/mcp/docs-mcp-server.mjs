@@ -16,7 +16,25 @@ const argv = process.argv.slice(2);
 const portFlagIndex = argv.indexOf('--port');
 const port = portFlagIndex === -1 ? 3333 : Number(argv[portFlagIndex + 1]);
 
-const stripFrontmatter = (markdown) => markdown.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/u, '');
+// Frontmatter stripping MIRRORS packages/contracts/src/frontmatter.ts, which is the source of
+// truth for these rules: a UTF-8 BOM before the opening delimiter, blank or whitespace-only
+// lines above it, CRLF endings, and an empty `---\n---` block. This copy exists because the
+// script is emitted standalone into a generated site, and generated sites never depend on
+// @docstube/* at runtime, so it cannot import the canonical splitter. Keep the two in lockstep:
+// a stricter rule here silently leaks frontmatter into keyword scoring and search results.
+const stripFrontmatter = (markdown) => {
+  const text = markdown.charCodeAt(0) === 0xfeff ? markdown.slice(1) : markdown;
+  const blank = /^(?:[ \t]*\r?\n)*/u.exec(text)?.[0] ?? '';
+  const afterBlank = text.slice(blank.length);
+  const open = /^---[ \t]*\r?\n/u.exec(afterBlank);
+  if (open === null) {
+    return text;
+  }
+  const rest = afterBlank.slice(open[0].length);
+  // The closing delimiter is the first line in the remaining text that is exactly `---`.
+  const close = /^---[ \t]*(?:\r?\n|$)/mu.exec(rest);
+  return close === null ? text : rest.slice(close.index + close[0].length);
+};
 
 // Slugs are validated against the emitted index, so no path traversal is possible.
 const readPageMarkdown = async (slug) => {
@@ -54,7 +72,9 @@ const toolError = (text) => ({ content: [{ type: 'text', text }], isError: true 
 
 const callTool = async (name, args) => {
   if (name === 'read_wiki_structure') {
-    const lines = siteIndex.pages.map((page) => '- ' + page.title + ' (slug: ' + page.slug + ', url: ' + page.url + ')');
+    const lines = siteIndex.pages.map(
+      (page) => '- ' + page.title + ' (slug: ' + page.slug + ', url: ' + page.url + ')'
+    );
     return textResult('# ' + siteIndex.site + '\n\n' + lines.join('\n'));
   }
   if (name === 'read_wiki_contents') {

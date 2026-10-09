@@ -14,9 +14,7 @@ Concrete better design: introduce a committed `StructuralFinding`/`QualityFindin
 type StructuralFinding = {
   key: string; // stable semantic fingerprint
   code: string;
-  scope:
-    | { kind: 'entity'; address: EntityAddress }
-    | { kind: 'nav-group'; groupId: string; pageIds: string[] };
+  scope: { kind: 'entity'; address: EntityAddress } | { kind: 'nav-group'; groupId: string; pageIds: string[] };
   detector: {
     kind: 'deterministic' | 'ai-assessed';
     id: string;
@@ -37,17 +35,17 @@ Persist page-owned findings in page shards and navigation findings in one struct
 
 The taxonomy should be narrow and detector-specific:
 
-| Failure mode | Scope | Detection |
-|---|---|---|
-| Invalid or degenerate outline | Page | **Deterministic:** heading tree, empty sections, duplicate headings/anchors, section with no meaningful body |
-| Duplicate sections | Page | **Hybrid:** exact substantial AST/content duplication is deterministic; shared claim subjects and similar headings create candidates for AI adjudication |
-| Content/example in the wrong section | Page | **AI-assessed:** compare block content, referenced symbols, section purpose, and neighboring sections; deterministic only when an explicit plan slot is violated |
-| Brief/outline mismatch | Page | **AI-assessed:** risk critic compares the outline and section summaries with the page brief |
-| Broken prerequisite/order flow | Page | **AI-assessed; later:** concepts introduced after dependent steps, troubleshooting before setup, and similar judgment calls |
-| Shared-facet asymmetry | Sibling cohort | **Deterministic** when `ia.yml` explicitly requires the facet; otherwise a deterministic outline-matrix candidate followed by AI applicability assessment |
-| Shared-facet order drift | Sibling cohort | **Deterministic** under an explicit structural profile; inferred order norms should be AI-assessed |
-| Duplicate topic ownership | Sibling cohort | **Hybrid; later:** claim-subject/source overlap proposes candidates; AI distinguishes duplication from intentional recap |
-| Page does not belong in its nav group | Navigation | **AI-assessed; later:** compare the page brief, role, outline, and sibling summaries |
+| Failure mode                          | Scope          | Detection                                                                                                                                                        |
+| ------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invalid or degenerate outline         | Page           | **Deterministic:** heading tree, empty sections, duplicate headings/anchors, section with no meaningful body                                                     |
+| Duplicate sections                    | Page           | **Hybrid:** exact substantial AST/content duplication is deterministic; shared claim subjects and similar headings create candidates for AI adjudication         |
+| Content/example in the wrong section  | Page           | **AI-assessed:** compare block content, referenced symbols, section purpose, and neighboring sections; deterministic only when an explicit plan slot is violated |
+| Brief/outline mismatch                | Page           | **AI-assessed:** risk critic compares the outline and section summaries with the page brief                                                                      |
+| Broken prerequisite/order flow        | Page           | **AI-assessed; later:** concepts introduced after dependent steps, troubleshooting before setup, and similar judgment calls                                      |
+| Shared-facet asymmetry                | Sibling cohort | **Deterministic** when `ia.yml` explicitly requires the facet; otherwise a deterministic outline-matrix candidate followed by AI applicability assessment        |
+| Shared-facet order drift              | Sibling cohort | **Deterministic** under an explicit structural profile; inferred order norms should be AI-assessed                                                               |
+| Duplicate topic ownership             | Sibling cohort | **Hybrid; later:** claim-subject/source overlap proposes candidates; AI distinguishes duplication from intentional recap                                         |
+| Page does not belong in its nav group | Navigation     | **AI-assessed; later:** compare the page brief, role, outline, and sibling summaries                                                                             |
 
 “Deterministic candidate” and “deterministic finding” must remain distinct. A 5/8 heading frequency is deterministic evidence, but not proof that all eight pages should contain that heading.
 
@@ -106,7 +104,7 @@ Concrete better design: make IA nodes an explicit discriminated union before rel
   title: Compute resources
   consistency:
     mode: auto
-    requiredFacets: []       # optional explicit user rules
+    requiredFacets: [] # optional explicit user rules
   children:
     - kind: page
       pageId: pg_function

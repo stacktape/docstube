@@ -15,20 +15,20 @@ prior versions of this document. Reasoning and evidence live in `knowledge/` (se
 
 Documentation tooling sits on an autonomy ladder:
 
-| Level | Who writes | Who maintains | Examples |
-|---|---|---|---|
-| L0 | humans | humans | Docusaurus, Starlight, MkDocs |
-| L1 | humans + AI assist | humans | GitBook editor AI, "you + Claude in the repo" |
-| L2 | humans wrote the base | AI drafts PRs, humans approve | Mintlify Autopilot, GitBook Agent, Dosu, Swimm |
-| L3 | AI generates from code | humans review output | DocuWriter-style one-shots |
-| **L4** | **AI generates** | **AI maintains — no human gate** | DeepWiki (unverified, distrusted) · **docstube (verified)** |
+| Level  | Who writes             | Who maintains                    | Examples                                                    |
+| ------ | ---------------------- | -------------------------------- | ----------------------------------------------------------- |
+| L0     | humans                 | humans                           | Docusaurus, Starlight, MkDocs                               |
+| L1     | humans + AI assist     | humans                           | GitBook editor AI, "you + Claude in the repo"               |
+| L2     | humans wrote the base  | AI drafts PRs, humans approve    | Mintlify Autopilot, GitBook Agent, Dosu, Swimm              |
+| L3     | AI generates from code | humans review output             | DocuWriter-style one-shots                                  |
+| **L4** | **AI generates**       | **AI maintains — no human gate** | DeepWiki (unverified, distrusted) · **docstube (verified)** |
 
 docstube is designed ground-up as **L4**: humans set intent once (config, personas, IA); the system generates, verifies, ships, and maintains docs autonomously. Human attention is pulled **only** for declared exceptions. Flags are exceptions, not supervision — if humans must review output, it's L3.
 
 Standing tenet (founder, 2026-07-19): **minimize human review everywhere.** docstube's default
 posture is autonomous with visible outcomes, never approval gates.
 
-The ladder is **published publicly** as category-defining content ("the 5 levels of documentation autonomy"). Whoever publishes the scale defines the category; docstube claims the top: *"the only actual L4 — because you can't claim L4 when it doesn't work."*
+The ladder is **published publicly** as category-defining content ("the 5 levels of documentation autonomy"). Whoever publishes the scale defines the category; docstube claims the top: _"the only actual L4 — because you can't claim L4 when it doesn't work."_
 
 **Honesty posture:** the L4 claim leads the marketing; the in-product surfaces stay honest that the
 guarantee does not cover every use case. The **AssuranceProfile** — a versioned per-project
@@ -60,7 +60,7 @@ decision 4), which ships in the review-routing wave. Until then the floor stands
 uncovered span still forbids completeness, so ledger omission can never manufacture a green badge.
 
 **A dirty working tree cannot mint the complete state.** The badge asserts a claim about
-*committed* source, so completeness additionally requires a clean tree: when a run reads
+_committed_ source, so completeness additionally requires a clean tree: when a run reads
 uncommitted changes (or a checkout with no HEAD), the page renders its **true counts** — the checks
 are content-hash bound and genuinely happened — plus an explicit **"checked against uncommitted
 changes"** note, and never the complete/green state. No reader surface presents the HEAD commit as
@@ -73,7 +73,7 @@ ladder is removed from all public surfaces):
 
 1. **Correctness** — per claim: `checked | unchecked | contradicted`, always with the evidence
    kind (source grounding, predicate check, execution, owner attestation, project-defined check).
-2. **Editorial** — per page: reviewed | not reviewed | issues ("AI-reviewed for *persona*" appears
+2. **Editorial** — per page: reviewed | not reviewed | issues ("AI-reviewed for _persona_" appears
    only when the review genuinely completed).
 3. **Workflow** — per page: publishable | needs attention | blocked.
 
@@ -82,13 +82,13 @@ never feeds the correctness state.
 
 ### 1.3 Accuracy doctrine
 
-Nothing is 100%. The bar is the **human baseline**, which is measurably bad: 28.9% of popular repos document symbols that no longer exist; the average outdated reference has been wrong 4.7 years (Tan/Wagner/Treude, EMSE). Key asymmetry: human doc errors are mostly *staleness* (was true once); raw AI errors include *confabulation* (never true). The claim ledger plus deterministic grounding structurally eliminates the confabulation class; fingerprint-driven regeneration eliminates staleness. What remains is flagged.
+Nothing is 100%. The bar is the **human baseline**, which is measurably bad: 28.9% of popular repos document symbols that no longer exist; the average outdated reference has been wrong 4.7 years (Tan/Wagner/Treude, EMSE). Key asymmetry: human doc errors are mostly _staleness_ (was true once); raw AI errors include _confabulation_ (never true). The claim ledger plus deterministic grounding structurally eliminates the confabulation class; fingerprint-driven regeneration eliminates staleness. What remains is flagged.
 
 `docstube audit` is the measuring device, and it ships honestly: in 0.1.0 it is a **stale
 public-reference checker** for existing docs sites — pages scanned, identifiers checked,
 missing/renamed references reported. Behavioral claims are excluded from the denominator; audit is
 not marketed as an overall accuracy metric until claim-class predicate verifiers exist.
-PROVISIONAL (trust-model-v2): the public defect metric is *defective claims / checked claims*, with
+PROVISIONAL (trust-model-v2): the public defect metric is _defective claims / checked claims_, with
 extraction coverage and unresolved counts reported separately — one claim, one outcome.
 
 ---
@@ -151,7 +151,7 @@ page also emits a clean pure-Markdown twin** (per-component `renderToMarkdown`, 
 **Identity under ambiguity — the threading hybrid.** Trust state is NEVER carried by matching:
 correctness and evidence recompute every run (the invariant that makes continuity safe). On
 regeneration: confident match → ID and human threads (feedback, flags, review history) carry;
-ambiguous match → ID carries *for threading only* and every carried human thread gets a drift
+ambiguous match → ID carries _for threading only_ and every carried human thread gets a drift
 marker ("content changed substantially since this was written", one-click detach), with matching
 confidence recorded on the shard; no plausible match → new ID, and the old entity's threads
 surface as orphans for re-attachment or dismissal.
@@ -162,28 +162,28 @@ surface as orphans for re-attachment or dismissal.
   (existence/shape of a named API or config field — the class formerly called `structural`;
   page-structure quality is never a claim), value/behavior ("defaults to 3", "throws on
   timeout"), intent/history.
-  - *Shape claims*: grounding against the codemap suffices — the identifier's existence is most
+  - _Shape claims_: grounding against the codemap suffices — the identifier's existence is most
     of the assertion.
-  - *Value claims*: 0.1.0 ships a **minimal value-predicate verifier** (founder decision,
+  - _Value claims_: 0.1.0 ships a **minimal value-predicate verifier** (founder decision,
     2026-07-21): the claim's asserted value is normalized and compared against the value
     fingerprints the typed fingerprint ladder already extracts per symbol — match → `checked`,
     mismatch → `contradicted` (a caught lie). This makes the full badge honestly achievable at
     launch instead of rare.
-  - *Behavior claims*: grounding confers only `source-linked` (subject real, assertion
+  - _Behavior claims_: grounding confers only `source-linked` (subject real, assertion
     unchecked). In 0.1.0 behavior prose claims are **honestly unchecked, always** — correctness
     `unchecked`, disposition `no-checker-available`; they start counting as **checked** in v1.x
     when the richer predicate verifiers land (execution assertions, schema validation). Snippet
     execution proves that code **examples** run (block-level evidence), never that a behavior
     prose claim is true. Grounding failures (missing identifiers) are hard defects for every
     class.
-  - *Intent/history claims*: a recorded maintainer answer (**owner-attested**, with authorship +
+  - _Intent/history claims_: a recorded maintainer answer (**owner-attested**, with authorship +
     timestamp in the evidence record) is legitimate evidence and counts toward 100%; the UI
     distinguishes attestation from mechanical checks.
 - **Citations are inline per claim.** A claim's evidence (source span, passed check, or
   attestation) attaches to the claim itself. The flat page-footer sources list is removed; a
   collapsed "Files consulted" disclosure survives, labeled as lineage — explicitly not evidence.
 - Symbol-level grounding uses **normalized symbol hashes** over the codemap — never identifier
-  *names* (the stale-naming hallucination class). Bias rule: when provenance is uncertain,
+  _names_ (the stale-naming hallucination class). Bias rule: when provenance is uncertain,
   regenerate or flag — never assume.
 - PROVISIONAL (trust-model-v2): unresolved claims carry explicit **dispositions** —
   `not-applicable`, `no-checker-available`, `maintainer-input-needed`, `owner-attested` — derived
@@ -325,7 +325,7 @@ Harness posture (product-level): **codemap-backed evidence tools are the primary
 surface** (semantic symbol search/read, example/test lookup, snippet and draft preflight), with
 the generic read tools kept as escape hatches; all content-bearing tool results emit evidence
 handles. **Generated output is excluded from agent read roots** — prior content enters only
-through explicit labeled channels (the prior version of the *same* page for diff-edit repair;
+through explicit labeled channels (the prior version of the _same_ page for diff-edit repair;
 neighbor-page summaries in the context pack). PROVISIONAL: the prior-docs access policy is
 settled by the eval queue (§4.1 "Evals"), not by argument.
 
@@ -342,6 +342,7 @@ Internal spec, v1: every failure class → detection mechanism → resulting tru
 ### 3.9 First run, local UI & wizard
 
 #### 3.9.1 Entry: bare `docstube` is context-aware
+
 No config → opens the browser directly into first-run setup; config present → opens the
 dashboard. TTY-safe: non-interactive shells print the URL instead; `--no-open` is always
 available. The UI is a single-page localhost web app (not a TUI). Surfaces: setup wizard ·
@@ -350,7 +351,8 @@ across all surfaces (IA editing → progress → review navigation); **no node-g
 (considered, rejected).
 
 #### 3.9.2 Setup wizard: four adaptive phases over an onboarding session
-The wizard works over an **onboarding-session draft** — autosaved, functional *before* committed
+
+The wizard works over an **onboarding-session draft** — autosaved, functional _before_ committed
 config exists; agent-backed setup steps accept the draft directly. Four phases (details behind
 progressive disclosure: components, theme tokens, per-role models, locales):
 
@@ -383,12 +385,15 @@ framework sniffing) — confident detections pre-fill, ambiguous fields stay bla
 shared module (also serves `doctor`, `audit`, language-pack detection).
 
 #### 3.9.3 Generation dashboard
+
 Principle: **"the waiting room is the review room"** — finished pages stream in reviewable while the run continues. NavTree in progress mode (`queued → writing → checking → judging → retrying → passed / flagged`, findings counts, per-page cost, live over WebSocket). Per-page **CI-style step timeline** (each step expands to the actual agent output, reviewer criteria results, deterministic-check results, retry diffs) — a **pure renderer over SQLite job/findings state**: identical after resume. Live preview pane renders real production output as pages land. Cap-freeze banner: frozen work is staged, publish waits for plan completion (§3.5).
 
 #### 3.9.4 Review UI
+
 Production-rendered preview. **Feedback anchors to entities** (§3.1): element/block, section, page, whole-docs — addressed by stable entity IDs. Feedback handling is governed (§3.10). Actions per page: regenerate · approve — **approval is never a shipping gate** (auto-merge default, §3.3); required human attention lives only in the flag queue.
 
 #### 3.9.5 Config & round-trip
+
 `docstube.yml` at repo root = single source of truth, **intent only**. The wizard is one editor among others: reads → pre-fills → writes back through a **comment- and formatting-preserving YAML document API** (hard requirement — hand annotations must survive). Config shape = Zod schema → generated JSON Schema, shipped + registered on SchemaStore; same Zod validates at runtime with human-readable errors. Everything is files ⇒ **an agent can configure a project end-to-end without the wizard** ("IaC for docs"). **Secrets never in config** — env/keychain only. No reserved-but-ignored config blocks — every field in the schema does something.
 
 **docType is a preset layer, not a control layer.** The enum is a richer archetype set covering
@@ -402,6 +407,7 @@ The wizard shows the inference with evidence and explicitly asks the one thing c
 **"are the docs public?"** (kills the private-repo→internal-docs misclassification).
 
 #### 3.9.6 Cross-cutting UI principles
+
 Explainable quality scores (criteria results + deterministic outcomes + finding severity; never an opaque number). Resumability first-class (timelines are pure SQLite renderers). PostHog opt-out telemetry with the strict never-send list.
 
 ### 3.10 Knowledge & feedback
@@ -409,7 +415,7 @@ Explainable quality scores (criteria results + deterministic outcomes + finding 
 **Tribal knowledge has durable semantic identity: KnowledgeNeed + KnowledgeFact.** Needs and
 Facts are records with stable IDs, authorship, status, and supersession (replacing
 question-text-hash files). Dedup key = **subject + kind-of-missing-fact (slots)**; text similarity
-only *suggests* merges in the queue, never silently discards. Facts bind to code two ways: the
+only _suggests_ merges in the queue, never silently discards. Facts bind to code two ways: the
 durable entity thread (identity threading, §3.1 — survives refactors, no re-ask) plus the
 answer-time revision fingerprint (material change → `needs-revalidation`: pages flagged, ONE
 targeted re-ask). Committed knowledge is a public data format at release. Capture is
@@ -477,26 +483,26 @@ RFC-2119 keywords (MUST/SHOULD/MAY) used deliberately.
 
 **Verification & proof**
 
-| Feature | Spec |
-|---|---|
-| Claim ledger + coverage linter | §1.2, §3.5. The writer-emitted ledger is the trust denominator; the linter blocks silent omission |
-| Extended deterministic verifiers | MDX compile + component props, tsc, pyright, javac, import/path resolution, internal+external links, D2 render, glossary rules, frontmatter/IDs, API-ref consistency, shellcheck for bash blocks, JSON/YAML samples vs schema, config examples vs Zod/JSON-schema, curl examples vs OpenAPI spec, env-var existence, CLI flag validity. Claim-class **predicate verifiers** (default-value comparison, execution assertions) are the v1.x roadmap — until then value/behavior claims report `source-linked`/`no-checker-available`, honestly |
-| Snippet runtime execution | **Executable verification is the default for self-contained code samples** (js/ts/python; doctest-style, compile ≠ works), opting out per fence with `no-exec`. **Shell fences opt IN with `exec`** — a shell block is normally a reader instruction depending on prior steps, network, or machine state the verifier does not have, so executing it would prove nothing while claiming a pass; non-executed shell fences are still linted (shellcheck) and claim no execution evidence. **Execution counts as checked; the evidence records the environment fingerprint** (OS, runtime versions, `sandbox: none`). Sandboxed evidence supersedes when the OS sandbox ships (post-0.1.0) |
-| Verified diagrams | D2 only. 0.1.0 scope stated exactly: **verified = syntax + node names checked against the codemap**; edge grounding waits for the relations graph (v1.x, with predicate verifiers). Layout: ELK default, dagre fallback, TALA opt-in only |
-| `docstube audit` | **Stale public-reference checker** for arbitrary existing docs sites (Mintlify/Docusaurus/GitBook/MD/MDX): pages scanned, identifiers checked, missing/renamed reported; behavioral claims excluded from the denominator. The GTM weapon, framed honestly (§1.3) |
-| Inline per-claim citations | §3.2; "Files consulted" is lineage, not evidence |
-| Trust states | Three-axis vocabulary (§1.2) in shard + UI; no proven/scored/out-of-domain on any public surface |
-| Coverage ratchet | Coverage is a **ratchet over explicit obligations**: `documented` requires a claim/entity reference (never a mere file read); statuses `documented · generated-reference-only · intentionally-omitted · not-public-for-docs · unassigned`; IA pages own source scopes so new symbols route to candidate pages; 100% absolute coverage is an opt-in release policy. Doc-type-conditional via the explicit `coverage` field |
-| Verification badge | Static badge at launch; badge = 100% of ledger claims checked (§1.2); live endpoint is Cloud |
-| AssuranceProfile + support matrix | §1.1, §2: versioned per-project assurance declaration; generated supported/preview/unavailable matrix consumed by website, wizard, doctor, Action |
+| Feature                           | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claim ledger + coverage linter    | §1.2, §3.5. The writer-emitted ledger is the trust denominator; the linter blocks silent omission                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Extended deterministic verifiers  | MDX compile + component props, tsc, pyright, javac, import/path resolution, internal+external links, D2 render, glossary rules, frontmatter/IDs, API-ref consistency, shellcheck for bash blocks, JSON/YAML samples vs schema, config examples vs Zod/JSON-schema, curl examples vs OpenAPI spec, env-var existence, CLI flag validity. Claim-class **predicate verifiers** (default-value comparison, execution assertions) are the v1.x roadmap — until then value/behavior claims report `source-linked`/`no-checker-available`, honestly                                                                                                                                             |
+| Snippet runtime execution         | **Executable verification is the default for self-contained code samples** (js/ts/python; doctest-style, compile ≠ works), opting out per fence with `no-exec`. **Shell fences opt IN with `exec`** — a shell block is normally a reader instruction depending on prior steps, network, or machine state the verifier does not have, so executing it would prove nothing while claiming a pass; non-executed shell fences are still linted (shellcheck) and claim no execution evidence. **Execution counts as checked; the evidence records the environment fingerprint** (OS, runtime versions, `sandbox: none`). Sandboxed evidence supersedes when the OS sandbox ships (post-0.1.0) |
+| Verified diagrams                 | D2 only. 0.1.0 scope stated exactly: **verified = syntax + node names checked against the codemap**; edge grounding waits for the relations graph (v1.x, with predicate verifiers). Layout: ELK default, dagre fallback, TALA opt-in only                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `docstube audit`                  | **Stale public-reference checker** for arbitrary existing docs sites (Mintlify/Docusaurus/GitBook/MD/MDX): pages scanned, identifiers checked, missing/renamed reported; behavioral claims excluded from the denominator. The GTM weapon, framed honestly (§1.3)                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Inline per-claim citations        | §3.2; "Files consulted" is lineage, not evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Trust states                      | Three-axis vocabulary (§1.2) in shard + UI; no proven/scored/out-of-domain on any public surface                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Coverage ratchet                  | Coverage is a **ratchet over explicit obligations**: `documented` requires a claim/entity reference (never a mere file read); statuses `documented · generated-reference-only · intentionally-omitted · not-public-for-docs · unassigned`; IA pages own source scopes so new symbols route to candidate pages; 100% absolute coverage is an opt-in release policy. Doc-type-conditional via the explicit `coverage` field                                                                                                                                                                                                                                                                |
+| Verification badge                | Static badge at launch; badge = 100% of ledger claims checked (§1.2); live endpoint is Cloud                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| AssuranceProfile + support matrix | §1.1, §2: versioned per-project assurance declaration; generated supported/preview/unavailable matrix consumed by website, wizard, doctor, Action                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 **Autonomy**
 
-| Feature | Spec |
-|---|---|
+| Feature               | Spec                                                                                                                                                                                                |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Auto-merge by default | §3.3. PRs annotated with the verified delta; fail-closed PublicationDecision; output-inventory allowlist; no-new-debt policy; recorded waivers; approval-assisted labeling under plain GITHUB_TOKEN |
-| Flag queue | Exception triage only — never page-by-page approval |
-| Knowledge system | KnowledgeNeed/KnowledgeFact + auto-answer agent + `/answer` GitHub ingestion + immediate targeted regeneration (§3.10) |
+| Flag queue            | Exception triage only — never page-by-page approval                                                                                                                                                 |
+| Knowledge system      | KnowledgeNeed/KnowledgeFact + auto-answer agent + `/answer` GitHub ingestion + immediate targeted regeneration (§3.10)                                                                              |
 
 **Generation quality**
 
@@ -546,7 +552,7 @@ claim-contradiction "topology pass" framing)
   twin is the agent/human plain channel and applies to all components, not just Claim.
 - **Reader trust UX:** chip **"Verified · 23/23 checked"** — brand word + literal denominator;
   green reserved for 100%; partial pages show "18/23 checked · 2 issues" without the brand word;
-  separate rows for "AI-reviewed for *persona*" and translation fidelity. Click → popover:
+  separate rows for "AI-reviewed for _persona_" and translation fidelity. Click → popover:
   denominator, evidence mix, unresolved dispositions, last-checked commit/date, definition of
   "checked". Positive section chips disappear (exceptions only). A generated `/verification/`
   trust-report page ships (methodology, coverage, unresolved issues). **Evidence UI: quiet
@@ -622,7 +628,7 @@ or is planned.
   GitHub Action keeps docs current in the repo; it does not publish hosting.) Site auth therefore
   belongs to the user's hosting; SSO is Cloud.
 - CLI: bare `docstube` (context-aware, §3.9.1) · `generate [--explain|--ci|--fresh]` · `refine
-  [page] [--max-rounds]` · **`audit`** · `validate` · `check` · `status` · `doctor [--ci --json]`
+[page] [--max-rounds]` · **`audit`** · `validate` · `check` · `status` · `doctor [--ci --json]`
   · `upgrade [--check|--to]` · `plugin` (scaffold via skill) · `help` · `version`. `check` kinds
   MUST derive from registered verifier plugins (open enum, §3.4) — not a hardcoded list.
 - Config: docstube.yml (typed, comment-preserving) · ia.yml (schema v2: explicit `group | page`
@@ -646,23 +652,23 @@ or is planned.
 
 ### 4.2 v1.x — designed now, ships shortly after
 
-| Item | Spec |
-|---|---|
-| **Versioned docs** | The complete lifecycle ships whole: current version live from HEAD, past versions frozen snapshots cut at release time; cut anytime — never waits on localization; snapshots record which pages fell back; **sealed + explicit repair** (`docstube version repair <label>` consciously backfills, recorded); new-locale backfill targets current only. Version is already an address dimension; the half-built cut/state code is parked, not deleted |
-| Richer predicate verifiers | Execution assertions, schema validation, signature comparison beyond values — flips remaining behavior claims from source-linked to checked (§3.2; the minimal value-predicate verifier ships in 0.1.0) |
-| Diagram edge grounding | Relations graph; extends 0.1.0's syntax + node-name checking |
-| Sandboxed snippet execution | OS sandbox; supersedes environment-fingerprinted host execution evidence |
-| Public MCP endpoint | After a deployment adapter exists |
+| Item                        | Spec                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Versioned docs**          | The complete lifecycle ships whole: current version live from HEAD, past versions frozen snapshots cut at release time; cut anytime — never waits on localization; snapshots record which pages fell back; **sealed + explicit repair** (`docstube version repair <label>` consciously backfills, recorded); new-locale backfill targets current only. Version is already an address dimension; the half-built cut/state code is parked, not deleted |
+| Richer predicate verifiers  | Execution assertions, schema validation, signature comparison beyond values — flips remaining behavior claims from source-linked to checked (§3.2; the minimal value-predicate verifier ships in 0.1.0)                                                                                                                                                                                                                                              |
+| Diagram edge grounding      | Relations graph; extends 0.1.0's syntax + node-name checking                                                                                                                                                                                                                                                                                                                                                                                         |
+| Sandboxed snippet execution | OS sandbox; supersedes environment-fingerprinted host execution evidence                                                                                                                                                                                                                                                                                                                                                                             |
+| Public MCP endpoint         | After a deployment adapter exists                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ### 4.3 v1 — architect-only (contracts now, ship later)
 
-| Contract | Design now |
-|---|---|
-| Signed provenance manifest | Tamper-evident per-entity record {source, commit, check, state, signature} |
-| Multi-language sample variants | Entity model supports variants (§3.1) |
-| SSO / access-control hooks | In the Cloud contract |
-| Remaining language packs | Go / Rust / C# / PHP behind the pack interface |
-| Cloud contract | §3.7 |
+| Contract                       | Design now                                                                 |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| Signed provenance manifest     | Tamper-evident per-entity record {source, commit, check, state, signature} |
+| Multi-language sample variants | Entity model supports variants (§3.1)                                      |
+| SSO / access-control hooks     | In the Cloud contract                                                      |
+| Remaining language packs       | Go / Rust / C# / PHP behind the pack interface                             |
+| Cloud contract                 | §3.7                                                                       |
 
 ### 4.4 V2 / fast-follow
 
@@ -683,27 +689,27 @@ World-class custom docs search (the assumed pillar; likely Stacktape-deployed) �
 
 ## 5 · Removed (decided against, with reasons)
 
-| Item | Reason |
-|---|---|
-| `refresh` as a command | `generate` is the idempotent reconciler; a second maintenance verb was a duplicate concept. Removed outright, no alias |
-| Versioned docs in 0.1.0 | Cut whole to v1.x (§4.2) rather than shipped half; latest-only at launch |
-| `sectioned` layout | One excellent nested layout for 0.1.0; tabs return later as another rendering of the same nav tree |
-| Reserved `screenshots` config object | Fake affordance; screenshot capture stays out of scope with no config stub |
-| Reserved `autonomy` config block | Fake affordance; the policy engine introduces its config when it ships (v2) |
-| proven / scored / out-of-domain as public vocabulary | Replaced by the three-axis trust vocabulary + dispositions (§1.2, §3.2); the ladder conflated correctness with editorial review |
-| Post-hoc claim extractor for generated pages | The writer emits the ledger; extraction survives only inside `audit` for foreign docs |
-| Per-persona review multiplier | Primary persona gates; secondary advisory/sampled; correctness left persona reviews entirely |
-| Flat page-footer sources list | Inline per-claim citations; "Files consulted" is lineage, not evidence |
-| "Defects per 100 claims" audit framing | Gameable denominator; audit reframed as stale-reference checking, defect rate over *checked* claims (PROVISIONAL) |
-| Question-text-hash knowledge files | Replaced by KnowledgeNeed/KnowledgeFact records (§3.10) |
-| First-party deployment adapters (incl. GitHub Pages integration) | 0.1.0 stops at the local artifact + a "Deploying" docs page; no hosting surface owned |
-| Section fan-out / assembler writer | One writer per page, always; revisit only with eval evidence |
-| Dry-run / plan mode as a gate | `generate --explain` is a non-generative preview, not an approval step; PRs show the delta |
-| One-command rollback | Git revert covers it |
-| Flag-rate telemetry (as a feature) | Cut; flags are visible per-run anyway |
-| "Was this helpful?" widget | Needs a backend; Ask-AI query mining (Cloud) is strictly richer signal |
-| TALA as default layout | Proprietary licensing incompatible with MIT default |
-| Public failure-mode registry | Kept private — acquirer value; audit reports carry the marketing |
+| Item                                                             | Reason                                                                                                                          |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `refresh` as a command                                           | `generate` is the idempotent reconciler; a second maintenance verb was a duplicate concept. Removed outright, no alias          |
+| Versioned docs in 0.1.0                                          | Cut whole to v1.x (§4.2) rather than shipped half; latest-only at launch                                                        |
+| `sectioned` layout                                               | One excellent nested layout for 0.1.0; tabs return later as another rendering of the same nav tree                              |
+| Reserved `screenshots` config object                             | Fake affordance; screenshot capture stays out of scope with no config stub                                                      |
+| Reserved `autonomy` config block                                 | Fake affordance; the policy engine introduces its config when it ships (v2)                                                     |
+| proven / scored / out-of-domain as public vocabulary             | Replaced by the three-axis trust vocabulary + dispositions (§1.2, §3.2); the ladder conflated correctness with editorial review |
+| Post-hoc claim extractor for generated pages                     | The writer emits the ledger; extraction survives only inside `audit` for foreign docs                                           |
+| Per-persona review multiplier                                    | Primary persona gates; secondary advisory/sampled; correctness left persona reviews entirely                                    |
+| Flat page-footer sources list                                    | Inline per-claim citations; "Files consulted" is lineage, not evidence                                                          |
+| "Defects per 100 claims" audit framing                           | Gameable denominator; audit reframed as stale-reference checking, defect rate over _checked_ claims (PROVISIONAL)               |
+| Question-text-hash knowledge files                               | Replaced by KnowledgeNeed/KnowledgeFact records (§3.10)                                                                         |
+| First-party deployment adapters (incl. GitHub Pages integration) | 0.1.0 stops at the local artifact + a "Deploying" docs page; no hosting surface owned                                           |
+| Section fan-out / assembler writer                               | One writer per page, always; revisit only with eval evidence                                                                    |
+| Dry-run / plan mode as a gate                                    | `generate --explain` is a non-generative preview, not an approval step; PRs show the delta                                      |
+| One-command rollback                                             | Git revert covers it                                                                                                            |
+| Flag-rate telemetry (as a feature)                               | Cut; flags are visible per-run anyway                                                                                           |
+| "Was this helpful?" widget                                       | Needs a backend; Ask-AI query mining (Cloud) is strictly richer signal                                                          |
+| TALA as default layout                                           | Proprietary licensing incompatible with MIT default                                                                             |
+| Public failure-mode registry                                     | Kept private — acquirer value; audit reports carry the marketing                                                                |
 
 ## 6 · Boundaries (out of scope)
 
@@ -736,20 +742,20 @@ Most of the original §7 questions are resolved in ARCHITECTURE.md and the
 
 ### 2026-07 initial session
 
-| Decision | Reasoning |
-|---|---|
-| L4 as design goal (overriding research rec of "L3 default + dial") | Founder call; credibility earned via failure-mode enumeration + verification, not via keeping a human gate |
-| Positioning C: L4 vision + verification mechanism | L4 is the category claim; verification is why it's believable |
-| Ladder public, registry private | Ladder = pure positioning; registry = engineering asset + acquirer value |
-| Segments: public product docs + internal wikis; OpenAPI v1 | Research-confirmed whitespace; public docs leak without OpenAPI |
-| Auto-merge by default | Honest L4 posture; exceptions hardcoded now, policy engine v2 |
-| Unified entity model | One schema serves evidence, trust states, feedback, regeneration |
-| Plugin kernel + authoring skill | Collapses plugin cost to a prompt; first-party dogfoods the API |
-| `audit` handles arbitrary docs | The GTM play requires the hard version |
-| v1 hosted = registration/waitlist only | Local-first launch, funnel open, no premature backend |
-| Wizard-first onboarding; deterministic pre-fill | Humans set intent once upfront; agent inference too slow for pre-fill |
-| State: manifest committed (lockfile pattern), sqlite never committed | Branch-correct provenance, backend-free CI, no binary merge conflicts |
-| Tribal-knowledge capture is non-blocking | Blocking generation on human answers would reintroduce supervision |
+| Decision                                                             | Reasoning                                                                                                  |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| L4 as design goal (overriding research rec of "L3 default + dial")   | Founder call; credibility earned via failure-mode enumeration + verification, not via keeping a human gate |
+| Positioning C: L4 vision + verification mechanism                    | L4 is the category claim; verification is why it's believable                                              |
+| Ladder public, registry private                                      | Ladder = pure positioning; registry = engineering asset + acquirer value                                   |
+| Segments: public product docs + internal wikis; OpenAPI v1           | Research-confirmed whitespace; public docs leak without OpenAPI                                            |
+| Auto-merge by default                                                | Honest L4 posture; exceptions hardcoded now, policy engine v2                                              |
+| Unified entity model                                                 | One schema serves evidence, trust states, feedback, regeneration                                           |
+| Plugin kernel + authoring skill                                      | Collapses plugin cost to a prompt; first-party dogfoods the API                                            |
+| `audit` handles arbitrary docs                                       | The GTM play requires the hard version                                                                     |
+| v1 hosted = registration/waitlist only                               | Local-first launch, funnel open, no premature backend                                                      |
+| Wizard-first onboarding; deterministic pre-fill                      | Humans set intent once upfront; agent inference too slow for pre-fill                                      |
+| State: manifest committed (lockfile pattern), sqlite never committed | Branch-correct provenance, backend-free CI, no binary merge conflicts                                      |
+| Tribal-knowledge capture is non-blocking                             | Blocking generation on human answers would reintroduce supervision                                         |
 
 ### 2026-07-19/21 design-review adjudication (Sol review; binding, folded into this document)
 
@@ -757,16 +763,16 @@ Full decision records: `knowledge/design/trust-model-v2.md`, `i18n-lifecycle-v2.
 `pipeline-v2.md`, `release-scope-v2.md`, `harness-state-v2.md`, `dx-knowledge-v2.md`,
 `quality-ci-reader-v2.md`.
 
-| Decision | Record |
-|---|---|
-| Writer-emitted claim ledger; badge = 100% checked; class-appropriate evidence; editorial review a separate axis; inline citations; identity-threading hybrid; page-level regen scope | trust-model-v2 |
-| Three-axis trust vocabulary; proven/scored/out-of-domain leave public surfaces; `structural`→`code-structure`; audit as stale-reference checker; support matrix; AssuranceProfile; L4 marketing stays with honest in-product copy | quality-ci-reader-v2 |
-| `generate` = idempotent reconciler; refresh removed; staged atomic publish on freeze; typed fingerprint ladder + diff-edit repair; refine Pareto gate; `--explain` preview | pipeline-v2 |
-| Versioning cut from 0.1.0 (v1.x whole); primary-persona gating; immediate targeted regeneration; deployment = local artifact only | release-scope-v2 |
-| i18n stays in 0.1.0; source fallbacks; fidelity review; strict isomorphism; non-blocking translation failures; auto-committed terminology profiles | i18n-lifecycle-v2 + quality-ci-reader-v2 |
-| Evidence tools primary; PageContextPack additive (HIGH-RISK); one writer/page; inline `<Claim>` markers; Markdown twin via renderToMarkdown; generated output out of read roots (PROVISIONAL, eval-gated); risk critic; unrun reviews nonblocking; docset = initialized directory; canonical-JSON manifest shards | harness-state-v2 |
-| Context-aware bare `docstube`; four-phase wizard over onboarding session; provider preselect + preflight; estimate-is-the-button spend UX; docType preset layer; KnowledgeNeed/Fact; auto-answer agent; `/answer`; governed feedback; config patch preview | dx-knowledge-v2 |
-| Fail-closed PublicationDecision; output-inventory allowlist; no-new-debt; coverage ratchet; waivers; auth honesty; one reusable workflow; structural findings all non-blocking; ia.yml schema v2; reader trust chip + quiet evidence UI; canonical machine corpus; local MCP; nav from ia.yml; sectioned removed | quality-ci-reader-v2 |
+| Decision                                                                                                                                                                                                                                                                                                          | Record                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Writer-emitted claim ledger; badge = 100% checked; class-appropriate evidence; editorial review a separate axis; inline citations; identity-threading hybrid; page-level regen scope                                                                                                                              | trust-model-v2                           |
+| Three-axis trust vocabulary; proven/scored/out-of-domain leave public surfaces; `structural`→`code-structure`; audit as stale-reference checker; support matrix; AssuranceProfile; L4 marketing stays with honest in-product copy                                                                                 | quality-ci-reader-v2                     |
+| `generate` = idempotent reconciler; refresh removed; staged atomic publish on freeze; typed fingerprint ladder + diff-edit repair; refine Pareto gate; `--explain` preview                                                                                                                                        | pipeline-v2                              |
+| Versioning cut from 0.1.0 (v1.x whole); primary-persona gating; immediate targeted regeneration; deployment = local artifact only                                                                                                                                                                                 | release-scope-v2                         |
+| i18n stays in 0.1.0; source fallbacks; fidelity review; strict isomorphism; non-blocking translation failures; auto-committed terminology profiles                                                                                                                                                                | i18n-lifecycle-v2 + quality-ci-reader-v2 |
+| Evidence tools primary; PageContextPack additive (HIGH-RISK); one writer/page; inline `<Claim>` markers; Markdown twin via renderToMarkdown; generated output out of read roots (PROVISIONAL, eval-gated); risk critic; unrun reviews nonblocking; docset = initialized directory; canonical-JSON manifest shards | harness-state-v2                         |
+| Context-aware bare `docstube`; four-phase wizard over onboarding session; provider preselect + preflight; estimate-is-the-button spend UX; docType preset layer; KnowledgeNeed/Fact; auto-answer agent; `/answer`; governed feedback; config patch preview                                                        | dx-knowledge-v2                          |
+| Fail-closed PublicationDecision; output-inventory allowlist; no-new-debt; coverage ratchet; waivers; auth honesty; one reusable workflow; structural findings all non-blocking; ia.yml schema v2; reader trust chip + quiet evidence UI; canonical machine corpus; local MCP; nav from ia.yml; sectioned removed  | quality-ci-reader-v2                     |
 
 ## 10 · Knowledge index
 

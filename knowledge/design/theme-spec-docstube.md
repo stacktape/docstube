@@ -27,11 +27,11 @@ Important scope distinction:
 
 ## 1.1 Font families
 
-| Role | Family stack | Intended use |
-|---|---|---|
-| Display | `'Outfit', ui-sans-serif, system-ui, sans-serif` | Page and section headings, card headings, brand-forward labels |
-| Body | `'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif` | Body copy, navigation, controls |
-| Monospace | `'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace` | Code, breadcrumbs, navigation section labels, tabs, shortcuts, technical metadata |
+| Role      | Family stack                                                   | Intended use                                                                      |
+| --------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Display   | `'Outfit', ui-sans-serif, system-ui, sans-serif`               | Page and section headings, card headings, brand-forward labels                    |
+| Body      | `'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif` | Body copy, navigation, controls                                                   |
+| Monospace | `'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace`  | Code, breadcrumbs, navigation section labels, tabs, shortcuts, technical metadata |
 
 Global browser features:
 
@@ -87,9 +87,9 @@ Defined in `apps/web/src/styles/global.css`.
 
 ### Brand teal scale
 
-| Token | Value |
-|---|---|
-| `brand-50` | `#ecfbf9` |
+| Token       | Value     |
+| ----------- | --------- |
+| `brand-50`  | `#ecfbf9` |
 | `brand-100` | `#d2f4f0` |
 | `brand-200` | `#a7e8e1` |
 | `brand-300` | `#70d0ca` |
@@ -105,46 +105,46 @@ The palette is derived from the logo ring (`#7ED0BE → #36A6A4 → #0A7B85`) an
 
 ### Text and neutral colors
 
-| Token | Value | Role |
-|---|---|---|
-| `ink` | `#0e2b2d` | Headings and strongest text |
-| `ink-soft` | `#33484a` | Primary body text |
-| `muted` | `#5d7173` | Secondary copy and navigation |
-| `faint` | `#8497988a` | Very low-emphasis content |
+| Token      | Value       | Role                          |
+| ---------- | ----------- | ----------------------------- |
+| `ink`      | `#0e2b2d`   | Headings and strongest text   |
+| `ink-soft` | `#33484a`   | Primary body text             |
+| `muted`    | `#5d7173`   | Secondary copy and navigation |
+| `faint`    | `#8497988a` | Very low-emphasis content     |
 
 ### Surfaces
 
-| Token | Value |
-|---|---|
-| `paper` | `#ffffff` |
-| `canvas` | `#f5faf9` |
-| `line` | `#e0ece9` |
+| Token         | Value     |
+| ------------- | --------- |
+| `paper`       | `#ffffff` |
+| `canvas`      | `#f5faf9` |
+| `line`        | `#e0ece9` |
 | `line-strong` | `#cfe1dd` |
-| `night` | `#0b1716` |
-| `night-soft` | `#102322` |
+| `night`       | `#0b1716` |
+| `night-soft`  | `#102322` |
 
 ### Semantic colors
 
-| Token | Value | Role |
-|---|---|---|
-| `pass` | `#15a06b` | Successful verification/check |
-| `flag` | `#c2790b` | Warning, flag, or string-like syntax accent |
-| `danger` | `#d6584f` | Error/destructive condition |
+| Token    | Value     | Role                                        |
+| -------- | --------- | ------------------------------------------- |
+| `pass`   | `#15a06b` | Successful verification/check               |
+| `flag`   | `#c2790b` | Warning, flag, or string-like syntax accent |
+| `danger` | `#d6584f` | Error/destructive condition                 |
 
 ### One-off colors in `GeneratedDocs.astro`
 
-| Value | Use |
-|---|---|
-| `#1f3a36` | Dark-theme placeholder/content bars |
-| `#06201f` | Dark inline-code sample background |
-| `#6d4ee6` | Agent/MCP accent and light-theme function syntax |
-| `#ece6fd` | MCP badge background |
-| `#ffffff` / `#fff` | White text and cursor outline |
-| `rgba(54,177,176,0.18)` | Glow behind the docs mockup |
-| `rgba(10,129,139,0.05)` | Global grid lines |
-| `rgba(10,129,139,0.12)` | Global dot background |
-| `rgba(13,50,48,0.08)` | Light code-block shadow |
-| `rgba(0,0,0,0.08)` | Diagram-node shadow |
+| Value                   | Use                                              |
+| ----------------------- | ------------------------------------------------ |
+| `#1f3a36`               | Dark-theme placeholder/content bars              |
+| `#06201f`               | Dark inline-code sample background               |
+| `#6d4ee6`               | Agent/MCP accent and light-theme function syntax |
+| `#ece6fd`               | MCP badge background                             |
+| `#ffffff` / `#fff`      | White text and cursor outline                    |
+| `rgba(54,177,176,0.18)` | Glow behind the docs mockup                      |
+| `rgba(10,129,139,0.05)` | Global grid lines                                |
+| `rgba(10,129,139,0.12)` | Global dot background                            |
+| `rgba(13,50,48,0.08)`   | Light code-block shadow                          |
+| `rgba(0,0,0,0.08)`      | Diagram-node shadow                              |
 
 ---
 
@@ -154,41 +154,41 @@ These are local to `[data-doc-preview]`.
 
 ### Light
 
-| Token | Value | Role |
-|---|---|---|
-| `--dp-bg` | `#ffffff` | Main docs surface, active tab/pill |
-| `--dp-card` | `#f5faf9` | Search field, diagram cards |
-| `--dp-text` | `#0e2b2d` | Primary text |
-| `--dp-muted` | `#5d7173` | Secondary text and icons |
-| `--dp-border` | `#e0ece9` | Pane dividers, outlines, dot grid |
-| `--dp-accent` | `#0a818b` | Active navigation, links, diagram edges |
-| `--dp-active` | `#ecfbf9` | Active navigation row |
-| `--dp-inline` | `rgba(10, 129, 139, 0.1)` | Inline code/icon background |
-| `--dp-codebg` | `#f1f5f4` | Code-block background |
-| `--dp-codetext` | `#33484a` | Default code text |
-| `--dp-kw` | `#0a7b85` | Syntax keywords |
-| `--dp-str` | `#b5610b` | Syntax strings |
-| `--dp-fn` | `#7a5cf0` | Syntax functions |
-| `--dp-var` | `#0e2b2d` | Syntax variables/types |
+| Token           | Value                     | Role                                    |
+| --------------- | ------------------------- | --------------------------------------- |
+| `--dp-bg`       | `#ffffff`                 | Main docs surface, active tab/pill      |
+| `--dp-card`     | `#f5faf9`                 | Search field, diagram cards             |
+| `--dp-text`     | `#0e2b2d`                 | Primary text                            |
+| `--dp-muted`    | `#5d7173`                 | Secondary text and icons                |
+| `--dp-border`   | `#e0ece9`                 | Pane dividers, outlines, dot grid       |
+| `--dp-accent`   | `#0a818b`                 | Active navigation, links, diagram edges |
+| `--dp-active`   | `#ecfbf9`                 | Active navigation row                   |
+| `--dp-inline`   | `rgba(10, 129, 139, 0.1)` | Inline code/icon background             |
+| `--dp-codebg`   | `#f1f5f4`                 | Code-block background                   |
+| `--dp-codetext` | `#33484a`                 | Default code text                       |
+| `--dp-kw`       | `#0a7b85`                 | Syntax keywords                         |
+| `--dp-str`      | `#b5610b`                 | Syntax strings                          |
+| `--dp-fn`       | `#7a5cf0`                 | Syntax functions                        |
+| `--dp-var`      | `#0e2b2d`                 | Syntax variables/types                  |
 
 ### Dark
 
-| Token | Value | Role |
-|---|---|---|
-| `--dp-bg` | `#161c1c` | Main docs surface |
-| `--dp-card` | `#222828` | Secondary surfaces |
-| `--dp-text` | `rgba(255, 255, 255, 0.9)` | Primary text |
-| `--dp-muted` | `#8c9594` | Secondary text |
-| `--dp-border` | `#2f3434` | Dividers and outlines |
-| `--dp-accent` | `#36bebe` | Active/accent color |
-| `--dp-active` | `#2b3231` | Active navigation row |
-| `--dp-inline` | `rgba(54, 190, 190, 0.14)` | Inline code/icon background |
-| `--dp-codebg` | `#1b2221` | Code-block background |
-| `--dp-codetext` | `#cfeae6` | Default code text |
-| `--dp-kw` | `#569cd6` | Syntax keywords |
-| `--dp-str` | `#ce9178` | Syntax strings |
-| `--dp-fn` | `#dcdcaa` | Syntax functions |
-| `--dp-var` | `#9cdcfe` | Syntax variables/types |
+| Token           | Value                      | Role                        |
+| --------------- | -------------------------- | --------------------------- |
+| `--dp-bg`       | `#161c1c`                  | Main docs surface           |
+| `--dp-card`     | `#222828`                  | Secondary surfaces          |
+| `--dp-text`     | `rgba(255, 255, 255, 0.9)` | Primary text                |
+| `--dp-muted`    | `#8c9594`                  | Secondary text              |
+| `--dp-border`   | `#2f3434`                  | Dividers and outlines       |
+| `--dp-accent`   | `#36bebe`                  | Active/accent color         |
+| `--dp-active`   | `#2b3231`                  | Active navigation row       |
+| `--dp-inline`   | `rgba(54, 190, 190, 0.14)` | Inline code/icon background |
+| `--dp-codebg`   | `#1b2221`                  | Code-block background       |
+| `--dp-codetext` | `#cfeae6`                  | Default code text           |
+| `--dp-kw`       | `#569cd6`                  | Syntax keywords             |
+| `--dp-str`      | `#ce9178`                  | Syntax strings              |
+| `--dp-fn`       | `#dcdcaa`                  | Syntax functions            |
+| `--dp-var`      | `#9cdcfe`                  | Syntax variables/types      |
 
 The dark theme is charcoal-green, not neutral black. Preserve that teal-tinted character.
 
@@ -198,44 +198,44 @@ The dark theme is charcoal-green, not neutral black. Preserve that teal-tinted c
 
 ### Global/base
 
-| Role | Size | Weight | Line height | Other |
-|---|---:|---:|---:|---|
-| Body default | `16px` | `400` | `1.6` | Inter |
-| Global headings | inherited | varies | `1.07` | Outfit, `-0.02em`, balanced wrapping |
-| Eyebrow | `12px` | `600` | normal | Mono, uppercase, `0.08em` tracking |
-| Chip | `12.5px` | `400` | normal | Mono |
+| Role            |      Size | Weight | Line height | Other                                |
+| --------------- | --------: | -----: | ----------: | ------------------------------------ |
+| Body default    |    `16px` |  `400` |       `1.6` | Inter                                |
+| Global headings | inherited | varies |      `1.07` | Outfit, `-0.02em`, balanced wrapping |
+| Eyebrow         |    `12px` |  `600` |      normal | Mono, uppercase, `0.08em` tracking   |
+| Chip            |  `12.5px` |  `400` |      normal | Mono                                 |
 
 ### Docs mockup
 
-| Role | Size | Weight | Line height |
-|---|---:|---:|---:|
-| Page title | `26px` | `600` | global heading `1.07` |
-| Breadcrumb | `11px` | `400` | normal |
-| Intro/body copy | `13.5px` | `400` | Tailwind `leading-relaxed` = `1.625` |
-| Inline code | `11.5px` | `400` | inherited |
-| Sidebar navigation | `12.5px` | `400`; active `500` | default |
-| Sidebar group labels | `10px` | `600` | default; uppercase, `0.06em` |
-| TOC navigation | `12px` | active `500` | default |
-| TOC label | `10px` | `600` | uppercase, `0.06em` |
-| Search/Ask AI | `11px` | Ask AI `600` | default |
-| Theme buttons | `10px` | `600` | default |
-| Code tabs | `11.5px` | `600` | default |
-| Code | `12px` | `400` | `1.85` |
-| Diagram node label | `11px` | `500` | default |
-| Diagram edge label | `8.5px` | `400` | default |
-| Diagram caption | `9.5px` | `400` | default |
+| Role                 |     Size |              Weight |                          Line height |
+| -------------------- | -------: | ------------------: | -----------------------------------: |
+| Page title           |   `26px` |               `600` |                global heading `1.07` |
+| Breadcrumb           |   `11px` |               `400` |                               normal |
+| Intro/body copy      | `13.5px` |               `400` | Tailwind `leading-relaxed` = `1.625` |
+| Inline code          | `11.5px` |               `400` |                            inherited |
+| Sidebar navigation   | `12.5px` | `400`; active `500` |                              default |
+| Sidebar group labels |   `10px` |               `600` |         default; uppercase, `0.06em` |
+| TOC navigation       |   `12px` |        active `500` |                              default |
+| TOC label            |   `10px` |               `600` |                  uppercase, `0.06em` |
+| Search/Ask AI        |   `11px` |        Ask AI `600` |                              default |
+| Theme buttons        |   `10px` |               `600` |                              default |
+| Code tabs            | `11.5px` |               `600` |                              default |
+| Code                 |   `12px` |               `400` |                               `1.85` |
+| Diagram node label   |   `11px` |               `500` |                              default |
+| Diagram edge label   |  `8.5px` |               `400` |                              default |
+| Diagram caption      |  `9.5px` |               `400` |                              default |
 
 ### Marketing wrapper/gallery
 
-| Role | Size |
-|---|---:|
+| Role                 |                          Size |
+| -------------------- | ----------------------------: |
 | Main section heading | `30px` mobile; `42px` at `sm` |
-| Main section lead | `16px`, relaxed |
-| Gallery heading | `24px`, weight `600` |
-| Gallery lead | `14.5px`, relaxed |
-| Gallery card heading | `15px`, weight `600` |
-| Gallery card copy | `12.5px`, relaxed |
-| Miniature UI copy | `7px–11.5px` |
+| Main section lead    |               `16px`, relaxed |
+| Gallery heading      |          `24px`, weight `600` |
+| Gallery lead         |             `14.5px`, relaxed |
+| Gallery card heading |          `15px`, weight `600` |
+| Gallery card copy    |             `12.5px`, relaxed |
+| Miniature UI copy    |                  `7px–11.5px` |
 
 The `7px–10px` sizes are infographic-only. They should not be carried into a production documentation UI at full scale.
 
@@ -247,22 +247,22 @@ Tailwind’s standard 4px-based spacing scale is used, plus a few arbitrary valu
 
 Common production-worthy values:
 
-| Use | Value |
-|---|---:|
-| Very tight gap/padding | `2px` |
-| Control rail padding | `3px` |
-| Small gap | `4px`, `6px`, `8px` |
-| Nav row vertical padding | `6px` |
-| Search/control vertical padding | `7px` |
-| Nav row horizontal padding | `10px` |
-| Chrome padding | `10px 16px` |
-| Sidebar padding | `12px` |
-| TOC padding | `16px` |
-| Article padding | `24px`; `28px` at `sm` |
-| Code content padding | `12px 16px 16px` |
-| Diagram content padding | `28px 20px` |
-| Section horizontal padding | `20px`; `32px` at `sm` |
-| Section vertical padding | `80px`; `96px` at `sm` |
+| Use                             |                  Value |
+| ------------------------------- | ---------------------: |
+| Very tight gap/padding          |                  `2px` |
+| Control rail padding            |                  `3px` |
+| Small gap                       |    `4px`, `6px`, `8px` |
+| Nav row vertical padding        |                  `6px` |
+| Search/control vertical padding |                  `7px` |
+| Nav row horizontal padding      |                 `10px` |
+| Chrome padding                  |            `10px 16px` |
+| Sidebar padding                 |                 `12px` |
+| TOC padding                     |                 `16px` |
+| Article padding                 | `24px`; `28px` at `sm` |
+| Code content padding            |       `12px 16px 16px` |
+| Diagram content padding         |            `28px 20px` |
+| Section horizontal padding      | `20px`; `32px` at `sm` |
+| Section vertical padding        | `80px`; `96px` at `sm` |
 
 Layout dimensions:
 
@@ -293,19 +293,19 @@ Responsive behavior currently defined:
 
 ## 1.6 Radii
 
-| Token/class | Value | Use |
-|---|---:|---|
-| Global `--radius-xl` | `16px` | Available theme token |
-| `rounded-2xl` | `16px` | Outer docs frame |
-| `.surface` / `.surface-tint` | `14px` | Marketing cards |
-| `rounded-xl` | `12px` | Code blocks, diagrams, inner cards |
-| `rounded-lg` | `8px` | Search, controls, icon tiles |
-| Arbitrary control rail | `9px` | Theme switch outer rail |
-| Arbitrary nav/control | `7px` | Nav rows, active pill |
-| Code-tab pill | `6px` | Animated tab selection |
-| `rounded-md` | `6px` | Small callouts and rows |
-| `rounded` | `4px` | Inline code, small badges |
-| `rounded-full` | `9999px` | Dots, status circles, chips |
+| Token/class                  |    Value | Use                                |
+| ---------------------------- | -------: | ---------------------------------- |
+| Global `--radius-xl`         |   `16px` | Available theme token              |
+| `rounded-2xl`                |   `16px` | Outer docs frame                   |
+| `.surface` / `.surface-tint` |   `14px` | Marketing cards                    |
+| `rounded-xl`                 |   `12px` | Code blocks, diagrams, inner cards |
+| `rounded-lg`                 |    `8px` | Search, controls, icon tiles       |
+| Arbitrary control rail       |    `9px` | Theme switch outer rail            |
+| Arbitrary nav/control        |    `7px` | Nav rows, active pill              |
+| Code-tab pill                |    `6px` | Animated tab selection             |
+| `rounded-md`                 |    `6px` | Small callouts and rows            |
+| `rounded`                    |    `4px` | Inline code, small badges          |
+| `rounded-full`               | `9999px` | Dots, status circles, chips        |
 
 The recognizable radius hierarchy is: `16 outer → 12 content blocks → 8 controls → 4 inline elements`.
 
@@ -316,16 +316,11 @@ The recognizable radius hierarchy is: `16 outer → 12 content blocks → 8 cont
 Global tokens:
 
 ```css
---shadow-soft:
-  0 1px 2px rgba(13, 50, 48, 0.04),
-  0 6px 20px -8px rgba(13, 50, 48, 0.12);
+--shadow-soft: 0 1px 2px rgba(13, 50, 48, 0.04), 0 6px 20px -8px rgba(13, 50, 48, 0.12);
 
---shadow-lift:
-  0 2px 4px rgba(13, 50, 48, 0.05),
-  0 18px 40px -16px rgba(13, 50, 48, 0.22);
+--shadow-lift: 0 2px 4px rgba(13, 50, 48, 0.05), 0 18px 40px -16px rgba(13, 50, 48, 0.22);
 
---shadow-brand:
-  0 8px 24px -10px rgba(10, 129, 139, 0.55);
+--shadow-brand: 0 8px 24px -10px rgba(10, 129, 139, 0.55);
 ```
 
 Docs code block:
@@ -352,14 +347,14 @@ inset 0 1px 0 rgba(255, 255, 255, 0.04)
 
 ## 1.8 Motion
 
-| Interaction | Timing |
-|---|---|
-| Theme/code selection pill | `left/width 0.28s cubic-bezier(0.34,1.56,0.64,1)` |
-| Pill vertical/height change | `0.25s ease` |
-| Navigation hover | `background-color 0.15s ease` |
-| Accordion panel | `grid-template-rows 0.22s ease` |
-| Accordion chevron | `transform 0.22s ease` |
-| Marketing card lift | `220ms` spring transform, `220ms` border, `220ms` shadow |
+| Interaction                 | Timing                                                   |
+| --------------------------- | -------------------------------------------------------- |
+| Theme/code selection pill   | `left/width 0.28s cubic-bezier(0.34,1.56,0.64,1)`        |
+| Pill vertical/height change | `0.25s ease`                                             |
+| Navigation hover            | `background-color 0.15s ease`                            |
+| Accordion panel             | `grid-template-rows 0.22s ease`                          |
+| Accordion chevron           | `transform 0.22s ease`                                   |
+| Marketing card lift         | `220ms` spring transform, `220ms` border, `220ms` shadow |
 
 Reduced-motion support globally forces animations and transitions to `0.001ms`, one iteration.
 
@@ -373,7 +368,7 @@ The section sits on a pale teal canvas with a `22px × 22px` radial dot grid:
 
 ```css
 background-color: #f5faf9;
-background-image: radial-gradient(rgba(10,129,139,0.12) 1px, transparent 1px);
+background-image: radial-gradient(rgba(10, 129, 139, 0.12) 1px, transparent 1px);
 background-size: 22px 22px;
 ```
 
@@ -831,16 +826,16 @@ Missing:
 
 Suggested full-scale roles:
 
-| Role | Suggested size/line height |
-|---|---|
-| Page H1 | `36px/1.1` desktop; `30px/1.12` mobile |
-| H2 | `26px/1.2` |
-| H3 | `21px/1.25` |
-| H4 | `17px/1.3` |
-| Body | `16px/1.7` |
-| Small/meta | `13px/1.5` |
-| Code | `13.5px/1.75` |
-| Content width | `680–760px` |
+| Role          | Suggested size/line height             |
+| ------------- | -------------------------------------- |
+| Page H1       | `36px/1.1` desktop; `30px/1.12` mobile |
+| H2            | `26px/1.2`                             |
+| H3            | `21px/1.25`                            |
+| H4            | `17px/1.3`                             |
+| Body          | `16px/1.7`                             |
+| Small/meta    | `13px/1.5`                             |
+| Code          | `13.5px/1.75`                          |
+| Content width | `680–760px`                            |
 
 Keep Outfit for headings and Inter for prose. The preview’s `13.5px` body size is suitable only because the entire docs site is a reduced marketing mockup.
 

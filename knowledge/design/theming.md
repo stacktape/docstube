@@ -26,28 +26,27 @@ scripts/build-theme-bundles.ts  — compiles site/** + assets/** into generated
 
 ```ts
 type ThemeManifest = {
-  name: string;                          // builtins: bare names; plugin themes later: 'plugin/name'
+  name: string; // builtins: bare names; plugin themes later: 'plugin/name'
   description: string;
-  dependencies: Record<string, string>;  // exact pins; conflict with kernel deps = build error
-  build: ThemeBuild;                     // typed Astro hooks — the kernel owns astro.config
-  renderers: Record<string, string>;     // component contract name -> export in site/components
-  tokens: ThemeTokens;                   // defaults; config theme.tokens overrides the semantic set
-  options?: Record<string, unknown>;     // theme-scoped knobs (validated by the theme)
+  dependencies: Record<string, string>; // exact pins; conflict with kernel deps = build error
+  build: ThemeBuild; // typed Astro hooks — the kernel owns astro.config
+  renderers: Record<string, string>; // component contract name -> export in site/components
+  tokens: ThemeTokens; // defaults; config theme.tokens overrides the semantic set
+  options?: Record<string, unknown>; // theme-scoped knobs (validated by the theme)
 };
 
 // The kernel generates astro.config.mjs from invariants (MDX, static output, Pagefind, content
 // dirs) plus these typed hooks — themes never own the config file (Sol #6, one owner).
 type ThemeBuild = {
-  integrationsModule?: string;   // site/ path exporting extra Astro integrations (e.g. react())
-  globalStyleEntry: string;      // site/ path of the css entry the layout imports
-  shiki?: { themes: string[]; transformers?: string[] };  // code-block pipeline config
+  integrationsModule?: string; // site/ path exporting extra Astro integrations (e.g. react())
+  globalStyleEntry: string; // site/ path of the css entry the layout imports
+  shiki?: { themes: string[]; transformers?: string[] }; // code-block pipeline config
 };
 
 // Semantic tokens every theme MUST honor (portable brand overrides — Sol #8 scoped to v1):
 // accent, accentDark, fontBody, fontCode. Everything else is theme-internal; the existing
 // free-form theme.tokens record maps onto the theme's own custom properties as an escape hatch.
-type ThemeTokens = { accent: string; accentDark?: string; fontBody: string; fontCode: string } &
-  Record<string, string>;
+type ThemeTokens = { accent: string; accentDark?: string; fontBody: string; fontCode: string } & Record<string, string>;
 ```
 
 ## Proof rendering is a conformance contract, not a theme choice (Sol #4)
@@ -67,6 +66,7 @@ The product's signature is visible verification. The KERNEL, not the theme:
 Emission writes `.docstube/theme-files.json`: `{ theme, themeVersion, files: [{path, hash}] }`.
 
 Refresh/theme-switch algorithm:
+
 1. Read the previous ownership manifest (absent → treat all previous theme paths as unowned,
    overwrite-only legacy mode).
 2. For each previously-owned path not in the new bundle: delete IF its hash still matches
@@ -74,19 +74,19 @@ Refresh/theme-switch algorithm:
 3. Write new bundle files; overwrite owned files; a user-modified owned file is reported and
    skipped unless `--force-theme`.
 4. Rewrite package.json deps + kernel astro.config.
-Content (`content/**`, `public/*.md`, llms.txt), site-data, and the MCP server are
-kernel/content-owned and never touched by theme operations.
+   Content (`content/**`, `public/*.md`, llms.txt), site-data, and the MCP server are
+   kernel/content-owned and never touched by theme operations.
 
 ## Ownership table (Sol #15)
 
-| Path | Owner | Theme switch touches? |
-|---|---|---|
-| content/**, public/*.md, llms.txt, mcp/** | content/kernel | never |
-| src/site-data.mjs | kernel | never |
-| astro.config.mjs, package.json | kernel (theme hooks as input) | rewritten |
-| src/layouts/**, src/components/**, src/styles/**, public/fonts/** | theme bundle | manifest-driven replace |
-| src/docstube/** (proof primitives, entity wrappers) | kernel | rewritten |
-| anything user-added | user | preserved; conflicts reported |
+| Path                                                              | Owner                         | Theme switch touches?         |
+| ----------------------------------------------------------------- | ----------------------------- | ----------------------------- |
+| content/**, public/\*.md, llms.txt, mcp/**                        | content/kernel                | never                         |
+| src/site-data.mjs                                                 | kernel                        | never                         |
+| astro.config.mjs, package.json                                    | kernel (theme hooks as input) | rewritten                     |
+| src/layouts/**, src/components/**, src/styles/**, public/fonts/** | theme bundle                  | manifest-driven replace       |
+| src/docstube/** (proof primitives, entity wrappers)               | kernel                        | rewritten                     |
+| anything user-added                                               | user                          | preserved; conflicts reported |
 
 ## Config
 

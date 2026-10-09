@@ -246,12 +246,12 @@ Other avoidable costs and confusion:
 
 The current and recommended vocabulary are not equivalent:
 
-| Current stored state | Reader sees | Problem | Better reader language |
-|---|---|---|---|
-| `proven` | verified | Too absolute; hides which property was checked | “12 of 18 factual claims checked,” with exact check names |
-| `scored` | reviewed | No score; may be default or review may have failed | Separate “AI-reviewed for \<persona\>” assessment |
-| `out-of-domain` | unverified | Conflates several causes and actions | “Needs maintainer input,” “No checker available,” or “Check unavailable” |
-| `grounded` | implicit proof | Means only that a referenced name exists | “Source-linked” |
+| Current stored state | Reader sees    | Problem                                            | Better reader language                                                   |
+| -------------------- | -------------- | -------------------------------------------------- | ------------------------------------------------------------------------ |
+| `proven`             | verified       | Too absolute; hides which property was checked     | “12 of 18 factual claims checked,” with exact check names                |
+| `scored`             | reviewed       | No score; may be default or review may have failed | Separate “AI-reviewed for \<persona\>” assessment                        |
+| `out-of-domain`      | unverified     | Conflates several causes and actions               | “Needs maintainer input,” “No checker available,” or “Check unavailable” |
+| `grounded`           | implicit proof | Means only that a referenced name exists           | “Source-linked”                                                          |
 
 “Verified” can remain useful for a specific evidence result—“sample executed,” “API signature matched”—or for a page with genuinely complete claim coverage. `proven`, `scored`, and `out-of-domain` should not remain the user-facing correctness vocabulary, and probably should not remain a single internal enum either.
 

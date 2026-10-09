@@ -385,7 +385,10 @@ samp {
   font-size: 12px;
   margin: 0;
 }
-.dt-page-meta .dt-guarantee {
+.dt-page-meta .dt-claims-chips {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
   margin-left: auto;
 }
 
@@ -755,7 +758,8 @@ samp {
 
 /* ---------- proof primitives (kernel markup, theme styling) ---------- */
 
-.dt-guarantee {
+.dt-claims,
+.dt-reviewed {
   align-items: center;
   border-radius: 5px;
   display: inline-flex;
@@ -767,7 +771,8 @@ samp {
   padding: 3px 8px;
   vertical-align: middle;
 }
-.dt-guarantee::before {
+.dt-claims::before,
+.dt-reviewed::before {
   background: currentColor;
   content: '';
   flex: none;
@@ -775,28 +780,101 @@ samp {
   mask: center / contain no-repeat;
   width: 10px;
 }
-.dt-guarantee--proven {
-  background: var(--status-proven-bg);
-  color: var(--status-proven-text);
-}
-.dt-guarantee--proven::before {
-  background: var(--status-proven);
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.7 9.5 3.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-}
-.dt-guarantee--scored {
+.dt-claims {
   background: var(--status-scored-bg);
   color: var(--status-scored-text);
 }
-.dt-guarantee--scored::before {
+/* The COMPLETE state (PRODUCT §1.2): every ledger claim checked, nothing contradicted, and no
+   unmarked assertion left by the coverage linter. Gated by the kernel primitive — a page with
+   uncovered assertion-shaped prose never receives this class. */
+.dt-claims--complete {
+  background: var(--status-proven-bg);
+  color: var(--status-proven-text);
+}
+.dt-claims--complete::before {
+  background: var(--status-proven);
+}
+.dt-claims::before {
   background: var(--status-scored);
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='4.4' fill='none' stroke='%23000' stroke-width='1.7'/%3E%3Ccircle cx='6' cy='6' r='1.7'/%3E%3C/svg%3E");
 }
-.dt-guarantee--out-of-domain {
-  background: color-mix(in srgb, var(--dt-text) 7%, transparent);
-  color: var(--dt-muted);
+.dt-reviewed {
+  background: var(--status-proven-bg);
+  color: var(--status-proven-text);
 }
-.dt-guarantee--out-of-domain::before {
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Ccircle cx='6' cy='6' r='4.4' fill='none' stroke='%23000' stroke-width='1.7' stroke-dasharray='2.4 2.1'/%3E%3C/svg%3E");
+.dt-reviewed::before {
+  background: var(--status-proven);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2 5 8.7 9.5 3.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.dt-unverified-warning {
+  background: #fff4e0;
+  border: 1px solid #e8c98f;
+  border-radius: 999px;
+  color: #8a5a00;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 3px 10px;
+}
+.dt-source-fallback {
+  background: #eef4fb;
+  border: 1px solid #b9d2ec;
+  border-radius: 999px;
+  color: #2a5a8a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+/* Checked against uncommitted changes (PRODUCT §1.2): honest counts, never the complete look —
+   deliberately styled as a caution, distinct from the green complete state. */
+.dt-uncommitted {
+  background: color-mix(in srgb, #d8b34a 14%, transparent);
+  border: 1px solid color-mix(in srgb, #d8b34a 45%, transparent);
+  border-radius: 999px;
+  color: #d8b34a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+/* The translation dimension: its own visible line beside the correctness counts, never merged. */
+.dt-translation-assurance {
+  background: color-mix(in srgb, #8b7bd8 14%, transparent);
+  border: 1px solid color-mix(in srgb, #8b7bd8 45%, transparent);
+  border-radius: 999px;
+  color: #a396e6;
+  font-family: var(--font-code, ui-monospace, monospace);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+.dt-contradictions {
+  background: color-mix(in srgb, #e5484d 12%, transparent);
+  border: 1px solid color-mix(in srgb, #e5484d 45%, transparent);
+  border-radius: 8px;
+  color: #e5484d;
+  font-family: var(--font-code, ui-monospace, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 12px 0 20px;
+  padding: 10px 14px;
+}
+.dt-claim--contradicted {
+  background: color-mix(in srgb, #e5484d 12%, transparent);
+  border-bottom: 2px solid #e5484d;
+}
+/* Quiet-but-visible unchecked mark: an exception indicator, never an alarm. */
+.dt-claim--unchecked {
+  border-bottom: 1px dotted color-mix(in srgb, currentColor 55%, transparent);
+  cursor: help;
+}
+.dt-claim-mark {
+  color: #e5484d;
+  font-family: var(--font-code, ui-monospace, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-left: 4px;
+  text-transform: uppercase;
+  vertical-align: middle;
 }
 .dt-section-chip {
   font-size: 10px;
@@ -804,6 +882,9 @@ samp {
   padding: 2px 6px;
   position: relative;
   top: -2px;
+}
+.dt-section-chip--contradicted {
+  color: #e5484d;
 }
 
 .dt-sources {

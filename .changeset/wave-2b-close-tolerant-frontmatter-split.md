@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Wave 2b close. FRONTMATTER SPLITTING now accepts every block Astro accepts. A UTF-8 BOM before the

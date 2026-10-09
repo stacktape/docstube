@@ -36,7 +36,9 @@ const notes = [
   'This ends on vision plus near-term momentum. The plan mirrors the strategy: free adoption first, revenue later. "Adopted by real teams" and "first paying customers" are directional goals, not forecasts, so keep them unquantified. The .docstube-folder line is the close: docstube becomes the default way docs work, which is the ubiquity the exit rests on.'
 ];
 
-const missing = ORDER.map((i) => resolve(ASSETS, `slide-${String(i).padStart(2, '0')}.png`)).filter((p) => !existsSync(p));
+const missing = ORDER.map((i) => resolve(ASSETS, `slide-${String(i).padStart(2, '0')}.png`)).filter(
+  (p) => !existsSync(p)
+);
 if (missing.length) {
   console.error('Missing slide PNGs (run `node shoot.mjs` first):\n' + missing.join('\n'));
   process.exit(1);

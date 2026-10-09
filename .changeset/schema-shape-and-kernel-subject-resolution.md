@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Three gaps between what docstube can prove and what it actually decides are closed, and the

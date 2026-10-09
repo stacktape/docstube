@@ -1,82 +1,215 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
-<style>
-  .step { width:208px; flex:none; background:var(--paper); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow-soft); padding:16px 16px 17px; display:flex; flex-direction:column; }
-  .step.you { border-color:var(--line-strong); }
-  .chev { width:28px; flex:none; display:flex; align-items:center; justify-content:center; }
-  .tag { font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.08em; padding:2px 8px; border-radius:999px; }
-  .tag.you { background:var(--ink); color:#eafaf6; }
-  .tag.ai { background:var(--brand-50); color:var(--brand-700); border:1px solid var(--brand-200); }
-  .step h3 { font-family:var(--display); font-weight:600; font-size:15.5px; color:var(--ink); margin-top:12px; }
-  .step p { font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.45; }
-</style>
-</head>
-<body>
-<div class="slide bg-grid">
-  <div class="hz">
-    <h1 class="head">Five steps. <span class="accent">You drive the first. It does the rest.</span></h1>
-  </div>
-
-  <div class="body center">
-    <div style="position:relative">
-      <div class="row" style="gap:0;align-items:stretch">
-        <!-- 1 -->
-        <div class="step you">
-          <div class="row between items-c"><span class="num ink">1</span><span class="tag you">YOU · ~5 MIN</span></div>
-          <h3>Configure</h3>
-          <p>Point it at your repo. Pick a doc type, name your readers, edit the nav. Takes about five minutes.</p>
-        </div>
-        <div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand-400)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
-        <!-- 2 -->
-        <div class="step">
-          <div class="row between items-c"><span class="num">2</span><span class="tag ai">AI</span></div>
-          <h3>Generate</h3>
-          <p>A writer agent drafts MDX from a structural map of your code.</p>
-        </div>
-        <div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand-400)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
-        <!-- 3 -->
-        <div class="step">
-          <div class="row between items-c"><span class="num">3</span><span class="tag ai">AI</span></div>
-          <h3>Review</h3>
-          <p>One reviewer agent per persona checks audience fit.</p>
-        </div>
-        <div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand-400)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
-        <!-- 4 -->
-        <div class="step">
-          <div class="row between items-c"><span class="num">4</span><span class="tag ai">AI</span></div>
-          <h3>Verify</h3>
-          <p>Deterministic + AI verifiers prove every claim.</p>
-        </div>
-        <div class="chev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand-400)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div>
-        <!-- 5 -->
-        <div class="step">
-          <div class="row between items-c"><span class="num">5</span><span class="tag ai">AI</span></div>
-          <h3>Stay in sync</h3>
-          <p>Only affected pages regenerate; the GitHub Action opens a PR.</p>
-        </div>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+    <style>
+      .step {
+        width: 208px;
+        flex: none;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: var(--shadow-soft);
+        padding: 16px 16px 17px;
+        display: flex;
+        flex-direction: column;
+      }
+      .step.you {
+        border-color: var(--line-strong);
+      }
+      .chev {
+        width: 28px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .tag {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .tag.you {
+        background: var(--ink);
+        color: #eafaf6;
+      }
+      .tag.ai {
+        background: var(--brand-50);
+        color: var(--brand-700);
+        border: 1px solid var(--brand-200);
+      }
+      .step h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 15.5px;
+        color: var(--ink);
+        margin-top: 12px;
+      }
+      .step p {
+        font-size: 11.5px;
+        color: var(--muted);
+        margin-top: 6px;
+        line-height: 1.45;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide bg-grid">
+      <div class="hz">
+        <h1 class="head">Five steps. <span class="accent">You drive the first. It does the rest.</span></h1>
       </div>
 
-      <!-- retry loop: steps 3 & 4 feed back to step 2 -->
-      <svg width="1152" height="72" viewBox="0 0 1152 72" fill="none" style="display:block;margin-top:2px">
-        <path d="M812 4 V44 H340 V12" stroke="var(--flag)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M576 4 V44" stroke="var(--flag)" stroke-width="2" stroke-linecap="round"/>
-        <path d="M333 18 L340 8 L347 18" stroke="var(--flag)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <rect x="398" y="33" width="124" height="22" rx="6" fill="var(--canvas)"/>
-        <text x="460" y="48" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11.5" font-weight="600" fill="var(--flag)">back to the writer</text>
-      </svg>
+      <div class="body center">
+        <div style="position: relative">
+          <div class="row" style="gap: 0; align-items: stretch">
+            <!-- 1 -->
+            <div class="step you">
+              <div class="row between items-c">
+                <span class="num ink">1</span><span class="tag you">YOU · ~5 MIN</span>
+              </div>
+              <h3>Configure</h3>
+              <p>Point it at your repo. Pick a doc type, name your readers, edit the nav. Takes about five minutes.</p>
+            </div>
+            <div class="chev">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--brand-400)"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </div>
+            <!-- 2 -->
+            <div class="step">
+              <div class="row between items-c"><span class="num">2</span><span class="tag ai">AI</span></div>
+              <h3>Generate</h3>
+              <p>A writer agent drafts MDX from a structural map of your code.</p>
+            </div>
+            <div class="chev">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--brand-400)"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </div>
+            <!-- 3 -->
+            <div class="step">
+              <div class="row between items-c"><span class="num">3</span><span class="tag ai">AI</span></div>
+              <h3>Review</h3>
+              <p>One reviewer agent per persona checks audience fit.</p>
+            </div>
+            <div class="chev">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--brand-400)"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </div>
+            <!-- 4 -->
+            <div class="step">
+              <div class="row between items-c"><span class="num">4</span><span class="tag ai">AI</span></div>
+              <h3>Verify</h3>
+              <p>Deterministic + AI verifiers prove every claim.</p>
+            </div>
+            <div class="chev">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--brand-400)"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </div>
+            <!-- 5 -->
+            <div class="step">
+              <div class="row between items-c"><span class="num">5</span><span class="tag ai">AI</span></div>
+              <h3>Stay in sync</h3>
+              <p>Only affected pages regenerate; the GitHub Action opens a PR.</p>
+            </div>
+          </div>
+
+          <!-- retry loop: steps 3 & 4 feed back to step 2 -->
+          <svg width="1152" height="72" viewBox="0 0 1152 72" fill="none" style="display: block; margin-top: 2px">
+            <path
+              d="M812 4 V44 H340 V12"
+              stroke="var(--flag)"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M576 4 V44" stroke="var(--flag)" stroke-width="2" stroke-linecap="round" />
+            <path
+              d="M333 18 L340 8 L347 18"
+              stroke="var(--flag)"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              fill="none"
+            />
+            <rect x="398" y="33" width="124" height="22" rx="6" fill="var(--canvas)" />
+            <text
+              x="460"
+              y="48"
+              text-anchor="middle"
+              font-family="JetBrains Mono, monospace"
+              font-size="11.5"
+              font-weight="600"
+              fill="var(--flag)"
+            >
+              back to the writer
+            </text>
+          </svg>
+        </div>
+
+        <p
+          style="
+            text-align: center;
+            font-size: 14px;
+            color: var(--ink-soft);
+            margin-top: 14px;
+            max-width: 80ch;
+            align-self: center;
+            line-height: 1.5;
+          "
+        >
+          <span style="font-weight: 600; color: var(--ink)">A check fails?</span> Review and verify send the page back
+          to the writer, rewritten and re-checked, until it passes or gets flagged.
+        </p>
+      </div>
+
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">06 / 16</span>
+      </div>
     </div>
-
-    <p style="text-align:center;font-size:14px;color:var(--ink-soft);margin-top:14px;max-width:80ch;align-self:center;line-height:1.5">
-      <span style="font-weight:600;color:var(--ink)">A check fails?</span> Review and verify send the page back to the writer, rewritten and re-checked, until it passes or gets flagged.
-    </p>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">06 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

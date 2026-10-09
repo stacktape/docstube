@@ -1,80 +1,76 @@
 ---
-title: "Getting started"
-description: "Install docstube, open the setup wizard, and generate the first documentation site."
+title: 'Getting started'
+description: 'Install docstube, open the setup wizard, and generate the first verified docs site.'
 ---
 
 # Getting started
 
-The npm package is named `docstube` and exposes a `docstube` binary. For projects that already use Node tooling, the first-run path can be run through `npx`:
+Install docstube in the repository you want documented. <Claim id="c1">`docstube` is the npm package name.</Claim> <Claim id="c2">`docstube` is the CLI binary name.</Claim>
 
-```text
+```bash
+npm install --save-dev docstube
+npx docstube --version
+```
+
+For a standalone install, use the hosted installer scripts instead of adding the npm package. <Claim id="c3">`installs.docstube.dev` is the production install-scripts domain.</Claim>
+
+```bash
+curl -fsSL https://installs.docstube.dev/linux.sh | sh
+```
+
+```powershell
+iwr https://installs.docstube.dev/windows.ps1 -UseB | iex
+```
+
+## Open The Wizard
+
+Run docstube from the repository root.
+
+```bash
+npx docstube
+```
+
+You can also name the wizard command directly. <Claim id="c4">`docstube wizard` opens the local setup wizard and control plane.</Claim> <Claim id="c5">Bare `docstube` opens the local control plane.</Claim>
+
+```bash
 npx docstube wizard
-npx docstube generate
-npx docstube status
 ```
 
-For a standalone binary, use the install scripts hosted at `installs.docstube.dev`. The project README names `https://installs.docstube.dev/linux.sh` for Linux and `https://installs.docstube.dev/windows.ps1` for Windows. After installing the standalone binary, use the same commands without the `npx` prefix.
+On a new repository, the control plane starts in setup. <Claim id="c6">A repository without `docstube.yml` opens first-run setup.</Claim> During setup, choose the project type, personas, agent provider, information architecture, site settings, theme, and components.
 
-## Open the wizard
+## Start Generation
 
-`docstube wizard` starts the local control plane. The command accepts an optional port:
+The last setup screen has one happy-path action: <Claim id="c7">First-run setup writes `docstube.yml` and `ia.yml`.</Claim> <Claim id="c8">First-run setup starts a generate run.</Claim>
 
-```text
-npx docstube wizard --port 4317
-```
+After setup, you can run generation again from the terminal. <Claim id="c9">`docstube generate` generates docs from existing config.</Claim>
 
-When the server starts, the CLI prints:
-
-```text
-docstube control plane running at:
-
-  <local URL>
-
-Press Ctrl+C to stop.
-```
-
-Open the printed URL. The local UI includes a Wizard tab. On a first run, the wizard uses scaffold mode; its final step writes the config family and starts a `generate` run.
-
-## Generate the site
-
-If you start generation from the terminal, run:
-
-```text
+```bash
 npx docstube generate
 ```
 
-The `generate` command loads the config, creates the task runner from that config, and runs the documentation pipeline. During the run, it prints one line per generated page or translation, using `ok` for passed output and `FLAG` for output with open flags.
-
-The generated site is emitted to the configured `outDir`. The config schema defaults that directory to:
+The CLI reports each generated page, then prints where the site was published. <Claim id="c10">The config schema sets `outDir` to `docs-site` when `outDir` is omitted.</Claim>
 
 ```text
-docs-site/
+site published to docs-site/ -- build it with: npm install && npm run build
 ```
 
-After emission, the CLI prints the site directory and the build hint:
+## After The First Run
 
-```text
-site emitted to docs-site/ — build it with: npm install && npm run build
+The first successful publish leaves two important directories in the repository:
+
+- `docs-site/` contains the generated site. <Claim id="c11">`docstube generate` publishes the site to `outDir` when the run summary is published.</Claim>
+- `.docstube/manifest/` contains the committed manifest store. <Claim id="c12">`committedManifestDir` returns `.docstube/manifest` under the repository root.</Claim>
+
+Build the generated site when you are ready to inspect or deploy it.
+
+```bash
+cd docs-site
+npm install
+npm run build
 ```
 
-docstube also writes verified run state under:
+To serve the generated site locally through docstube, use preview. <Claim id="c13">`docstube preview` builds the generated docs site when it is stale and serves it locally.</Claim>
 
-```text
-.docstube/manifest/
-```
-
-That manifest directory contains `manifest.yml` and page shard files under `pages/<locale>/`.
-
-## Check the result
-
-Run status after the first generation:
-
-```text
-npx docstube status
-```
-
-When a manifest exists, `status` reports the docs version, locales, page count, each page guarantee state, and the open flag count. If no manifest exists yet, it prints:
-
-```text
-No manifest yet — run `docstube generate` first.
+```bash
+npx docstube preview
 ```

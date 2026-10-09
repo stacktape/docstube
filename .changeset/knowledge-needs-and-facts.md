@@ -13,7 +13,7 @@ by global text similarity. Four traced consequences, all fixed here:
   questions both survive; an unresolvable subject dedups only within its requesting page. Text
   similarity now only decides whether a rewording is the SAME gap about the SAME subject (ask
   once) or a different one (its own discriminated slot) — and never suppresses a need across
-  subjects. Cross-subject similarity is surfaced as a queue *suggestion*; merges are explicit.
+  subjects. Cross-subject similarity is surfaced as a queue _suggestion_; merges are explicit.
 - **A paraphrase of an answered question can no longer suppress a genuinely new question.**
 - **Answers are additive.** Re-answering supersedes: the previous fact is retained with its own
   author and timestamp, the new fact records `supersedes`, and answers carry real attribution

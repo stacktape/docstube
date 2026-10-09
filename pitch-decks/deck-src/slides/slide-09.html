@@ -1,110 +1,398 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
-<style>
-  .matrix thead th { font-size:14.5px; padding:13px 8px; }
-  .matrix tbody td { padding:13px 8px; font-size:13.5px; }
-  .matrix .cap { font-size:14px; }
-  .row-hi td { background:rgba(194,121,11,.055); }
-  .row-hi td.col-us { background:linear-gradient(180deg, rgba(0,151,161,.13), rgba(0,151,161,.10)); }
-  .row-hi .cap { color:var(--ink); font-weight:700; }
-</style>
-</head>
-<body>
-<div class="slide bg-grid">
-  <div class="hz">
-    <h1 class="head">The comparison.</h1>
-  </div>
-
-  <div class="body">
-    <div class="card flush" style="padding:4px 8px">
-      <table class="matrix">
-        <thead>
-          <tr>
-            <th class="cap" style="width:262px">Capability</th>
-            <th class="us col-us"><span class="row items-c center-x gap-2"><img src="../img/docstube-icon.svg" style="height:18px;width:18px">docstube</span></th>
-            <th>Mintlify</th><th>GitBook</th><th>DeepWiki</th><th>Dosu</th><th>DIY</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="row-hi">
-            <td class="cap">Deterministic verification</td>
-            <td class="col-us"><span class="mk y"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-          </tr>
-          <tr>
-            <td class="cap">AI-based verification</td>
-            <td class="col-us"><span class="mk y"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-          </tr>
-          <tr>
-            <td class="cap">Per-persona audience fit</td>
-            <td class="col-us"><span class="mk y"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><span style="color:var(--pass)"><svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-          </tr>
-          <tr>
-            <td class="cap">BYO AI · source stays local</td>
-            <td class="col-us"><span class="mk y"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><span style="color:var(--pass)"><svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-          </tr>
-          <tr>
-            <td class="cap">Updates efficiently</td>
-            <td class="col-us"><span class="mk y"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-          </tr>
-          <tr>
-            <td class="cap">Open-source</td>
-            <td class="col-us"><span class="mk y"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg></td>
-            <td><span style="color:var(--pass)"><svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- legend + punchline -->
-    <div class="row between items-c" style="margin-top:16px">
-      <div class="row gap-4 items-c" style="font-size:12px;color:var(--muted)">
-        <span class="row items-c gap-2"><span class="mk y" style="width:20px;height:20px"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> yes</span>
-        <span class="row items-c gap-2"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5"/><path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)"/></svg> partial</span>
-        <span class="row items-c gap-2"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round"/></svg> no</span>
-        <span class="dim" style="margin-left:8px">June 2026 competitive review · docstube cells are design targets (pre-product)</span>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+    <style>
+      .matrix thead th {
+        font-size: 14.5px;
+        padding: 13px 8px;
+      }
+      .matrix tbody td {
+        padding: 13px 8px;
+        font-size: 13.5px;
+      }
+      .matrix .cap {
+        font-size: 14px;
+      }
+      .row-hi td {
+        background: rgba(194, 121, 11, 0.055);
+      }
+      .row-hi td.col-us {
+        background: linear-gradient(180deg, rgba(0, 151, 161, 0.13), rgba(0, 151, 161, 0.1));
+      }
+      .row-hi .cap {
+        color: var(--ink);
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide bg-grid">
+      <div class="hz">
+        <h1 class="head">The comparison.</h1>
       </div>
-      <div class="row items-c gap-2" style="background:linear-gradient(90deg,#fff8ee,#fdfbf6);border:1px solid rgba(194,121,11,.28);border-radius:11px;padding:9px 15px">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 14V3a1 1 0 011-1h7l-1.5 3L11 8H4" stroke="var(--flag)" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        <span style="font-size:13px;color:var(--ink)">One row is blank for every shipping tool. <span class="sb">That empty row is what docstube owns.</span></span>
+
+      <div class="body">
+        <div class="card flush" style="padding: 4px 8px">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th class="cap" style="width: 262px">Capability</th>
+                <th class="us col-us">
+                  <span class="row items-c center-x gap-2"
+                    ><img src="../img/docstube-icon.svg" style="height: 18px; width: 18px" />docstube</span
+                  >
+                </th>
+                <th>Mintlify</th>
+                <th>GitBook</th>
+                <th>DeepWiki</th>
+                <th>Dosu</th>
+                <th>DIY</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="row-hi">
+                <td class="cap">Deterministic verification</td>
+                <td class="col-us">
+                  <span class="mk y"
+                    ><svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+              </tr>
+              <tr>
+                <td class="cap">AI-based verification</td>
+                <td class="col-us">
+                  <span class="mk y"
+                    ><svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+              </tr>
+              <tr>
+                <td class="cap">Per-persona audience fit</td>
+                <td class="col-us">
+                  <span class="mk y"
+                    ><svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <span style="color: var(--pass)"
+                    ><svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+              </tr>
+              <tr>
+                <td class="cap">BYO AI · source stays local</td>
+                <td class="col-us">
+                  <span class="mk y"
+                    ><svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <span style="color: var(--pass)"
+                    ><svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+              </tr>
+              <tr>
+                <td class="cap">Updates efficiently</td>
+                <td class="col-us">
+                  <span class="mk y"
+                    ><svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                    <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+              </tr>
+              <tr>
+                <td class="cap">Open-source</td>
+                <td class="col-us">
+                  <span class="mk y"
+                    ><svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                </td>
+                <td>
+                  <span style="color: var(--pass)"
+                    ><svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                      <path
+                        d="M2.5 6.2 5 8.7 9.5 3.5"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      /></svg
+                  ></span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- legend + punchline -->
+        <div class="row between items-c" style="margin-top: 16px">
+          <div class="row gap-4 items-c" style="font-size: 12px; color: var(--muted)">
+            <span class="row items-c gap-2"
+              ><span class="mk y" style="width: 20px; height: 20px"
+                ><svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M2.5 6.2 5 8.7 9.5 3.5"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /></svg
+              ></span>
+              yes</span
+            >
+            <span class="row items-c gap-2"
+              ><svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6.4" fill="none" stroke="var(--flag)" stroke-width="1.5" />
+                <path d="M8 1.6 A6.4 6.4 0 0 1 8 14.4 Z" fill="var(--flag)" />
+              </svg>
+              partial</span
+            >
+            <span class="row items-c gap-2"
+              ><svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M3 3l6 6M9 3l-6 6" stroke="var(--line-strong)" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+              no</span
+            >
+            <span class="dim" style="margin-left: 8px"
+              >June 2026 competitive review · docstube cells are design targets (pre-product)</span
+            >
+          </div>
+          <div
+            class="row items-c gap-2"
+            style="
+              background: linear-gradient(90deg, #fff8ee, #fdfbf6);
+              border: 1px solid rgba(194, 121, 11, 0.28);
+              border-radius: 11px;
+              padding: 9px 15px;
+            "
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M3 14V3a1 1 0 011-1h7l-1.5 3L11 8H4"
+                stroke="var(--flag)"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span style="font-size: 13px; color: var(--ink)"
+              >One row is blank for every shipping tool.
+              <span class="sb">That empty row is what docstube owns.</span></span
+            >
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">10 / 16</span>
       </div>
     </div>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">10 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

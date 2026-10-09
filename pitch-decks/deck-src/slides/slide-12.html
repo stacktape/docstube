@@ -1,80 +1,239 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
-<style>
-  .mech { flex:1; background:var(--paper); border:1px solid var(--line); border-radius:13px; box-shadow:var(--shadow-soft); padding:15px 16px; display:flex; flex-direction:column; gap:7px; }
-  .mech .ic2 { width:32px;height:32px;border-radius:9px;background:var(--brand-50);border:1px solid var(--brand-100);color:var(--brand-600);display:flex;align-items:center;justify-content:center }
-  .mech h4 { font-family:var(--display); font-weight:600; font-size:14.5px; color:var(--ink); line-height:1.2; }
-  .mech p { font-size:11.5px; color:var(--muted); line-height:1.45; }
-  .drow { display:flex; align-items:center; gap:10px; padding:7px 0; }
-  .drow + .drow { border-top:1px solid var(--line); }
-  .drow .d { width:7px;height:7px;border-radius:999px;flex:none }
-</style>
-</head>
-<body>
-<div class="slide bg-grid">
-  <div class="hz">
-    <h1 class="head">Open source is great for <span class="accent">distribution.</span></h1>
-  </div>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+    <style>
+      .mech {
+        flex: 1;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        box-shadow: var(--shadow-soft);
+        padding: 15px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+      .mech .ic2 {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: var(--brand-50);
+        border: 1px solid var(--brand-100);
+        color: var(--brand-600);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .mech h4 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 14.5px;
+        color: var(--ink);
+        line-height: 1.2;
+      }
+      .mech p {
+        font-size: 11.5px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .drow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+      }
+      .drow + .drow {
+        border-top: 1px solid var(--line);
+      }
+      .drow .d {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        flex: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide bg-grid">
+      <div class="hz">
+        <h1 class="head">Open source is great for <span class="accent">distribution.</span></h1>
+      </div>
 
-  <div class="body">
-    <div class="mono" style="font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:11px">Why open-source spreads on its own</div>
+      <div class="body">
+        <div
+          class="mono"
+          style="
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 11px;
+          "
+        >
+          Why open-source spreads on its own
+        </div>
 
-    <div class="row gap-3">
-      <div class="mech">
-        <span class="ic2"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5M21 7h-5"/></svg></span>
-        <h4>Free channels reward it</h4>
-        <p>GitHub trending and stars, Hacker News, Reddit, dev newsletters feature open-source for free. Paid SaaS has to buy its way in.</p>
+        <div class="row gap-3">
+          <div class="mech">
+            <span class="ic2"
+              ><svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 17l6-6 4 4 8-8" />
+                <path d="M21 7v5M21 7h-5" /></svg
+            ></span>
+            <h4>Free channels reward it</h4>
+            <p>
+              GitHub trending and stars, Hacker News, Reddit, dev newsletters feature open-source for free. Paid SaaS
+              has to buy its way in.
+            </p>
+          </div>
+          <div class="mech">
+            <span class="ic2"
+              ><svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg
+            ></span>
+            <h4>Instant time to value</h4>
+            <p>Free, MIT, runs locally. A developer goes from seeing it to running it on their repo in minutes.</p>
+          </div>
+          <div class="mech">
+            <span class="ic2"
+              ><svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="4" y="11" width="16" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 0 1 7.9-1" /></svg
+            ></span>
+            <h4>No barriers to entry</h4>
+            <p>No procurement, no security review, no budget sign-off. A developer just installs it.</p>
+          </div>
+          <div class="mech">
+            <span class="ic2"
+              ><svg
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.9"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="18" cy="5" r="2.5" />
+                <circle cx="6" cy="12" r="2.5" />
+                <circle cx="18" cy="19" r="2.5" />
+                <path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" /></svg
+            ></span>
+            <h4>Developers trust and share it</h4>
+            <p>People recommend open tools freely. Some become contributors: free work, free word of mouth.</p>
+          </div>
+        </div>
+
+        <p style="font-size: 13px; color: var(--ink-soft); margin-top: 12px">
+          So we don't need a big marketing team or budget to get started.
+        </p>
+
+        <!-- first growth play: the drift report -->
+        <div
+          class="row gap-6 items-c mt-auto"
+          style="
+            margin-top: 18px;
+            background: linear-gradient(100deg, #f4fbf9, #ecfbf9);
+            border: 1px solid var(--brand-200);
+            border-radius: 16px;
+            padding: 20px 24px;
+          "
+        >
+          <div class="col" style="flex: 1; gap: 9px">
+            <span class="eyebrow" style="font-size: 12.5px">First growth play</span>
+            <h3 style="font-family: var(--display); font-weight: 700; font-size: 19px; color: var(--ink)">
+              The drift report
+            </h3>
+            <p style="font-size: 13px; color: var(--ink-soft); line-height: 1.55">
+              The first thing we'll run: point docstube at well-known open-source projects and publish what it finds.
+              "Your docs disagree with your code in N places." It is useful, it is easy to share, and it shows the
+              product working on code people already know. Then we offer to fix and host those docs for free.
+            </p>
+          </div>
+
+          <!-- mock report -->
+          <div class="card flush" style="width: 396px; flex: none">
+            <div class="win-bar" style="padding: 10px 14px">
+              <span class="win-dots"><i></i><i></i><i></i></span>
+              <span class="win-title" style="font-size: 12px"
+                ><span class="ink sb">drift report</span> · popular-oss</span
+              >
+              <span
+                class="pill danger"
+                style="margin-left: auto; font-size: 11.5px; padding: 4px 10px; white-space: nowrap"
+                ><span class="dot"></span> 34 issues</span
+              >
+            </div>
+            <div style="padding: 6px 16px 8px">
+              <div class="drow">
+                <span class="d" style="background: var(--flag)"></span
+                ><code class="mono" style="font-size: 12.5px; color: var(--ink)">getUser(id)</code
+                ><span style="margin-left: auto; font-size: 12px; color: var(--muted)"
+                  >signature changed → 2 pages</span
+                >
+              </div>
+              <div class="drow">
+                <span class="d" style="background: var(--flag)"></span
+                ><code class="mono" style="font-size: 12.5px; color: var(--ink)">POST /v2/sessions</code
+                ><span style="margin-left: auto; font-size: 12px; color: var(--muted)">endpoint removed → 1 page</span>
+              </div>
+              <div class="drow">
+                <span class="d" style="background: var(--brand-400)"></span
+                ><code class="mono" style="font-size: 12.5px; color: var(--ink)">useFlags()</code
+                ><span style="margin-left: auto; font-size: 12px; color: var(--muted)">new export, undocumented</span>
+              </div>
+            </div>
+            <div
+              style="
+                padding: 9px 16px;
+                border-top: 1px solid var(--line);
+                background: var(--canvas);
+                font-size: 12px;
+                color: var(--brand-700);
+              "
+            >
+              want us to fix them all, free?
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="mech">
-        <span class="ic2"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
-        <h4>Instant time to value</h4>
-        <p>Free, MIT, runs locally. A developer goes from seeing it to running it on their repo in minutes.</p>
-      </div>
-      <div class="mech">
-        <span class="ic2"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-1"/></svg></span>
-        <h4>No barriers to entry</h4>
-        <p>No procurement, no security review, no budget sign-off. A developer just installs it.</p>
-      </div>
-      <div class="mech">
-        <span class="ic2"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg></span>
-        <h4>Developers trust and share it</h4>
-        <p>People recommend open tools freely. Some become contributors: free work, free word of mouth.</p>
+
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">12 / 16</span>
       </div>
     </div>
-
-    <p style="font-size:13px;color:var(--ink-soft);margin-top:12px">So we don't need a big marketing team or budget to get started.</p>
-
-    <!-- first growth play: the drift report -->
-    <div class="row gap-6 items-c mt-auto" style="margin-top:18px;background:linear-gradient(100deg,#f4fbf9,#ecfbf9);border:1px solid var(--brand-200);border-radius:16px;padding:20px 24px">
-      <div class="col" style="flex:1;gap:9px">
-        <span class="eyebrow" style="font-size:12.5px">First growth play</span>
-        <h3 style="font-family:var(--display);font-weight:700;font-size:19px;color:var(--ink)">The drift report</h3>
-        <p style="font-size:13px;color:var(--ink-soft);line-height:1.55">The first thing we'll run: point docstube at well-known open-source projects and publish what it finds. "Your docs disagree with your code in N places." It is useful, it is easy to share, and it shows the product working on code people already know. Then we offer to fix and host those docs for free.</p>
-      </div>
-
-      <!-- mock report -->
-      <div class="card flush" style="width:396px;flex:none">
-        <div class="win-bar" style="padding:10px 14px">
-          <span class="win-dots"><i></i><i></i><i></i></span>
-          <span class="win-title" style="font-size:12px"><span class="ink sb">drift report</span> · popular-oss</span>
-          <span class="pill danger" style="margin-left:auto;font-size:11.5px;padding:4px 10px;white-space:nowrap"><span class="dot"></span> 34 issues</span>
-        </div>
-        <div style="padding:6px 16px 8px">
-          <div class="drow"><span class="d" style="background:var(--flag)"></span><code class="mono" style="font-size:12.5px;color:var(--ink)">getUser(id)</code><span style="margin-left:auto;font-size:12px;color:var(--muted)">signature changed → 2 pages</span></div>
-          <div class="drow"><span class="d" style="background:var(--flag)"></span><code class="mono" style="font-size:12.5px;color:var(--ink)">POST /v2/sessions</code><span style="margin-left:auto;font-size:12px;color:var(--muted)">endpoint removed → 1 page</span></div>
-          <div class="drow"><span class="d" style="background:var(--brand-400)"></span><code class="mono" style="font-size:12.5px;color:var(--ink)">useFlags()</code><span style="margin-left:auto;font-size:12px;color:var(--muted)">new export, undocumented</span></div>
-        </div>
-        <div style="padding:9px 16px;border-top:1px solid var(--line);background:var(--canvas);font-size:12px;color:var(--brand-700)">want us to fix them all, free?</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">12 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

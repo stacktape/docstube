@@ -1,11 +1,13 @@
 ---
 // docstube brand theme layout: header chrome with centered search + theme rail, three-pane shell
 // (sidebar / content / bent-rail TOC) per knowledge/design/theme-spec-docstube.md. Kernel proof
-// primitives (src/docstube/**) are mandatory mounts: the guarantee badge, section chips, sources
-// footer, entity wrapper, and Pagefind search are a conformance contract, not a theme choice.
+// primitives (src/docstube/**) are mandatory mounts: the literal claims chip, contradiction
+// warning, section chips, sources footer, entity wrapper, and Pagefind search are a conformance
+// contract, not a theme choice.
 import '../styles/global.css';
+import DocstubeClaims from '../docstube/DocstubeClaims.astro';
+import DocstubeContradictions from '../docstube/DocstubeContradictions.astro';
 import DocstubeEntity from '../docstube/DocstubeEntity.astro';
-import DocstubeGuarantee from '../docstube/DocstubeGuarantee.astro';
 import DocstubeSearch from '../docstube/DocstubeSearch.astro';
 import DocstubeSectionChips from '../docstube/DocstubeSectionChips.astro';
 import DocstubeSources from '../docstube/DocstubeSources.astro';
@@ -25,8 +27,29 @@ const { frontmatter } = Astro.props;
 const title = frontmatter.title ? `${frontmatter.title} | ${siteTitle}` : siteTitle;
 const description = frontmatter.description || siteDescription;
 const canonicalUrl = siteUrl ? new URL(Astro.url.pathname, siteUrl).href : undefined;
-const guarantee = frontmatter.docstubeGuarantee;
-const guaranteeTitle = `${frontmatter.docstubeBlocksProven ?? 0} of ${frontmatter.docstubeBlocksTotal ?? 0} blocks proven`;
+const claimsChecked = frontmatter.docstubeClaimsChecked ?? 0;
+const claimsTotal = frontmatter.docstubeClaimsTotal ?? 0;
+const claimsContradicted = frontmatter.docstubeClaimsContradicted ?? 0;
+// Coverage lint (PRODUCT §1.2, no hidden denominator): assertion-shaped prose no <Claim> marker
+// covers. The complete state is gated on it, so unmarked facts never read as a fully checked page.
+// What the complete state MEANS, precisely: every claim in this page's ledger is checked and no
+// unmarked assertion was detected. It does not mean the page contains no unverified statement —
+// the detector is a deterministic floor, and semantic assertion-coverage belongs to the risk critic
+// (harness-state-v2 decision 4). The chip states exactly this in its own popover text.
+const uncoveredAssertions = frontmatter.docstubeUncoveredAssertions ?? 0;
+const claimsComplete = frontmatter.docstubeClaimsComplete === true;
+const contradictedClaims = frontmatter.docstubeContradictedClaims ?? [];
+const uncheckedClaims = frontmatter.docstubeUncheckedClaims ?? [];
+const reviewedFor = frontmatter.docstubeReviewedFor;
+const unverifiedPage = frontmatter.docstubeUnverified === true;
+const sourceFallback = frontmatter.docstubeSourceFallback === true;
+// DIRTY WORKING TREE (PRODUCT §1.2): the run read uncommitted bytes, so the page shows its true
+// counts plus an explicit note and never the complete state, and the sources footer withholds the
+// commit HEAD cannot vouch for.
+const dirtyWorkingTree = frontmatter.docstubeDirtyWorkingTree === true;
+// Translation assurance (i18n-lifecycle-v2 decision 3): a SECOND proof dimension, rendered as its
+// own line beside the correctness counts — never collapsed into them.
+const translationAssurance = frontmatter.docstubeTranslationAssurance;
 const locale = frontmatter.docstubeLocale ?? sourceLocale;
 const alternates = frontmatter.docstubeAlternates ?? [];
 const sourceAlternate = alternates.find((alternate) => alternate.locale === sourceLocale);
@@ -158,12 +181,13 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
         <div class="dt-article">
           <div class="dt-page-meta">
             {breadcrumb ? <p class="dt-breadcrumb">{breadcrumb}</p> : null}
-            {guarantee ? <DocstubeGuarantee guarantee={guarantee} title={guaranteeTitle} /> : null}
+            <DocstubeClaims checked={claimsChecked} total={claimsTotal} contradicted={claimsContradicted} uncovered={uncoveredAssertions} complete={claimsComplete} reviewedFor={reviewedFor} unverifiedPage={unverifiedPage} sourceFallback={sourceFallback} dirtyWorkingTree={dirtyWorkingTree} translationAssurance={translationAssurance} />
           </div>
-          <DocstubeEntity entityId={frontmatter.docstubePageId} guarantee={guarantee}>
+          <DocstubeContradictions contradicted={claimsContradicted} markers={contradictedClaims} uncheckedMarkers={uncheckedClaims} />
+          <DocstubeEntity entityId={frontmatter.docstubePageId}>
             <slot />
           </DocstubeEntity>
-          <DocstubeSources sources={sources} repoUrl={repoUrl} />
+          <DocstubeSources sources={sources} repoUrl={repoUrl} dirtyWorkingTree={dirtyWorkingTree} />
           {footerCredit ? (
             <footer class="dt-footer">Docs by <a href="https://docstube.dev">docstube</a></footer>
           ) : null}
@@ -493,7 +517,7 @@ const breadcrumb = [currentGroup?.label, frontmatter.title].filter(Boolean).join
             link.style.paddingLeft = `${xs[index] + 18}px`;
             link.href = `#${heading.id}`;
             const clone = heading.cloneNode(true);
-            for (const chip of clone.querySelectorAll('.dt-guarantee')) chip.remove();
+            for (const chip of clone.querySelectorAll('.dt-section-chip')) chip.remove();
             link.textContent = (clone.textContent || '').trim();
             link.dataset.index = String(index);
             tocBody.append(link);

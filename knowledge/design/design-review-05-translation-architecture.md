@@ -2,13 +2,13 @@
 
 Verdict: do not harden `translateArtifact` as the long-term architecture. Replace it with a derived-localization subsystem whose cache unit is a translatable block field, whose normal model-call unit is a page-locale batch, and whose assurance/publication unit is the complete page-locale.
 
-| Concern | Correct unit |
-|---|---|
-| Factual truth and claim checking | Canonical source claim |
-| Translation cache and invalidation | Block-derived translatable field |
-| Translation model request | Changed fields batched per page-locale |
-| Fidelity review and publication | Complete page-locale revision |
-| Links, routes, and locale coverage | Version-locale site graph |
+| Concern                            | Correct unit                           |
+| ---------------------------------- | -------------------------------------- |
+| Factual truth and claim checking   | Canonical source claim                 |
+| Translation cache and invalidation | Block-derived translatable field       |
+| Translation model request          | Changed fields batched per page-locale |
+| Fidelity review and publication    | Complete page-locale revision          |
+| Links, routes, and locale coverage | Version-locale site graph              |
 
 Target flow:
 
@@ -233,13 +233,13 @@ Now, this is a moderate publication-state and route-resolver change. After relea
 
 Assume `P` source pages and `L` target locales.
 
-| Situation | Translation calls | Fidelity calls | Total per page-locale |
-|---|---:|---:|---:|
-| Initial generation | 1 | 1 | 2 |
-| Unchanged refresh | 0 | 0 | 0 |
-| Refresh with one or more changed translatable units | 1 batched call | 1 | 2 |
-| One failed fidelity correction cycle | +1 | +1 | 4 maximum |
-| New-locale backfill | 1 | 1 | 2 |
+| Situation                                           | Translation calls | Fidelity calls | Total per page-locale |
+| --------------------------------------------------- | ----------------: | -------------: | --------------------: |
+| Initial generation                                  |                 1 |              1 |                     2 |
+| Unchanged refresh                                   |                 0 |              0 |                     0 |
+| Refresh with one or more changed translatable units |    1 batched call |              1 |                     2 |
+| One failed fidelity correction cycle                |                +1 |             +1 |             4 maximum |
+| New-locale backfill                                 |                 1 |              1 |                     2 |
 
 Terminology bootstrap adds two one-time calls per new locale—one generation and one review—not two calls per page.
 

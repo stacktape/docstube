@@ -1,68 +1,216 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css">
-<style>
-  .wcard { flex:1; display:flex; flex-direction:column; padding:26px 28px; }
-  .wcard.pri { border:2px solid var(--brand-400); box-shadow:var(--shadow-lift); }
-  .alabel { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:.02em; }
-  .wic { width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--brand-50);border:1px solid var(--brand-100);color:var(--brand-600) }
-  .wcard.pri .wic { background:var(--brand-500); color:#fff; border-color:var(--brand-500); }
-  .wcard h3 { font-family:var(--display); font-weight:600; font-size:20px; color:var(--ink); }
-  .lead { font-weight:600; font-size:15px; color:var(--ink); margin-top:14px; line-height:1.42; }
-  .wdiv { height:1px; background:var(--line); margin:16px 0 15px; }
-  .wcard .check { font-size:13.5px; }
-  .wcard .check + .check { margin-top:12px; }
-</style>
-</head>
-<body>
-<div class="slide bg-grid">
-  <div class="hz">
-    <h1 class="head">Win adoption. <span class="accent">Unblock your team.</span></h1>
-  </div>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+    <style>
+      .wcard {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 26px 28px;
+      }
+      .wcard.pri {
+        border: 2px solid var(--brand-400);
+        box-shadow: var(--shadow-lift);
+      }
+      .alabel {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .wic {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: none;
+        background: var(--brand-50);
+        border: 1px solid var(--brand-100);
+        color: var(--brand-600);
+      }
+      .wcard.pri .wic {
+        background: var(--brand-500);
+        color: #fff;
+        border-color: var(--brand-500);
+      }
+      .wcard h3 {
+        font-family: var(--display);
+        font-weight: 600;
+        font-size: 20px;
+        color: var(--ink);
+      }
+      .lead {
+        font-weight: 600;
+        font-size: 15px;
+        color: var(--ink);
+        margin-top: 14px;
+        line-height: 1.42;
+      }
+      .wdiv {
+        height: 1px;
+        background: var(--line);
+        margin: 16px 0 15px;
+      }
+      .wcard .check {
+        font-size: 13.5px;
+      }
+      .wcard .check + .check {
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="slide bg-grid">
+      <div class="hz">
+        <h1 class="head">Win adoption. <span class="accent">Unblock your team.</span></h1>
+      </div>
 
-  <div class="body">
-    <div class="grow" style="display:flex;align-items:center">
-      <div class="row gap-5" style="align-items:stretch;width:100%">
+      <div class="body">
+        <div class="grow" style="display: flex; align-items: center">
+          <div class="row gap-5" style="align-items: stretch; width: 100%">
+            <!-- Left: public docs -->
+            <div class="card wcard">
+              <div class="alabel">Open-source maintainers · API companies</div>
+              <div class="row items-c gap-3" style="margin-top: 15px">
+                <span class="wic"
+                  ><svg
+                    width="21"
+                    height="21"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M3 12h18" />
+                    <path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z" /></svg
+                ></span>
+                <h3>Public docs</h3>
+              </div>
+              <p class="lead">Your docs are your funnel. Good ones win users, bad ones lose them.</p>
+              <div class="wdiv"></div>
+              <div class="check">
+                <span class="ic pass"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                You write nothing. It's all generated from your code.
+              </div>
+              <div class="check">
+                <span class="ic pass"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                Built-in AI answers, so users find what they need fast.
+              </div>
+              <div class="check">
+                <span class="ic pass"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                Free, open-source, yours to host.
+              </div>
+            </div>
 
-        <!-- Left: public docs -->
-        <div class="card wcard">
-          <div class="alabel">Open-source maintainers · API companies</div>
-          <div class="row items-c gap-3" style="margin-top:15px">
-            <span class="wic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg></span>
-            <h3>Public docs</h3>
+            <!-- Right: internal wikis (priority) -->
+            <div class="card wcard pri">
+              <div class="alabel">Engineering teams</div>
+              <div class="row items-c gap-3" style="margin-top: 15px">
+                <span class="wic"
+                  ><svg
+                    width="21"
+                    height="21"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="4" y="11" width="16" height="10" rx="2" />
+                    <path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg
+                ></span>
+                <h3>Internal wikis</h3>
+              </div>
+              <p class="lead">The wiki people finally trust, because it can't be silently wrong.</p>
+              <div class="wdiv"></div>
+              <div class="check">
+                <span class="ic pass"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                New hires ramp in days, not weeks.
+              </div>
+              <div class="check">
+                <span class="ic pass"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                Engineers self-serve instead of pinging the one person who knows.
+              </div>
+              <div class="check">
+                <span class="ic pass"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                Runs on your own AI. Your code stays local.
+              </div>
+            </div>
           </div>
-          <p class="lead">Your docs are your funnel. Good ones win users, bad ones lose them.</p>
-          <div class="wdiv"></div>
-          <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> You write nothing. It's all generated from your code.</div>
-          <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Built-in AI answers, so users find what they need fast.</div>
-          <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Free, open-source, yours to host.</div>
         </div>
 
-        <!-- Right: internal wikis (priority) -->
-        <div class="card wcard pri">
-          <div class="alabel">Engineering teams</div>
-          <div class="row items-c gap-3" style="margin-top:15px">
-            <span class="wic"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
-            <h3>Internal wikis</h3>
-          </div>
-          <p class="lead">The wiki people finally trust, because it can't be silently wrong.</p>
-          <div class="wdiv"></div>
-          <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> New hires ramp in days, not weeks.</div>
-          <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Engineers self-serve instead of pinging the one person who knows.</div>
-          <div class="check"><span class="ic pass"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Runs on your own AI. Your code stays local.</div>
-        </div>
+        <p style="text-align: center; font-size: 14px; color: var(--muted); margin-top: 18px">
+          Public docs earn attention. Internal wikis earn the revenue.
+        </p>
+      </div>
 
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">09 / 16</span>
       </div>
     </div>
-
-    <p style="text-align:center;font-size:14px;color:var(--muted);margin-top:18px">Public docs earn attention. Internal wikis earn the revenue.</p>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">09 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

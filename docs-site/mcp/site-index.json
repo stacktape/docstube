@@ -7,37 +7,37 @@
       "title": "CLI reference",
       "slug": "cli-reference",
       "url": "/cli-reference/",
-      "description": "Command reference for the docstube CLI."
+      "description": "Command syntax and flags for the docstube CLI."
     },
     {
       "title": "Configuration",
       "slug": "configuration",
       "url": "/configuration/",
-      "description": "Configure the docstube config family, agents, versions, locales, components, plugins, and comment-preserving edits."
+      "description": "Configure docstube.yml, ia.yml, glossary.yaml, agents, locales, components, and plugins."
     },
     {
       "title": "Getting started",
       "slug": "getting-started",
       "url": "/getting-started/",
-      "description": "Install docstube, open the setup wizard, and generate the first documentation site."
+      "description": "Install docstube, open the setup wizard, and generate the first verified docs site."
     },
     {
       "title": "CI and the GitHub Action",
       "slug": "github-action",
       "url": "/github-action/",
-      "description": "Run docstube in GitHub Actions, open verified documentation PRs, deliver flags, and gate auto-merge from the committed manifest."
+      "description": "How the docstube GitHub Action runs generation, reports verified changes, and gates auto-merge."
     },
     {
       "title": "How verification works",
       "slug": "how-verification-works",
       "url": "/how-verification-works/",
-      "description": "How docstube assigns proof levels, runs built-in verifiers, grounds claims, and ships visible flags instead of silent errors."
+      "description": "How docstube turns writer claims into anchored, checked, unchecked, or contradicted documentation states."
     },
     {
       "title": "Writing plugins",
       "slug": "writing-plugins",
       "url": "/writing-plugins/",
-      "description": "Build docstube plugins with @docstube/plugin-sdk, registration hooks, permissions, plugin loading, and the plugin-authoring scaffold."
+      "description": "Create and load docstube plugins with @docstube/plugin-sdk."
     }
   ]
 }

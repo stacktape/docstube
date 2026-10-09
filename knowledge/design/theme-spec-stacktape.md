@@ -14,65 +14,65 @@ A fundamental constraint: **the site is dark-only**. There is no light token set
 
 These are registered in `docs/src/styles/global.css` under Tailwind 4’s `@theme`.
 
-| Token | Exact value | Typical use |
-|---|---:|---|
-| `--color-brand` | `rgb(54 190 190)` / `#36BEBE` | Main accent, page-title border |
-| `--color-primary` | `rgb(17 105 105)` / `#116969` | Selected/search states |
-| `--color-primary-lighter` | `rgb(34 166 166)` / `#22A6A6` | Link hover |
-| `--color-secondary` | `rgb(34 87 122)` / `#22577A` | Secondary actions |
-| `--color-bg` | `rgb(28 33 33)` / `#1C2121` | Header, tooltip surface |
-| `--color-page` | `rgb(22 28 28)` / `#161C1C` | Page background |
-| `--color-element` | `rgb(34 40 40)` / `#222828` | Cards, code blocks, result hits |
-| `--color-modal` | `rgb(30 35 35)` / `#1E2323` | Modal surface |
-| `--color-darker` | `rgb(22 27 27)` / `#161B1B` | Dark inset/key surface |
-| `--color-input` | `rgb(20 26 26)` / `#141A1A` | Search/input surfaces |
-| `--color-input-hover` | `rgb(25 31 31)` / `#191F1F` | Input hover |
-| `--color-hover` | `rgb(35 40 40)` / `#232828` | Generic hover surface |
-| `--color-border` | `rgb(8 13 13)` / `#080D0D` | Strong/dark border |
-| `--color-border-light` | `rgb(47 52 52)` / `#2F3434` | Sidebar/TOC rails |
-| `--color-fc-primary` | `rgba(255,255,255,0.87)` | Main text |
-| `--color-fc-secondary` | `rgba(10,187,181,1)` / `#0ABBB5` | Teal text |
-| `--color-fc-light` | `rgb(140 140 140)` / `#8C8C8C` | Muted text/scrollbar |
-| `--color-fc-lighter` | `rgb(160 160 160)` / `#A0A0A0` | Navigation/secondary text |
-| `--color-fc-ternary` | `#848484` | Captions |
-| `--color-fc-headline` | `#CECECE` | Headline text |
-| `--color-light-gray` | `#A6A5A5` | List markers/subgroup labels |
-| `--color-gray` | `#9A9A9A` | General gray |
-| `--color-dark-grey` | `#2D2D2D` | Scrollbar hover |
-| `--color-error` | `#EB6161` | Error states |
-| `--color-success` | `rgb(24 153 144)` / `#189990` | Success/tip |
-| `--color-aws-compute` | `rgb(237 113 0)` / `#ED7100` | AWS compute icons |
-| `--color-aws-database` | `#4D73F4` | AWS database icons |
-| `--color-aws-integration` | `#F64683` | AWS integration icons |
-| `--color-aws-security` | `#F34446` | AWS security icons |
-| `--color-aws-storage` | `#5CA034` | AWS storage icons |
-| `--color-aws-network` | `#8E58EB` | AWS network icons |
+| Token                     |                      Exact value | Typical use                     |
+| ------------------------- | -------------------------------: | ------------------------------- |
+| `--color-brand`           |    `rgb(54 190 190)` / `#36BEBE` | Main accent, page-title border  |
+| `--color-primary`         |    `rgb(17 105 105)` / `#116969` | Selected/search states          |
+| `--color-primary-lighter` |    `rgb(34 166 166)` / `#22A6A6` | Link hover                      |
+| `--color-secondary`       |     `rgb(34 87 122)` / `#22577A` | Secondary actions               |
+| `--color-bg`              |      `rgb(28 33 33)` / `#1C2121` | Header, tooltip surface         |
+| `--color-page`            |      `rgb(22 28 28)` / `#161C1C` | Page background                 |
+| `--color-element`         |      `rgb(34 40 40)` / `#222828` | Cards, code blocks, result hits |
+| `--color-modal`           |      `rgb(30 35 35)` / `#1E2323` | Modal surface                   |
+| `--color-darker`          |      `rgb(22 27 27)` / `#161B1B` | Dark inset/key surface          |
+| `--color-input`           |      `rgb(20 26 26)` / `#141A1A` | Search/input surfaces           |
+| `--color-input-hover`     |      `rgb(25 31 31)` / `#191F1F` | Input hover                     |
+| `--color-hover`           |      `rgb(35 40 40)` / `#232828` | Generic hover surface           |
+| `--color-border`          |       `rgb(8 13 13)` / `#080D0D` | Strong/dark border              |
+| `--color-border-light`    |      `rgb(47 52 52)` / `#2F3434` | Sidebar/TOC rails               |
+| `--color-fc-primary`      |         `rgba(255,255,255,0.87)` | Main text                       |
+| `--color-fc-secondary`    | `rgba(10,187,181,1)` / `#0ABBB5` | Teal text                       |
+| `--color-fc-light`        |   `rgb(140 140 140)` / `#8C8C8C` | Muted text/scrollbar            |
+| `--color-fc-lighter`      |   `rgb(160 160 160)` / `#A0A0A0` | Navigation/secondary text       |
+| `--color-fc-ternary`      |                        `#848484` | Captions                        |
+| `--color-fc-headline`     |                        `#CECECE` | Headline text                   |
+| `--color-light-gray`      |                        `#A6A5A5` | List markers/subgroup labels    |
+| `--color-gray`            |                        `#9A9A9A` | General gray                    |
+| `--color-dark-grey`       |                        `#2D2D2D` | Scrollbar hover                 |
+| `--color-error`           |                        `#EB6161` | Error states                    |
+| `--color-success`         |    `rgb(24 153 144)` / `#189990` | Success/tip                     |
+| `--color-aws-compute`     |     `rgb(237 113 0)` / `#ED7100` | AWS compute icons               |
+| `--color-aws-database`    |                        `#4D73F4` | AWS database icons              |
+| `--color-aws-integration` |                        `#F64683` | AWS integration icons           |
+| `--color-aws-security`    |                        `#F34446` | AWS security icons              |
+| `--color-aws-storage`     |                        `#5CA034` | AWS storage icons               |
+| `--color-aws-network`     |                        `#8E58EB` | AWS network icons               |
 
 Additional exact colors in `variables.ts`:
 
-| Role | Value |
-|---|---:|
-| Navigation hover text | `rgba(255,255,255,0.75)` |
-| Disabled primary | `rgb(21,114,120)` |
-| Primary button border | `#40958E` |
-| Secondary button border | `rgb(69,151,203)` |
-| Highlighted legacy code line | `rgb(53,59,69)` |
-| Sidebar list hover | `rgb(45,50,50)` |
-| Dark gray hover | `rgb(27,32,32)` |
-| VS Code blue | `#569CD6` |
-| VS Code lighter blue | `rgb(102 160 208)` |
-| VS Code orange | `#CE9178` |
-| VS Code light gray | `#D4D4D4` |
-| VS Code number green | `#B5CEA8` |
-| VS Code comment green | `#608B4E` |
-| VS Code background | `#1E1E1E` |
-| Orange | `#ED8B00` |
-| Orange-light | `#FBE9D0` |
-| Green | `#00965E` |
-| Green-light | `#D0EBE1` |
-| Blue | `#0066CC` |
-| White | `#FFFFFF` |
-| Black | `#000000` |
+| Role                         |                    Value |
+| ---------------------------- | -----------------------: |
+| Navigation hover text        | `rgba(255,255,255,0.75)` |
+| Disabled primary             |        `rgb(21,114,120)` |
+| Primary button border        |                `#40958E` |
+| Secondary button border      |        `rgb(69,151,203)` |
+| Highlighted legacy code line |          `rgb(53,59,69)` |
+| Sidebar list hover           |          `rgb(45,50,50)` |
+| Dark gray hover              |          `rgb(27,32,32)` |
+| VS Code blue                 |                `#569CD6` |
+| VS Code lighter blue         |       `rgb(102 160 208)` |
+| VS Code orange               |                `#CE9178` |
+| VS Code light gray           |                `#D4D4D4` |
+| VS Code number green         |                `#B5CEA8` |
+| VS Code comment green        |                `#608B4E` |
+| VS Code background           |                `#1E1E1E` |
+| Orange                       |                `#ED8B00` |
+| Orange-light                 |                `#FBE9D0` |
+| Green                        |                `#00965E` |
+| Green-light                  |                `#D0EBE1` |
+| Blue                         |                `#0066CC` |
+| White                        |                `#FFFFFF` |
+| Black                        |                `#000000` |
 
 No OKLCH values are used by the authored theme.
 
@@ -86,15 +86,15 @@ background-image:
     0deg,
     transparent,
     transparent 2px,
-    rgba(54,190,190,0.02) 3px,
-    rgba(54,190,190,0.02) 5px
+    rgba(54, 190, 190, 0.02) 3px,
+    rgba(54, 190, 190, 0.02) 5px
   ),
   repeating-linear-gradient(
     90deg,
     transparent,
     transparent 2px,
-    rgba(54,190,190,0.02) 3px,
-    rgba(54,190,190,0.02) 5px
+    rgba(54, 190, 190, 0.02) 3px,
+    rgba(54, 190, 190, 0.02) 5px
   );
 background-attachment: fixed;
 background-repeat: repeat;
@@ -102,9 +102,9 @@ background-repeat: repeat;
 
 ### 1.3 Fonts
 
-| Role | Stack |
-|---|---|
-| Sans | `Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif` |
+| Role | Stack                                                                     |
+| ---- | ------------------------------------------------------------------------- |
+| Sans | `Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`        |
 | Mono | `"Geist Mono", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif` |
 
 Weights loaded and used: `400`, `500`, `600`, `700`. A few landing components request nonstandard numeric weights such as `650`, `720`, and `750`; browsers interpolate them if a variable font is delivered, otherwise synthesize/map them.
@@ -121,38 +121,38 @@ The source stub is `docs/src/styles/fonts.ts`; font loading is in `docs/src/layo
 
 Root browser font size is not overridden, so `1rem = 16px`.
 
-| Role | Desktop | Small-screen behavior |
-|---|---|---|
-| Global prose/body | `0.925rem` = `14.8px`; weight `500`; line-height `1.9` | At `≤750px`: `0.85rem` = `13.6px` |
-| Page title | `26px`, weight `500`, line-height `1.5` | At `≤795px`: `24px` |
-| MDX `h1` | `28px`, weight `700`, line-height `1.4` | At `≤795px`: `25px` |
-| MDX `h2` | `24.5px`, weight `700`, line-height `1.4` | At `≤795px`: `20px` |
-| MDX `h3` | `20px`, weight `600`, line-height `1.4` | unchanged |
-| MDX `h4` | `16px`, weight `500`, line-height `1.4`, underlined | unchanged |
-| MDX paragraph | `0.925rem`; inherited line-height `1.9` | global `≤750px` base may reduce native size, but `.mdx-content p` explicitly remains `0.925rem` |
-| Sidebar group | `12px`, `600`, `1.3`, `0.6px` letter-spacing, uppercase |
-| Sidebar subgroup | `12px`, `600`, `1.4`, `0.5px`, uppercase |
-| Sidebar leaf | `13.5px`, `400`, `1.4`, `0.02em` |
-| TOC label/items | `12.5px`; label line-height `1`; item `1.2` |
-| Code block wrapper | `13.5px`, line-height `1.5` |
+| Role                  | Desktop                                                         | Small-screen behavior                                                                           |
+| --------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Global prose/body     | `0.925rem` = `14.8px`; weight `500`; line-height `1.9`          | At `≤750px`: `0.85rem` = `13.6px`                                                               |
+| Page title            | `26px`, weight `500`, line-height `1.5`                         | At `≤795px`: `24px`                                                                             |
+| MDX `h1`              | `28px`, weight `700`, line-height `1.4`                         | At `≤795px`: `25px`                                                                             |
+| MDX `h2`              | `24.5px`, weight `700`, line-height `1.4`                       | At `≤795px`: `20px`                                                                             |
+| MDX `h3`              | `20px`, weight `600`, line-height `1.4`                         | unchanged                                                                                       |
+| MDX `h4`              | `16px`, weight `500`, line-height `1.4`, underlined             | unchanged                                                                                       |
+| MDX paragraph         | `0.925rem`; inherited line-height `1.9`                         | global `≤750px` base may reduce native size, but `.mdx-content p` explicitly remains `0.925rem` |
+| Sidebar group         | `12px`, `600`, `1.3`, `0.6px` letter-spacing, uppercase         |
+| Sidebar subgroup      | `12px`, `600`, `1.4`, `0.5px`, uppercase                        |
+| Sidebar leaf          | `13.5px`, `400`, `1.4`, `0.02em`                                |
+| TOC label/items       | `12.5px`; label line-height `1`; item `1.2`                     |
+| Code block wrapper    | `13.5px`, line-height `1.5`                                     |
 | Highlighted code line | inherited `13.5px`; line-height `1.75`; minimum height `1.75em` |
-| Code tabs | `12.5px`, `600`, line-height `1.2` |
-| Inline code | `0.875em` of surrounding text |
-| Image caption | `13px`, italic, line-height `1.5` |
-| Blockquote caption | `14px`, centered, `#9B9999` |
-| Search trigger text | `0.9rem` |
-| Search result title | `0.925rem` |
-| Search result path | `0.85rem` |
+| Code tabs             | `12.5px`, `600`, line-height `1.2`                              |
+| Inline code           | `0.875em` of surrounding text                                   |
+| Image caption         | `13px`, italic, line-height `1.5`                               |
+| Blockquote caption    | `14px`, centered, `#9B9999`                                     |
+| Search trigger text   | `0.9rem`                                                        |
+| Search result title   | `0.925rem`                                                      |
+| Search result path    | `0.85rem`                                                       |
 
 Heading spacing:
 
-| Element | Top | Bottom |
-|---|---:|---:|
-| MDX `h1` | `72px` (`52px` at `≤795px`) | `23px` |
-| MDX `h2` | `60px` (`42px` at `≤795px`) | `20px` |
-| MDX `h3` | `40px` | `20px` |
-| MDX `h4` | `17px` | `10px` |
-| Paragraph | `10px` | `10px` |
+| Element   |                         Top | Bottom |
+| --------- | --------------------------: | -----: |
+| MDX `h1`  | `72px` (`52px` at `≤795px`) | `23px` |
+| MDX `h2`  | `60px` (`42px` at `≤795px`) | `20px` |
+| MDX `h3`  |                      `40px` | `20px` |
+| MDX `h4`  |                      `17px` | `10px` |
+| Paragraph |                      `10px` | `10px` |
 
 `h1` and `h2` use `text-shadow: 2px 2px #161B1B`. MDX `h1` is teal `#0BA29D`.
 
@@ -179,25 +179,25 @@ For a faithful port, preserve the arbitrary values instead of normalizing them o
 
 ### 1.6 Radii
 
-| Element | Radius |
-|---|---:|
-| General card/box/code shell | `8px` |
-| Sidebar rows/groups | `7px` |
-| Code/search tab container | `8px` |
-| Code/search tab active pill | `6px` |
-| Search trigger | `8px` |
-| Search keycap | `5px` |
-| Search form | `8px` |
-| Search hit | outer `4px`; container `7px` |
-| Search footer | `0 0 4.5px 4.5px` |
-| DocSearch search bar | `4.5px` |
-| Tooltip | `6px` |
-| Inline code | `4px` |
-| Badge | `4px` |
-| Callout | `8px` |
-| Highlight wrapper | `6px` |
-| CTA section | `16px` |
-| Circular markers | `50%` or `999px` |
+| Element                     |                       Radius |
+| --------------------------- | ---------------------------: |
+| General card/box/code shell |                        `8px` |
+| Sidebar rows/groups         |                        `7px` |
+| Code/search tab container   |                        `8px` |
+| Code/search tab active pill |                        `6px` |
+| Search trigger              |                        `8px` |
+| Search keycap               |                        `5px` |
+| Search form                 |                        `8px` |
+| Search hit                  | outer `4px`; container `7px` |
+| Search footer               |            `0 0 4.5px 4.5px` |
+| DocSearch search bar        |                      `4.5px` |
+| Tooltip                     |                        `6px` |
+| Inline code                 |                        `4px` |
+| Badge                       |                        `4px` |
+| Callout                     |                        `8px` |
+| Highlight wrapper           |                        `6px` |
+| CTA section                 |                       `16px` |
+| Circular markers            |             `50%` or `999px` |
 
 ### 1.7 Borders and shadows
 
@@ -208,39 +208,39 @@ background: #222828;
 border: none;
 border-radius: 8px;
 box-shadow:
-  0 2px 8px rgba(0,0,0,0.75),
-  0 0 0 1px rgba(255,255,255,0.10),
-  inset 0 1px 0 rgba(255,255,255,0.20);
+  0 2px 8px rgba(0, 0, 0, 0.75),
+  0 0 0 1px rgba(255, 255, 255, 0.1),
+  inset 0 1px 0 rgba(255, 255, 255, 0.2);
 backdrop-filter: blur(10px);
 ```
 
 Active sidebar pill/code-tab pill:
 
 ```css
-background: linear-gradient(135deg, rgb(60,64,64), rgb(44,47,47));
+background: linear-gradient(135deg, rgb(60, 64, 64), rgb(44, 47, 47));
 box-shadow:
-  0 4px 12px rgba(0,0,0,0.45),
-  0 0 0 1px rgba(190,190,190,0.16),
-  inset 0 1px 0 rgba(255,255,255,0.10);
+  0 4px 12px rgba(0, 0, 0, 0.45),
+  0 0 0 1px rgba(190, 190, 190, 0.16),
+  inset 0 1px 0 rgba(255, 255, 255, 0.1);
 ```
 
 Header:
 
 ```css
 box-shadow:
-  0 2px 8px rgba(0,0,0,0.55),
-  0 1px 0 rgba(255,255,255,0.04),
-  inset 0 -1px 0 rgba(255,255,255,0.04);
+  0 2px 8px rgba(0, 0, 0, 0.55),
+  0 1px 0 rgba(255, 255, 255, 0.04),
+  inset 0 -1px 0 rgba(255, 255, 255, 0.04);
 backdrop-filter: blur(10px);
 ```
 
 Hover sidebar pill:
 
 ```css
-background: rgba(255,255,255,0.06);
+background: rgba(255, 255, 255, 0.06);
 box-shadow:
-  0 6px 14px rgba(0,0,0,0.35),
-  inset 0 1px 0 rgba(255,255,255,0.05);
+  0 6px 14px rgba(0, 0, 0, 0.35),
+  inset 0 1px 0 rgba(255, 255, 255, 0.05);
 ```
 
 ---
@@ -317,7 +317,7 @@ Its inner scroller:
 width: 100%;
 padding-top: 20px;
 overflow-y: auto;
-border-right: 1px solid #2F3434;
+border-right: 1px solid #2f3434;
 -webkit-overflow-scrolling: touch;
 ```
 
@@ -350,17 +350,17 @@ It is completely hidden at `≤1200px`.
 
 ### 2.5 Responsive breakpoints
 
-| Breakpoint | Behavior |
-|---:|---|
-| `≤1200px` | Right-side TOC disappears. Main expands into that space. |
-| `≤1000px` | Landing feature grids reduce from configured columns to two. |
-| `≤870px` | Gallery two-column fallback; testimonials/pricing collapse to one column. |
-| `≤795px` | Desktop header contents and desktop sidebar disappear; mobile logo/actions and hamburger appear. MDX `h1`/`h2`, page title adjust. |
-| `≤750px` | Global body/nav/control typography reduces from `0.925rem` to `0.85rem`; search trigger becomes full-width in mobile drawer. |
-| `≤720px` | Main padding becomes `25px 17.5px 0 20px`; footer rearranges. |
-| `≤650px` | Card grids become block/one-column; mobile sign-up button becomes full-width within its allocation. |
-| `≤500px` | MDX links may wrap; code block gets `3.5px` top adjustment; compact previous/next padding. |
-| Minimum document width | `320px` |
+|             Breakpoint | Behavior                                                                                                                           |
+| ---------------------: | ---------------------------------------------------------------------------------------------------------------------------------- |
+|              `≤1200px` | Right-side TOC disappears. Main expands into that space.                                                                           |
+|              `≤1000px` | Landing feature grids reduce from configured columns to two.                                                                       |
+|               `≤870px` | Gallery two-column fallback; testimonials/pricing collapse to one column.                                                          |
+|               `≤795px` | Desktop header contents and desktop sidebar disappear; mobile logo/actions and hamburger appear. MDX `h1`/`h2`, page title adjust. |
+|               `≤750px` | Global body/nav/control typography reduces from `0.925rem` to `0.85rem`; search trigger becomes full-width in mobile drawer.       |
+|               `≤720px` | Main padding becomes `25px 17.5px 0 20px`; footer rearranges.                                                                      |
+|               `≤650px` | Card grids become block/one-column; mobile sign-up button becomes full-width within its allocation.                                |
+|               `≤500px` | MDX links may wrap; code block gets `3.5px` top adjustment; compact previous/next padding.                                         |
+| Minimum document width | `320px`                                                                                                                            |
 
 ### 2.6 Sticky and scroll behavior
 
@@ -433,7 +433,7 @@ font-weight: 600;
 line-height: 1.3;
 letter-spacing: 0.6px;
 text-transform: uppercase;
-color: #A0A0A0;
+color: #a0a0a0;
 display: flex;
 align-items: center;
 gap: 8px;
@@ -470,7 +470,7 @@ font-size: 13.5px;
 font-weight: 400;
 line-height: 1.4;
 letter-spacing: 0.02em;
-color: rgba(255,255,255,0.87);
+color: rgba(255, 255, 255, 0.87);
 white-space: nowrap;
 text-overflow: ellipsis;
 overflow: hidden;
@@ -484,7 +484,7 @@ font-weight: 600;
 line-height: 1.4;
 letter-spacing: 0.5px;
 text-transform: uppercase;
-color: #A6A5A5;
+color: #a6a5a5;
 ```
 
 ### 3.4 Active and hover states
@@ -565,7 +565,7 @@ Mobile sidebar changes:
 Astro supplies all rendered headings. The component filters out level 1:
 
 ```ts
-rawToc.filter(item => (item.level || 1) > 1)
+rawToc.filter((item) => (item.level || 1) > 1);
 ```
 
 Thus it displays `h2`, `h3`, `h4`, etc., but not the page title or content `h1`.
@@ -628,14 +628,14 @@ Inactive:
 
 ```css
 font-weight: 400;
-color: #A0A0A0;
+color: #a0a0a0;
 ```
 
 Active:
 
 ```css
 font-weight: 500;
-color: rgba(255,255,255,0.87);
+color: rgba(255, 255, 255, 0.87);
 ```
 
 ### 4.4 Active-section algorithm
@@ -657,7 +657,7 @@ color: rgba(255,255,255,0.87);
 Astro compile-time syntax highlighting is disabled:
 
 ```js
-markdown.syntaxHighlight = false
+markdown.syntaxHighlight = false;
 ```
 
 Code blocks are transformed from Markdown AST nodes into hydrated `<CodeBlock>` islands by:
@@ -755,9 +755,9 @@ background: #222828;
 border: none;
 border-radius: 8px;
 box-shadow:
-  0 2px 8px rgba(0,0,0,0.75),
-  0 0 0 1px rgba(255,255,255,0.10),
-  inset 0 1px 0 rgba(255,255,255,0.20);
+  0 2px 8px rgba(0, 0, 0, 0.75),
+  0 0 0 1px rgba(255, 255, 255, 0.1),
+  inset 0 1px 0 rgba(255, 255, 255, 0.2);
 backdrop-filter: blur(10px);
 ```
 
@@ -774,9 +774,11 @@ padding: 0 18px;
 line-height: 1.75;
 min-height: 1.75em;
 white-space: pre;
-font-family: "Geist Mono", ...;
+font-family: 'Geist Mono', ...;
 font-variant-ligatures: none;
-font-feature-settings: "liga" 0, "calt" 0;
+font-feature-settings:
+  'liga' 0,
+  'calt' 0;
 ```
 
 The Shiki `<pre>` is forced transparent:
@@ -809,20 +811,15 @@ Markers are stripped before display/copy.
 Focus behavior collapses nonfocused runs to a single `...` placeholder. Placeholder style:
 
 ```css
-color: #8C8C8C;
+color: #8c8c8c;
 opacity: 0.75;
 ```
 
 Highlighted line:
 
 ```css
-background: linear-gradient(
-  90deg,
-  rgba(137,180,250,0.18) 0%,
-  rgba(137,180,250,0.08) 55%,
-  rgba(0,0,0,0) 100%
-);
-border-left: 2px solid rgba(137,180,250,0.8);
+background: linear-gradient(90deg, rgba(137, 180, 250, 0.18) 0%, rgba(137, 180, 250, 0.08) 55%, rgba(0, 0, 0, 0) 100%);
+border-left: 2px solid rgba(137, 180, 250, 0.8);
 ```
 
 There are **no visible line numbers**.
@@ -852,11 +849,11 @@ display: inline-flex;
 gap: 3px;
 padding: 3px;
 margin-bottom: 8px;
-background: rgba(0,0,0,0.25);
+background: rgba(0, 0, 0, 0.25);
 border-radius: 8px;
 box-shadow:
-  inset 0 1px 3px rgba(0,0,0,0.3),
-  0 1px 0 rgba(255,255,255,0.05);
+  inset 0 1px 3px rgba(0, 0, 0, 0.3),
+  0 1px 0 rgba(255, 255, 255, 0.05);
 backdrop-filter: blur(10px);
 ```
 
@@ -868,7 +865,7 @@ line-height: 1.2;
 font-weight: 600;
 padding: 7px 10px;
 border-radius: 6px;
-color: rgba(190,190,190,0.8);
+color: rgba(190, 190, 190, 0.8);
 ```
 
 Active pill uses the active sidebar gradient/shadow. The measured pill slides with:
@@ -891,10 +888,10 @@ Platform-specific tabs select Windows, Linux, macOS ARM, or macOS by default. Th
 ### 5.9 Inline code
 
 ```css
-font-family: "Geist Mono", ...;
+font-family: 'Geist Mono', ...;
 font-size: 0.875em;
-color: #36BEBE;
-background: rgba(54,190,190,0.13);
+color: #36bebe;
+background: rgba(54, 190, 190, 0.13);
 padding: 0 5px;
 border-radius: 4px;
 display: inline-block;
@@ -913,7 +910,7 @@ Global/code scrollbar target:
 
 ```css
 scrollbar-width: thin;
-scrollbar-color: #8C8C8C transparent;
+scrollbar-color: #8c8c8c transparent;
 ```
 
 WebKit:
@@ -930,16 +927,16 @@ Note: `.stp-pretty-scrollbar`’s WebKit selectors contain a descendant space, w
 Primary popup tokens:
 
 ```css
---twoslash-border-color: rgba(147,153,178,0.24);
---twoslash-underline-color: #89B4FA;
---twoslash-popup-bg: rgba(30,30,46,0.96);
---twoslash-popup-color: #CDD6F4;
---twoslash-popup-shadow: 0 18px 48px rgba(0,0,0,0.45);
---twoslash-docs-color: #A6ADC8;
---twoslash-link-color: #89B4FA;
---twoslash-error-color: #F38BA8;
---twoslash-warn-color: #F9E2AF;
---twoslash-tag-color: #89DCEB;
+--twoslash-border-color: rgba(147, 153, 178, 0.24);
+--twoslash-underline-color: #89b4fa;
+--twoslash-popup-bg: rgba(30, 30, 46, 0.96);
+--twoslash-popup-color: #cdd6f4;
+--twoslash-popup-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+--twoslash-docs-color: #a6adc8;
+--twoslash-link-color: #89b4fa;
+--twoslash-error-color: #f38ba8;
+--twoslash-warn-color: #f9e2af;
+--twoslash-tag-color: #89dceb;
 ```
 
 Popup:
@@ -949,7 +946,7 @@ position: fixed;
 z-index: 9999;
 min-width: 280px;
 max-width: min(600px, calc(100vw - 40px));
-border: 1px solid rgba(147,153,178,0.24);
+border: 1px solid rgba(147, 153, 178, 0.24);
 border-radius: 6px;
 font-size: 13px;
 line-height: 1.5;
@@ -979,7 +976,7 @@ The complete registry is in `src/components/mdx-react-components.tsx`, plus inte
 `Link`:
 
 ```css
-color: rgb(34,186,181);
+color: rgb(34, 186, 181);
 white-space: nowrap;
 font-weight: 500;
 ```
@@ -1001,17 +998,17 @@ border-left-width: 4px;
 border-radius: 8px;
 line-height: 1.6;
 box-shadow:
-  0 2px 8px rgba(0,0,0,0.15),
-  inset 0 1px 0 rgba(255,255,255,0.05);
+  0 2px 8px rgba(0, 0, 0, 0.15),
+  inset 0 1px 0 rgba(255, 255, 255, 0.05);
 backdrop-filter: blur(8px);
 ```
 
-| Type | Border | Background |
-|---|---|---|
-| Warning | `#ED8B00` | `rgba(237,139,0,0.12)` |
-| Info | `#0066CC` | `rgba(0,102,204,0.12)` |
-| Tip | `rgb(24,153,144)` | `rgba(24,153,144,0.12)` |
-| Error | `#E74C3C` | `rgba(231,76,60,0.12)` |
+| Type    | Border            | Background              |
+| ------- | ----------------- | ----------------------- |
+| Warning | `#ED8B00`         | `rgba(237,139,0,0.12)`  |
+| Info    | `#0066CC`         | `rgba(0,102,204,0.12)`  |
+| Tip     | `rgb(24,153,144)` | `rgba(24,153,144,0.12)` |
+| Error   | `#E74C3C`         | `rgba(231,76,60,0.12)`  |
 
 All callout text is `rgba(255,255,255,0.87)`, weight `500`, `0.925rem`, line-height `1.9`; `0.85rem` at `≤750px`.
 
@@ -1086,7 +1083,7 @@ font-size: 0.8rem;
 font-weight: 500;
 line-height: 1.4;
 white-space: nowrap;
-border: 1px solid #161B1B;
+border: 1px solid #161b1b;
 ```
 
 Text automatically becomes `rgba(255,255,255,0.95)` for dark backgrounds or `rgba(0,0,0,0.95)` for light backgrounds.
@@ -1139,8 +1136,8 @@ padding: 20px;
 background: #222828;
 border-radius: 8px;
 box-shadow:
-  0 2px 8px rgba(0,0,0,0.4),
-  inset 0 1px 0 rgba(255,255,255,0.05);
+  0 2px 8px rgba(0, 0, 0, 0.4),
+  inset 0 1px 0 rgba(255, 255, 255, 0.05);
 ```
 
 Question nodes use a `20px` circular `?` marker. Answer nodes use `→`; result nodes use `✓` and a translucent primary background.
@@ -1183,9 +1180,9 @@ Hover:
 ```css
 transform: translateY(-3px);
 box-shadow:
-  0 8px 20px rgba(0,0,0,0.6),
-  0 0 0 1px rgba(255,255,255,0.12),
-  inset 0 1px 0 rgba(255,255,255,0.22);
+  0 8px 20px rgba(0, 0, 0, 0.6),
+  0 0 0 1px rgba(255, 255, 255, 0.12),
+  inset 0 1px 0 rgba(255, 255, 255, 0.22);
 ```
 
 Search input height `44px`, radius `10px`, maximum width `460px`.
@@ -1227,9 +1224,8 @@ CTA section uses:
 ```css
 padding: 36px 30px;
 border-radius: 16px;
-background:
-  linear-gradient(135deg, rgba(54,190,190,0.1), rgba(74,166,220,0.06));
-box-shadow: inset 0 0 0 1px rgba(54,190,190,0.22);
+background: linear-gradient(135deg, rgba(54, 190, 190, 0.1), rgba(74, 166, 220, 0.06));
+box-shadow: inset 0 0 0 1px rgba(54, 190, 190, 0.22);
 ```
 
 ### 6.14 Specialized/data-driven components
@@ -1270,13 +1266,13 @@ Desktop trigger:
 width: 300px;
 height: 38px;
 padding: 0 8px 0 12px;
-background: #141A1A;
+background: #141a1a;
 border: none;
 border-radius: 8px;
 box-shadow:
-  inset 0 1px 3px rgba(0,0,0,0.3),
-  0 1px 0 rgba(255,255,255,0.05),
-  0 0 0 1px rgba(255,255,255,0.05);
+  inset 0 1px 3px rgba(0, 0, 0, 0.3),
+  0 1px 0 rgba(255, 255, 255, 0.05),
+  0 0 0 1px rgba(255, 255, 255, 0.05);
 backdrop-filter: blur(10px);
 ```
 
@@ -1300,12 +1296,12 @@ Keyboard keycaps:
 ### 7.3 Overlay/modal tokens
 
 ```css
---docsearch-primary-color: rgb(34,136,132);
---docsearch-container-background: rgba(0,0,0,0.8);
---docsearch-modal-background: #1C2121;
---docsearch-modal-shadow: 0 8px 32px rgba(0,0,0,0.6);
+--docsearch-primary-color: rgb(34, 136, 132);
+--docsearch-container-background: rgba(0, 0, 0, 0.8);
+--docsearch-modal-background: #1c2121;
+--docsearch-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
 --docsearch-hit-background: #222828;
---docsearch-footer-background: #161B1B;
+--docsearch-footer-background: #161b1b;
 ```
 
 Search form:
@@ -1459,12 +1455,7 @@ The visual React components can be retained, but the tree-building adapter must 
 
 ```ts
 {
-  url,
-  key,
-  title,
-  order,
-  icon,
-  children
+  (url, key, title, order, icon, children);
 }
 ```
 

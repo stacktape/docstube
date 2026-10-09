@@ -11,7 +11,7 @@ pipeline-v2.md, and release-scope-v2.md.
 1. **Exploration: codemap-backed evidence tools become primary.** The four generic read tools
    (read_file / list_dir / glob / grep) stay as escape hatches, but agents get semantic tools that
    answer docs questions directly: `search_symbols`, `read_symbol(hash, include: signature | body
-   | tests | usages)`, `find_examples` / `find_tests`, batched `read_ranges`, plus preflight
+| tests | usages)`, `find_examples` / `find_tests`, batched `read_ranges`, plus preflight
    `check_snippet` and `validate_page_draft`. All content-bearing results emit evidence handles
    (symbol hash or file/span/hash) — this also closes the grep provenance hole (grep currently
    records no observed reads). Generic grep gets cheap fixes: case-insensitivity flag, glob

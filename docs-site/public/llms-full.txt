@@ -8,140 +8,180 @@ URL: /cli-reference/
 
 # CLI reference
 
-Use `docstube help [command]` to print command usage.
+<Claim id="c1">The `docstube` CLI registers subcommands through `main.subCommands`.</Claim> Run `docstube help` when you want the same command list printed by the executable.
+
+## `docstube`
+
+Purpose: <Claim id="c2">Bare `docstube` opens the local control plane.</Claim> <Claim id="c3">Bare `docstube` treats a positional command name as an unknown command.</Claim>
+
+Flags: <Claim id="c4">Bare `docstube --port` sets the local control-plane port.</Claim> <Claim id="c5">Bare `docstube --no-open` disables browser opening.</Claim>
+
+Usage example:
 
 ```bash
-docstube help generate
+docstube --no-open
 ```
 
-## `wizard`
+## `docstube wizard`
 
-Opens the local setup wizard and control plane. The `--port <n>` flag sets the local control-plane port; without it, the server chooses a port.
+Purpose: <Claim id="c6">`docstube wizard` opens the local setup wizard and control plane.</Claim>
+
+Flags: <Claim id="c7">`docstube wizard --port` sets the local control-plane port.</Claim> <Claim id="c8">`docstube wizard --no-open` disables browser opening.</Claim>
+
+Usage example:
 
 ```bash
-docstube wizard --port 3001
+docstube wizard --port 4242 --no-open
 ```
 
-## `generate`
+## `docstube generate`
 
-Generates docs from the existing config. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
+Purpose: <Claim id="c9">`docstube generate` generates docs from existing config.</Claim> <Claim id="c10">`docstube generate` is the idempotent reconciler for later runs.</Claim>
+
+Flags: <Claim id="c11">`docstube generate --max-attempts` sets the max write attempts per page.</Claim> <Claim id="c12">`docstube generate --ci` emits the fail-closed publication decision used by the GitHub Action.</Claim> <Claim id="c13">`docstube generate --max-attempts` requires an integer of at least 1.</Claim>
+
+Usage example:
 
 ```bash
-docstube generate --max-attempts 3
+docstube generate --max-attempts 4
 ```
 
-## `refresh`
+## `docstube refine`
 
-Regenerates only entities affected by code changes. The `--max-attempts <n>` flag sets the maximum write attempts per page for that run.
+Purpose: <Claim id="c14">`docstube refine` improves the lowest-quality generated pages first.</Claim>
+
+Flags and arguments: <Claim id="c15">`docstube refine target` sets the page slug to refine.</Claim> <Claim id="c16">`docstube refine --failed` considers only pages with open flags.</Claim> <Claim id="c17">`docstube refine --max-pages` sets the max pages refined in one run.</Claim> <Claim id="c18">`docstube refine --max-rounds-per-page` sets the max rewrite rounds per page.</Claim> <Claim id="c19">`docstube refine --total-rounds` sets the global rewrite-round budget for the whole run.</Claim> <Claim id="c20">`docstube refine` numeric budget flags require integers of at least 1.</Claim>
+
+Usage example:
 
 ```bash
-docstube refresh --max-attempts 2
+docstube refine cli-reference --failed --max-pages 1
 ```
 
-## `refine`
+## `docstube preview`
 
-Improves generated pages. Pass a page slug to target one page, or use `--failed` to consider only pages with open flags.
+Purpose: <Claim id="c21">`docstube preview` builds and serves the generated docs site locally.</Claim>
 
-Budget flags:
+Flags: <Claim id="c22">`docstube preview --port` sets the local preview server port.</Claim> <Claim id="c23">`docstube preview --build` forces a rebuild.</Claim> <Claim id="c24">`docstube preview --port` requires an integer from 0 through 65535.</Claim>
 
-- `--max-pages <n>` limits how many pages are refined.
-- `--max-rounds-per-page <n>` limits rewrite rounds for each page.
-- `--total-rounds <n>` sets a global rewrite-round budget for the run.
+Usage example:
 
 ```bash
-docstube refine cli-reference --failed --max-pages 1 --max-rounds-per-page 2 --total-rounds 2
+docstube preview --build --port 4173
 ```
 
-## `audit`
+## `docstube audit`
 
-Measures verified defects in an existing docs directory. The required `<docs-dir>` argument points at Markdown or MDX docs. The `--json` flag emits the report as JSON.
+Purpose: <Claim id="c25">`docstube audit` extracts claims from an existing docs site and verifies them against the codebase.</Claim>
+
+Flags and arguments: <Claim id="c26">`docstube audit docs-dir` is required.</Claim> <Claim id="c27">`docstube audit --json` emits the audit report as JSON.</Claim>
+
+Usage example:
 
 ```bash
 docstube audit docs --json
 ```
 
-## `answer`
+## `docstube answer`
 
-Lists open maintainer questions, or records an answer for one question id. When answering, pass the id and the answer text.
+Purpose: <Claim id="c28">`docstube answer` lists and answers open maintainer questions.</Claim>
 
-```bash
-docstube answer
-```
+Arguments: <Claim id="c29">`docstube answer id` selects a question id.</Claim> <Claim id="c30">`docstube answer text` supplies the answer text.</Claim>
 
-```bash
-docstube answer abc12345 "This behavior is intentional because the parser owns command shape."
-```
-
-## `check`
-
-Runs deterministic checks over generated docs. Check kinds come from registered verifier plugins, so use `--list` to see the checks available in the current project. Passing `[kind]` runs only that verifier.
+Usage example:
 
 ```bash
-docstube check --list
+docstube answer fl_12345678 "The retry limit mirrors the upstream API limit."
 ```
 
-```bash
-docstube check claim-grounding
-```
+## `docstube validate`
 
-## `status`
+Purpose: <Claim id="c31">`docstube validate` validates the docstube config family.</Claim>
 
-Shows the generated manifest state, page guarantee levels, provable-block distribution, and open flag count.
-
-```bash
-docstube status
-```
-
-## `doctor`
-
-Checks local runtime and project setup. It checks Node, Git, project detection, config loading, and the configured agent runtime for the project.
-
-```bash
-docstube doctor
-```
-
-## `plugin scaffold`
-
-Scaffolds a docstube plugin under `plugins/`, writes a matching spec file, and materializes the plugin-authoring skill under `.docstube/skills/plugin-authoring/SKILL.md`.
-
-```bash
-docstube plugin scaffold wordcount
-```
-
-## `validate`
-
-Validates the docstube config family and reports the loaded doc type, persona count, IA top-level node count, and glossary term count.
+Usage example:
 
 ```bash
 docstube validate
 ```
 
-## `upgrade`
+## `docstube check`
 
-Upgrades the docstube tool itself. Use `--check` to compare the current version with the target version without installing. Use `--to <version>` to target a specific version; otherwise the command targets the latest version it resolves.
+Purpose: <Claim id="c32">`docstube check` runs deterministic checks over the generated docs.</Claim>
+
+Flags and arguments: <Claim id="c33">`docstube check kind` selects a verifier id.</Claim> <Claim id="c34">`docstube check --list` lists registered checks.</Claim>
+
+Usage example:
+
+```bash
+docstube check --list
+```
+
+## `docstube status`
+
+Purpose: <Claim id="c35">`docstube status` shows manifest, claim counts, and open flags.</Claim>
+
+Usage example:
+
+```bash
+docstube status
+```
+
+## `docstube doctor`
+
+Purpose: <Claim id="c36">`docstube doctor` checks local runtime and project setup.</Claim>
+
+Flags: <Claim id="c37">`docstube doctor --ci` runs the CI preflight.</Claim> <Claim id="c38">`docstube doctor --json` emits the versioned preflight report as JSON.</Claim>
+
+Usage example:
+
+```bash
+docstube doctor --ci --json
+```
+
+## `docstube plugin`
+
+Purpose: <Claim id="c39">`docstube plugin` scaffolds and manages docstube plugins.</Claim>
+
+Arguments: <Claim id="c40">`docstube plugin action` is required.</Claim> <Claim id="c41">`docstube plugin name` supplies the plugin name.</Claim>
+
+Usage example:
+
+```bash
+docstube plugin scaffold wordcount
+```
+
+## `docstube upgrade`
+
+Purpose: <Claim id="c42">`docstube upgrade` upgrades the docstube tool itself.</Claim>
+
+Flags: <Claim id="c43">`docstube upgrade --check` only checks the current version.</Claim> <Claim id="c44">`docstube upgrade --to` sets the target version.</Claim>
+
+Usage example:
 
 ```bash
 docstube upgrade --check
 ```
 
-```bash
-docstube upgrade --to 0.0.3
-```
+## `docstube version`
 
-## `version`
+Purpose: <Claim id="c45">`docstube version` prints the docstube version.</Claim>
 
-Prints the docstube version.
+Usage example:
 
 ```bash
 docstube version
 ```
 
-## `help`
+## `docstube help`
 
-Prints the command overview or command-specific help.
+Purpose: <Claim id="c46">`docstube help` prints command help.</Claim>
+
+Arguments: <Claim id="c47">`docstube help command` selects a command to describe.</Claim>
+
+Usage example:
 
 ```bash
-docstube help refine
+docstube help generate
 ```
 
 ## Configuration
@@ -150,77 +190,105 @@ URL: /configuration/
 
 # Configuration
 
-`configFileNames` defines the config family file names: `docstube.yml`, `ia.yml`, and `glossary.yaml`.
+<Claim id="c1">`configFileNames.config` is docstube.yml.</Claim> <Claim id="c2">`configFileNames.ia` is ia.yml.</Claim> <Claim id="c3">`configFileNames.glossary` is glossary.yaml.</Claim>
 
-`loadConfigFamily` reads the files from the repository root. It requires `docstube.yml` and `ia.yml`, parses them with `parseDocstubeConfig` and `parseIaFile`, and returns an empty glossary with `schemaVersion: 1` and `terms: []` when `glossary.yaml` is absent.
+These files are the configuration family a maintainer edits when a repository's documentation intent changes. <Claim id="c4">`loadConfigFamily` reads `docstube.yml` and `ia.yml`.</Claim> <Claim id="c5">`loadConfigFamily` uses an empty glossary when `glossary.yaml` is absent.</Claim>
 
-## `docstube.yml`
+## Main Config
 
-`docstubeConfigSchema` validates the main intent config. The schema covers document type, project context, personas, sources, agents, versions, locales, theme, site metadata, enabled components, configured plugins, coverage, output directory, telemetry, and reserved screenshot config.
+<Claim id="c6">`docstubeConfigSchema` requires `schemaVersion`.</Claim> <Claim id="c7">`docstubeConfigSchema` requires `docType`.</Claim> <Claim id="c8">`docstubeConfigSchema` requires `personas`.</Claim> <Claim id="c9">`docstubeConfigSchema` requires `site`.</Claim>
 
-The scaffold path writes the raw seed input rather than an expanded defaults object, so first-run `docstube.yml` records chosen intent instead of every defaulted field.
+The schema is strict: <Claim id="c10">`docstubeConfigSchema` rejects unknown top-level keys.</Claim> Keep `docstube.yml` focused on intent: project context, personas, source hints, agent routing, site metadata, localization, components, plugins, and output policy.
 
-## `ia.yml`
-
-`iaSchema` validates the information architecture. It requires `schemaVersion: 1` and a non-empty `tree`.
-
-`iaNodeSchema` validates each node title and slug. A node can also carry a page brief, depth budget, page id, and child nodes. Nodes with a `brief` are page targets; nodes without a `brief` are grouping nodes.
-
-`depthBudgetSchema` accepts `overview`, `standard`, and `deep`. `iaSchema` also accepts an optional positive integer page-count target.
-
-## `glossary.yaml`
-
-`glossarySchema` validates terminology data. It requires `schemaVersion: 1` and defaults `terms` to an empty array.
-
-Each glossary term requires a term and definition. Aliases and avoid-list entries default to empty arrays.
+```yaml
+schemaVersion: 1
+docType: external-product
+projectContext: >-
+  Short description of what this project is and who the generated docs are for.
+personas:
+  - id: oss-maintainer
+    description: Maintains the repository and reviews generated docs.
+sources:
+  openapi: []
+  asyncapi: []
+  imports: []
+agents:
+  transport: codex-cli
+  model: gpt-5.5
+  budgets:
+    maxRunUsd: 100
+    maxTurnsPerTask: 24
+    maxToolCallsPerTask: 64
+    maxPlanUsagePercent: 80
+locales:
+  source: en
+  targets: []
+theme:
+  name: basic
+site:
+  title: My Project
+  description: Verified documentation for My Project.
+  layout: single-tree
+components:
+  - Callout
+  - CodeBlock
+plugins:
+  - ./plugins/company-style.ts
+```
 
 ## Agents
 
-`agentsConfigSchema` validates the agent block. `transportIdSchema` accepts `claude-cli`, `codex-cli`, `anthropic-api`, and `openai-compatible` in `docstube.yml`.
+<Claim id="c11">`transportIdSchema` accepts `claude-cli`.</Claim> <Claim id="c12">`transportIdSchema` accepts `codex-cli`.</Claim> <Claim id="c13">`transportIdSchema` accepts `anthropic-api`.</Claim> <Claim id="c14">`transportIdSchema` accepts `openai-compatible`.</Claim>
 
-`createTransportFromConfig` builds the runtime transport from the validated config. It supplies default models for `claude-cli` and `anthropic-api`; transports without a default model require an explicit configured model.
+<Claim id="c15">`agentsConfigSchema.transport` defaults to claude-cli.</Claim> <Claim id="c16">`agentsConfigSchema.baseUrl` is optional.</Claim> <Claim id="c17">`agentsConfigSchema.apiKeyEnv` is optional.</Claim> <Claim id="c18">`agentsConfigSchema.apiKeyEnv` accepts uppercase environment variable names.</Claim>
 
-API transports receive the configured base URL and credential environment-variable reference from the agent config. The schema validates the credential reference with an uppercase environment-variable-name pattern.
+Role overrides let a maintainer route different work to different models. <Claim id="c19">`agentRolesConfigSchema` defines `writer`.</Claim> <Claim id="c20">`agentRolesConfigSchema` defines `reviewer`.</Claim> <Claim id="c21">`agentRolesConfigSchema` defines `risk-critic`.</Claim> <Claim id="c22">`agentRolesConfigSchema` defines `translator`.</Claim> <Claim id="c23">`agentRolesConfigSchema` defines `architect`.</Claim> <Claim id="c24">`agentRolesConfigSchema` defines `extractor`.</Claim>
 
-`reviewModel` is optional. `createTaskRunnerFromConfig` uses it for `review-page` tasks and otherwise uses the primary model.
+<Claim id="c25">`resolveRoleRouting` lets a role inherit the top-level transport.</Claim> <Claim id="c26">`resolveRoleRouting` lets a role inherit the top-level model.</Claim> <Claim id="c27">`resolveRoleRouting` uses the role transport before the top-level transport.</Claim>
 
-Agent budgets are part of `agentsConfigSchema`. They default to:
+## Budgets
 
-- `maxRunUsd: 20`
-- `maxTurnsPerTask: 24`
-- `maxToolCallsPerTask: 64`
+<Claim id="c28">`agentsConfigSchema.budgets.maxRunUsd` defaults to 20.</Claim> <Claim id="c29">`agentsConfigSchema.budgets.maxTurnsPerTask` defaults to 24.</Claim> <Claim id="c30">`agentsConfigSchema.budgets.maxToolCallsPerTask` defaults to 64.</Claim> <Claim id="c31">`agentsConfigSchema.budgets.maxPlanUsagePercent` defaults to 80.</Claim>
 
-`createRunCostTracker` freezes a capped run when reported plus estimated spend reaches `FREEZE_MARGIN_RATIO`, which is `0.85`, multiplied by the configured run cap. `freezeReason` reports that freeze as reaching 85% of the cap. The run-cost code tracks vendor-reported spend separately from token-derived estimates.
+<Claim id="c32">`FREEZE_MARGIN_RATIO` is 0.85.</Claim> <Claim id="c33">`createRunCostTracker` freezes a run when reported and estimated spend reaches 85 percent of `maxRunUsd` without a plan-usage signal.</Claim> <Claim id="c34">`createRunCostTracker` freezes a run when plan usage reaches `maxPlanUsagePercent`.</Claim> <Claim id="c35">`buildWritePageTask` uses `maxTurnsPerTask` for writer task turns.</Claim> <Claim id="c36">`buildWritePageTask` uses `maxToolCallsPerTask` for writer task tool calls.</Claim>
 
-## Versions And Locales
+For maintainers, the practical split is simple: `maxRunUsd` is the run cap, `maxPlanUsagePercent` is the subscription plan cap, and per-task turn and tool-call limits bound individual writer tasks.
 
-`versionsConfigSchema` defaults the current version label to `latest` and the frozen-version list to an empty array. `versionLabelSchema` validates path-safe labels such as `1.x`, `v2`, and `2026-06`.
+## Locales
 
-`localesConfigSchema` defaults the source locale to `en` and target locales to an empty array. `localeCodeSchema` accepts the supported locale-code shape shown in its message, such as `en`, `pt-BR`, and `zh-Hans`.
+<Claim id="c37">`localesConfigSchema.source` defaults to en.</Claim> <Claim id="c38">`localesConfigSchema.targets` defaults to an empty array.</Claim> <Claim id="c39">`localeCodeSchema` accepts locale codes like `en`.</Claim> <Claim id="c40">`localeCodeSchema` accepts locale codes like `pt-BR`.</Claim> <Claim id="c41">`localesConfigSchema` rejects a target that equals the source locale.</Claim> <Claim id="c42">`localesConfigSchema` rejects duplicate targets case-insensitively.</Claim>
 
-## Components
+<Claim id="c43">`loadConfigFamily` rejects an IA page slug that collides with a configured target locale route prefix.</Claim>
 
-The main config schema validates `components` as an array of non-empty strings. Its schema comment describes the list as enabled MDX components that must exist in the block-type registry.
+## Information Architecture
 
-`registryComponents` exposes the local UI choices: `Callout`, `CodeBlock`, `CodeGroup`, `Terminal`, `Card`, `CardGrid`, `Steps`, `Tabs`, `FileTree`, `Badge`, `ParamTable`, and `ComparisonTable`.
+<Claim id="c44">`iaSchema` requires `schemaVersion`.</Claim> <Claim id="c45">`iaSchema` requires `tree`.</Claim> <Claim id="c46">`iaNodeSchema` requires `title`.</Claim> <Claim id="c47">`iaNodeSchema` requires `slug`.</Claim> <Claim id="c48">`iaNodeSchema` allows `brief`.</Claim> <Claim id="c49">`iaNodeSchema` allows `children`.</Claim> <Claim id="c50">`depthBudgetSchema` accepts `overview`.</Claim> <Claim id="c51">`depthBudgetSchema` accepts `standard`.</Claim> <Claim id="c52">`depthBudgetSchema` accepts `deep`.</Claim>
 
-`builtinComponents` defines the built-in component metadata and prop schemas. `builtinComponentNames` is derived from those definitions.
+A node with a `brief` is page intent for the writer, and a node without a `brief` can be used as a grouping node. <Claim id="c53">`iaSchema` rejects duplicate page slugs.</Claim>
 
-## Plugins
+## Glossary
 
-The main config schema validates `plugins` as an array of non-empty strings. Its schema comment describes entries as npm package names or repository-relative paths.
+<Claim id="c54">`glossarySchema` requires `schemaVersion`.</Claim> <Claim id="c55">`glossarySchema.terms` defaults to an empty array.</Claim> <Claim id="c56">`glossaryTermSchema` requires `term`.</Claim> <Claim id="c57">`glossaryTermSchema` requires `definition`.</Claim> <Claim id="c58">`glossaryTermSchema.aliases` defaults to an empty array.</Claim> <Claim id="c59">`glossaryTermSchema.avoid` defaults to an empty array.</Claim>
 
-`registerBuiltinPlugins` registers the built-in verifier, TypeScript language, and Python language plugins through the plugin host. `loadConfiguredPlugins` then loads each configured plugin from the config plugin list.
+Use `glossary.yaml` for terminology the generated pages should treat consistently.
 
-Local plugin specifiers are imported from files under the target repository. Other specifiers are resolved from the target repository's package dependencies. A configured plugin must default-export a value recognized by `isDocstubePlugin`; otherwise `loadConfiguredPlugins` raises a plugin load error.
+## Components And Plugins
+
+<Claim id="c60">`docstubeConfigSchema.components` defaults to an empty array.</Claim> The component list names enabled MDX components for generated pages.
+
+<Claim id="c61">`docstubeConfigSchema.plugins` defaults to an empty array.</Claim> <Claim id="c62">`loadConfiguredPlugins` loads each configured plugin specifier.</Claim> <Claim id="c63">`loadConfiguredPlugins` treats relative plugin specifiers as local plugins.</Claim> <Claim id="c64">`loadConfiguredPlugins` resolves package plugin specifiers from the target repository.</Claim> <Claim id="c65">`loadConfiguredPlugins` requires a default export created with `definePlugin`.</Claim>
+
+```yaml
+plugins:
+  - docstube-plugin-wordcount
+  - ./plugins/company-style.ts
+```
 
 ## Programmatic Edits
 
-`editYamlDocument` uses the `yaml` Document API and serializes the edited document back to text. `setYamlIn` and `editConfigFile` build on that helper.
+<Claim id="c66">`editYamlDocument` parses YAML with `parseDocument`.</Claim> <Claim id="c67">`editYamlDocument` serializes YAML with `doc.toString`.</Claim> <Claim id="c68">`updateConfigValues` validates the edited `docstube.yml` before writing it.</Claim> <Claim id="c69">`editConfigFile` validates the edited config-family file before writing it.</Claim> <Claim id="c70">`writeIaFile` preserves a top-of-file comment.</Claim>
 
-`updateConfigValues` batches config edits, validates the edited document with `parseDocstubeConfig`, and writes only after validation succeeds.
-
-`writeIaFile` validates the next IA with `iaSchema` before writing. It preserves the document header comment when replacing the IA document; comments inside a replaced IA tree are not preserved by that structural rewrite.
+That means a maintainer can keep hand-written comments in the config family while using the local UI or wizard for routine edits.
 
 ## Getting started
 
@@ -228,78 +296,74 @@ URL: /getting-started/
 
 # Getting started
 
-The npm package is named `docstube` and exposes a `docstube` binary. For projects that already use Node tooling, the first-run path can be run through `npx`:
+Install docstube in the repository you want documented. <Claim id="c1">`docstube` is the npm package name.</Claim> <Claim id="c2">`docstube` is the CLI binary name.</Claim>
 
-```text
+```bash
+npm install --save-dev docstube
+npx docstube --version
+```
+
+For a standalone install, use the hosted installer scripts instead of adding the npm package. <Claim id="c3">`installs.docstube.dev` is the production install-scripts domain.</Claim>
+
+```bash
+curl -fsSL https://installs.docstube.dev/linux.sh | sh
+```
+
+```powershell
+iwr https://installs.docstube.dev/windows.ps1 -UseB | iex
+```
+
+## Open The Wizard
+
+Run docstube from the repository root.
+
+```bash
+npx docstube
+```
+
+You can also name the wizard command directly. <Claim id="c4">`docstube wizard` opens the local setup wizard and control plane.</Claim> <Claim id="c5">Bare `docstube` opens the local control plane.</Claim>
+
+```bash
 npx docstube wizard
-npx docstube generate
-npx docstube status
 ```
 
-For a standalone binary, use the install scripts hosted at `installs.docstube.dev`. The project README names `https://installs.docstube.dev/linux.sh` for Linux and `https://installs.docstube.dev/windows.ps1` for Windows. After installing the standalone binary, use the same commands without the `npx` prefix.
+On a new repository, the control plane starts in setup. <Claim id="c6">A repository without `docstube.yml` opens first-run setup.</Claim> During setup, choose the project type, personas, agent provider, information architecture, site settings, theme, and components.
 
-## Open the wizard
+## Start Generation
 
-`docstube wizard` starts the local control plane. The command accepts an optional port:
+The last setup screen has one happy-path action: <Claim id="c7">First-run setup writes `docstube.yml` and `ia.yml`.</Claim> <Claim id="c8">First-run setup starts a generate run.</Claim>
 
-```text
-npx docstube wizard --port 4317
-```
+After setup, you can run generation again from the terminal. <Claim id="c9">`docstube generate` generates docs from existing config.</Claim>
 
-When the server starts, the CLI prints:
-
-```text
-docstube control plane running at:
-
-  <local URL>
-
-Press Ctrl+C to stop.
-```
-
-Open the printed URL. The local UI includes a Wizard tab. On a first run, the wizard uses scaffold mode; its final step writes the config family and starts a `generate` run.
-
-## Generate the site
-
-If you start generation from the terminal, run:
-
-```text
+```bash
 npx docstube generate
 ```
 
-The `generate` command loads the config, creates the task runner from that config, and runs the documentation pipeline. During the run, it prints one line per generated page or translation, using `ok` for passed output and `FLAG` for output with open flags.
-
-The generated site is emitted to the configured `outDir`. The config schema defaults that directory to:
+The CLI reports each generated page, then prints where the site was published. <Claim id="c10">The config schema sets `outDir` to `docs-site` when `outDir` is omitted.</Claim>
 
 ```text
-docs-site/
+site published to docs-site/ -- build it with: npm install && npm run build
 ```
 
-After emission, the CLI prints the site directory and the build hint:
+## After The First Run
 
-```text
-site emitted to docs-site/ — build it with: npm install && npm run build
+The first successful publish leaves two important directories in the repository:
+
+- `docs-site/` contains the generated site. <Claim id="c11">`docstube generate` publishes the site to `outDir` when the run summary is published.</Claim>
+- `.docstube/manifest/` contains the committed manifest store. <Claim id="c12">`committedManifestDir` returns `.docstube/manifest` under the repository root.</Claim>
+
+Build the generated site when you are ready to inspect or deploy it.
+
+```bash
+cd docs-site
+npm install
+npm run build
 ```
 
-docstube also writes verified run state under:
+To serve the generated site locally through docstube, use preview. <Claim id="c13">`docstube preview` builds the generated docs site when it is stale and serves it locally.</Claim>
 
-```text
-.docstube/manifest/
-```
-
-That manifest directory contains `manifest.yml` and page shard files under `pages/<locale>/`.
-
-## Check the result
-
-Run status after the first generation:
-
-```text
-npx docstube status
-```
-
-When a manifest exists, `status` reports the docs version, locales, page count, each page guarantee state, and the open flag count. If no manifest exists yet, it prints:
-
-```text
-No manifest yet — run `docstube generate` first.
+```bash
+npx docstube preview
 ```
 
 ## CI and the GitHub Action
@@ -308,19 +372,17 @@ URL: /github-action/
 
 # CI and the GitHub Action
 
-The GitHub Action metadata is defined in `apps/github-action/action.yml`. In this repository, the action identifier is the local path `./apps/github-action`; that identifier only works in workflows for a repository that contains that path.
+The GitHub Action is the CI wrapper around the CLI. <Claim id="c1">`createDocstubeCliArgs` runs `generate` with `--ci`.</Claim> <Claim id="c2">`createDocstubePreflightArgs` runs `doctor` with `--ci` and `--json`.</Claim>
 
-<Callout>
-The source defines the local action path and the package name `@docstube/action`, but it does not define a public `uses:` reference. If you run docstube from another repository, replace `./apps/github-action` with the action location you have installed, vendored, or published.
-</Callout>
+Use your workflow triggers to decide when docs regenerate. A common starting point is to run the Action on pushes to the branch that owns your docs and on manual dispatch:
 
 ```yaml
 name: docstube
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -328,81 +390,52 @@ permissions:
   issues: write
 
 jobs:
-  refresh-docs:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run docstube
-        uses: ./apps/github-action
+      - uses: docstube/action@v0
         with:
-          mode: refresh
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-Use `mode: generate` for a first documentation run and `mode: refresh` for ongoing maintenance after code changes. If `mode` is omitted, the action uses `refresh`.
+## Preflight
 
-The `github-token` input is used by the `gh` CLI for pull requests, PR comments, the digest issue, and auto-merge. If it is not provided, the action reads `GITHUB_TOKEN`.
+Before generation, <Claim id="c3">`runGitHubAction` evaluates CI preflight before it checks out the base branch.</Claim> <Claim id="c4">`runGitHubAction` returns before generation when CI preflight is blocked.</Claim> When the preflight report cannot be used, <Claim id="c5">`runGitHubAction` falls back to `checkModelCredential`.</Claim>
 
-The model credential is separate from the GitHub token. Before running the CLI, the action checks for API key environment variables. If `docstube.yml` names variables with `apiKeyEnv:`, those names are checked. Otherwise, the action checks common names including `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, and `GEMINI_API_KEY`.
+The Action also exposes the preflight result to later workflow steps: <Claim id="c6">`setActionOutputs` writes the `preflight` output.</Claim> <Claim id="c7">`setActionOutputs` writes the `automation-mode` output.</Claim>
 
-## Inputs
+## Generate And Commit
 
-| Input | Default | Behavior |
-| --- | --- | --- |
-| `mode` | `refresh` | Runs either `generate` or `refresh`. Other values fail. |
-| `github-token` | `GITHUB_TOKEN` | Token passed to `gh` for PRs, comments, issues, and auto-merge. |
-| `base-branch` | `GITHUB_BASE_REF`, then `GITHUB_REF_NAME`, then `main` | Branch checked out and targeted by the PR. |
-| `branch-prefix` | `docstube/docs` | Prefix for the generated docs branch. |
-| `commit-message` | `docs: docstube <mode>` | Commit message for the docs update. |
-| `docstube-package` | `docstube@0.0.2` | Package spec passed to `npx --yes`. |
-| `workspace` | `GITHUB_WORKSPACE`, then the current working directory | Checked-out repository path. |
+The Action prepares a branch and then runs the CLI. <Claim id="c8">`runGitHubAction` checks out the base branch before it creates the docstube branch.</Claim> <Claim id="c9">`runGitHubAction` reads the head commit before it runs docstube.</Claim>
 
-The action rejects the removed `dry-run` input. It always opens or updates a real pull request when there are commit-worthy changes.
+The committed manifest is the docs lockfile for the PR report. <Claim id="c10">`manifestIndexRelativePath` is `.docstube/manifest/manifest.json`.</Claim> <Claim id="c11">`loadVerifiedDelta` reads the manifest index from `manifestIndexRelativePath`.</Claim> <Claim id="c12">`loadVerifiedDelta` returns `undefined` when the manifest index is missing.</Claim>
 
-## What The Action Runs
+The Action stages a bounded set of paths. <Claim id="c13">`selectCommitPaths` filters changed files through `machineLocalPatterns`.</Claim> <Claim id="c14">`verifyOutputInventory` returns staged paths, undeclared paths, and hash mismatches.</Claim> <Claim id="c15">`runGitHubAction` commits `inventoryCheck.stagedPaths` when an inventory check exists.</Claim>
 
-The action checks out the base branch, creates or resets a docs branch, and runs the CLI as:
+## Pull Request Report
 
-```bash
-npx --yes docstube@0.0.2 refresh
-```
+When there is committed work, <Claim id="c16">`runGitHubAction` creates a pull request when no open pull request exists for the docstube branch.</Claim> <Claim id="c17">`runGitHubAction` updates the open pull request when one already exists for the docstube branch.</Claim>
 
-The package spec and command change when `docstube-package` or `mode` are set.
+The PR body is generated from the verified delta and merge decision. <Claim id="c18">`buildPullRequestBody` includes the changed pages section when a verified delta exists.</Claim> <Claim id="c19">`buildPullRequestBody` includes the open flags section when a verified delta exists.</Claim> <Claim id="c20">`buildPullRequestBody` includes the publication decision section.</Claim>
 
-After the CLI exits successfully, the action reads `git status --porcelain`, filters out machine-local state under `.docstube/db.sqlite`, `.docstube/cache/`, and `.docstube/runs/`, and commits the remaining changed paths together.
-
-That single commit can include generated docs, manifest shards, criteria, instructions, and knowledge files. If no commit-worthy paths remain, the action writes a job summary and does not open a PR.
-
-## Manifest Delta
-
-The action computes the verified delta from `.docstube/manifest/manifest.yml` and page shard files under `.docstube/manifest/pages/...`. It does not derive the PR decision from CLI prose.
-
-The PR body and job summary include changed pages, guarantee counts, open flag counts, the decision, and committed files when the manifest delta is available. If no manifest index is found, the action leaves the PR open without auto-merge.
+The job summary follows the same run outcome. <Claim id="c21">`buildJobSummary` reports no branch and no pull request for failed runs.</Claim> <Claim id="c22">`buildJobSummary` reports no documentation changes for no-change runs.</Claim> <Claim id="c23">`buildJobSummary` reports the pull request URL for pull-request runs.</Claim>
 
 ## Auto-Merge Gate
 
-The merge decision uses open flags from readable page shards plus manifest system flags. Auto-merge is eligible only when no open flag has a blocking kind.
+Auto-merge is gated by the publication artifacts, open blocking flags, and inventory validation. <Claim id="c24">`publicationDecisionRelativePath` is `.docstube/runs/publication-decision.json`.</Claim> <Claim id="c25">`outputInventoryRelativePath` is `.docstube/runs/output-inventory.json`.</Claim> <Claim id="c26">`loadPublicationArtifacts` returns a failed validation when the output inventory file is missing.</Claim> <Claim id="c27">`loadPublicationArtifacts` returns a failed validation when the publication decision file is missing.</Claim>
 
-Blocking open flag kinds are:
+The Action enforces that decision after the CLI has run. <Claim id="c28">`decideAutoMerge` withholds auto-merge when a blocking open flag exists.</Claim> <Claim id="c29">`decideAutoMerge` withholds auto-merge when publication validation is not ok.</Claim> <Claim id="c30">`decideAutoMerge` withholds auto-merge when undeclared paths exist.</Claim> <Claim id="c31">`decideAutoMerge` enables auto-merge when `withheldReasons` is empty.</Claim>
 
-- `out-of-domain`
-- `coverage`
-- `guarantee-downgrade`
-- `structural-change`
-- `system`
+If the gate passes and GitHub accepts the request, <Claim id="c32">`runGitHubAction` enables auto-merge through `mergeControl.enableAutoMerge`.</Claim> <Claim id="c33">`createMergeControl` requests the squash merge method.</Claim>
 
-`tribal-knowledge` is not in the hardcoded blocking list. Open tribal-knowledge questions can be delivered without blocking the docs PR.
+## Flags And Tribal Knowledge
 
-When the PR is eligible, the action calls GitHub's auto-merge API with squash merge. If GitHub rejects that request, the action leaves the PR open and reports auto-merge as unavailable.
+Flags are delivered on the pull request when the PR number is known. <Claim id="c34">`runGitHubAction` calls `deliverFlags` when the merge decision has open flags.</Claim> <Claim id="c35">`planCommentUpsert` updates an existing comment when that comment body includes the marker.</Claim> <Claim id="c36">`planCommentUpsert` creates a comment when no existing comment body includes the marker.</Claim>
 
-## Flag Delivery
-
-When a PR has open flags, the action posts a marker-tagged PR comment. On later runs, it updates the existing marker-tagged comment instead of creating another one.
-
-Tribal-knowledge flags are also collected into a long-lived issue titled `docstube: open questions`. The action searches for an open issue with that title, updates it if it exists, and creates it otherwise.
+Tribal-knowledge flags also feed a durable issue. <Claim id="c37">`digestIssueTitle` is `docstube: open questions`.</Claim> <Claim id="c38">`upsertTribalDigestIssue` filters open flags to `tribal-knowledge` flags.</Claim> <Claim id="c39">`upsertTribalDigestIssue` creates the digest issue when tribal-knowledge flags exist and no digest issue exists.</Claim> <Claim id="c40">`upsertTribalDigestIssue` updates the digest issue when a digest issue already exists.</Claim>
 
 ## How verification works
 
@@ -410,69 +443,65 @@ URL: /how-verification-works/
 
 # How verification works
 
-Docstube stores verification state in the entity model, not only in CLI output. `PageEntity`, `SectionEntity`, `BlockEntity`, and `ClaimEntity` each include a `guarantee` field backed by `guaranteeLevelSchema`. The allowed `GuaranteeLevel` values are `proven`, `scored`, and `out-of-domain`.
+The shortest version is the contract: <Claim id="c1">`writerClaimLedgerSchema` exists.</Claim> The writer does not only return prose; <Claim id="c2">`draftClaimSchema` records a `markerId` field.</Claim> <Claim id="c3">`draftClaimSchema` records a `class` field.</Claim> <Claim id="c4">`draftClaimSchema` records a `predicate` field.</Claim> <Claim id="c5">`draftClaimSchema` records a `proposedEvidence` field.</Claim> <Claim id="c6">`draftClaimSchema` records a `proposedSubscriptions` field.</Claim>
 
-`proven` means a deterministic proving path covered the entity. `scored` means the entity was assessed by criteria-based review but was not deterministically proven. `out-of-domain` is for material that cannot be proven from source, such as intent or tribal knowledge.
+That shape matters because the marker is the visible denominator. <Claim id="c7">`claimMarkerIdSchema` exists.</Claim> <Claim id="c8">`anchorWriterLedger` scans inline `Claim` markers in the MDX.</Claim> <Claim id="c9">`anchorWriterLedger` rejects a marker that has no ledger entry.</Claim> <Claim id="c10">`anchorWriterLedger` rejects a ledger entry whose marker is absent from the MDX.</Claim>
 
-Rollups are pessimistic through `rollUpGuarantee`: a parent displays the weakest guarantee among the provable child levels passed to it. When there is nothing provable under a parent, the rollup is `scored`.
+## The ledger path
 
-## The pipeline
+After a page is accepted, the kernel owns the durable record. <Claim id="c11">`claimLedgerSchema` exists.</Claim> <Claim id="c12">`claimLedgerSchema` records a `sourceRevision` field.</Claim> <Claim id="c13">`ledgerClaimSchema` records an `anchor` field.</Claim> <Claim id="c14">`ledgerClaimSchema` records a `quote` field.</Claim> <Claim id="c15">`ledgerClaimSchema` records a `correctness` field.</Claim> <Claim id="c16">`ledgerClaimSchema` records a `disposition` field.</Claim>
 
-`runGenerate` builds a codemap before page generation by calling `buildCodemap` with the current commit and registered language packs. The codemap is the source index used later by writers, claim grounding, and verifiers.
+Anchoring is deliberately conservative. <Claim id="c17">`anchorWriterLedger` initializes each anchored code-dependent claim as `unchecked`.</Claim> <Claim id="c18">`anchorWriterLedger` initializes each anchored `intent-history` claim with the `maintainer-input-needed` disposition.</Claim> <Claim id="c19">`anchorWriterLedger` stores uncovered coverage-lint spans in `coverageLint.uncovered`.</Claim>
 
-For each page, `generatePage` runs a bounded loop. Each attempt builds a `write-page` task with the page brief, config, glossary, codemap, prior findings, enabled components, instructions, stored knowledge, and the `flagQuestion` tool.
+Verification then updates the trust state. <Claim id="c20">`CLAIM_VERIFICATION_CHECK` is claim-verification</Claim>. <Claim id="c21">`verifyClaims` assigns each claim a `correctness` value.</Claim> <Claim id="c22">`verifyClaims` emits `ClaimEvidence` records for reader-facing trust data.</Claim> <Claim id="c23">`claimCorrectnessSchema` allows `checked`.</Claim> <Claim id="c24">`claimCorrectnessSchema` allows `unchecked`.</Claim> <Claim id="c25">`claimCorrectnessSchema` allows `contradicted`.</Claim>
 
-After the writer returns MDX, `generatePage` extracts a `PageEntity`, records observed file reads from the transcript, and creates a `PageArtifact` containing the entity tree, MDX text, MDX path, locale, and version.
+## Checkable wording
 
-The draft then goes through deterministic verification and persona review:
+A claim is checkable only when the visible marker text and the ledger predicate say the same canonical thing. <Claim id="c26">`assessClaimCheckability` exists.</Claim> <Claim id="c27">`canonicalizeAssertionText` collapses whitespace.</Claim> <Claim id="c28">`canonicalizeAssertionText` removes one trailing period.</Claim>
 
-- `runVerifiers` runs registered verifiers that apply to the current artifact.
-- `reviewPage` runs one reviewer task for each configured persona.
-- Error-severity verifier findings and error-severity review findings feed the same retry loop.
+The existence grammar is small on purpose. <Claim id="c29">`existenceAssertionForms` is exists,is defined,is available,is exported</Claim>. In page prose, write the marker around only the atomic fact, such as `runGenerateCommand exists`, then keep surrounding context outside the marker.
 
-When no verifier or review errors remain, `attachExtractedClaims` runs the claims stage. It extracts checkable claims from the generated page, matches them against the codemap with `matchClaim`, and attaches claim entities to blocks. A grounded claim becomes `proven`; an unverifiable claim becomes `scored`; a defective claim creates a `claim-grounding` error finding.
+Value claims use the bound value path as the subject. <Claim id="c30">`renderValuePathSubject` renders parameter defaults as a call-shaped subject.</Claim> <Claim id="c31">`parseValueAssertionText` parses value assertions with `is set to`.</Claim> <Claim id="c32">`parseValueAssertionText` parses value assertions with `defaults to`.</Claim> <Claim id="c33">`parseValueAssertionText` parses value assertions with `equals`.</Claim> <Claim id="c34">`parseValueAssertionText` parses value assertions with `is`.</Claim>
 
-After successful claim grounding, `liftClaimGroundedBlocks` promotes a prose block to `proven` when every attached claim is `proven`, then recomputes page and section rollups.
+Schema claims have their own canonical forms. <Claim id="c35">`schemaPresenceVerbs` is requires,accepts,defines,records,stores</Claim>. <Claim id="c36">`parseSchemaDefaultAssertionText` accepts the split default spelling.</Claim> <Claim id="c37">`parseSchemaDefaultAssertionText` accepts the dotted default spelling.</Claim>
 
-If errors remain after the configured attempts, `generatePage` writes a shard with an open system flag instead of hiding the problem. The page outcome is `flagged`, and the flag detail includes the remaining finding checks and messages.
+The visible text also has to bind the subject and value. <Claim id="c38">`bindClaimSubject` requires the subject name in the visible marker text.</Claim> <Claim id="c39">`bindClaimSubject` requires the subject name in the predicate.</Claim> <Claim id="c40">`bindCitedValue` requires the cited value in the visible marker text.</Claim> <Claim id="c41">`bindCitedValue` requires the cited value in the predicate.</Claim>
 
-## Deterministic verifier results
+## Claim decisions
 
-Each verifier returns a `VerifierRunResult` through `runVerifier`. A verifier result is `pass` when it has no error-severity findings, `fail` when it has at least one error-severity finding, and `error` when the verifier itself crashes. Some verifiers can also return `skipped`.
+The claim verifier has four built-in classes. <Claim id="c42">`builtinClaimClasses` is code-structure,value,behavior,intent-history</Claim>.
 
-Only verifiers whose definitions set `proves: true` can upgrade covered entities through `assignGuarantees`. A passing proving verifier adds its `coveredEntityIds` to the proven set. If an error finding names an entity, that entity is removed from the proven set.
+For structure claims, the deciding path is narrow. <Claim id="c43">`verifyClaims` checks canonical `code-structure` existence claims with `codemap-grounding` evidence.</Claim> <Claim id="c44">`verifyClaims` can contradict an `is exported` claim when the codemap visibility is not public.</Claim> <Claim id="c45">`verifyClaims` can decide schema presence claims with `schema-check` evidence.</Claim>
 
-## Built-in verifier ids
+For value claims, the source value has to match the cited value. <Claim id="c46">`verifyClaims` compares cited-value subscriptions with extracted cited values.</Claim> <Claim id="c47">`verifyClaims` marks a mismatched value claim as `contradicted`.</Claim> <Claim id="c48">`verifyClaims` leaves an unresolvable value claim as `unchecked`.</Claim> <Claim id="c49">`verifyClaims` can decide schema default claims with `schema-check` evidence.</Claim>
 
-The built-in verifier plugin is `@docstube/verifiers`. Its `builtinVerifierIds` are registered in this order:
+For behavior and history, the current state is explicit. <Claim id="c50">`verifyClaims` leaves `behavior` claims as `unchecked` in 0.1.0.</Claim> <Claim id="c51">`verifyClaims` leaves `intent-history` claims with the `maintainer-input-needed` disposition.</Claim>
 
-| Verifier id | Scope | Locale behavior | Proves | What it checks |
-| --- | --- | --- | --- | --- |
-| `mdx-compile` | page | per-locale | no | Compiles each page with the MDX compiler and separately validates fenced frontmatter as YAML. |
-| `internal-links` | site | per-locale | no | Finds markdown links and JSX anchor hrefs, ignores external targets, checks same-page anchors against section anchors, and checks internal page paths against generated slugs. |
-| `code-typecheck-ts` | block | source-only | yes | Typechecks `ts`, `tsx`, and `typescript` code-example blocks in isolation with TypeScript diagnostics. |
-| `entity-integrity` | page | per-locale | no | Checks unique entity ids, unique section anchors, valid block content hashes, known component block types, and component metadata schemas. |
-| `snippet-exec` | block | source-only | yes | Runs executable `bash`, `sh`, `js`, `javascript`, `ts`, and `typescript` code examples unless the fence has `no-exec`. |
-| `shellcheck` | block | source-only | no | Runs ShellCheck on `bash` and `sh` code-example blocks when `shellcheck` is available. |
-| `sample-parses` | block | per-locale | yes | Checks `json`, `yaml`, and `yml` code-example blocks with `parseJsonSample` or `parseYamlSample`. |
-| `prose-lints` | page | per-locale | no | Runs deterministic prose lints for banned phrases, repeated sentence openings, and monotone sentence lengths outside code and JSX. |
-| `diagram-d2` | block | source-only | yes | Compiles `d2` diagrams and checks whether extracted diagram nodes ground to codemap symbols. |
+## Built-in page checks
 
-Warnings are still visible. `runVerifier` treats warnings-only output as `pass`, but warnings do not make an entity proven unless the verifier is proving and covers that entity. Several verifiers deliberately use warnings for conditions that should be visible without becoming a hard gate, such as missing matching fences, unknown component block types, style lints, or ungrounded non-strict D2 nodes.
+The built-in verifier plugin is registered through the same plugin path as other verifiers. <Claim id="c52">`builtinVerifierIds` exists.</Claim> <Claim id="c53">`verifiersPluginName` is @docstube/verifiers</Claim>.
 
-## Claim grounding
+Current built-ins:
 
-The claims stage is separate from the built-in verifier list. It runs on the clean path after deterministic verification and persona review.
+- <Claim id="c54">`mdxCompileVerifier` uses verifier id `mdx-compile`.</Claim>
+- <Claim id="c55">`internalLinksVerifier` uses verifier id `internal-links`.</Claim>
+- <Claim id="c56">`codeTypecheckTsVerifier` uses verifier id `code-typecheck-ts`.</Claim>
+- <Claim id="c57">`entityIntegrityVerifier` uses verifier id `entity-integrity`.</Claim>
+- <Claim id="c58">`snippetExecVerifier` uses verifier id `snippet-exec`.</Claim>
+- <Claim id="c59">`shellcheckVerifier` uses verifier id `shellcheck`.</Claim>
+- <Claim id="c60">`sampleParsesVerifier` uses verifier id `sample-parses`.</Claim>
+- <Claim id="c61">`proseLintsVerifier` uses verifier id `prose-lints`.</Claim>
+- <Claim id="c62">`diagramD2Verifier` uses verifier id `diagram-d2`.</Claim>
 
-`attachExtractedClaims` calls the claim extractor, locates each claim anchor in the MDX, maps the anchor to a block source range, and checks the extracted claim against a codemap index. The resulting `claim-grounding` finding is an error when a claim references something defective. That error sends the page back through the bounded retry loop.
+Those checks mostly protect pages and examples, not the prose claim state. <Claim id="c63">`mdxCompileVerifier` checks MDX compilation.</Claim> <Claim id="c64">`mdxCompileVerifier` checks frontmatter YAML parsing.</Claim> <Claim id="c65">`internalLinksVerifier` checks same-page anchors.</Claim> <Claim id="c66">`internalLinksVerifier` checks internal page slugs.</Claim> <Claim id="c67">`codeTypecheckTsVerifier` typechecks `ts`, `tsx`, and `typescript` code-example blocks.</Claim> <Claim id="c68">`snippetExecVerifier` executes JavaScript and TypeScript samples by default.</Claim> <Claim id="c69">`snippetExecVerifier` executes shell samples only when the fence metadata contains `exec`.</Claim> <Claim id="c70">`shellcheckVerifier` runs shellcheck for `bash` and `sh` code-example blocks.</Claim> <Claim id="c71">`sampleParsesVerifier` parses `json`, `yaml`, and `yml` code-example blocks.</Claim> <Claim id="c72">`diagramD2Verifier` compiles `d2` code-example blocks.</Claim> <Claim id="c73">`diagramD2Verifier` warns for ungrounded diagram nodes unless the fence metadata contains `strict`.</Claim> <Claim id="c74">`proseLintsVerifier` emits warning findings for banned prose phrases.</Claim>
 
-A grounded claim becomes `proven`. An unverifiable claim becomes `scored`. A claim whose anchor quote cannot be located is counted as unanchored and is not attached to a block.
+## Coverage and the badge
 
-## Why flags ship
+The coverage linter is a deterministic floor. <Claim id="c75">`lintUncoveredAssertions` exists.</Claim> <Claim id="c76">`coverageLintRules.numericLiteral` is identifier-with-numeric-literal</Claim>. <Claim id="c77">`coverageLintRules.assertionVerb` is identifier-with-assertion-verb</Claim>. <Claim id="c78">`lintUncoveredAssertions` ignores code-example blocks.</Claim> <Claim id="c79">`lintUncoveredAssertions` records at most 20 spans per page.</Claim>
 
-Docstube does not treat unresolved verification as invisible failure. `generatePage` writes flags into the page shard when verification or review still fails after retries. The GitHub Action later reads committed manifest shards with `loadVerifiedDelta`, counts content-bearing block and claim guarantees with `countPageGuarantees`, and includes open flags in the verified delta.
+A complete badge is computed from the committed trust data. <Claim id="c80">`projectShardProof` counts `checked` claim evidence records.</Claim> <Claim id="c81">`projectShardProof` counts `contradicted` claim evidence records.</Claim> <Claim id="c82">`projectShardProof` sets `complete` to false when `uncoveredAssertions` is greater than 0.</Claim> <Claim id="c83">`projectShardProof` sets `complete` to false when `dirtyWorkingTree` is true.</Claim> <Claim id="c84">`projectShardProof` sets `complete` to true only when `totalClaims` is greater than 0.</Claim>
 
-That means a page can be present while still showing exactly what remained unproven or broken. Flagged-but-visible is the fallback path for bounded automation: the docs stay usable, and the unresolved risk is carried in machine-readable state instead of being buried in generated prose.
+Read that badge literally. <Claim id="c85">`projectShardProof` does not use `riskCriticFindings` to compute `complete`.</Claim> <Claim id="c86">`projectShardProof` exposes `semanticAssertionRisks` separately from `uncoveredAssertions`.</Claim> A complete page means the kernel found checked evidence for every claim in the ledger, found no deterministic uncovered assertion spans, and did not withhold completeness for a dirty working tree. It does not mean a human never needs to review the page.
 
 ## Writing plugins
 
@@ -480,114 +509,119 @@ URL: /writing-plugins/
 
 # Writing plugins
 
-`@docstube/plugin-sdk` exposes `definePlugin` as the plugin entry point. It also re-exports plugin contract schemas and types, including `pluginManifestSchema`, `pluginPermissionsSchema`, `pluginCapabilityKindSchema`, `PluginManifest`, `PluginPermissions`, `PluginCapabilityKind`, `VerifierRunResult`, `Finding`, and `SymbolRecord`.
+Start with the SDK entry point, then decide which hook your repository needs. <Claim id="c1">`definePlugin` is exported.</Claim> <Claim id="c2">`PluginRegistrationHost` is exported.</Claim> <Claim id="c3">`PluginManifest` is exported.</Claim>
 
-A plugin module must default-export the value returned by `definePlugin`. The loader rejects a module whose default export was not created with `definePlugin`.
+A plugin file should default-export a `definePlugin` call. <Claim id="c4">`definePlugin` parses manifest input with `pluginManifestSchema`.</Claim> <Claim id="c5">`definePlugin` throws a `TypeError` when `register` is not a function.</Claim> <Claim id="c6">`definePlugin` returns a frozen branded plugin object.</Claim>
 
-```ts
+```ts no-exec
 import { definePlugin } from '@docstube/plugin-sdk';
+import type {
+  Finding,
+  PageArtifact,
+  VerifierContext,
+  VerifierDefinition,
+  VerifierRunResult
+} from '@docstube/plugin-sdk';
+
+const verifierId = 'frontmatter-title';
+
+const verify = async (_ctx: VerifierContext, pages: PageArtifact[]): Promise<VerifierRunResult> => {
+  const findings: Finding[] = [];
+
+  for (const artifact of pages) {
+    const hasTitle = /^title:\s*\S/mu.test(artifact.mdx);
+    if (!hasTitle) {
+      findings.push({
+        source: 'verifier',
+        check: verifierId,
+        severity: 'error',
+        message: `page "${artifact.page.slug}" is missing a frontmatter title`,
+        entity: { version: artifact.version, locale: artifact.locale, pageId: artifact.page.id },
+        file: artifact.mdxPath
+      });
+    }
+  }
+
+  return {
+    verifier: verifierId,
+    plugin: 'docstube-plugin-frontmatter-title',
+    status: findings.some((finding) => finding.severity === 'error') ? 'fail' : 'pass',
+    findings,
+    coveredEntityIds: pages.map((artifact) => artifact.page.id)
+  };
+};
+
+export const frontmatterTitleVerifier: VerifierDefinition = {
+  id: verifierId,
+  title: 'Frontmatter title',
+  scope: 'page',
+  localeScope: 'per-locale',
+  proves: true,
+  verify
+};
 
 export default definePlugin({
   apiVersion: 1,
-  name: 'docstube-plugin-wordcount',
+  name: 'docstube-plugin-frontmatter-title',
   version: '0.1.0',
+  description: 'Fails pages that omit a frontmatter title.',
   permissions: { network: false, exec: [], writableRoots: [] },
-  capabilities: [{ kind: 'verifier', ids: ['wordcount'] }],
+  capabilities: [{ kind: 'verifier', ids: [verifierId] }],
   register: (host) => {
-    host.verifier({
-      id: 'wordcount',
-      title: 'Page word budget',
-      scope: 'page',
-      localeScope: 'per-locale',
-      proves: false,
-      verify: async (_ctx, pages) => ({
-        verifier: 'wordcount',
-        plugin: 'docstube-plugin-wordcount',
-        status: 'pass',
-        findings: [],
-        coveredEntityIds: pages.map((artifact) => artifact.page.id)
-      })
-    });
+    host.verifier(frontmatterTitleVerifier);
   }
 });
 ```
 
-## Manifest validation
+## Manifest
 
-`definePlugin` accepts the manifest fields plus `register`, parses the manifest fields with `pluginManifestSchema`, checks that `register` is a function, and returns a branded `DocstubePlugin`.
+Keep the manifest honest because the host compares declarations with registrations. <Claim id="c7">`pluginApiVersion` is 1.</Claim> <Claim id="c8">`pluginManifestSchema` requires `apiVersion` to equal `pluginApiVersion`.</Claim> <Claim id="c9">`pluginManifestSchema` requires at least one capability declaration.</Claim>
 
-`pluginManifestSchema` requires `apiVersion: 1`, a valid plugin package name, a semver `version`, and at least one capability declaration. `description` is optional.
+Permissions are declared in the manifest. <Claim id="c10">`pluginPermissionsSchema.network` defaults to false.</Claim> <Claim id="c11">`pluginPermissionsSchema.exec` defaults to an empty array.</Claim> <Claim id="c12">`pluginPermissionsSchema.writableRoots` defaults to an empty array.</Claim>
 
-`pluginPermissionsSchema` has three fields: `network`, `exec`, and `writableRoots`. The schema defaults are `network: false`, `exec: []`, and `writableRoots: []`.
+For maintainers, the practical review is simple: use `network: false` unless the plugin contacts a service, list only the executables the plugin calls through `ctx.exec`, and list only repo-relative roots the plugin writes through `ctx.fs.writeFile`.
 
-```ts
-import { pluginPermissionsSchema } from '@docstube/plugin-sdk';
+## Hooks
 
-const permissions = pluginPermissionsSchema.parse({
-  network: false,
-  exec: [],
-  writableRoots: []
-});
+The registration host is the plugin's connection to docstube. <Claim id="c13">`PluginRegistrationHost.verifier` exists.</Claim> <Claim id="c14">`PluginRegistrationHost.languagePack` exists.</Claim> <Claim id="c15">`PluginRegistrationHost.contentSource` exists.</Claim> <Claim id="c16">`PluginRegistrationHost.importer` exists.</Claim> <Claim id="c17">`PluginRegistrationHost.deployTarget` exists.</Claim> <Claim id="c18">`PluginRegistrationHost.searchProvider` exists.</Claim> <Claim id="c19">`PluginRegistrationHost.component` exists.</Claim>
 
-console.log(permissions);
-```
+A verifier is the usual first plugin because it can add a repository-specific check without changing docstube itself. <Claim id="c20">`VerifierDefinition.scope` accepts `block`, `page`, or `site`.</Claim> <Claim id="c21">`VerifierDefinition.localeScope` accepts `source-only` or `per-locale`.</Claim> <Claim id="c22">`VerifierDefinition.verify` receives a `VerifierContext` and an array of `PageArtifact` values.</Claim>
 
-## Registration hooks
+The verifier example above returns a `VerifierRunResult`. <Claim id="c23">`VerifierRunResult.status` accepts `pass`, `fail`, `error`, or `skipped`.</Claim> <Claim id="c24">`Finding.severity` accepts `info`, `warning`, or `error`.</Claim>
 
-`register(host)` receives a `PluginRegistrationHost`. The host has seven registration methods:
+## Runtime Handles
 
-| Method | Definition type |
-| --- | --- |
-| `host.verifier(...)` | `VerifierDefinition` |
-| `host.languagePack(...)` | `LanguagePackDefinition` |
-| `host.contentSource(...)` | `ContentSourceDefinition` |
-| `host.importer(...)` | `ImporterDefinition` |
-| `host.deployTarget(...)` | `DeployTargetDefinition` |
-| `host.searchProvider(...)` | `SearchProviderDefinition` |
-| `host.component(...)` | `ComponentDefinition` |
+Verifier code receives controlled helpers through `VerifierContext`. <Claim id="c25">`PluginFs.readFile` exists.</Claim> <Claim id="c26">`PluginFs.exists` exists.</Claim> <Claim id="c27">`PluginFs.writeFile` exists.</Claim> <Claim id="c28">`PluginExec` accepts `cwd`, `input`, `timeoutMs`, and `env` options.</Claim>
 
-The matching capability kinds are `verifier`, `language-pack`, `content-source`, `importer`, `deploy-target`, `search-provider`, and `component`.
+The core verifier runner wires those helpers from the plugin manifest. <Claim id="c29">`createPluginExec` rejects a command that is not listed in `permissions.exec`.</Claim> <Claim id="c30">`createPluginFs.writeFile` throws when a write target is outside `writableRoots`.</Claim>
 
-During registration, docstube checks each registered id or component name against the plugin manifest capabilities. Registering an undeclared capability is an error. Declaring a capability without registering it is recorded as a warning.
+## Loading
 
-## Verifier shape
-
-A verifier definition contains `id`, `title`, optional `description`, `scope`, optional `appliesTo`, `localeScope`, `proves`, and `verify`.
-
-`scope` is typed as `'block' | 'page' | 'site'`. `localeScope` is typed as `'source-only' | 'per-locale'`. `verify` receives a `VerifierContext` and an array of `PageArtifact` values, then returns a `VerifierRunResult`.
-
-A verifier context includes the repository root, parsed config, codemap, glossary, block type registry, plugin file-system helper, plugin exec helper, and logger. `PluginFs` provides `readFile`, `exists`, and `writeFile`. `PluginExec` runs a command with arguments and optional `cwd`, `input`, `timeoutMs`, and `env`.
-
-## Permissions
-
-`permissions.network` declares whether the plugin intends to make network calls.
-
-`permissions.exec` lists executables the plugin may spawn through the host-provided `ctx.exec` helper. The `PluginExec` type takes a command, argument list, and optional execution options.
-
-`permissions.writableRoots` lists repo-relative roots the plugin may write through `ctx.fs.writeFile`. An empty list means the plugin declares no writable roots.
-
-## Loading plugins
-
-`loadConfiguredPlugins` loads every specifier in `config.plugins`.
-
-Local plugin specifiers start with `.` or are absolute paths. They are imported from the repository root. Other specifiers are resolved as npm dependencies from the documented repository by using `createRequire` with that repository's `package.json`.
-
-After import, the loader reads the module default export and rejects it unless `isDocstubePlugin` returns true. Loaded plugins are registered with source `"local"` or `"npm"`.
+Enable plugins in `docstube.yml`.
 
 ```yaml
 plugins:
-  - docstube-plugin-wordcount
-  - ./plugins/wordcount.ts
+  - docstube-plugin-frontmatter-title
+  - ./plugins/frontmatter-title.ts
 ```
 
-## Scaffolding
+The loader treats the two forms differently. <Claim id="c31">`loadConfiguredPlugins` reads plugin specifiers from `config.plugins`.</Claim> <Claim id="c32">`loadConfiguredPlugins` treats relative and absolute plugin specifiers as local plugins.</Claim> <Claim id="c33">`loadConfiguredPlugins` resolves npm plugin specifiers from the documented repository.</Claim> <Claim id="c34">`loadConfiguredPlugins` rejects a plugin module whose default export was not created with `definePlugin`.</Claim>
 
-The CLI `plugin` command supports the `scaffold` action.
+Use a local path while developing a private verifier. Use an npm package when multiple repositories should share the same plugin.
 
-`docstube plugin scaffold <name>` writes `plugins/<name>.ts` and `plugins/<name>.spec.ts` from the plugin-authoring example source, then materializes `.docstube/skills/plugin-authoring/SKILL.md`.
+## Scaffold
+
+The CLI has a starter path for plugin authors. <Claim id="c35">`runPluginCommand` is exported.</Claim> <Claim id="c36">`runPluginCommand` accepts only the `scaffold` action.</Claim> <Claim id="c37">`runPluginCommand` writes `plugins/<name>.ts`.</Claim> <Claim id="c38">`runPluginCommand` writes `plugins/<name>.spec.ts`.</Claim> <Claim id="c39">`runPluginCommand` materializes the `plugin-authoring` skill.</Claim>
 
 ```bash
-docstube plugin scaffold wordcount
+pnpm docstube plugin scaffold frontmatter-title
 ```
 
-The scaffold command prints the local plugin entry to add to `docstube.yml`, points the authoring agent at `.docstube/skills/plugin-authoring/SKILL.md`, and notes that `docstube check --list` shows the check after the plugin registers a verifier.
+After scaffolding, register the generated local plugin in `docstube.yml`.
+
+```yaml
+plugins:
+  - ./plugins/frontmatter-title.ts
+```
+
+Then point your coding agent at `.docstube/skills/plugin-authoring/SKILL.md` when the starter needs custom verifier logic, a language pack, a deploy target, or another hook kind.

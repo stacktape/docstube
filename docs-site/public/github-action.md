@@ -1,23 +1,21 @@
 ---
-title: "CI and the GitHub Action"
-description: "Run docstube in GitHub Actions, open verified documentation PRs, deliver flags, and gate auto-merge from the committed manifest."
+title: 'CI and the GitHub Action'
+description: 'How the docstube GitHub Action runs generation, reports verified changes, and gates auto-merge.'
 ---
 
 # CI and the GitHub Action
 
-The GitHub Action metadata is defined in `apps/github-action/action.yml`. In this repository, the action identifier is the local path `./apps/github-action`; that identifier only works in workflows for a repository that contains that path.
+The GitHub Action is the CI wrapper around the CLI. <Claim id="c1">`createDocstubeCliArgs` runs `generate` with `--ci`.</Claim> <Claim id="c2">`createDocstubePreflightArgs` runs `doctor` with `--ci` and `--json`.</Claim>
 
-<Callout>
-The source defines the local action path and the package name `@docstube/action`, but it does not define a public `uses:` reference. If you run docstube from another repository, replace `./apps/github-action` with the action location you have installed, vendored, or published.
-</Callout>
+Use your workflow triggers to decide when docs regenerate. A common starting point is to run the Action on pushes to the branch that owns your docs and on manual dispatch:
 
 ```yaml
 name: docstube
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -25,76 +23,49 @@ permissions:
   issues: write
 
 jobs:
-  generate-docs:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run docstube
-        uses: ./apps/github-action
+      - uses: docstube/action@v0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-The action always runs `docstube generate` — the idempotent reconciler handles first runs and ongoing maintenance alike. The former `mode` input was removed; workflows still passing it fail with an actionable message.
+## Preflight
 
-The `github-token` input is used by the `gh` CLI for pull requests, PR comments, the digest issue, and auto-merge. If it is not provided, the action reads `GITHUB_TOKEN`.
+Before generation, <Claim id="c3">`runGitHubAction` evaluates CI preflight before it checks out the base branch.</Claim> <Claim id="c4">`runGitHubAction` returns before generation when CI preflight is blocked.</Claim> When the preflight report cannot be used, <Claim id="c5">`runGitHubAction` falls back to `checkModelCredential`.</Claim>
 
-The model credential is separate from the GitHub token. Before running the CLI, the action checks for API key environment variables. If `docstube.yml` names variables with `apiKeyEnv:`, those names are checked. Otherwise, the action checks common names including `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, and `GEMINI_API_KEY`.
+The Action also exposes the preflight result to later workflow steps: <Claim id="c6">`setActionOutputs` writes the `preflight` output.</Claim> <Claim id="c7">`setActionOutputs` writes the `automation-mode` output.</Claim>
 
-## Inputs
+## Generate And Commit
 
-| Input | Default | Behavior |
-| --- | --- | --- |
-| `github-token` | `GITHUB_TOKEN` | Token passed to `gh` for PRs, comments, issues, and auto-merge. |
-| `base-branch` | `GITHUB_BASE_REF`, then `GITHUB_REF_NAME`, then `main` | Branch checked out and targeted by the PR. |
-| `branch-prefix` | `docstube/docs` | Prefix for the generated docs branch. |
-| `commit-message` | `docs: docstube generate` | Commit message for the docs update. |
-| `docstube-package` | `docstube@0.0.2` | Package spec passed to `npx --yes`. |
-| `workspace` | `GITHUB_WORKSPACE`, then the current working directory | Checked-out repository path. |
+The Action prepares a branch and then runs the CLI. <Claim id="c8">`runGitHubAction` checks out the base branch before it creates the docstube branch.</Claim> <Claim id="c9">`runGitHubAction` reads the head commit before it runs docstube.</Claim>
 
-The action rejects the removed `dry-run` and `mode` inputs. It always opens or updates a real pull request when there are commit-worthy changes.
+The committed manifest is the docs lockfile for the PR report. <Claim id="c10">`manifestIndexRelativePath` is `.docstube/manifest/manifest.json`.</Claim> <Claim id="c11">`loadVerifiedDelta` reads the manifest index from `manifestIndexRelativePath`.</Claim> <Claim id="c12">`loadVerifiedDelta` returns `undefined` when the manifest index is missing.</Claim>
 
-## What The Action Runs
+The Action stages a bounded set of paths. <Claim id="c13">`selectCommitPaths` filters changed files through `machineLocalPatterns`.</Claim> <Claim id="c14">`verifyOutputInventory` returns staged paths, undeclared paths, and hash mismatches.</Claim> <Claim id="c15">`runGitHubAction` commits `inventoryCheck.stagedPaths` when an inventory check exists.</Claim>
 
-The action checks out the base branch, creates or resets a docs branch, and runs the CLI as:
+## Pull Request Report
 
-```bash
-npx --yes docstube@0.0.2 generate
-```
+When there is committed work, <Claim id="c16">`runGitHubAction` creates a pull request when no open pull request exists for the docstube branch.</Claim> <Claim id="c17">`runGitHubAction` updates the open pull request when one already exists for the docstube branch.</Claim>
 
-The package spec changes when `docstube-package` is set.
+The PR body is generated from the verified delta and merge decision. <Claim id="c18">`buildPullRequestBody` includes the changed pages section when a verified delta exists.</Claim> <Claim id="c19">`buildPullRequestBody` includes the open flags section when a verified delta exists.</Claim> <Claim id="c20">`buildPullRequestBody` includes the publication decision section.</Claim>
 
-After the CLI exits successfully, the action reads `git status --porcelain`, filters out machine-local state under `.docstube/db.sqlite`, `.docstube/cache/`, and `.docstube/runs/`, and commits the remaining changed paths together.
-
-That single commit can include generated docs, manifest shards, criteria, instructions, and knowledge files. If no commit-worthy paths remain, the action writes a job summary and does not open a PR.
-
-## Manifest Delta
-
-The action computes the verified delta from `.docstube/manifest/manifest.yml` and page shard files under `.docstube/manifest/pages/...`. It does not derive the PR decision from CLI prose.
-
-The PR body and job summary include changed pages, guarantee counts, open flag counts, the decision, and committed files when the manifest delta is available. If no manifest index is found, the action leaves the PR open without auto-merge.
+The job summary follows the same run outcome. <Claim id="c21">`buildJobSummary` reports no branch and no pull request for failed runs.</Claim> <Claim id="c22">`buildJobSummary` reports no documentation changes for no-change runs.</Claim> <Claim id="c23">`buildJobSummary` reports the pull request URL for pull-request runs.</Claim>
 
 ## Auto-Merge Gate
 
-The merge decision uses open flags from readable page shards plus manifest system flags. Auto-merge is eligible only when no open flag has a blocking kind.
+Auto-merge is gated by the publication artifacts, open blocking flags, and inventory validation. <Claim id="c24">`publicationDecisionRelativePath` is `.docstube/runs/publication-decision.json`.</Claim> <Claim id="c25">`outputInventoryRelativePath` is `.docstube/runs/output-inventory.json`.</Claim> <Claim id="c26">`loadPublicationArtifacts` returns a failed validation when the output inventory file is missing.</Claim> <Claim id="c27">`loadPublicationArtifacts` returns a failed validation when the publication decision file is missing.</Claim>
 
-Blocking open flag kinds are:
+The Action enforces that decision after the CLI has run. <Claim id="c28">`decideAutoMerge` withholds auto-merge when a blocking open flag exists.</Claim> <Claim id="c29">`decideAutoMerge` withholds auto-merge when publication validation is not ok.</Claim> <Claim id="c30">`decideAutoMerge` withholds auto-merge when undeclared paths exist.</Claim> <Claim id="c31">`decideAutoMerge` enables auto-merge when `withheldReasons` is empty.</Claim>
 
-- `out-of-domain`
-- `coverage`
-- `guarantee-downgrade`
-- `structural-change`
-- `system`
+If the gate passes and GitHub accepts the request, <Claim id="c32">`runGitHubAction` enables auto-merge through `mergeControl.enableAutoMerge`.</Claim> <Claim id="c33">`createMergeControl` requests the squash merge method.</Claim>
 
-`tribal-knowledge` is not in the hardcoded blocking list. Open tribal-knowledge questions can be delivered without blocking the docs PR.
+## Flags And Tribal Knowledge
 
-When the PR is eligible, the action calls GitHub's auto-merge API with squash merge. If GitHub rejects that request, the action leaves the PR open and reports auto-merge as unavailable.
+Flags are delivered on the pull request when the PR number is known. <Claim id="c34">`runGitHubAction` calls `deliverFlags` when the merge decision has open flags.</Claim> <Claim id="c35">`planCommentUpsert` updates an existing comment when that comment body includes the marker.</Claim> <Claim id="c36">`planCommentUpsert` creates a comment when no existing comment body includes the marker.</Claim>
 
-## Flag Delivery
-
-When a PR has open flags, the action posts a marker-tagged PR comment. On later runs, it updates the existing marker-tagged comment instead of creating another one.
-
-Tribal-knowledge flags are also collected into a long-lived issue titled `docstube: open questions`. The action searches for an open issue with that title, updates it if it exists, and creates it otherwise.
+Tribal-knowledge flags also feed a durable issue. <Claim id="c37">`digestIssueTitle` is `docstube: open questions`.</Claim> <Claim id="c38">`upsertTribalDigestIssue` filters open flags to `tribal-knowledge` flags.</Claim> <Claim id="c39">`upsertTribalDigestIssue` creates the digest issue when tribal-knowledge flags exist and no digest issue exists.</Claim> <Claim id="c40">`upsertTribalDigestIssue` updates the digest issue when a digest issue already exists.</Claim>

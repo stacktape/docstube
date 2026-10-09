@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Wave 2b close. STATIC LITERAL PROPS CANNOT REACH A PROTOTYPE. An object key named `__proto__` does

@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Wave 2b close. The COVERAGE LINTER now runs its two halves at two explicitly different scopes: the
@@ -14,5 +14,5 @@ so quoted (`"docstubeReviewedFor"`), explicit (`? docstubeReviewedFor`), indente
 spellings can no longer smuggle a false editorial trust label onto an unreviewed page. Authored keys
 keep their comments, quoting, and block style; frontmatter that cannot be parsed as a mapping fails
 closed — the page renders with kernel-computed frontmatter only and the route is named in a warning.
-LOCALE ROUTE PREFIXES are compared case-insensitively, so slug `pt-br/foo` with locale `pt-BR` is
+LOCALE ROUTE PREFIXES are compared case-insensitively, so slug `pt-br/foo`with locale`pt-BR` is
 rejected at planning instead of aliasing on case-insensitive Windows/macOS filesystems.

@@ -134,33 +134,33 @@ The central DX problem is that docstube exposes its internal architecture—pipe
 
 10. **Preview/build contradicts the no-Node distribution story — significant**
 
-   **Why:** The standalone binary is presented as the no-Node path, but `docstube preview` shells out to `npm install` and `npm run build` inside the generated site. [preview-command.ts](/C:/Projects/docstube/apps/cli/src/commands/preview-command.ts:125) Generation tells every user to do the same, regardless of their package manager. A standalone-binary user may therefore generate source but be unable to preview or produce deployable static output.
+**Why:** The standalone binary is presented as the no-Node path, but `docstube preview` shells out to `npm install` and `npm run build` inside the generated site. [preview-command.ts](/C:/Projects/docstube/apps/cli/src/commands/preview-command.ts:125) Generation tells every user to do the same, regardless of their package manager. A standalone-binary user may therefore generate source but be unable to preview or produce deployable static output.
 
-   Running `npm install` inside a committed generated directory also creates network latency and can introduce lockfile or dependency drift after verification.
+Running `npm install` inside a committed generated directory also creates network latency and can introduce lockfile or dependency drift after verification.
 
-   **Better design:** Make assemble produce both ejectable source and a production static artifact using toolchain versions bundled or tightly owned by docstube. `preview` should serve that same artifact without installing anything. Deployment adapters should deploy it directly. If bundling the build is infeasible, emit a pinned lockfile, select the detected package manager, perform the build during generation, and explicitly state that the standalone path still requires Node for site building.
+**Better design:** Make assemble produce both ejectable source and a production static artifact using toolchain versions bundled or tightly owned by docstube. `preview` should serve that same artifact without installing anything. Deployment adapters should deploy it directly. If bundling the build is infeasible, emit a pinned lockfile, select the detected package manager, perform the build during generation, and explicitly state that the standalone path still requires Node for site building.
 
-   **Cost:** Moderate to high now. After release, generated-site layout and hosting adapters will depend on whichever artifact boundary ships first.
+**Cost:** Moderate to high now. After release, generated-site layout and hosting adapters will depend on whichever artifact boundary ships first.
 
 11. **Error handling diagnoses components, not user recovery — significant**
 
-   **Why:** The wizard converts every config-family error—not just missing config—into `null`, so invalid existing config is misrepresented as first-run setup and only fails at the final overwrite attempt. [wizard.tsx](/C:/Projects/docstube/apps/local-ui/src/wizard.tsx:41) `doctor` then truncates config errors to the first line, discarding the useful field-level issues. [doctor-command.ts](/C:/Projects/docstube/apps/cli/src/commands/doctor-command.ts:89)
+**Why:** The wizard converts every config-family error—not just missing config—into `null`, so invalid existing config is misrepresented as first-run setup and only fails at the final overwrite attempt. [wizard.tsx](/C:/Projects/docstube/apps/local-ui/src/wizard.tsx:41) `doctor` then truncates config errors to the first line, discarding the useful field-level issues. [doctor-command.ts](/C:/Projects/docstube/apps/cli/src/commands/doctor-command.ts:89)
 
-   CLI help is also a manually maintained second description of the command registry. [cli-help.ts](/C:/Projects/docstube/apps/cli/src/cli-help.ts:1) This has already allowed the specification’s `--fresh` flags and the actual CLI surface to diverge. [PRODUCT.md](/C:/Projects/docstube/PRODUCT.md:230)
+CLI help is also a manually maintained second description of the command registry. [cli-help.ts](/C:/Projects/docstube/apps/cli/src/cli-help.ts:1) This has already allowed the specification’s `--fresh` flags and the actual CLI surface to diverge. [PRODUCT.md](/C:/Projects/docstube/PRODUCT.md:230)
 
-   **Better design:** Introduce one error renderer shared by CLI and UI: stable code, concise title, source location, cause, remediation, retry command, and optional details. Preserve the distinction between missing, invalid, incompatible, and unreadable configuration. Generate all help from one typed command definition and group it by lifecycle. Add a global `--json` result/error envelope for CI.
+**Better design:** Introduce one error renderer shared by CLI and UI: stable code, concise title, source location, cause, remediation, retry command, and optional details. Preserve the distinction between missing, invalid, incompatible, and unreadable configuration. Generate all help from one typed command definition and group it by lifecycle. Add a global `--json` result/error envelope for CI.
 
-   **Cost:** Low to moderate now; mostly centralization. After release, scripts and support material will depend on current text and exit behavior.
+**Cost:** Low to moderate now; mostly centralization. After release, scripts and support material will depend on current text and exit behavior.
 
 12. **Glossary feedback is not a closed learning loop — significant**
 
-   **Why:** `glossary.yaml` is optional and silently becomes an empty in-memory glossary when absent. [config-io.ts](/C:/Projects/docstube/packages/core/src/config/config-io.ts:77) Terminology feedback does not update that canonical file; it is appended to `.docstube/glossary/ui-feedback.md` under a header saying it must later be “folded into glossary.yaml.” [feedback.ts](/C:/Projects/docstube/packages/core/src/server/feedback.ts:17) That contradicts the promise that categorized feedback becomes durable shared learning automatically.
+**Why:** `glossary.yaml` is optional and silently becomes an empty in-memory glossary when absent. [config-io.ts](/C:/Projects/docstube/packages/core/src/config/config-io.ts:77) Terminology feedback does not update that canonical file; it is appended to `.docstube/glossary/ui-feedback.md` under a header saying it must later be “folded into glossary.yaml.” [feedback.ts](/C:/Projects/docstube/packages/core/src/server/feedback.ts:17) That contradicts the promise that categorized feedback becomes durable shared learning automatically.
 
-   The glossary’s array-of-objects form is also needlessly verbose for hand editing and permits competing entries for the same canonical term. [glossary-schema.ts](/C:/Projects/docstube/packages/contracts/src/glossary-schema.ts:5)
+The glossary’s array-of-objects form is also needlessly verbose for hand editing and permits competing entries for the same canonical term. [glossary-schema.ts](/C:/Projects/docstube/packages/contracts/src/glossary-schema.ts:5)
 
-   **Better design:** Make the canonical term the map key and update the typed YAML directly through the comment-preserving editor, with conflict handling when feedback overlaps an existing term. If automatic structured mutation is considered too risky, store a typed pending patch that the next run consumes—not an inert prose inbox. Use one filename convention across the config family.
+**Better design:** Make the canonical term the map key and update the typed YAML directly through the comment-preserving editor, with conflict handling when feedback overlaps an existing term. If automatic structured mutation is considered too risky, store a typed pending patch that the next run consumes—not an inert prose inbox. Use one filename convention across the config family.
 
-   **Cost:** Moderate now. After release, users will accumulate terminology in two incompatible stores and generated writing behavior will depend on which one they happened to edit.
+**Cost:** Moderate now. After release, users will accumulate terminology in two incompatible stores and generated writing behavior will depend on which one they happened to edit.
 
 ## Effectiveness and UX
 

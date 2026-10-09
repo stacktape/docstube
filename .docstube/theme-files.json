@@ -132,7 +132,7 @@
     },
     {
       "path": "src/layouts/DocLayout.astro",
-      "hash": "7c1bf951d92b4b50c283d1d05323a720c93924c1617ff233a4ccd2fc3625ac4e"
+      "hash": "98475138f73878c7d267a6c7c8781117705790fab10188c8a33e8e4e64ca21ac"
     },
     {
       "path": "src/styles/fonts.css",
@@ -140,7 +140,7 @@
     },
     {
       "path": "src/styles/global.css",
-      "hash": "901243cadb0569a2330be7d2633cf1291e925db296d3a6ed7ea0e0cc37c0a3d1"
+      "hash": "981ea896a4e21a5bf353292c6df85792caa077e9fe142d464fa8056c59da3d69"
     }
   ]
 }

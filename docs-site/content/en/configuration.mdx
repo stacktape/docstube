@@ -1,78 +1,154 @@
 ---
-title: "Configuration"
-description: "Configure the docstube config family, agents, versions, locales, components, plugins, and comment-preserving edits."
+title: 'Configuration'
+description: 'Configure docstube.yml, ia.yml, glossary.yaml, agents, locales, components, and plugins.'
 ---
 
 # Configuration
 
-`configFileNames` defines the config family file names: `docstube.yml`, `ia.yml`, and `glossary.yaml`.
+<Claim id="c1">`configFileNames.config` is docstube.yml.</Claim> <Claim id="c2">`configFileNames.ia` is ia.yml.</Claim>
+<Claim id="c3">`configFileNames.glossary` is glossary.yaml.</Claim>
 
-`loadConfigFamily` reads the files from the repository root. It requires `docstube.yml` and `ia.yml`, parses them with `parseDocstubeConfig` and `parseIaFile`, and returns an empty glossary with `schemaVersion: 1` and `terms: []` when `glossary.yaml` is absent.
+These files are the configuration family a maintainer edits when a repository's documentation intent changes. <Claim id="c4">`loadConfigFamily` reads `docstube.yml` and `ia.yml`.</Claim> <Claim id="c5">`loadConfigFamily` uses an empty glossary when `glossary.yaml` is absent.</Claim>
 
-## `docstube.yml`
+## Main Config
 
-`docstubeConfigSchema` validates the main intent config. The schema covers document type, project context, personas, sources, agents, versions, locales, theme, site metadata, enabled components, configured plugins, coverage, output directory, telemetry, and reserved screenshot config.
+<Claim id="c6">`docstubeConfigSchema` requires `schemaVersion`.</Claim>
+<Claim id="c7">`docstubeConfigSchema` requires `docType`.</Claim>
+<Claim id="c8">`docstubeConfigSchema` requires `personas`.</Claim>
+<Claim id="c9">`docstubeConfigSchema` requires `site`.</Claim>
 
-The scaffold path writes the raw seed input rather than an expanded defaults object, so first-run `docstube.yml` records chosen intent instead of every defaulted field.
+The schema is strict: <Claim id="c10">`docstubeConfigSchema` rejects unknown top-level keys.</Claim> Keep `docstube.yml` focused on intent: project context, personas, source hints, agent routing, site metadata, localization, components, plugins, and output policy.
 
-## `ia.yml`
-
-`iaSchema` validates the information architecture. It requires `schemaVersion: 1` and a non-empty `tree`.
-
-`iaNodeSchema` validates each node title and slug. A node can also carry a page brief, depth budget, page id, and child nodes. Nodes with a `brief` are page targets; nodes without a `brief` are grouping nodes.
-
-`depthBudgetSchema` accepts `overview`, `standard`, and `deep`. `iaSchema` also accepts an optional positive integer page-count target.
-
-## `glossary.yaml`
-
-`glossarySchema` validates terminology data. It requires `schemaVersion: 1` and defaults `terms` to an empty array.
-
-Each glossary term requires a term and definition. Aliases and avoid-list entries default to empty arrays.
+```yaml
+schemaVersion: 1
+docType: external-product
+projectContext: >-
+  Short description of what this project is and who the generated docs are for.
+personas:
+  - id: oss-maintainer
+    description: Maintains the repository and reviews generated docs.
+sources:
+  openapi: []
+  asyncapi: []
+  imports: []
+agents:
+  transport: codex-cli
+  model: gpt-5.5
+  budgets:
+    maxRunUsd: 100
+    maxTurnsPerTask: 24
+    maxToolCallsPerTask: 64
+    maxPlanUsagePercent: 80
+locales:
+  source: en
+  targets: []
+theme:
+  name: basic
+site:
+  title: My Project
+  description: Verified documentation for My Project.
+  layout: single-tree
+components:
+  - Callout
+  - CodeBlock
+plugins:
+  - ./plugins/company-style.ts
+```
 
 ## Agents
 
-`agentsConfigSchema` validates the agent block. `transportIdSchema` accepts `claude-cli`, `codex-cli`, `anthropic-api`, and `openai-compatible` in `docstube.yml`.
+<Claim id="c11">`transportIdSchema` accepts `claude-cli`.</Claim>
+<Claim id="c12">`transportIdSchema` accepts `codex-cli`.</Claim>
+<Claim id="c13">`transportIdSchema` accepts `anthropic-api`.</Claim>
+<Claim id="c14">`transportIdSchema` accepts `openai-compatible`.</Claim>
 
-`createTransportFromConfig` builds the runtime transport from the validated config. It supplies default models for `claude-cli` and `anthropic-api`; transports without a default model require an explicit configured model.
+<Claim id="c15">`agentsConfigSchema.transport` defaults to claude-cli.</Claim>
+<Claim id="c16">`agentsConfigSchema.baseUrl` is optional.</Claim>
+<Claim id="c17">`agentsConfigSchema.apiKeyEnv` is optional.</Claim>
+<Claim id="c18">`agentsConfigSchema.apiKeyEnv` accepts uppercase environment variable names.</Claim>
 
-API transports receive the configured base URL and credential environment-variable reference from the agent config. The schema validates the credential reference with an uppercase environment-variable-name pattern.
+Role overrides let a maintainer route different work to different models. <Claim id="c19">`agentRolesConfigSchema` defines `writer`.</Claim> <Claim id="c20">`agentRolesConfigSchema` defines `reviewer`.</Claim> <Claim id="c21">`agentRolesConfigSchema` defines `risk-critic`.</Claim> <Claim id="c22">`agentRolesConfigSchema` defines `translator`.</Claim> <Claim id="c23">`agentRolesConfigSchema` defines `architect`.</Claim> <Claim id="c24">`agentRolesConfigSchema` defines `extractor`.</Claim>
 
-`reviewModel` is optional. `createTaskRunnerFromConfig` uses it for `review-page` tasks and otherwise uses the primary model.
+<Claim id="c25">`resolveRoleRouting` lets a role inherit the top-level transport.</Claim>
+<Claim id="c26">`resolveRoleRouting` lets a role inherit the top-level model.</Claim>
+<Claim id="c27">`resolveRoleRouting` uses the role transport before the top-level transport.</Claim>
 
-Agent budgets are part of `agentsConfigSchema`. They default to:
+## Budgets
 
-- `maxRunUsd: 20`
-- `maxTurnsPerTask: 24`
-- `maxToolCallsPerTask: 64`
+<Claim id="c28">`agentsConfigSchema.budgets.maxRunUsd` defaults to 20.</Claim>
+<Claim id="c29">`agentsConfigSchema.budgets.maxTurnsPerTask` defaults to 24.</Claim>
+<Claim id="c30">`agentsConfigSchema.budgets.maxToolCallsPerTask` defaults to 64.</Claim>
+<Claim id="c31">`agentsConfigSchema.budgets.maxPlanUsagePercent` defaults to 80.</Claim>
 
-`createRunCostTracker` freezes a capped run when reported plus estimated spend reaches `FREEZE_MARGIN_RATIO`, which is `0.85`, multiplied by the configured run cap. `freezeReason` reports that freeze as reaching 85% of the cap. The run-cost code tracks vendor-reported spend separately from token-derived estimates.
+<Claim id="c32">`FREEZE_MARGIN_RATIO` is 0.85.</Claim>
+<Claim id="c33">
+  `createRunCostTracker` freezes a run when reported and estimated spend reaches 85 percent of `maxRunUsd` without a
+  plan-usage signal.
+</Claim>
+<Claim id="c34">`createRunCostTracker` freezes a run when plan usage reaches `maxPlanUsagePercent`.</Claim>
+<Claim id="c35">`buildWritePageTask` uses `maxTurnsPerTask` for writer task turns.</Claim>
+<Claim id="c36">`buildWritePageTask` uses `maxToolCallsPerTask` for writer task tool calls.</Claim>
 
-## Versions And Locales
+For maintainers, the practical split is simple: `maxRunUsd` is the run cap, `maxPlanUsagePercent` is the subscription plan cap, and per-task turn and tool-call limits bound individual writer tasks.
 
-`versionsConfigSchema` defaults the current version label to `latest` and the frozen-version list to an empty array. `versionLabelSchema` validates path-safe labels such as `1.x`, `v2`, and `2026-06`.
+## Locales
 
-`localesConfigSchema` defaults the source locale to `en` and target locales to an empty array. `localeCodeSchema` accepts the supported locale-code shape shown in its message, such as `en`, `pt-BR`, and `zh-Hans`.
+<Claim id="c37">`localesConfigSchema.source` defaults to en.</Claim>
+<Claim id="c38">`localesConfigSchema.targets` defaults to an empty array.</Claim>
+<Claim id="c39">`localeCodeSchema` accepts locale codes like `en`.</Claim>
+<Claim id="c40">`localeCodeSchema` accepts locale codes like `pt-BR`.</Claim>
+<Claim id="c41">`localesConfigSchema` rejects a target that equals the source locale.</Claim>
+<Claim id="c42">`localesConfigSchema` rejects duplicate targets case-insensitively.</Claim>
 
-## Components
+<Claim id="c43">
+  `loadConfigFamily` rejects an IA page slug that collides with a configured target locale route prefix.
+</Claim>
 
-The main config schema validates `components` as an array of non-empty strings. Its schema comment describes the list as enabled MDX components that must exist in the block-type registry.
+## Information Architecture
 
-`registryComponents` exposes the local UI choices: `Callout`, `CodeBlock`, `CodeGroup`, `Terminal`, `Card`, `CardGrid`, `Steps`, `Tabs`, `FileTree`, `Badge`, `ParamTable`, and `ComparisonTable`.
+<Claim id="c44">`iaSchema` requires `schemaVersion`.</Claim> <Claim id="c45">`iaSchema` requires `tree`.</Claim>
+<Claim id="c46">`iaNodeSchema` requires `title`.</Claim> <Claim id="c47">`iaNodeSchema` requires `slug`.</Claim>
+<Claim id="c48">`iaNodeSchema` allows `brief`.</Claim> <Claim id="c49">`iaNodeSchema` allows `children`.</Claim>
+<Claim id="c50">`depthBudgetSchema` accepts `overview`.</Claim>
+<Claim id="c51">`depthBudgetSchema` accepts `standard`.</Claim>
+<Claim id="c52">`depthBudgetSchema` accepts `deep`.</Claim>
 
-`builtinComponents` defines the built-in component metadata and prop schemas. `builtinComponentNames` is derived from those definitions.
+A node with a `brief` is page intent for the writer, and a node without a `brief` can be used as a grouping node. <Claim id="c53">`iaSchema` rejects duplicate page slugs.</Claim>
 
-## Plugins
+## Glossary
 
-The main config schema validates `plugins` as an array of non-empty strings. Its schema comment describes entries as npm package names or repository-relative paths.
+<Claim id="c54">`glossarySchema` requires `schemaVersion`.</Claim>
+<Claim id="c55">`glossarySchema.terms` defaults to an empty array.</Claim>
+<Claim id="c56">`glossaryTermSchema` requires `term`.</Claim>
+<Claim id="c57">`glossaryTermSchema` requires `definition`.</Claim>
+<Claim id="c58">`glossaryTermSchema.aliases` defaults to an empty array.</Claim>
+<Claim id="c59">`glossaryTermSchema.avoid` defaults to an empty array.</Claim>
 
-`registerBuiltinPlugins` registers the built-in verifier, TypeScript language, and Python language plugins through the plugin host. `loadConfiguredPlugins` then loads each configured plugin from the config plugin list.
+Use `glossary.yaml` for terminology the generated pages should treat consistently.
 
-Local plugin specifiers are imported from files under the target repository. Other specifiers are resolved from the target repository's package dependencies. A configured plugin must default-export a value recognized by `isDocstubePlugin`; otherwise `loadConfiguredPlugins` raises a plugin load error.
+## Components And Plugins
+
+<Claim id="c60">`docstubeConfigSchema.components` defaults to an empty array.</Claim> The component list names enabled
+MDX components for generated pages.
+
+<Claim id="c61">`docstubeConfigSchema.plugins` defaults to an empty array.</Claim>
+<Claim id="c62">`loadConfiguredPlugins` loads each configured plugin specifier.</Claim>
+<Claim id="c63">`loadConfiguredPlugins` treats relative plugin specifiers as local plugins.</Claim>
+<Claim id="c64">`loadConfiguredPlugins` resolves package plugin specifiers from the target repository.</Claim>
+<Claim id="c65">`loadConfiguredPlugins` requires a default export created with `definePlugin`.</Claim>
+
+```yaml
+plugins:
+  - docstube-plugin-wordcount
+  - ./plugins/company-style.ts
+```
 
 ## Programmatic Edits
 
-`editYamlDocument` uses the `yaml` Document API and serializes the edited document back to text. `setYamlIn` and `editConfigFile` build on that helper.
+<Claim id="c66">`editYamlDocument` parses YAML with `parseDocument`.</Claim>
+<Claim id="c67">`editYamlDocument` serializes YAML with `doc.toString`.</Claim>
+<Claim id="c68">`updateConfigValues` validates the edited `docstube.yml` before writing it.</Claim>
+<Claim id="c69">`editConfigFile` validates the edited config-family file before writing it.</Claim>
+<Claim id="c70">`writeIaFile` preserves a top-of-file comment.</Claim>
 
-`updateConfigValues` batches config edits, validates the edited document with `parseDocstubeConfig`, and writes only after validation succeeds.
-
-`writeIaFile` validates the next IA with `iaSchema` before writing. It preserves the document header comment when replacing the IA document; comments inside a replaced IA tree are not preserved by that structural rewrite.
+That means a maintainer can keep hand-written comments in the config family while using the local UI or wizard for routine edits.

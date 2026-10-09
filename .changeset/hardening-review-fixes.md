@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Harden the agent runtime and surrounding surfaces: subprocess timeouts now kill the whole process tree (no orphaned MCP servers) and early child exits no longer crash on stdin EPIPE; the codex transport keeps fully-parsed sessions on non-zero exits; truncated API responses (Anthropic `max_tokens`, OpenAI `length`) surface as errors instead of shipping cut-off pages, with the Anthropic output budget raised to 32K tokens; `read_file` stats before reading and bounds oversized files; read-root containment also checks real paths so symlinks cannot escape; retried sessions keep the failed attempts' token usage in cost accounting; documentation snippets run with a scrubbed environment by default (opt back in per fence with `allow-env`); the Python inspector ships embedded so standalone binaries can extract symbols; the GitHub Action pins the exact docstube version, fails fast when no model credential is present, scrubs credential-shaped env values from logs, and notices when a newer docstube exists; the local UI session token moved from the query string to the URL fragment plus sessionStorage; generated docs sites pin exact dependency versions.

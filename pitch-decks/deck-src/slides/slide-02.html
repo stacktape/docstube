@@ -1,68 +1,248 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><link rel="stylesheet" href="../deck.css"></head>
-<body>
-<div class="slide bg-grid">
-  <div class="hz">
-    <h1 class="head">Every way we write docs today is <span class="accent">broken.</span></h1>
-  </div>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../deck.css" />
+  </head>
+  <body>
+    <div class="slide bg-grid">
+      <div class="hz">
+        <h1 class="head">Every way we write docs today is <span class="accent">broken.</span></h1>
+      </div>
 
-  <div class="body">
-    <div class="row gap-5" style="flex:1;align-items:stretch">
+      <div class="body">
+        <div class="row gap-5" style="flex: 1; align-items: stretch">
+          <!-- Tile 1: stale -->
+          <div class="card col" style="flex: 1; padding: 26px 24px">
+            <span class="tile flag"
+              ><svg
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M21 12a9 9 0 1 1-3.2-6.9" />
+                <path d="M21 4v4h-4" />
+                <path d="M12 8v4l2.5 1.5" /></svg
+            ></span>
+            <h3
+              style="
+                font-family: var(--display);
+                font-weight: 600;
+                font-size: 20px;
+                color: var(--ink);
+                margin-top: 16px;
+              "
+            >
+              It goes stale
+            </h3>
+            <p style="font-size: 13.5px; color: var(--muted); margin-top: 8px; line-height: 1.5">
+              Code ships every day; hand-written docs don't move. Signatures drift until the page describes an API that
+              no longer exists.
+            </p>
+            <div
+              class="mt-auto"
+              style="
+                background: var(--canvas);
+                border: 1px solid var(--line);
+                border-radius: 11px;
+                padding: 13px 14px;
+                margin-top: 18px;
+              "
+            >
+              <div class="row items-c gap-2" style="font-family: var(--mono); font-size: 12.5px">
+                <span class="dim" style="width: 38px">docs:</span><span class="strike">getSession()</span>
+              </div>
+              <div class="row items-c gap-2" style="font-family: var(--mono); font-size: 12.5px; margin-top: 7px">
+                <span class="dim" style="width: 38px">code:</span
+                ><span class="ink"
+                  >getSession(<span style="color: var(--brand-600); font-weight: 600">opts</span>)</span
+                >
+              </div>
+              <div class="row items-c gap-2" style="margin-top: 11px; color: var(--flag); font-size: 11.5px">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M3 14V3a1 1 0 011-1h7l-1.5 3L11 8H4"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                out of sync with the source
+              </div>
+            </div>
+          </div>
 
-      <!-- Tile 1: stale -->
-      <div class="card col" style="flex:1;padding:26px 24px">
-        <span class="tile flag"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3.2-6.9"/><path d="M21 4v4h-4"/><path d="M12 8v4l2.5 1.5"/></svg></span>
-        <h3 style="font-family:var(--display);font-weight:600;font-size:20px;color:var(--ink);margin-top:16px">It goes stale</h3>
-        <p style="font-size:13.5px;color:var(--muted);margin-top:8px;line-height:1.5">Code ships every day; hand-written docs don't move. Signatures drift until the page describes an API that no longer exists.</p>
-        <div class="mt-auto" style="background:var(--canvas);border:1px solid var(--line);border-radius:11px;padding:13px 14px;margin-top:18px">
-          <div class="row items-c gap-2" style="font-family:var(--mono);font-size:12.5px">
-            <span class="dim" style="width:38px">docs:</span><span class="strike">getSession()</span>
+          <!-- Tile 2: assumes -->
+          <div class="card col" style="flex: 1; padding: 26px 24px">
+            <span class="tile flag"
+              ><svg
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="8" r="3.4" />
+                <path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg
+            ></span>
+            <h3
+              style="
+                font-family: var(--display);
+                font-weight: 600;
+                font-size: 20px;
+                color: var(--ink);
+                margin-top: 16px;
+              "
+            >
+              It assumes too much
+            </h3>
+            <p style="font-size: 13.5px; color: var(--muted); margin-top: 8px; line-height: 1.5">
+              Whoever wrote the code can't un-know it. The "obvious" step gets skipped, internal names leak in, and the
+              newcomer is lost.
+            </p>
+            <div class="mt-auto" style="margin-top: 18px">
+              <div
+                style="
+                  background: var(--canvas);
+                  border: 1px solid var(--line);
+                  border-radius: 11px 11px 11px 3px;
+                  padding: 11px 13px;
+                  font-size: 12.5px;
+                  color: var(--ink-soft);
+                "
+              >
+                Initialise the client with your
+                <span style="color: var(--ink); font-weight: 600">workspace token</span>.
+              </div>
+              <div class="row" style="justify-content: flex-end; margin-top: 8px">
+                <div
+                  style="
+                    background: rgba(214, 88, 79, 0.08);
+                    border: 1px solid rgba(214, 88, 79, 0.28);
+                    border-radius: 11px 11px 3px 11px;
+                    padding: 11px 13px;
+                    font-size: 12.5px;
+                    color: var(--danger);
+                    max-width: 86%;
+                  "
+                >
+                  …what's a workspace token, and where do I get one?
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="row items-c gap-2" style="font-family:var(--mono);font-size:12.5px;margin-top:7px">
-            <span class="dim" style="width:38px">code:</span><span class="ink">getSession(<span style="color:var(--brand-600);font-weight:600">opts</span>)</span>
-          </div>
-          <div class="row items-c gap-2" style="margin-top:11px;color:var(--flag);font-size:11.5px">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 14V3a1 1 0 011-1h7l-1.5 3L11 8H4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-            out of sync with the source
+
+          <!-- Tile 3: never written -->
+          <div class="card col" style="flex: 1; padding: 26px 24px">
+            <span class="tile flag"
+              ><svg
+                width="21"
+                height="21"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M14 3v5h5" />
+                <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /></svg
+            ></span>
+            <h3
+              style="
+                font-family: var(--display);
+                font-weight: 600;
+                font-size: 20px;
+                color: var(--ink);
+                margin-top: 16px;
+              "
+            >
+              It never gets written
+            </h3>
+            <p style="font-size: 13.5px; color: var(--muted); margin-top: 8px; line-height: 1.5">
+              Docs lose to every deadline. The quickstart gets done. Configuration, edge cases, and the migration guide
+              stay empty, and those are the pages people need most.
+            </p>
+            <div
+              class="mt-auto"
+              style="
+                background: var(--canvas);
+                border: 1px solid var(--line);
+                border-radius: 11px;
+                padding: 13px 15px;
+                margin-top: 18px;
+              "
+            >
+              <div class="row items-c gap-2" style="font-size: 12.5px; color: var(--ink-soft); padding: 4px 0">
+                <span class="ic pass" style="width: 17px; height: 17px"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                Quickstart
+              </div>
+              <div class="row items-c gap-2" style="font-size: 12.5px; color: var(--ink-soft); padding: 4px 0">
+                <span class="ic pass" style="width: 17px; height: 17px"
+                  ><svg viewBox="0 0 12 12" fill="none">
+                    <path
+                      d="M2.5 6.2 5 8.7 9.5 3.5"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    /></svg
+                ></span>
+                Installation
+              </div>
+              <div class="row items-c gap-2" style="font-size: 12.5px; color: var(--faint); padding: 4px 0">
+                <span
+                  style="
+                    width: 17px;
+                    height: 17px;
+                    border: 1.5px dashed var(--line-strong);
+                    border-radius: 999px;
+                    flex: none;
+                  "
+                ></span>
+                Configuration
+                <span class="mono" style="margin-left: auto; font-size: 10.5px; color: var(--faint)">empty</span>
+              </div>
+              <div class="row items-c gap-2" style="font-size: 12.5px; color: var(--faint); padding: 4px 0">
+                <span
+                  style="
+                    width: 17px;
+                    height: 17px;
+                    border: 1.5px dashed var(--line-strong);
+                    border-radius: 999px;
+                    flex: none;
+                  "
+                ></span>
+                Migration guide
+                <span class="mono" style="margin-left: auto; font-size: 10.5px; color: var(--faint)">empty</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Tile 2: assumes -->
-      <div class="card col" style="flex:1;padding:26px 24px">
-        <span class="tile flag"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></span>
-        <h3 style="font-family:var(--display);font-weight:600;font-size:20px;color:var(--ink);margin-top:16px">It assumes too much</h3>
-        <p style="font-size:13.5px;color:var(--muted);margin-top:8px;line-height:1.5">Whoever wrote the code can't un-know it. The "obvious" step gets skipped, internal names leak in, and the newcomer is lost.</p>
-        <div class="mt-auto" style="margin-top:18px">
-          <div style="background:var(--canvas);border:1px solid var(--line);border-radius:11px 11px 11px 3px;padding:11px 13px;font-size:12.5px;color:var(--ink-soft)">Initialise the client with your <span style="color:var(--ink);font-weight:600">workspace token</span>.</div>
-          <div class="row" style="justify-content:flex-end;margin-top:8px">
-            <div style="background:rgba(214,88,79,.08);border:1px solid rgba(214,88,79,.28);border-radius:11px 11px 3px 11px;padding:11px 13px;font-size:12.5px;color:var(--danger);max-width:86%">…what's a workspace token, and where do I get one?</div>
-          </div>
-        </div>
+      <div class="foot">
+        <span class="fl">docs<b>tube</b></span>
+        <span class="fc">Verified, not guessed</span>
+        <span class="fr">02 / 16</span>
       </div>
-
-      <!-- Tile 3: never written -->
-      <div class="card col" style="flex:1;padding:26px 24px">
-        <span class="tile flag"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></span>
-        <h3 style="font-family:var(--display);font-weight:600;font-size:20px;color:var(--ink);margin-top:16px">It never gets written</h3>
-        <p style="font-size:13.5px;color:var(--muted);margin-top:8px;line-height:1.5">Docs lose to every deadline. The quickstart gets done. Configuration, edge cases, and the migration guide stay empty, and those are the pages people need most.</p>
-        <div class="mt-auto" style="background:var(--canvas);border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-top:18px">
-          <div class="row items-c gap-2" style="font-size:12.5px;color:var(--ink-soft);padding:4px 0"><span class="ic pass" style="width:17px;height:17px"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Quickstart</div>
-          <div class="row items-c gap-2" style="font-size:12.5px;color:var(--ink-soft);padding:4px 0"><span class="ic pass" style="width:17px;height:17px"><svg viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.7 9.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Installation</div>
-          <div class="row items-c gap-2" style="font-size:12.5px;color:var(--faint);padding:4px 0"><span style="width:17px;height:17px;border:1.5px dashed var(--line-strong);border-radius:999px;flex:none"></span> Configuration <span class="mono" style="margin-left:auto;font-size:10.5px;color:var(--faint)">empty</span></div>
-          <div class="row items-c gap-2" style="font-size:12.5px;color:var(--faint);padding:4px 0"><span style="width:17px;height:17px;border:1.5px dashed var(--line-strong);border-radius:999px;flex:none"></span> Migration guide <span class="mono" style="margin-left:auto;font-size:10.5px;color:var(--faint)">empty</span></div>
-        </div>
-      </div>
-
     </div>
-  </div>
-
-  <div class="foot">
-    <span class="fl">docs<b>tube</b></span>
-    <span class="fc">Verified, not guessed</span>
-    <span class="fr">02 / 16</span>
-  </div>
-</div>
-</body>
+  </body>
 </html>

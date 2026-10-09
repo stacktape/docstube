@@ -1,8 +1,8 @@
 {
   "name": "docstube-pitch-deck",
   "private": true,
-  "type": "module",
   "description": "Source for the docstube investor pitch deck. Each slide is a self-contained HTML page (slides/slide-NN.html) sharing deck.css; shoot.mjs renders them to 2x PNGs with headless Chrome, build.mjs assembles the .pptx.",
+  "type": "module",
   "scripts": {
     "render": "node shoot.mjs",
     "pack": "node build.mjs",

@@ -1,5 +1,5 @@
 ---
-"docstube": patch
+'docstube': patch
 ---
 
 Claim verification lands on the canonical ClaimEvidence records (wave 2b-ii). The kernel now assigns claim correctness from the class/evidence authority table: code-structure claims check via codemap grounding, value claims through the minimal value-predicate verifier (asserted value compared byte-wise against the language pack's extracted value — a mismatch is a gating CONTRADICTION that blocks the page and flags it after bounded retries, never shipping as neutral content), behavior claims only under conservative snippet-execution coverage, and intent-history claims stay maintainer-input-needed. Grounding failures (hallucinated or stale symbol references) are hard defects for every class. Dependency fallbacks now cover only the claim's grounded subject and fail closed otherwise; claim matching records confidence with drift markers and surfaces orphaned claims; anchoring re-proves the exact marker/ledger bijection. Each verified page also assembles the four-way provenance v2 record (lineage, dependencies, claim evidence, assessments) in memory.

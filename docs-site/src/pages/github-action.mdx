@@ -1,16 +1,566 @@
 ---
-title: "CI and the GitHub Action"
-description: "Run docstube in GitHub Actions, open verified documentation PRs, deliver flags, and gate auto-merge from the committed manifest."
-layout: "../layouts/DocLayout.astro"
-docstubeLocale: "en"
-docstubePageId: "pg_j7sf9qm14feh17cjy4n4"
-docstubeGuarantee: "proven"
-docstubeBlocksProven: 2
-docstubeBlocksTotal: 22
-docstubeSources: [{"file":"apps/github-action/src/delta-report.ts","line":10,"endLine":10,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":11,"endLine":11,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":12,"endLine":12,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":19,"endLine":23,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":25,"endLine":28,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":68,"endLine":89,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":92,"endLine":100,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":102,"endLine":102,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":104,"endLine":104,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":107,"endLine":110,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":127,"endLine":135,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":137,"endLine":146,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/delta-report.ts","line":161,"endLine":182,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":26,"endLine":26,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":28,"endLine":39,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":41,"endLine":44,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":46,"endLine":49,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":51,"endLine":54,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":56,"endLine":59,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":61,"endLine":65,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":67,"endLine":73,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":75,"endLine":81,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":83,"endLine":87,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":89,"endLine":96,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":98,"endLine":102,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":104,"endLine":112,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":114,"endLine":128,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":130,"endLine":130,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":132,"endLine":144,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":152,"endLine":156,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":158,"endLine":158,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":215,"endLine":215,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":219,"endLine":241,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":298,"endLine":302,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":304,"endLine":308,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":367,"endLine":560,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":824,"endLine":828,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":830,"endLine":839,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":875,"endLine":892,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":917,"endLine":933,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/github-action.ts","line":935,"endLine":944,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/merge-decision.ts","line":8,"endLine":10,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/merge-decision.ts","line":12,"endLine":16,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":9,"endLine":13,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":15,"endLine":23,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":25,"endLine":30,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":32,"endLine":32,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":34,"endLine":34,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":38,"endLine":38,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":40,"endLine":40,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":50,"endLine":60,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":62,"endLine":62,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"apps/github-action/src/verified-delta.ts","line":78,"endLine":130,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":8,"endLine":21,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":22,"endLine":22,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":24,"endLine":24,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":26,"endLine":31,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":33,"endLine":46,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":47,"endLine":47,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"},{"file":"packages/contracts/src/flag-schema.ts","line":53,"endLine":59,"commit":"9a487923a5a706c08bf849f3c049250b4357e5e8"}]
-docstubeSections: [{"anchor":"inputs","title":"Inputs","guarantee":"scored"},{"anchor":"what-the-action-runs","title":"What The Action Runs","guarantee":"proven"},{"anchor":"manifest-delta","title":"Manifest Delta","guarantee":"scored"},{"anchor":"auto-merge-gate","title":"Auto-Merge Gate","guarantee":"scored"},{"anchor":"flag-delivery","title":"Flag Delivery","guarantee":"scored"}]
+title: 'CI and the GitHub Action'
+description: 'How the docstube GitHub Action runs generation, reports verified changes, and gates auto-merge.'
+layout: '../layouts/DocLayout.astro'
+docstubeLocale: 'en'
+docstubePageId: 'pg_epvaqj46wngw89sd3a4w'
+docstubeClaimsChecked: 4
+docstubeClaimsTotal: 40
+docstubeClaimsContradicted: 0
+docstubeUncoveredAssertions: 0
+docstubeDirtyWorkingTree: true
+docstubeUncheckedClaims:
+  [
+    'c1',
+    'c2',
+    'c3',
+    'c4',
+    'c5',
+    'c6',
+    'c7',
+    'c8',
+    'c9',
+    'c11',
+    'c12',
+    'c13',
+    'c14',
+    'c15',
+    'c16',
+    'c17',
+    'c18',
+    'c19',
+    'c20',
+    'c21',
+    'c22',
+    'c23',
+    'c26',
+    'c27',
+    'c28',
+    'c29',
+    'c30',
+    'c31',
+    'c32',
+    'c33',
+    'c34',
+    'c35',
+    'c36',
+    'c38',
+    'c39',
+    'c40'
+  ]
+docstubeReviewedFor: 'oss-maintainer'
+docstubeSources:
+  [
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 29,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 31,
+      endLine: 36,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 38,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 45,
+      endLine: 49,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 53,
+      endLine: 60,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 62,
+      endLine: 72,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 94,
+      endLine: 110,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 114,
+      endLine: 262,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 654,
+      endLine: 700,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 702,
+      endLine: 809,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/ci-preflight.ts',
+      line: 819,
+      endLine: 828,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/generate-command.ts',
+      line: 19,
+      endLine: 27,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/cli/src/commands/generate-command.ts',
+      line: 29,
+      endLine: 163,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/ci-preflight-gate.ts',
+      line: 16,
+      endLine: 16,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/ci-preflight-gate.ts',
+      line: 18,
+      endLine: 21,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/ci-preflight-gate.ts',
+      line: 25,
+      endLine: 47,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/ci-preflight-gate.ts',
+      line: 49,
+      endLine: 59,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/ci-preflight-gate.ts',
+      line: 68,
+      endLine: 92,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 10,
+      endLine: 10,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 11,
+      endLine: 11,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 12,
+      endLine: 12,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 28,
+      endLine: 32,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 34,
+      endLine: 37,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 81,
+      endLine: 94,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 105,
+      endLine: 137,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 177,
+      endLine: 200,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 203,
+      endLine: 211,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 213,
+      endLine: 213,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 215,
+      endLine: 215,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 218,
+      endLine: 221,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 238,
+      endLine: 246,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 248,
+      endLine: 257,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/delta-report.ts',
+      line: 272,
+      endLine: 296,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 33,
+      endLine: 43,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 45,
+      endLine: 48,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 50,
+      endLine: 53,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 55,
+      endLine: 58,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 60,
+      endLine: 63,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 65,
+      endLine: 69,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 71,
+      endLine: 77,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 79,
+      endLine: 88,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 90,
+      endLine: 94,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 96,
+      endLine: 103,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 105,
+      endLine: 109,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 111,
+      endLine: 119,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 121,
+      endLine: 143,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 145,
+      endLine: 145,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 147,
+      endLine: 168,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 176,
+      endLine: 180,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 182,
+      endLine: 182,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 239,
+      endLine: 239,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 243,
+      endLine: 265,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 322,
+      endLine: 326,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 328,
+      endLine: 332,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 395,
+      endLine: 678,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 714,
+      endLine: 772,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 956,
+      endLine: 961,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 964,
+      endLine: 970,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 972,
+      endLine: 989,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 991,
+      endLine: 1000,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 1052,
+      endLine: 1081,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 1098,
+      endLine: 1118,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/github-action.ts',
+      line: 1120,
+      endLine: 1131,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 25,
+      endLine: 25,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 26,
+      endLine: 26,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 28,
+      endLine: 30,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 72,
+      endLine: 120,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 122,
+      endLine: 131,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 137,
+      endLine: 168,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 170,
+      endLine: 181,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/merge-decision.ts',
+      line: 185,
+      endLine: 277,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 15,
+      endLine: 19,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 21,
+      endLine: 29,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 34,
+      endLine: 39,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 49,
+      endLine: 55,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 57,
+      endLine: 64,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 66,
+      endLine: 66,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 68,
+      endLine: 68,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 72,
+      endLine: 72,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 74,
+      endLine: 74,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 85,
+      endLine: 91,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 93,
+      endLine: 93,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    },
+    {
+      file: 'apps/github-action/src/verified-delta.ts',
+      line: 109,
+      endLine: 212,
+      commit: '0c4e5e30ea6c73b3049964ebcfa57b2d3fb5e68c'
+    }
+  ]
+docstubeSections:
+  [
+    { anchor: 'preflight', title: 'Preflight', checked: 0, total: 5, contradicted: 0 },
+    { anchor: 'generate-and-commit', title: 'Generate And Commit', checked: 1, total: 8, contradicted: 0 },
+    { anchor: 'pull-request-report', title: 'Pull Request Report', checked: 0, total: 8, contradicted: 0 },
+    { anchor: 'auto-merge-gate', title: 'Auto-Merge Gate', checked: 2, total: 10, contradicted: 0 },
+    { anchor: 'flags-and-tribal-knowledge', title: 'Flags And Tribal Knowledge', checked: 1, total: 7, contradicted: 0 }
+  ]
 ---
 
+import Claim from '../docstube/DocstubeClaim.astro';
 import { default as Callout } from '../components/Callout.astro';
 import { default as CodeBlock } from '../components/CodeBlock.astro';
 import { default as CodeGroup } from '../components/CodeGroup.astro';
@@ -24,22 +574,19 @@ import { default as Badge } from '../components/Badge.astro';
 import { default as ParamTable } from '../components/ParamTable.astro';
 import { default as ComparisonTable } from '../components/ComparisonTable.astro';
 
-
 # CI and the GitHub Action
 
-The GitHub Action metadata is defined in `apps/github-action/action.yml`. In this repository, the action identifier is the local path `./apps/github-action`; that identifier only works in workflows for a repository that contains that path.
+The GitHub Action is the CI wrapper around the CLI. <Claim id="c1">`createDocstubeCliArgs` runs `generate` with `--ci`.</Claim> <Claim id="c2">`createDocstubePreflightArgs` runs `doctor` with `--ci` and `--json`.</Claim>
 
-<Callout>
-The source defines the local action path and the package name `@docstube/action`, but it does not define a public `uses:` reference. If you run docstube from another repository, replace `./apps/github-action` with the action location you have installed, vendored, or published.
-</Callout>
+Use your workflow triggers to decide when docs regenerate. A common starting point is to run the Action on pushes to the branch that owns your docs and on manual dispatch:
 
 ```yaml
 name: docstube
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -47,78 +594,49 @@ permissions:
   issues: write
 
 jobs:
-  refresh-docs:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Run docstube
-        uses: ./apps/github-action
+      - uses: docstube/action@v0
         with:
-          mode: refresh
           github-token: ${{ secrets.GITHUB_TOKEN }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 ```
 
-Use `mode: generate` for a first documentation run and `mode: refresh` for ongoing maintenance after code changes. If `mode` is omitted, the action uses `refresh`.
+## Preflight
 
-The `github-token` input is used by the `gh` CLI for pull requests, PR comments, the digest issue, and auto-merge. If it is not provided, the action reads `GITHUB_TOKEN`.
+Before generation, <Claim id="c3">`runGitHubAction` evaluates CI preflight before it checks out the base branch.</Claim> <Claim id="c4">`runGitHubAction` returns before generation when CI preflight is blocked.</Claim> When the preflight report cannot be used, <Claim id="c5">`runGitHubAction` falls back to `checkModelCredential`.</Claim>
 
-The model credential is separate from the GitHub token. Before running the CLI, the action checks for API key environment variables. If `docstube.yml` names variables with `apiKeyEnv:`, those names are checked. Otherwise, the action checks common names including `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, and `GEMINI_API_KEY`.
+The Action also exposes the preflight result to later workflow steps: <Claim id="c6">`setActionOutputs` writes the `preflight` output.</Claim> <Claim id="c7">`setActionOutputs` writes the `automation-mode` output.</Claim>
 
-## Inputs
+## Generate And Commit
 
-| Input | Default | Behavior |
-| --- | --- | --- |
-| `mode` | `refresh` | Runs either `generate` or `refresh`. Other values fail. |
-| `github-token` | `GITHUB_TOKEN` | Token passed to `gh` for PRs, comments, issues, and auto-merge. |
-| `base-branch` | `GITHUB_BASE_REF`, then `GITHUB_REF_NAME`, then `main` | Branch checked out and targeted by the PR. |
-| `branch-prefix` | `docstube/docs` | Prefix for the generated docs branch. |
-| `commit-message` | `docs: docstube <mode>` | Commit message for the docs update. |
-| `docstube-package` | `docstube@0.0.2` | Package spec passed to `npx --yes`. |
-| `workspace` | `GITHUB_WORKSPACE`, then the current working directory | Checked-out repository path. |
+The Action prepares a branch and then runs the CLI. <Claim id="c8">`runGitHubAction` checks out the base branch before it creates the docstube branch.</Claim> <Claim id="c9">`runGitHubAction` reads the head commit before it runs docstube.</Claim>
 
-The action rejects the removed `dry-run` input. It always opens or updates a real pull request when there are commit-worthy changes.
+The committed manifest is the docs lockfile for the PR report. <Claim id="c10">`manifestIndexRelativePath` is `.docstube/manifest/manifest.json`.</Claim> <Claim id="c11">`loadVerifiedDelta` reads the manifest index from `manifestIndexRelativePath`.</Claim> <Claim id="c12">`loadVerifiedDelta` returns `undefined` when the manifest index is missing.</Claim>
 
-## What The Action Runs
+The Action stages a bounded set of paths. <Claim id="c13">`selectCommitPaths` filters changed files through `machineLocalPatterns`.</Claim> <Claim id="c14">`verifyOutputInventory` returns staged paths, undeclared paths, and hash mismatches.</Claim> <Claim id="c15">`runGitHubAction` commits `inventoryCheck.stagedPaths` when an inventory check exists.</Claim>
 
-The action checks out the base branch, creates or resets a docs branch, and runs the CLI as:
+## Pull Request Report
 
-```bash
-npx --yes docstube@0.0.2 refresh
-```
+When there is committed work, <Claim id="c16">`runGitHubAction` creates a pull request when no open pull request exists for the docstube branch.</Claim> <Claim id="c17">`runGitHubAction` updates the open pull request when one already exists for the docstube branch.</Claim>
 
-The package spec and command change when `docstube-package` or `mode` are set.
+The PR body is generated from the verified delta and merge decision. <Claim id="c18">`buildPullRequestBody` includes the changed pages section when a verified delta exists.</Claim> <Claim id="c19">`buildPullRequestBody` includes the open flags section when a verified delta exists.</Claim> <Claim id="c20">`buildPullRequestBody` includes the publication decision section.</Claim>
 
-After the CLI exits successfully, the action reads `git status --porcelain`, filters out machine-local state under `.docstube/db.sqlite`, `.docstube/cache/`, and `.docstube/runs/`, and commits the remaining changed paths together.
-
-That single commit can include generated docs, manifest shards, criteria, instructions, and knowledge files. If no commit-worthy paths remain, the action writes a job summary and does not open a PR.
-
-## Manifest Delta
-
-The action computes the verified delta from `.docstube/manifest/manifest.yml` and page shard files under `.docstube/manifest/pages/...`. It does not derive the PR decision from CLI prose.
-
-The PR body and job summary include changed pages, guarantee counts, open flag counts, the decision, and committed files when the manifest delta is available. If no manifest index is found, the action leaves the PR open without auto-merge.
+The job summary follows the same run outcome. <Claim id="c21">`buildJobSummary` reports no branch and no pull request for failed runs.</Claim> <Claim id="c22">`buildJobSummary` reports no documentation changes for no-change runs.</Claim> <Claim id="c23">`buildJobSummary` reports the pull request URL for pull-request runs.</Claim>
 
 ## Auto-Merge Gate
 
-The merge decision uses open flags from readable page shards plus manifest system flags. Auto-merge is eligible only when no open flag has a blocking kind.
+Auto-merge is gated by the publication artifacts, open blocking flags, and inventory validation. <Claim id="c24">`publicationDecisionRelativePath` is `.docstube/runs/publication-decision.json`.</Claim> <Claim id="c25">`outputInventoryRelativePath` is `.docstube/runs/output-inventory.json`.</Claim> <Claim id="c26">`loadPublicationArtifacts` returns a failed validation when the output inventory file is missing.</Claim> <Claim id="c27">`loadPublicationArtifacts` returns a failed validation when the publication decision file is missing.</Claim>
 
-Blocking open flag kinds are:
+The Action enforces that decision after the CLI has run. <Claim id="c28">`decideAutoMerge` withholds auto-merge when a blocking open flag exists.</Claim> <Claim id="c29">`decideAutoMerge` withholds auto-merge when publication validation is not ok.</Claim> <Claim id="c30">`decideAutoMerge` withholds auto-merge when undeclared paths exist.</Claim> <Claim id="c31">`decideAutoMerge` enables auto-merge when `withheldReasons` is empty.</Claim>
 
-- `out-of-domain`
-- `coverage`
-- `guarantee-downgrade`
-- `structural-change`
-- `system`
+If the gate passes and GitHub accepts the request, <Claim id="c32">`runGitHubAction` enables auto-merge through `mergeControl.enableAutoMerge`.</Claim> <Claim id="c33">`createMergeControl` requests the squash merge method.</Claim>
 
-`tribal-knowledge` is not in the hardcoded blocking list. Open tribal-knowledge questions can be delivered without blocking the docs PR.
+## Flags And Tribal Knowledge
 
-When the PR is eligible, the action calls GitHub's auto-merge API with squash merge. If GitHub rejects that request, the action leaves the PR open and reports auto-merge as unavailable.
+Flags are delivered on the pull request when the PR number is known. <Claim id="c34">`runGitHubAction` calls `deliverFlags` when the merge decision has open flags.</Claim> <Claim id="c35">`planCommentUpsert` updates an existing comment when that comment body includes the marker.</Claim> <Claim id="c36">`planCommentUpsert` creates a comment when no existing comment body includes the marker.</Claim>
 
-## Flag Delivery
-
-When a PR has open flags, the action posts a marker-tagged PR comment. On later runs, it updates the existing marker-tagged comment instead of creating another one.
-
-Tribal-knowledge flags are also collected into a long-lived issue titled `docstube: open questions`. The action searches for an open issue with that title, updates it if it exists, and creates it otherwise.
+Tribal-knowledge flags also feed a durable issue. <Claim id="c37">`digestIssueTitle` is `docstube: open questions`.</Claim> <Claim id="c38">`upsertTribalDigestIssue` filters open flags to `tribal-knowledge` flags.</Claim> <Claim id="c39">`upsertTribalDigestIssue` creates the digest issue when tribal-knowledge flags exist and no digest issue exists.</Claim> <Claim id="c40">`upsertTribalDigestIssue` updates the digest issue when a digest issue already exists.</Claim>

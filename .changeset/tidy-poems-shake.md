@@ -12,7 +12,7 @@ snapshot; every claim referencing one was rejected as a hallucinated identifier 
 hard defect on correct prose. Existence is now decided by the codemap, and a real symbol without
 typed prints is reported as a missing facet, which keeps its conservative whole-file dependency.
 
-The fingerprint snapshot also now records a whole-file content hash for the files packs *did*
+The fingerprint snapshot also now records a whole-file content hash for the files packs _did_
 fingerprint, not only the fallback files. A claim whose dependency is a normal source file
 ("the fact came from `packages/skills/src/skills.ts`") is no longer rejected as an unknown file
 just because that file parsed cleanly and the page happened not to read it.

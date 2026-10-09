@@ -38,8 +38,10 @@ developer laptops and inside GitHub Actions.
 ## Research questions (prioritized)
 
 ### Q1 — Sandboxing model-generated code execution (highest priority)
+
 State of the art (2025–2026) for safely executing model-authored shell/node/python snippets in a
 dev tool:
+
 - Practical isolation ladders: env scrubbing → network denial → filesystem scoping → full sandbox
   (containers, gVisor, Firecracker, macOS sandbox-exec/Seatbelt, Linux Landlock/seccomp/bwrap,
   Windows AppContainer/Job Objects). Which rungs are achievable WITHOUT Docker, per-OS, from a
@@ -53,8 +55,10 @@ dev tool:
   agent copies into a bash sample which the verifier then executes).
 
 ### Q2 — "Harness engineering" best practices
+
 The discipline recently emerged under this name. Survey current best practice (Anthropic/OpenAI
 engineering blogs, agent-harness postmortems, SWE-bench harness literature) for:
+
 - Tool-surface design: how many tools, description style, parameter shapes, result truncation
   budgets, unified-search vs separate grep/glob, error-message design that models recover from.
 - Loop design: turn budgets, retry-with-findings, structured-output repair turns, when to
@@ -64,8 +68,10 @@ engineering blogs, agent-harness postmortems, SWE-bench harness literature) for:
 - Evaluation: how teams eval harness changes (fixture repos, replay suites, live canaries).
 
 ### Q3 — Vendor-CLI transport quirks (headless/non-interactive modes)
+
 Documented pitfalls and current flag surfaces for driving these CLIs programmatically as pure
 model transports:
+
 - Claude Code CLI: `-p --input-format stream-json --output-format stream-json`, `--allowedTools`,
   permission modes headless, exit-code semantics, `total_cost_usd` reporting on subscription.
 - Codex CLI: `codex exec -` stdin prompts, `mcp_servers.*.default_tools_approval_mode`, missing
@@ -78,12 +84,14 @@ model transports:
   state a harness could read to implement "stop at 80% of plan usage"?
 
 ### Q4 — Reviewer independence and verification loops
+
 Evidence on same-model self-review vs cross-model review (writer model X, reviewer model Y):
 does independence measurably reduce missed errors in generation pipelines? Cheap-reviewer
 patterns. Also: patterns for diff-scoped review (review only what changed since last run) in
 incremental generation systems.
 
 ### Q5 — MCP boundary hardening
+
 Known attack classes against MCP stdio servers spawned by agent hosts (env leakage into argv,
 tool-result injection, path escape via symlinks) and current mitigations. What is best practice
 for a read-only file-serving MCP server exposed to a model processing untrusted repo content?
